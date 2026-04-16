@@ -1,0 +1,413 @@
+<template>
+  <v-dialog
+    v-model="isOpen"
+    max-width="800px"
+    persistent
+  >
+    <v-card>
+      <v-card-title class="primary-text d-flex align-center py-2">
+        <v-icon class="mr-2">
+          mdiCog
+        </v-icon>
+        Установки расчета планового режима
+        <v-spacer />
+        <v-btn
+          icon
+          density="compact"
+          @click="close"
+        >
+          <v-icon>mdiClose</v-icon>
+        </v-btn>
+      </v-card-title>
+      
+      <v-card-text class="pt-4 pb-0">
+        <v-form ref="form">
+          <!-- Наименование расчета -->
+          <p class="text-subtitle-2 mb-1">
+            Наименование расчета
+          </p>
+          <v-text-field
+            v-model="calculationName"
+            placeholder="Расчет планового режима"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+            hide-details
+          />
+          
+          <!-- Расчетные расходы потребителей -->
+          <p class="text-subtitle-2 mb-1">
+            Расчетные расходы потребителей
+          </p>
+          <v-radio-group
+            v-model="consumptionType"
+            inline
+            class="my-0"
+            density="compact"
+            hide-details
+          >
+            <v-radio
+              value="specific"
+              label="По удельным расходам"
+            />
+            <v-radio
+              value="temperature"
+              label="По температурному графику"
+            />
+          </v-radio-group>
+          
+          <p class="text-subtitle-2 mb-1 mt-2">
+            Активный фрагмент для расчета
+          </p>
+          <v-btn 
+            variant="outlined" 
+            class="mb-1" 
+            :color="fragmentError ? 'error' : undefined"
+            :class="{ 'error-border': fragmentError }"
+            @click="fragmentSelectModal = true"
+          >
+            {{ selectedFragmentName }}
+          </v-btn>
+          <p
+            v-if="fragmentError"
+            class="text-caption text-error mb-2"
+          >
+            Необходимо выбрать фрагмент для расчета
+          </p>
+          
+          <FragmentSelectModal
+            v-model="fragmentSelectModal"
+            :model-value-id="selectedFragmentId"
+            @update:model-value-id="val => selectedFragmentId = val"
+          />
+          
+          <div class="d-flex flex-wrap mt-2">
+            <div class="w-50 pr-2">
+              <v-checkbox 
+                v-model="considerHeatLoss" 
+                label="С учетом тепловых потерь в сети"
+                density="compact"
+                hide-details
+                :disabled="!isTemperatureMode"
+              />
+              
+              <v-checkbox 
+                v-model="considerMixingCoefficients" 
+                label="С учетом рассчитанных коэффициентов смешения"
+                density="compact"
+                hide-details
+                :disabled="!isTemperatureMode"
+              />
+              
+              <v-checkbox 
+                v-model="considerInternalHeat" 
+                label="С учетом внутренних тепловыделений"
+                density="compact"
+                hide-details
+              />
+            </div>
+          
+            <div class="w-50 pl-2">
+              <!-- Температура расчета тепловых потерь -->
+              <p class="text-subtitle-2 mb-1 mt-1">
+                Температура расчета тепловых потерь
+              </p>
+              <div class="d-flex">
+                <v-select
+                  v-model="heatLossTemperature"
+                  :items="heatLossTemperatureOptions"
+                  item-title="label"
+                  item-value="value"
+                  variant="outlined"
+                  density="compact"
+                  class="mr-2"
+                  hide-details
+                />
+              </div>
+              
+              <!-- Температура наружного воздуха -->
+              <p class="text-subtitle-2 mb-1 mt-2">
+                Температура наружного воздуха
+              </p>
+              <div class="d-flex align-center">
+                <v-text-field
+                  v-model="outdoorTemperature"
+                  variant="outlined"
+                  density="compact"
+                  type="number"
+                  class="mr-2"
+                  hide-details
+                />
+                <v-checkbox 
+                  v-model="considerWind" 
+                  label="Учитывать ветер"
+                  density="compact"
+                  hide-details
+                />
+              </div>
+            </div>
+          </div>
+          
+          <!-- Дополнительные опции -->
+          <div class="d-flex flex-wrap mt-2">
+            <div class="w-50 pr-2">
+              <v-checkbox 
+                v-model="calculateThrottleValves" 
+                label="Расчет дроссельных органов и запись сопротивлений"
+                density="compact"
+                hide-details
+              />
+              
+              <!-- <v-checkbox 
+                v-model="calculateAutomatedConsumers" 
+                label="Расчет автоматизированных потребителей"
+                density="compact"
+                hide-details
+                :disabled="!isTemperatureMode"
+              ></v-checkbox> -->
+              
+              <v-checkbox 
+                v-model="recordMixingCoefficients" 
+                label="Запись коэффициентов смешения"
+                density="compact"
+                hide-details
+                :disabled="!isTemperatureMode"
+              />
+              
+              <v-checkbox 
+                v-model="networkQuantitativeCharacteristics" 
+                label="Количественные характеристики сети"
+                density="compact"
+                hide-details
+              />
+            </div>
+            
+            <div class="w-50 pl-2">
+              <!-- Расчетный перепад напора -->
+              <p class="text-subtitle-2 mb-1">
+                Расчетный перепад напора:
+              </p>
+              <v-checkbox 
+                v-model="mainFragment" 
+                label="Магистральный фрагмент"
+                density="compact"
+                hide-details
+              />
+              
+              <v-checkbox 
+                v-model="recordHeatLoadLoss" 
+                label="Запись тепловых нагрузок и потерь в обобщенный потребитель"
+                density="compact"
+                hide-details
+              />
+              
+              <v-checkbox 
+                v-model="considerVariationCoefficients" 
+                label="С учетом коэффициентов вариации"
+                density="compact"
+                hide-details
+              />
+            </div>
+          </div>
+        </v-form>
+      </v-card-text>
+      
+      <v-card-actions class="pa-3">
+        <v-spacer />
+        <v-btn 
+          color="primary" 
+          variant="elevated" 
+          min-width="100"
+          density="comfortable"
+          :loading="calculating"
+          @click="calculate"
+        >
+          Расчет
+        </v-btn>
+        <v-btn 
+          variant="outlined" 
+          min-width="100"
+          density="comfortable"
+          @click="close"
+        >
+          Отмена
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue';
+import FragmentSelectModal from '~/components/FragmentSelectModal.vue';
+import { useFragmentStore } from '~/stores/fragmentStore';
+import { fastApiService } from '~/services/fastApiService';
+
+const heatLossTemperatureOptions = [
+  { label: 'расчетная tн отопл', value: 0 },
+  { label: 'среднесезонная tн от.периода', value: 1 },
+  { label: 'Текущая tн', value: 2 }
+];
+
+const fragmentStore = useFragmentStore();
+const fragments = computed(() => fragmentStore.getFragments);
+
+const selectedFragmentId = ref<number | null>(null);
+const fragmentSelectModal = ref(false);
+const fragmentError = ref(false);
+const calculating = ref(false);
+
+const selectedFragmentName = computed(() => {
+  if (selectedFragmentId.value === null) return 'Выбрать фрагмент';
+  const frag = fragments.value.find(f => f.id === selectedFragmentId.value);
+  return frag?.name ?? 'Выбрать фрагмент';
+});
+
+// Определяем пропсы
+const props = defineProps<{
+  modelValue: boolean
+}>();
+
+// Определяем события
+const emit = defineEmits<{
+  'update:modelValue': [value: boolean]
+  'calculate': []
+  'protocol-log': [{timestamp: string, message: string, type: string}]
+  'show-protocol': [value: boolean]
+}>();
+
+// Компьютед свойство для режима диалога
+const isOpen = computed({
+  get: () => props.modelValue,
+  set: (value) => emit('update:modelValue', value)
+});
+
+function getCurrentCalculationName() {
+  const now = new Date();
+  return `Расчет планового режима ${now.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).replace(',', '')}`;
+}
+
+const calculationName = ref(getCurrentCalculationName());
+
+watch(isOpen, (val) => {
+  if (val) {
+    calculationName.value = getCurrentCalculationName();
+  }
+});
+
+// Состояние формы
+const consumptionType = ref('specific'); // или 'temperature'
+const considerHeatLoss = ref(true);
+const considerMixingCoefficients = ref(false);
+const considerInternalHeat = ref(true);
+const heatLossStandard = ref('нормы');
+const heatLossTemperature = ref(0);
+const outdoorTemperature = ref('-32');
+const considerWind = ref(false);
+const calculateThrottleValves = ref(false);
+const calculateAutomatedConsumers = ref(false);
+const recordMixingCoefficients = ref(false);
+const networkQuantitativeCharacteristics = ref(false);
+const mainFragment = ref(false);
+const recordHeatLoadLoss = ref(false);
+const considerVariationCoefficients = ref(true);
+
+const isTemperatureMode = computed(() => consumptionType.value === 'temperature');
+
+// Методы
+const form = ref();
+
+// Закрыть модальное окно
+const close = () => {
+  isOpen.value = false;
+};
+
+const addProtocolLog = (message: string, type: string = 'info') => {
+  const now = new Date();
+  const timestamp = now.toLocaleTimeString('ru-RU');
+  const log = { timestamp, message, type };
+  emit('protocol-log', log);
+};
+
+const buildApiString = () => {
+  const params = [];
+  params.push(`-name "${calculationName.value}"`);
+  params.push(`-time "${new Date().toISOString().slice(0, 19).replace('T', ' ')}"`);
+  if (selectedFragmentId.value !== null) params.push(`-fileID ${selectedFragmentId.value}`);
+
+  if (isTemperatureMode.value) {
+    params.push('-tg');
+    if (!considerHeatLoss.value) params.push('-no_teplopoter');
+    if (considerMixingCoefficients.value) params.push('-uf_calc');
+    if (recordMixingCoefficients.value) params.push('-save_uf_new');
+  }
+
+  params.push(`-trtp ${heatLossTemperature.value}`);
+  if (outdoorTemperature.value) params.push(`-Tn ${outdoorTemperature.value}`);
+  if (considerWind.value) params.push('-veter');
+  if (!considerInternalHeat.value) params.push('-no_teplovyd');
+  if (calculateThrottleValves.value) params.push('-dross_yes');
+  if (networkQuantitativeCharacteristics.value) params.push('-char_sety');
+  if (mainFragment.value) params.push('-mag_fragment');
+  if (recordHeatLoadLoss.value) params.push('-save_po');
+  if (!considerVariationCoefficients.value) params.push('-no_kv');
+  params.push(`-user_gid 1`);
+
+  return params.join(' ');
+};
+
+// Выполнить расчет
+const calculate = async () => {
+  emit('show-protocol', true);
+  
+  if (selectedFragmentId.value === null) {
+    fragmentError.value = true;
+    addProtocolLog('Ошибка: необходимо выбрать фрагмент для расчета', 'error');
+    return;
+  }
+  fragmentError.value = false;
+
+  // Закрываем диалог при начале расчета
+  isOpen.value = false;
+
+  const apiString = buildApiString();
+  addProtocolLog('Начало расчета...', 'info');
+  addProtocolLog(`Параметры расчета: ${apiString}`, 'info');
+
+  calculating.value = true;
+  try {
+    const result = await fastApiService.postRunSetyCmd(apiString);
+    console.log(result);
+    if (result.message == 'Расчет окончен') {
+      addProtocolLog(result.message, 'success');
+      addProtocolLog(result.output, 'success');
+      return;
+    } else {
+      addProtocolLog(result.message, 'error');
+      console.log('result.output', result.output);
+      addProtocolLog(result.output, 'error');
+    }
+  } catch (error) {
+    addProtocolLog('Ошибка при выполнении расчета', 'error');
+    addProtocolLog(`Детали ошибки: ${error}`, 'error');
+  } finally {
+    calculating.value = false;
+  }
+  emit('calculate');
+};
+</script>
+
+<style scoped>
+.w-50 {
+  width: 50%;
+}
+.error-border {
+  border: 2px solid rgb(var(--v-theme-error));
+}
+</style> 

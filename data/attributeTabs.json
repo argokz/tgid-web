@@ -1,0 +1,398 @@
+{
+    "tg_tabs": [{
+            "Основные": [{
+                    "Основные": [
+                        "id",
+                        "consumerStateID",
+                        "name",
+                        "quarter",
+                        "maxBuildingHeight",
+                        "specExpendID",
+                        "calcTemperatureID",
+                        "gvsLoadGraphID",
+                        "varCoeffID",
+                        "accumCoeff",
+                        "normHLosFlow",
+                        "normHLosRet",
+                        "hydroModeSignID",
+                        "PDvalveInstallLocID",
+                        "setPDonRegulator",
+                        "setLeakageFlow",
+                        "setLeakageRet",
+                        "WEmeteringDeviceID",
+                        "volWaterHS",
+                        "volWaterVS"
+                    ]
+                },
+                {
+                    "Узел": [
+                        "externalCodeID",
+                        "externalNodeName",
+                        "externalSignID",
+                        "geoMarkTopTube",
+                        "geoMarkNodeArea"
+                    ]
+                },
+                {
+                    "Гидравлические сопротивления": [
+                        "hydroResCloseSys",
+                        "hydroResCloseSysSummer",
+                        "closeSysCalcSignID",
+                        "hydroResWDOFlow",
+                        "calcSignOpenSysFlowID",
+                        "hydroResWDORet",
+                        "calcSignResWDORetID",
+                        "calcSignSetLoadCloseSys",
+                        "calcSignSetLoadOpenSysFlow",
+                        "calcSignSetLoadOpenSysRet"
+                    ]
+                },
+                {
+                    "Производственная служба": [
+                        "nodeName",
+                        "nodeTypeID",
+                        "organizationID",
+                        "inventNumber",
+                        "registNumber"
+                    ]
+                },
+                {
+                    "Даты эксплуатации": [
+                        "PICdate",
+                        "lastRepairDate"
+                    ]
+                },
+                {
+                    "Архив": [
+                        "archiveChangeDate",
+                        "operatorID",
+                        "fileID"
+                    ]
+                }
+            ]
+        },
+        {
+            "Нагрузки": [{
+                    "Зависимая СО": [
+                        "calcHLdep",
+                        "calcInternHDdep",
+                        "calcTempDep",
+                        "connectionSchemeID",
+                        "mixFactCoeffDep"
+                    ]
+                },
+                {
+                    "Независимая СО": [
+                        "calcHLindep",
+                        "calcInternHDindep",
+                        "calcTempIndep"
+                    ]
+                },
+                {
+                    "Вентиляция": [
+                        "calcHLventil",
+                        "calcHLcond",
+                        "calcHLcloseSys",
+                        "calcHLopenSysFlow",
+                        "calcHLopenSysRet",
+                        "expendHWpart",
+                        "calcTempHA"
+                    ]
+                },
+                {
+                    "Параллельная ГВС": [
+                        "calcHLparall",
+                        "internHDparall",
+                        "schemeParallID",
+                        "calcHLGVSparall",
+                        "hourIrregCoeffParall",
+                        "avgHLcompParall",
+                        "tempRecircPipeParall",
+                        "calcTempHRparall",
+                        "calcTempHWDOparall",
+                        "AMRdepParall"
+                    ]
+                },
+                {
+                    "Смешанная ГВС": [
+                        "calcHLmix",
+                        "internHDmix",
+                        "schemeMixID",
+                        "calcHLGVSmix",
+                        "hourIrregCoeffMix",
+                        "avgHLcompMix",
+                        "tempRecircPipeMix",
+                        "calcTempHRmix",
+                        "calcTempHWDOmix",
+                        "AMRdepMix"
+                    ]
+                },
+                {
+                    "Последовательная ГВС": [
+                        "calcHLconseq",
+                        "internHDconseq",
+                        "schemeConseqID",
+                        "calcHLGVSconseq",
+                        "hourIrregCoeffConseq",
+                        "avgHLcompconseq",
+                        "tempRecircPipeConseq",
+                        "calcTempHRconseq",
+                        "calcTempHWDOconseq",
+                        "AMRdepConseq"
+                    ]
+                },
+                {
+                    "Предвключенная ГВС": [
+                        "calcHLpreON",
+                        "internHDpreON",
+                        "schemePreONID",
+                        "calcHLGVSpreON",
+                        "hourIrregCoeffPreON",
+                        "avgHLcompPreON",
+                        "tempRecircPipePreON",
+                        "calcTempHRpreON",
+                        "calcTempHWDOpreON",
+                        "AMRdepPreON"
+                    ]
+                },
+                {
+                    "Открытая ГВС": [
+                        "avgHLGVSopenSysFlow",
+                        "avgHLGVSopenSysRet",
+                        "hourIrregCoeffOpen",
+                        "avgHLcompOpen",
+                        "tempRecircPipeOpen",
+                        "calcTempHWDOopen"
+                    ]
+                }
+            ]
+        },
+        {
+            "Нагрузки договорные и перспективные": [{
+                "Нагрузки перспективные, Гкал/ч": [
+                    "perspCalcHLdep",
+                    "perspCalcInternHDdep",
+                    "perspCalcHLindep",
+                    "perspCalcInternHDindep",
+                    "perspCalcHLventil",
+                    "perspCalcHLcond",
+                    "perspCalcHLparall",
+                    "perspCalcHLGVSparall",
+                    "perspInternHDparall",
+                    "perspCalcHLmix",
+                    "perspCalcHLGVSmix",
+                    "perspInternHDmix",
+                    "perspCalcHLconseq",
+                    "perspCalcHLGVSconseq",
+                    "perspInternHDconseq",
+                    "perspCalcHLpreON",
+                    "perspCalcHLGVSpreON",
+                    "perspInternHDpreON",
+                    "perspAvgHLGVSopenSysFlow",
+                    "perspAvgHLGVSopenSysRet"
+                ]
+            }]
+        },
+        {
+            "Нагрузки договорные": [{
+                "Нагрузки договорные, Гкал/ч": [
+                    "adjCalcHLdep",
+                    "adjCalcHDdep",
+                    "adjCalcHLindep",
+                    "adjCalcInternHDindep",
+                    "adjCalcHLventil",
+                    "adjCalcHLcond",
+                    "adjCalcHLparall",
+                    "adjCalcHLGVSparall",
+                    "adjInternHDparall",
+                    "adjCalcHLmix",
+                    "adjCalcHLGVSmix",
+                    "adjInternHDmix",
+                    "adjCalcHLconseq",
+                    "adjCalcHLGVSconseq",
+                    "adjInternHDconseq",
+                    "adjCalcHLpreON",
+                    "adjCalcHLGVSpreON",
+                    "adjInternHDpreON",
+                    "adjAvgHLGVSopenSysFlow",
+                    "adjAvgHLGVSopenSysRet"
+                ]
+            }]
+        }
+    ],
+    "tg_names": {
+        "accumcoeff": "Коэффициент аккумуляции здания",
+        "adjcalchddep": "Договор.внутренние тепловыделения, зависимая СО, Гкал/ч",
+        "adjcalchlclosesys": "Договорная нагрузка на технологию в закрытой системе, Гкал/ч",
+        "adjcalchlcond": "Договорная нагрузка на кондиционирование, Гкал/ч",
+        "adjcalchlconseq": "Договорная нагрузка на отопление, посл.ГВС, Гкал/ч",
+        "adjcalchldep": "Договорная нагрузка на отопление, зависимая СО, Гкал/ч",
+        "adjcalchlindep": "Договорная нагрузка на отопление, независимая СО, Гкал/ч",
+        "adjcalchlmix": "Договорная нагрузка на отопление, смеш.ГВС, Гкал/ч",
+        "adjcalchlparall": "Договорная нагрузка на отопление парал.ГВС, Гкал/ч",
+        "adjcalchlpreon": "Договорная нагрузка на отопление, предвкл.ГВС, Гкал/ч",
+        "adjcalchlventil": "Договорная тепловая нагрузка на вентиляцию, Гкал/ч",
+        "adjcalcinternhdindep": "Договорные внутренние тепловыделения, независимая СО, Гкал/ч",
+        "adjinternhdconseq": "Договор.внутренние тепловыделения,посл.ГВС, Гкал/ч",
+        "adjinternhdmix": "Договор.внутренние тепловыделения,смеш.ГВС, Гкал/ч",
+        "adjinternhdparall": "Договор.внутренние тепловыделения, парал.ГВС, Гкал/ч",
+        "adjinternhdpreon": "Договор.внутренние тепловыделения, предвкл.ГВС, Гкал/ч",
+        "amrdepconseq": "Фактический коэффициент смешения,зав.СО,посл.ГВС",
+        "amrdepmix": "Фактический коэффициент смешения,зав.СО, смеш.ГВС",
+        "amrdepparall": "Фактический коэффициент смешения,зав.СО, парал.ГВС",
+        "amrdeppreon": "Фактический коэффициент смешения,зав.СО, предвкл.ГВС",
+        "avghlcompconseq": "Расчетная тепловая нагрузка на компенсацию тепловых потерь в трубопр. цирк-ой ГВС, посл.сх., %",
+        "avghlcompmix": "Расчетная тепловая нагрузка на компенсацию тепловых потерь в трубопр. цирк-ой ГВС, смеш.сх., %",
+        "avghlcompopen": "Расчетные тепловые потери в рециркуляц. контуре ГВС, откр.ГВС, %",
+        "avghlcompparall": "Расчетная тепловая нагрузка на компенсацию тепловых потерь в трубопр. цирк-ой ГВС, парал.сх., %",
+        "avghlcomppreon": "Расчетная тепловая нагрузка на компенсацию тепловых потерь в трубопр. цирк-ой ГВС, предвкл.сх., %",
+        "avghlgvsopensysflow": "Средняя тепловая нагрузка на ГВС в открытой системе из подающего трубопровода, Гкал/ч",
+        "avghlgvsopensysret": "Средняя тепловая нагрузка на ГВС в открытой системе из обратного трубопровода, Гкал/ч",
+        "calcexpendcond": "Расчетный расход на кондиционирование, т/ч",
+        "calcexpenddep": "Расчетный расход на отопление, зав.СО, т/ч",
+        "calcexpendhwconseq": "Расчетный расход на ГВС, последовательная, т/ч",
+        "calcexpendhwflow": "Расчетный расход на ГВС, под.трубопров., т/ч",
+        "calcexpendhwmix": "Расчетный расход на ГВС, смешанная, т/ч",
+        "calcexpendhwparall": "Расчетный расход на ГВС, параллельная, т/ч",
+        "calcexpendhwpreon": "Расчетный расход на ГВС, предвключенная, т/ч",
+        "calcexpendhwret": "Расчетный расход на ГВС, обр.трубопров., т/ч",
+        "calcexpendindep": "Расчетный расход на отопление, незав.СО, т/ч",
+        "calcexpendrecircopen": "Расчетный расход на рецирк., откр.ГВС, т/ч",
+        "calcexpendventil": "Расчетный расход на вентиляцию, т/ч",
+        "calchlclosesys": "Расчетная тепловая нагрузка на технологию в закрытой системе, Гкал/ч",
+        "calchlcond": "Расчетная тепловая нагрузка на кондиционирование, Гкал/ч",
+        "calchlconseq": "Расчетная тепловая нагрузка на отопление, посл.ГВС, Гкал/ч",
+        "calchldep": "Расчетная тепловая нагрузка на отопление, зависимая СО, Гкал/ч",
+        "calchlgvsconseq": "Средняя тепловая нагрузка на ГВС,посл. ГВС, Гкал/ч",
+        "calchlgvsmix": "Средняя тепловая нагрузка на ГВС, смеш., Гкал/ч",
+        "calchlgvsparall": "Средняя тепловая нагрузка на ГВС, парал.сх., Гкал/ч",
+        "calchlgvspreon": "Средняя тепловая нагрузка на ГВС, предвкл. ГВС, Гкал/ч",
+        "calchlindep": "Расчетная тепловая нагрузка на отопление, независимая СО, Гкал/ч",
+        "calchlmix": "Расчетная тепловая нагрузка на отопление, смеш.ГВС, Гкал/ч",
+        "calchlopensysflow": "Средняя нагрузка на технологию в открытой системе из подающего теплопровода, Гкал/ч",
+        "calchlopensysret": "Средняя нагрузка на технологию в открытой системе из обратного теплопровода, Гкал/ч",
+        "calchlparall": "Расчетная тепловая нагрузка на отопление парал.ГВС, Гкал/ч",
+        "calchlpreon": "Расчетная тепловая нагрузка на отопление, предвкл.ГВС, Гкал/ч",
+        "calchlventil": "Расчетная тепловая нагрузка на вентиляцию, Гкал/ч",
+        "calcinternhddep": "Расчетные внутренние тепловыделения, зависимая СО, Гкал/ч",
+        "calcinternhdindep": "Расчетные внутренние тепловыделения, независимая СО, Гкал/ч",
+        "calcsignopensysflowid": "Признак расчета на заданое сопротивление открытой системы теплопотребления при водоразборе из подающего трубопровода",
+        "calcsignreswdoretid": "Признак расчета на заданое сопротивление теплопотребителя для водоразбора из обратного трубопровода, пробел или символ 'Н'автоматический",
+        "calcsignsetloadclosesys": "Признак расчета на заданную нагрузку в закрытых системах теплопотребления",
+        "calcsignsetloadopensysflow": "Признак расчета на заданную нагрузку из подающего трубопровода в открытых системах теплопотребления",
+        "calcsignsetloadopensysret": "Признак расчета на заданную нагрузку из обратного трубопровода в открытых системах теплопотребления",
+        "calctempdep": "Расчетная температура в отапливаемых помещениях, зависимая СО, °C",
+        "calctemperatureid": "Код расчетных температур",
+        "calctempha": "Расч.темп. нагретого воздуха в системе вентиляции или возд.отопления, °C",
+        "calctemphrconseq": "Расчетная температура в отапливаемых помещениях, посл.ГВС, °C",
+        "calctemphrmix": "Расчетная температура в отапливаемых помещениях, смеш.ГВС, °C",
+        "calctemphrparall": "Расчетная температура в отапливаемых помещениях, парал.ГВС, °C",
+        "calctemphrpreon": "Расчетная температура в отапливаемых помещениях, предвкл.ГВС, °C",
+        "calctemphwdoconseq": "Расчетная температура горячей воды в местах водоразбора, посл.ГВС, °C",
+        "calctemphwdomix": "Расчетная температура горячей воды в местах водоразбора, смеш.ГВС, °C",
+        "calctemphwdoopen": "Расчетная температура горячей воды откр. ГВС, °C",
+        "calctemphwdoparall": "Расчетная температура горячей воды в местах водоразбора, парал.ГВС, °C",
+        "calctemphwdopreon": "Расчетная температура горячей воды в местах водоразбора, предвкл.ГВС, °C",
+        "calctempindep": "Расчетная температура в отапливаемых помещениях, независимая СО, °C",
+        "calcthrustinwsd": "Расчетный напор на входе водоразборных приборов, м.вод.ст",
+        "closesyscalcsignid": "Признак расчета на заданное сопротивление закрытой системы теплопотребления",
+        "connectionschemeid": "Схема присоединения зависимой СО",
+        "consumerstateid": "Состояние потребителя",
+        "expendhwpart": "Доля расхода сетевой воды через КУ от расчётного, при отключеннии её по воздуху",
+        "gvsloadgraphid": "Код суточного графика нагрузки ГВ, м*ч^2/т^2",
+        "hourirregcoeffconseq": "Коэф. часовой неравномерности, посл.ГВС",
+        "hourirregcoeffmix": "Коэф. часовой неравномерности нагрузки, смеш.ГВС",
+        "hourirregcoeffopen": "Коэф. часовой неравномерности, откр.ГВС",
+        "hourirregcoeffparall": "Коэф. часовой неравномерности нагрузки парал.ГВС",
+        "hourirregcoeffpreon": "Коэф. часовой неравномерности, предвкл.ГВС",
+        "hydromodesignid": "Признак расчета гидравл.аварийного потребителя: Ш - через шайбы, Д-через регулятор перепада давления, С - через сопротивления",
+        "hydroresclosesys": "Гидравлическое сопротивление для закрытой системы, м*ч^2/т^2",
+        "hydroresclosesyssummer": "Гидр.сопротивление закрытых систем в летний период, м*ч^2/т^2",
+        "hydroreswdoflow": "Гидравлическое сопротивление для водоразбора из подающего трубопровода, м*ч^2/т^2",
+        "hydroreswdoret": "Гидравlyческое сопротивление для водоразбора из обратного трубопровода, м*ч^2/т^2",
+        "hydrothrustin": "Пьезом.напор на входе тепл.пункта, плановый режим, м.вод.ст",
+        "hydrothrustout": "Пьезом.напор на выходе тепл.пункта, плановый режим, м.вод.ст",
+        "internhdconseq": "Внутренние тепловыделения,посл.ГВС, Гкал/ч",
+        "internhdmix": "Внутренние тепловыделения,смеш.ГВС, Гкал/ч",
+        "internhdparall": "Внутренние тепловыделения, парал.ГВС, Гкал/ч",
+        "internhdpreon": "Внутренние тепловыделения, предвкл.ГВС, Гкал/ч",
+        "maxbuildingheight": "Наибольшая высота здания, м",
+        "minthrustds": "Мин.располагаемый напор в распред.сети, м.вод.ст",
+        "mixfactcoeffdep": "Фактический коэффициент смешения, зависимая СО",
+        "mixfactcoeffindep": "Фактический коэффициент смешения, независимая СО",
+        "normhlosflow": "Норм.тепловые потери в под.теплопр.распр.сети, Гкал/ч",
+        "normhlosret": "Норм.тепловые потери в обр.теплопр.распр.сети, Гкал/ч",
+        "pdvalveinstalllocid": "Место установки клапана перепада давления: П- подача, О- Обратка",
+        "perspcalchlclosesys": "Перспективная нагрузка на технологию в закрытой системе, Гкал/ч",
+        "perspcalchlcond": "Перспективная нагрузка на кондиционирование, Гкал/ч",
+        "perspcalchlconseq": "Перспективная нагрузка на отопление, посл.ГВС, Гкал/ч",
+        "perspcalchldep": "Перспективная нагрузка на отопление, зависимая СО, Гкал/ч",
+        "perspcalchlindep": "Перспективная нагрузка на отопление, независимая СО, Гкал/ч",
+        "perspcalchlmix": "Перспективная нагрузка на отопление, смеш.ГВС, Гкал/ч",
+        "perspcalchlparall": "Перспективная нагрузка на отопление парал.ГВС, Гкал/ч",
+        "perspcalchlpreon": "Перспективная нагрузка на отопление, предвкл.ГВС, Гкал/ч",
+        "perspcalchlventil": "Перспективная тепловая нагрузка на вентиляцию, Гкал/ч",
+        "perspcalcinternhddep": "Перспект.внутренние тепловыделения, зависимая СО, Гкал/ч",
+        "perspcalcinternhdindep": "Перспективные внутренние тепловыделения, независимая СО, Гкал/ч",
+        "perspinternhdconseq": "Перспект.внутренние тепловыделения,посл.ГВС, Гкал/ч",
+        "perspinternhdmix": "Перспект.внутренние тепловыделения,смеш.ГВС, Гкал/ч",
+        "perspinternhdparall": "Перспект.внутренние тепловыделения, парал.ГВС, Гкал/ч",
+        "perspinternhdpreon": "Перспект.внутренние тепловыделения, предвкл.ГВС, Гкал/ч",
+        "quarter": "Квартал",
+        "schemeconseqid": "Схема присоединения СО посл.ГВС",
+        "schememixid": "Схема присоединения СО смеш.ГВС",
+        "schemeparallid": "Схема присоединения СО, при парал.ГВС",
+        "schemepreonid": "Схема присоединения СО предвкл.ГВС",
+        "setleakageflow": "Заданная утечка из подающего трубопровода, т/ч",
+        "setleakageret": "Заданная утечка из обратного трубопровода, т/ч",
+        "setpdonregulator": "Заданный перепад давления на регуляторе перепада, м.вод.ст",
+        "specexpendid": "Код удельных расходов тепло/вода, для расчетного режима",
+        "temprecircpipeconseq": "Температура в рециркуляционном трубопроводе ГВС, °C",
+        "temprecircpipemix": "Температура в рециркуляционном трубопроводе ГВС, °C",
+        "temprecircpipeopen": "Температура в рециркуляционном трубопроводе ГВС, °C",
+        "temprecircpipeparall": "Температура в рециркуляционном трубопроводе ГВС, °C",
+        "temprecircpipepreon": "Температура в рециркуляционном трубопроводе ГВС, °C",
+        "varcoeffid": "Код группы коэффициентов вариации",
+        "volwaterhs": "Удельный объем воды в системе отопления, м^3*ч/Гкал",
+        "volwatervs": "Удельный объем воды в системе вентиляции, м^3*ч/Гкал",
+        "wemeteringdeviceid": "Признак установки прибора учета",
+        "name": "Наименование",
+        "naimenovanie": "Наименование",
+        "shema": "Схема",
+        "gps_koordinaty": "GPS координаты",
+        "inventarnyy_nomer": "Инвентарный номер",
+        "prinadlezhnost": "Принадлежность",
+        "prinadlezhnost_uchastku_ms": "Принадлежность участку МС",
+        "prinadlezhnost_rs": "Принадлежность РС",
+        "uchastok_ms": "Участок МС",
+        "uchastok_rs": "Участок РС",
+        "data_vvoda_v_ekspluatatsiyu": "Дата ввода в эксплуатацию",
+        "prinadlezhnost_teplovym_setyam": "Принадлежность тепловым сетям",
+        "remontnye_raboty": "Ремонтные работы",
+        "pasport": "Паспорт",
+        "archivechangedate": "Дата изменения архива",
+        "firstpicdate": "Дата первичного ввода в эксплуатацию",
+        "hydrores": "Гидравлическое сопротивление участка",
+        "operatorid": "Оператор архивации",
+        "organizationid": "Владелец участка теплопровода",
+        "registnum": "Регистрационный номер",
+        "externalsignlineid": "Признак участка трубопровода",
+        "kod_p": "Код расчетной схемы узла присоединения",
+        "uzel_p": "Наименование узла присоединения",
+        "pr_p": "Признак теплопровода узла просоединения",
+        "kod1": "Код расчетной схемы начального узла участка трубопровода",
+        "kod2": "Код расчетной схемы конечного узла участка трубопровода",
+        "uzel1": "Наименование начального узла участка трубопровода",
+        "uzel2": "Наименование конечного узла участка трубопровода",
+        "pr1": "Признак трубопровода начального узла участка трубопровода",
+        "pr2": "Признак трубопровода конечного узла участка трубопровода",
+        "pr": "Признак теплопровода узла",
+        "kod": "Код расчетной схемы узла",
+        "uzel": "Наименование узла",
+        "nomer": "Порядковый номер записи",
+        "code": "Код",
+        "ord": "Порядок",
+        "externalcodeid": "Код расчетной схемы",
+        "externalnodename": "Наименование узла присоединения"
+    }
+}

@@ -1,0 +1,18 @@
+@use 'variables' as *;
+
+/* Глобальные стили для панели слоев */
+.v-navigation-drawer {
+  z-index: 1000;
+}
+
+/* Оптимизация для мобильных устройств */
+@media (max-width: $breakpoint-sm) {
+  .layer-control-wrapper .layer-control-button {
+    top: 5px;
+    right: 5px;
+  }
+
+  .v-navigation-drawer {
+    width: $drawer-width-mobile;
+  }
+}

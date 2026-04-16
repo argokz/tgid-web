@@ -1,0 +1,62 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "heatpipesections.375965",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -8517.91,
+            -953.09
+          ],
+          [
+            -8528.7,
+            -928.38
+          ],
+          [
+            -8525.24,
+            -926.66
+          ],
+          [
+            -8528.7,
+            -917
+          ],
+          [
+            -8532.49,
+            -917.34
+          ],
+          [
+            -8572.79,
+            -811.35
+          ]
+        ]
+      },
+      "geometry_name": "shape",
+      "properties": {
+        "fileid": 93,
+        "loc": 2,
+        "code": "UT",
+        "code2": "Участок",
+        "name": "РС1-5 у38-4 - РС1-5 5-38/5",
+        "text": "",
+        "zakr": false,
+        "nadz": false,
+        "mag": false,
+        "org": false,
+        "warning": null
+      }
+    }
+  ],
+  "totalFeatures": 79367,
+  "numberMatched": 79367,
+  "numberReturned": 1,
+  "timeStamp": "2026-03-27T09:18:55.365Z",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:EPSG::9998"
+    }
+  }
+}

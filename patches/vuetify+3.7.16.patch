@@ -1,0 +1,25 @@
+diff --git a/node_modules/vuetify/lib/components/VList/VList.mjs b/node_modules/vuetify/lib/components/VList/VList.mjs
+index 9480c5b..f070513 100644
+--- a/node_modules/vuetify/lib/components/VList/VList.mjs
++++ b/node_modules/vuetify/lib/components/VList/VList.mjs
+@@ -211,7 +211,7 @@ export const VList = genericComponent()({
+         }, themeClasses.value, backgroundColorClasses.value, borderClasses.value, densityClasses.value, elevationClasses.value, lineClasses.value, roundedClasses.value, props.class],
+         "style": [backgroundColorStyles.value, dimensionStyles.value, props.style],
+         "tabindex": props.disabled ? -1 : 0,
+-        "role": "listbox",
++        "role": "group",
+         "aria-activedescendant": undefined,
+         "onFocusin": onFocusin,
+         "onFocusout": onFocusout,
+diff --git a/node_modules/vuetify/lib/components/VTooltip/VTooltip.mjs b/node_modules/vuetify/lib/components/VTooltip/VTooltip.mjs
+index 81e58e9..933d51c 100644
+--- a/node_modules/vuetify/lib/components/VTooltip/VTooltip.mjs
++++ b/node_modules/vuetify/lib/components/VTooltip/VTooltip.mjs
+@@ -74,6 +74,7 @@ export const VTooltip = genericComponent()({
+         "origin": origin.value,
+         "persistent": true,
+         "role": "tooltip",
++        "aria-label": props.text || undefined,
+         "activatorProps": activatorProps.value,
+         "_disableGlobalStack": true
+       }, scopeId), {
