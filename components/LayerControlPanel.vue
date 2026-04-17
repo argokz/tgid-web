@@ -256,9 +256,12 @@
       <!-- Диалоговое окно для настройки порядка слоев -->
       <v-dialog
         v-model="layerOrderDialog"
-        max-width="500px"
+        :max-width="mobile ? undefined : 500"
+        :fullscreen="mobile"
+        scrollable
+        :transition="mobile ? 'dialog-bottom-transition' : 'dialog-transition'"
       >
-        <v-card>
+        <v-card :rounded="mobile ? '0' : undefined">
           <v-card-title class="text-h6">
             Настройка порядка слоев
           </v-card-title>

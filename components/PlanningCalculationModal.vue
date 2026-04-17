@@ -1,11 +1,17 @@
 <template>
   <v-dialog
     v-model="isOpen"
-    max-width="800px"
+    :max-width="mobile ? undefined : 800"
+    :fullscreen="mobile"
+    scrollable
     persistent
+    :transition="mobile ? 'dialog-bottom-transition' : 'dialog-transition'"
   >
-    <v-card>
-      <v-card-title class="primary-text d-flex align-center py-2">
+    <v-card
+      :rounded="mobile ? '0' : undefined"
+      :class="{ 'calc-form--stacked': mobile }"
+    >
+      <v-card-title class="primary-text d-flex align-center flex-wrap py-2 gap-1">
         <v-icon class="mr-2">
           mdiCog
         </v-icon>
@@ -41,7 +47,7 @@
           </p>
           <v-radio-group
             v-model="consumptionType"
-            inline
+            :inline="!mobile"
             class="my-0"
             density="compact"
             hide-details
@@ -81,8 +87,8 @@
             @update:model-value-id="val => selectedFragmentId = val"
           />
           
-          <div class="d-flex flex-wrap mt-2">
-            <div class="w-50 pr-2">
+          <div class="d-flex flex-wrap mt-2 calc-form-row">
+            <div class="w-50 pr-2 calc-form-col">
               <v-checkbox 
                 v-model="considerHeatLoss" 
                 label="С учетом тепловых потерь в сети"
@@ -107,7 +113,7 @@
               />
             </div>
           
-            <div class="w-50 pl-2">
+            <div class="w-50 pl-2 calc-form-col">
               <!-- Температура расчета тепловых потерь -->
               <p class="text-subtitle-2 mb-1 mt-1">
                 Температура расчета тепловых потерь
@@ -129,13 +135,14 @@
               <p class="text-subtitle-2 mb-1 mt-2">
                 Температура наружного воздуха
               </p>
-              <div class="d-flex align-center">
+              <div class="d-flex align-center flex-wrap ga-2">
                 <v-text-field
                   v-model="outdoorTemperature"
                   variant="outlined"
                   density="compact"
                   type="number"
-                  class="mr-2"
+                  class="flex-grow-1"
+                  style="min-width: 120px;"
                   hide-details
                 />
                 <v-checkbox 
@@ -149,8 +156,8 @@
           </div>
           
           <!-- Дополнительные опции -->
-          <div class="d-flex flex-wrap mt-2">
-            <div class="w-50 pr-2">
+          <div class="d-flex flex-wrap mt-2 calc-form-row">
+            <div class="w-50 pr-2 calc-form-col">
               <v-checkbox 
                 v-model="calculateThrottleValves" 
                 label="Расчет дроссельных органов и запись сопротивлений"
@@ -182,7 +189,7 @@
               />
             </div>
             
-            <div class="w-50 pl-2">
+            <div class="w-50 pl-2 calc-form-col">
               <!-- Расчетный перепад напора -->
               <p class="text-subtitle-2 mb-1">
                 Расчетный перепад напора:
@@ -212,25 +219,26 @@
         </v-form>
       </v-card-text>
       
-      <v-card-actions class="pa-3">
-        <v-spacer />
+      <v-card-actions class="pa-3 d-flex flex-wrap gap-2" :class="mobile ? 'flex-column-reverse' : 'justify-end'">
+        <v-btn 
+          variant="outlined" 
+          min-width="100"
+          density="comfortable"
+          :block="mobile"
+          @click="close"
+        >
+          Отмена
+        </v-btn>
         <v-btn 
           color="primary" 
           variant="elevated" 
           min-width="100"
           density="comfortable"
+          :block="mobile"
           :loading="calculating"
           @click="calculate"
         >
           Расчет
-        </v-btn>
-        <v-btn 
-          variant="outlined" 
-          min-width="100"
-          density="comfortable"
-          @click="close"
-        >
-          Отмена
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -239,6 +247,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { useDisplay } from 'vuetify';
 import FragmentSelectModal from '~/components/FragmentSelectModal.vue';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { fastApiService } from '~/services/fastApiService';
@@ -251,6 +260,8 @@ const heatLossTemperatureOptions = [
 
 const fragmentStore = useFragmentStore();
 const fragments = computed(() => fragmentStore.getFragments);
+
+const { mobile } = useDisplay();
 
 const selectedFragmentId = ref<number | null>(null);
 const fragmentSelectModal = ref(false);
@@ -406,6 +417,12 @@ const calculate = async () => {
 <style scoped>
 .w-50 {
   width: 50%;
+}
+
+.calc-form--stacked .calc-form-col.w-50 {
+  width: 100%;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
 .error-border {
   border: 2px solid rgb(var(--v-theme-error));

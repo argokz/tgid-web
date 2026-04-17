@@ -131,7 +131,7 @@
 
             <v-dialog
               :model-value="planetStyleTarget !== null"
-              max-width="340"
+              :max-width="planetStyleDialogWidth"
               scroll-strategy="reposition"
               @update:model-value="(v) => { if (!v) planetStyleTarget = null }"
             >
@@ -654,6 +654,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useDisplay } from 'vuetify'
 import { storeToRefs } from 'pinia'
 import { useLayerStore } from '~/stores/layerStore'
 import { useMapStore } from '~/stores/mapStore'
@@ -668,6 +669,11 @@ import {
   type PlanetLayerDef,
   type PlanetLayerStyleOverride,
 } from '~/utils/planetV4Layers'
+
+const { mobile } = useDisplay()
+const planetStyleDialogWidth = computed(() =>
+  mobile.value ? 'min(340px, calc(100vw - 24px))' : 340
+)
 
 const props = defineProps<{
   layerOpacities: Record<string, number>

@@ -141,19 +141,13 @@ export default defineEventHandler(async (event) => {
     const authHeaders = { 'Authorization': `Basic ${auth}` };
 
     try {
-      // Ищем настоящий стиль слоя, так как WMTS часто отдает 'generic'
-      if (!cleanStyleName || cleanStyleName === 'generic') {
-        const layerInfoUrl = `${geoserverUrl}/rest/workspaces/${workspaceName}/layers/${sourceLayer}.json`;
-        const layerInfo: any = await $fetch(layerInfoUrl, { headers: authHeaders, timeout: 5000 }).catch(() => null);
-        if (layerInfo?.layer?.defaultStyle?.name) {
-          const rawName = layerInfo.layer.defaultStyle.name;
-          cleanStyleName = rawName.includes(':') ? rawName.split(':')[1] : rawName;
-        }
-      }
-
-      // Явно используем созданный стиль heatpipesections_mvt для слоя heatpipesections
-      if (sourceLayer === 'heatpipesections') {
-         cleanStyleName = 'heatpipesections_mvt';
+      // WMTS GetCapabilities часто даёт generic или не тот идентификатор; для MBStyle берём
+      // стиль по умолчанию из REST (как при пустом STYLE= в GetTile).
+      const layerInfoUrl = `${geoserverUrl}/rest/workspaces/${workspaceName}/layers/${sourceLayer}.json`;
+      const layerInfo: any = await $fetch(layerInfoUrl, { headers: authHeaders, timeout: 5000 }).catch(() => null);
+      if (layerInfo?.layer?.defaultStyle?.name) {
+        const rawName = layerInfo.layer.defaultStyle.name;
+        cleanStyleName = rawName.includes(':') ? rawName.split(':')[1] : rawName;
       }
 
       if (cleanStyleName && cleanStyleName !== 'generic') {

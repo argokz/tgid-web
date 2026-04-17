@@ -95,6 +95,7 @@ import { useDisplay } from 'vuetify'
 import { useLayerStore }    from '~/stores/layerStore'
 import { useFragmentStore } from '~/stores/fragmentStore'
 import { useMapStore }      from '~/stores/mapStore'
+import { setMapSubLayerOpacity } from '~/utils/mapLayerOpacity'
 import MapSidebarPanel from './MapSidebarPanel.vue'
 
 const { mobile } = useDisplay()
@@ -136,15 +137,11 @@ const layerOpacities = ref<Record<string, number>>({})
 
 const updateLayerOpacity = (layerId: string, opacity: number) => {
   layerOpacities.value[layerId] = opacity
+  const map = mapStore.map
+  if (!map) return
   const subIds = mapStore.getLayerIdsOnMap(layerId)
   for (const subId of subIds) {
-    const layer = mapStore.map?.getLayer(subId)
-    if (!layer) continue
-    const type = (layer as any).type
-    if (type === 'line')   mapStore.map?.setPaintProperty(subId, 'line-opacity',   opacity)
-    if (type === 'fill')   mapStore.map?.setPaintProperty(subId, 'fill-opacity',   opacity)
-    if (type === 'circle') mapStore.map?.setPaintProperty(subId, 'circle-opacity', opacity)
-    if (type === 'symbol') mapStore.map?.setPaintProperty(subId, 'icon-opacity',   opacity)
+    setMapSubLayerOpacity(map, subId, opacity)
   }
   localStorage.setItem('layerOpacities', JSON.stringify(layerOpacities.value))
 }

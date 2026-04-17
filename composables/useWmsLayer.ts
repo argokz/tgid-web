@@ -35,15 +35,25 @@ export const useWmsLayer = () => {
     // Получаем базовый URL: из опций или из config
     const baseUrl = providedUrl || config.url
 
-    // Формируем viewparams в правильном формате
-    // Пример: param1:value1;param2:value2_value3
-    const viewParamsStr = Object.entries(viewParams)
-      .map(([key, value]) => {
-        const val = Array.isArray(value) ? value.join('_') : value
-        // Кодируем только значения параметров
-        return `${key}:${encodeURIComponent(String(val))}`
-      })
-      .join(';')
+    // GeoServer GetMap: значение VIEWPARAMS — одна строка key:value;key:value (как в MVT).
+    // layerStore передаёт уже готовую строку в { viewparams: "fragments:...;NAPOR:on;nach:2;" }.
+    const entries = Object.entries(viewParams)
+    let viewParamsQueryValue = ''
+    if (
+      entries.length === 1 &&
+      entries[0][0] === 'viewparams' &&
+      typeof entries[0][1] === 'string'
+    ) {
+      viewParamsQueryValue = encodeURIComponent(entries[0][1])
+    } else if (entries.length > 0) {
+      // Пример: param1:value1;param2:value2_value3 (устаревший формат с несколькими ключами)
+      viewParamsQueryValue = entries
+        .map(([key, value]) => {
+          const val = Array.isArray(value) ? value.join('_') : value
+          return `${key}:${encodeURIComponent(String(val))}`
+        })
+        .join(';')
+    }
 
     // КРИТИЧНО: Строим URL вручную, БЕЗ URLSearchParams
     // URLSearchParams кодирует {} и ломает placeholder {bbox-epsg-3857}
@@ -61,9 +71,8 @@ export const useWmsLayer = () => {
       'TRANSPARENT=TRUE',
     ]
 
-    // Добавляем viewparams если есть
-    if (viewParamsStr) {
-      queryParams.push(`VIEWPARAMS=${viewParamsStr}`)
+    if (viewParamsQueryValue) {
+      queryParams.push(`VIEWPARAMS=${viewParamsQueryValue}`)
     }
 
     // Добавляем CQL_FILTER

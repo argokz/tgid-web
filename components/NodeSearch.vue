@@ -1,8 +1,14 @@
 <template>
   <div>
-    <v-dialog v-model="dialog" max-width="900px" scrollable>
-      <v-card>
-        <v-card-title class="d-flex align-center pa-4">
+    <v-dialog
+      v-model="dialog"
+      :max-width="mobile ? undefined : 900"
+      :fullscreen="mobile"
+      scrollable
+      :transition="mobile ? 'dialog-bottom-transition' : 'dialog-transition'"
+    >
+      <v-card :rounded="mobile ? '0' : undefined">
+        <v-card-title class="d-flex align-center flex-wrap pa-4 gap-2">
           <v-icon class="mr-2" color="primary">mdi-map-search</v-icon>
           <span class="text-h6">Поиск узлов</span>
           <v-spacer />
@@ -33,7 +39,10 @@
 
         <v-divider />
 
-        <v-card-text class="pa-0" style="max-height: 500px; overflow-y: auto;">
+        <v-card-text
+          class="pa-0 node-search-results"
+          :style="resultsScrollStyle"
+        >
           <!-- Loading -->
           <div v-if="loading" class="pa-12 text-center">
             <v-progress-circular indeterminate color="primary" size="64" width="4" />
@@ -99,12 +108,18 @@
 
         <v-divider />
 
-        <v-card-actions class="pa-4">
-          <v-btn variant="text" color="grey" @click="removeMarker" prepend-icon="mdi-map-marker-off">
+        <v-card-actions class="pa-4 d-flex flex-wrap gap-2" :class="mobile ? 'flex-column' : ''">
+          <v-btn
+            variant="text"
+            color="grey"
+            :block="mobile"
+            prepend-icon="mdi-map-marker-off"
+            @click="removeMarker"
+          >
             Очистить маркер
           </v-btn>
-          <v-spacer />
-          <v-btn variant="text" @click="dialog = false">Закрыть</v-btn>
+          <v-spacer v-if="!mobile" />
+          <v-btn variant="text" :block="mobile" @click="dialog = false">Закрыть</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -116,7 +131,8 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, ref, computed } from 'vue'
+import { useDisplay } from 'vuetify'
 import type { Map } from 'maplibre-gl'
 import { useRuntimeConfig } from '#app'
 
@@ -126,6 +142,14 @@ interface Props {
 
 const props = defineProps<Props>()
 const config = useRuntimeConfig()
+
+const { mobile } = useDisplay()
+
+const resultsScrollStyle = computed(() =>
+  mobile.value
+    ? { maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' as const }
+    : { maxHeight: '500px', overflowY: 'auto' as const }
+)
 
 const dialog = ref(false)
 const searchText = ref('')

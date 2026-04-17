@@ -1035,35 +1035,48 @@ export const useLayerStore = defineStore('layer', {
       const globalLabels = labelStore.globalLabels;
       if (!globalLabels || globalLabels.length === 0) return '';
 
-      // If we have cached attributes for this layer, filter the global labels
       const cachedAttrs = this.layerAttributes[layer.layerId];
-      if (cachedAttrs && cachedAttrs.length > 0) {
-        // Convert cachedAttrs to lowercase for case-insensitive matching
-        const attrSet = new Set(cachedAttrs.map(a => a.toLowerCase()));
-        
-        console.log(`[layerStore] Filtering ${globalLabels.length} labels for ${layer.layerId} against ${cachedAttrs.length} cached attrs`);
-        
-        // Filter global labels to only those present in the PBF attributes
-        const filtered = globalLabels.filter(label => {
-          const l = label.toLowerCase();
-          const match = attrSet.has(l) || attrSet.has(label);
-          if (match) console.log(`[layerStore]   Label ${label} MATCHED for ${layer.layerId}`);
-          return match;
-        });
+      const fieldsFromSelection = () => globalLabels.map((f) => `${f}:on`).join(';');
 
+      // Атрибуты из PBF ещё не известны (до idle / WMS raster / не открывали менеджер) —
+      // всё равно передаём выбранные подписи, иначе после «Применить» viewparams остаётся без полей.
+      if (!cachedAttrs || cachedAttrs.length === 0) {
+        if (!cachedAttrs) {
+          console.warn(
+            `[layerStore] PBF attrs not yet known for ${layer.layerId}; using ${globalLabels.length} selected label(s) in viewparams`
+          );
+        } else {
+          console.warn(
+            `[layerStore] No PBF attrs for ${layer.layerId}, using all ${globalLabels.length} global labels in viewparams`
+          );
+        }
+        return fieldsFromSelection();
+      }
+
+      const attrSet = new Set(cachedAttrs.map((a) => a.toLowerCase()));
+      if (import.meta.dev) {
+        console.log(
+          `[layerStore] Filtering ${globalLabels.length} labels for ${layer.layerId} against ${cachedAttrs.length} cached attrs`
+        );
+      }
+
+      const filtered = globalLabels.filter((label) => {
+        const l = label.toLowerCase();
+        return attrSet.has(l) || attrSet.has(label);
+      });
+
+      if (import.meta.dev) {
         console.log(`[layerStore] Filtered results for ${layer.layerId}: ${filtered.length}/${globalLabels.length}`);
-        return filtered.map(f => `${f}:on`).join(';');
       }
 
-      // Пустой массив = таймаут/не удалось прочитать PBF — фолбэк как раньше (все подписи)
-      if (Array.isArray(cachedAttrs) && cachedAttrs.length === 0) {
-        console.warn(`[layerStore] No PBF attrs for ${layer.layerId}, using all ${globalLabels.length} global labels in viewparams`);
-        return globalLabels.map(f => `${f}:on`).join(';');
+      if (filtered.length > 0) {
+        return filtered.map((f) => `${f}:on`).join(';');
       }
 
-      // Атрибуты ещё не известны — не подмешиваем все globalLabels в первый запрос viewparams
-      console.warn(`[layerStore] PBF attrs not yet known for ${layer.layerId}; omitting label fields in viewparams until discovery`);
-      return '';
+      console.warn(
+        `[layerStore] No label names matched cached attrs for ${layer.layerId}; using selected labels in viewparams anyway`
+      );
+      return fieldsFromSelection();
     },
 
     saveVisibleLayers() {

@@ -19,10 +19,13 @@
       <v-dialog
         v-if="labelSettingsDialog"
         v-model="labelSettingsDialog"
-        max-width="800px"
+        :max-width="mobile ? undefined : 800"
+        :fullscreen="mobile"
+        scrollable
+        :transition="mobile ? 'dialog-bottom-transition' : 'dialog-transition'"
       >
-        <v-card>
-          <v-card-title class="text-h6">
+        <v-card :rounded="mobile ? '0' : undefined">
+          <v-card-title class="text-h6 text-wrap">
             Настройка атрибутов и надписей
           </v-card-title>
           <v-card-text>
@@ -56,7 +59,7 @@
                   <div v-else>
                     <!-- Настройки масштаба для всех надписей -->
                     <v-row class="mb-4">
-                      <v-col cols="6">
+                      <v-col cols="12" sm="6">
                         <v-text-field
                           v-model.number="labelMinZoom"
                           label="Мин. масштаб"
@@ -68,7 +71,7 @@
                           @update:model-value="handleLabelAttributeChange"
                         />
                       </v-col>
-                      <v-col cols="6">
+                      <v-col cols="12" sm="6">
                         <v-text-field
                           v-model.number="labelMaxZoom"
                           label="Макс. масштаб"
@@ -145,7 +148,7 @@
                           align="center"
                           no-gutters
                         >
-                          <v-col cols="6">
+                          <v-col cols="12" sm="6">
                             <v-checkbox
                               v-model="labelAttributes[attr.name].showAsLabel"
                               :label="getTranslatedAttributeName(attr.name)"
@@ -154,7 +157,7 @@
                               @change="handleLabelAttributeChange"
                             />
                           </v-col>
-                          <v-col cols="3">
+                          <v-col cols="12" sm="3">
                             <v-checkbox
                               v-model="labelAttributes[attr.name].showInPopup"
                               label="В попапе"
@@ -165,7 +168,8 @@
                           </v-col>
                           <v-col
                             v-if="labelAttributes[attr.name].showAsLabel"
-                            cols="3"
+                            cols="12"
+                            sm="3"
                           >
                             <v-select
                               v-model="labelAttributes[attr.name].icon"
@@ -261,7 +265,7 @@
                       Смещение:
                     </div>
                     <v-row dense>
-                      <v-col cols="6">
+                      <v-col cols="12" sm="6">
                         <v-text-field
                           v-model.number="labelStyle.offsetX"
                           label="По горизонтали"
@@ -271,7 +275,7 @@
                           @update:model-value="handleLabelStyleChange"
                         />
                       </v-col>
-                      <v-col cols="6">
+                      <v-col cols="12" sm="6">
                         <v-text-field
                           v-model.number="labelStyle.offsetY"
                           label="По вертикали"
@@ -359,6 +363,7 @@ import type { ExtendedLayerConfig } from '~/types';
 import { defaultLabelStyle, defaultLabelAttributes } from '~/utils/labelDefaults';
 import LayerIconSelector from './LayerIconSelector.vue';
 import { useTranslations } from '~/composables/useTranslations';
+import { useDisplay } from 'vuetify';
 
 
 
@@ -400,6 +405,7 @@ const layerStore = useLayerStore();
 const labelStore = useLabelStore();
 const popupStore = usePopupStore();
 const { loadTranslations, getCachedRussianName } = useTranslations();
+const { mobile } = useDisplay();
 
 // State
 const loading = ref(false);

@@ -1,10 +1,13 @@
 <template>
   <v-dialog
     v-model="isOpen"
-    max-width="500px"
+    :max-width="mobile ? undefined : 500"
+    :fullscreen="mobile"
+    scrollable
     persistent
+    :transition="mobile ? 'dialog-bottom-transition' : 'dialog-transition'"
   >
-    <v-card>
+    <v-card :rounded="mobile ? '0' : undefined">
       <v-card-title class="primary-text d-flex align-center py-2">
         <v-icon class="mr-2">
           mdi-puzzle
@@ -52,6 +55,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { useDisplay } from 'vuetify';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import type { Fragment } from '~/types';
 
@@ -71,6 +75,8 @@ const isOpen = computed({
 
 const fragmentStore = useFragmentStore();
 const fragments = computed(() => fragmentStore.getFragments);
+
+const { mobile } = useDisplay();
 
 const selectedId = ref<number | null>(props.modelValueId ?? null);
 watch(() => props.modelValueId, (v) => selectedId.value = v);

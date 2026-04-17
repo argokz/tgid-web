@@ -8,15 +8,26 @@
       border="b"
       tag="header"
     >
+      <v-btn
+        v-if="mobile"
+        icon
+        variant="text"
+        class="ms-1"
+        aria-label="Открыть меню"
+        @click="mainMenuOpen = true"
+      >
+        <v-icon>mdi-menu</v-icon>
+      </v-btn>
+
       <!-- Логотип -->
-      <div class="app-brand d-flex align-center ms-3 me-4">
+      <div class="app-brand d-flex align-center" :class="mobile ? 'ms-1 me-2' : 'ms-3 me-4'">
         <v-icon size="26" color="primary" class="brand-icon">mdi-layers</v-icon>
         <span class="brand-title ms-2">ITwin</span>
         <span class="brand-subtitle">Map</span>
       </div>
 
-      <!-- Навигация -->
-      <nav class="nav-links d-flex align-center">
+      <!-- Навигация (десктоп) -->
+      <nav v-if="!mobile" class="nav-links d-flex align-center">
         <v-btn
           v-for="link in links"
           :key="link.to"
@@ -123,6 +134,45 @@
       </v-menu>
     </v-app-bar>
 
+    <!-- Навигация: выдвижная панель на мобильных -->
+    <v-navigation-drawer
+      v-model="mainMenuOpen"
+      location="start"
+      temporary
+      width="300"
+      class="main-nav-drawer"
+    >
+      <v-list nav density="comfortable" class="pt-2">
+        <v-list-subheader class="text-uppercase text-caption font-weight-bold">
+          Меню
+        </v-list-subheader>
+        <v-list-item
+          v-for="link in links"
+          :key="link.to"
+          :to="link.to"
+          :prepend-icon="link.icon"
+          :title="link.text"
+          :active="isActive(link.to)"
+          rounded="lg"
+          @click="mainMenuOpen = false"
+        />
+        <v-list-item
+          prepend-icon="mdi-calculator-variant"
+          title="Расчет"
+          rounded="lg"
+          :active="showCalculationModal"
+          @click="onDrawerOpenCalculation"
+        />
+        <v-list-item
+          :prepend-icon="showProtocol ? 'mdi-console' : 'mdi-console-line'"
+          :title="showProtocol ? 'Скрыть протокол' : 'Протокол'"
+          rounded="lg"
+          :active="showProtocol"
+          @click="onDrawerToggleProtocol"
+        />
+      </v-list>
+    </v-navigation-drawer>
+
     <!-- Контент страницы: фиксированная min-height под app-bar — меньше CLS от v-container при гидрации -->
     <v-main tag="main">
       <v-container class="pa-0 layout-content-root" fluid>
@@ -163,6 +213,7 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router';
 import { defineAsyncComponent, ref } from 'vue';
+import { useDisplay } from 'vuetify';
 import { useNotificationStore } from '~/stores/notificationStore';
 
 const PlanningCalculationModal = defineAsyncComponent(() => import('~/components/PlanningCalculationModal.vue'));
@@ -181,11 +232,24 @@ const links: NavLink[] = [
 const route = useRoute();
 const isActive = (path: string) => route.path === path;
 
+const { mobile } = useDisplay();
+const mainMenuOpen = ref(false);
+
 const notificationStore = useNotificationStore();
 
 const showCalculationModal = ref(false);
 const showProtocol = ref(false);
 const protocolRef = ref();
+
+const onDrawerOpenCalculation = () => {
+  mainMenuOpen.value = false;
+  showCalculationModal.value = true;
+};
+
+const onDrawerToggleProtocol = () => {
+  showProtocol.value = !showProtocol.value;
+  mainMenuOpen.value = false;
+};
 
 const handleCalculate = () => {
   showProtocol.value = true;
