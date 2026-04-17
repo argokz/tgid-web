@@ -49,42 +49,40 @@
             <div class="mt-6 text-h6 text-grey">Поиск узлов...</div>
           </div>
 
-          <!-- Results -->
-          <v-list v-else-if="nodes.length > 0" class="pa-2" density="compact">
-            <v-virtual-scroll
-              :items="nodes"
-              :height="500"
-              :item-height="88"
-            >
-              <template #default="{ item, index }">
-                <v-list-item
-                  :key="item.id || index"
-                  class="node-item mb-2"
-                  rounded="lg"
-                  @click="selectNode(item)"
-                >
-                  <template #prepend>
-                    <v-avatar color="primary" size="48" class="elevation-2">
-                      <v-icon color="white" size="28">mdi-map-marker</v-icon>
-                    </v-avatar>
-                  </template>
-                  <v-list-item-title class="font-weight-medium mb-1">
-                    {{ getNodeTitle(item) }}
-                  </v-list-item-title>
-                  <v-list-item-subtitle class="text-caption">
-                    <div v-if="getNodeSubtitle(item)" class="d-flex align-center">
-                      <v-icon size="14" class="mr-1">mdi-information-outline</v-icon>
-                      {{ getNodeSubtitle(item) }}
-                    </div>
-                  </v-list-item-subtitle>
-                  <template #append>
-                    <v-btn icon variant="text" size="small" color="primary">
-                      <v-icon>mdi-chevron-right</v-icon>
-                    </v-btn>
-                  </template>
-                </v-list-item>
-              </template>
-            </v-virtual-scroll>
+          <!-- Results (сгруппировано: тип → код РС → фрагмент) -->
+          <v-list v-else-if="nodes.length > 0" class="pa-2 node-search-grouped-list" density="compact">
+            <template v-for="group in nodeGroups" :key="group.key">
+              <v-list-subheader class="node-group-subheader text-wrap py-2">
+                {{ group.label }}
+              </v-list-subheader>
+              <v-list-item
+                v-for="(item, index) in group.nodes"
+                :key="item.id ?? `${group.key}-${index}`"
+                class="node-item mb-2"
+                rounded="lg"
+                @click="selectNode(item)"
+              >
+                <template #prepend>
+                  <v-avatar color="primary" size="48" class="elevation-2">
+                    <v-icon color="white" size="28">mdi-map-marker</v-icon>
+                  </v-avatar>
+                </template>
+                <v-list-item-title class="font-weight-medium mb-1">
+                  {{ getNodeTitle(item) }}
+                </v-list-item-title>
+                <v-list-item-subtitle class="text-caption">
+                  <div v-if="getNodeSubtitle(item)" class="d-flex align-center">
+                    <v-icon size="14" class="mr-1">mdi-information-outline</v-icon>
+                    {{ getNodeSubtitle(item) }}
+                  </div>
+                </v-list-item-subtitle>
+                <template #append>
+                  <v-btn icon variant="text" size="small" color="primary">
+                    <v-icon>mdi-chevron-right</v-icon>
+                  </v-btn>
+                </template>
+              </v-list-item>
+            </template>
           </v-list>
 
           <!-- Empty state -->
@@ -168,19 +166,93 @@ const getGeoServerUrl = () => {
   return (config.public as any)?.geoserver?.url || ''
 }
 
-const getNodeTitle = (node: any) => {
-  return node.naimenovanie || node.naimenovanie_uzla || node.name || node.adres ||
-    (node.nomer ? `Узел № ${node.nomer}` : '') || `Узел #${node.id || '???'}`
+/** Непустая строка после trim (пробелы и пустые значения не считаем). */
+const meaningfulStr = (v: unknown): string | null => {
+  if (v == null) return null
+  const s = String(v).trim()
+  return s.length ? s : null
 }
 
-const getNodeSubtitle = (node: any) => {
-  const used = new Set(['id', 'naimenovanie', 'naimenovanie_uzla', 'name', 'adres', 'nomer', 'number'])
-  const keys = Object.keys(node).filter(k => !used.has(k) && node[k])
-  if (keys.length > 0) {
-    return `${keys[0].replace(/_/g, ' ')}: ${node[keys[0]]}`
+/** Первое непустое значение по списку ключей (WFS часто отдаёт русские имена полей). */
+const pickProp = (node: Record<string, unknown>, ...keys: string[]): string | null => {
+  for (const k of keys) {
+    const m = meaningfulStr(node[k])
+    if (m) return m
   }
   return null
 }
+
+const getNodeType = (node: any) =>
+  pickProp(node, 'Тип', 'tip', 'type', 'node_type')
+
+const getNodeRsCode = (node: any) =>
+  pickProp(node, 'Код РС', 'Kod_RS', 'kod_rs', 'rs_code')
+
+const getNodeFragment = (node: any) =>
+  pickProp(node, 'Фрагмент', 'fragment', 'Fragment')
+
+const getNodeTitle = (node: any) => {
+  return pickProp(node,
+    'Наименование узла', 'naimenovanie_uzla', 'naimenovanie', 'name', 'Наименование'
+  ) || pickProp(node, 'adres', 'Адрес')
+    || (meaningfulStr(node.nomer) ? `Узел № ${node.nomer}` : null)
+    || (meaningfulStr(node.number) ? `Узел № ${node.number}` : null)
+    || (node.id != null ? `Узел #${node.id}` : 'Узел')
+}
+
+const getNodeSubtitle = (node: any) => {
+  const opis = pickProp(node, 'Описание', 'description', 'opisanie')
+  const kod = pickProp(node, 'Код', 'kod', 'code')
+  const priznak = pickProp(node, 'Признак', 'priznak')
+  const parts: string[] = []
+  if (node.id != null) parts.push(`id: ${node.id}`)
+  if (kod) parts.push(`Код: ${kod}`)
+  if (opis) parts.push(opis)
+  if (priznak) parts.push(`Признак: ${priznak}`)
+  if (parts.length) return parts.join(' · ')
+
+  const used = new Set([
+    'id', 'Тип', 'Код РС', 'Фрагмент', 'Наименование узла', 'Наименование', 'Описание', 'Код',
+    'Признак', 'naimenovanie', 'naimenovanie_uzla', 'name', 'adres', 'nomer', 'number', 'tip', 'type'
+  ])
+  const keys = Object.keys(node).filter(k => !used.has(k) && meaningfulStr(node[k]))
+  if (keys.length > 0) return `${keys[0]}: ${meaningfulStr(node[keys[0]])}`
+  return null
+}
+
+type NodeGroup = { key: string; label: string; nodes: any[] }
+
+const nodeGroups = computed((): NodeGroup[] => {
+  const list = nodes.value
+  if (!list.length) return []
+
+  const byKey = new Map<string, any[]>()
+  for (const node of list) {
+    const type = getNodeType(node) ?? '—'
+    const rs = getNodeRsCode(node) ?? '—'
+    const frag = getNodeFragment(node)
+    const key = `${type}\t${rs}\t${frag ?? ''}`
+    if (!byKey.has(key)) byKey.set(key, [])
+    byKey.get(key)!.push(node)
+  }
+
+  const collator = new Intl.Collator('ru', { sensitivity: 'base', numeric: true })
+  const entries = [...byKey.entries()].sort(([ka], [kb]) => collator.compare(ka, kb))
+
+  return entries.map(([key, groupNodes]) => {
+    const [type, rs, fragPart] = key.split('\t')
+    const labelParts = [`${type}`, `РС: ${rs}`]
+    if (fragPart) labelParts.push(`Фрагмент: ${fragPart}`)
+    const sortedNodes = [...groupNodes].sort((a, b) =>
+      collator.compare(getNodeTitle(a), getNodeTitle(b))
+    )
+    return {
+      key,
+      label: labelParts.join(' · '),
+      nodes: sortedNodes
+    }
+  })
+})
 
 const onSearchInput = () => {
   if (searchTimeout) clearTimeout(searchTimeout)
@@ -373,6 +445,15 @@ onBeforeUnmount(() => {
 
 .node-item {
   animation: slideIn 0.3s ease-out;
+}
+
+.node-group-subheader {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgb(var(--v-theme-surface));
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 @keyframes slideIn {
