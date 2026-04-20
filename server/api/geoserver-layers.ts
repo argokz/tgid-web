@@ -1,28 +1,101 @@
 import { XMLParser } from 'fast-xml-parser';
 import type { LayerConfig } from '~/types';
-import { determineLayerType, getDefaultPaint, getLayerType } from '~/server/config/layer-types';
+import {
+  buildMvtLayerIdentifiers,
+  buildWmsOnlyLayerIdentifiers,
+  buildWmsRasterSourceId
+} from '~/utils/geoserverMvtIds';
+import type { GeoCatalogLayerEntry, GeoWorkspaceCatalogEntry } from '~/utils/geoserverLayerCatalog';
+
+/** Тестовый BBOX Web Mercator (Алматы), чтобы подставить вместо {bbox-epsg-3857}. */
+const MVT_PROBE_BBOX_3857 = '8500000,5280000,8580000,5360000';
+
+async function verifyMvtTileUrl(urlTemplate: string): Promise<boolean> {
+  let url = urlTemplate;
+  if (url.includes('{bbox-epsg-3857}')) {
+    url = url.replace('{bbox-epsg-3857}', MVT_PROBE_BBOX_3857);
+  }
+  try {
+    const buf = await $fetch<ArrayBuffer>(url, {
+      responseType: 'arrayBuffer',
+      timeout: 12000,
+      headers: { Accept: '*/*' }
+    });
+    return buf.byteLength > 24;
+  } catch {
+    return false;
+  }
+}
 
 const GLOBAL_KEY = '__geoserverLayersPending__';
 const pendingRequests: Map<string, Promise<LayerConfig[]>> = (globalThis as any)[GLOBAL_KEY] || new Map();
 (globalThis as any)[GLOBAL_KEY] = pendingRequests;
+
+function resolveGeoserverRestBaseUrl(runtimeConfig: ReturnType<typeof useRuntimeConfig>): string {
+  const fallback =
+    String(runtimeConfig.public?.geoserver?.url || 'https://itwin.kz/geoserver').replace(/\/$/, '');
+  const explicit = String((runtimeConfig as any).geoserverRestUrl || '').trim().replace(/\/$/, '');
+  if (explicit) return explicit;
+
+  const capUrl = String(runtimeConfig.geoserverCapabilitiesUrl || '');
+  if (!capUrl) return fallback;
+  try {
+    const u = new URL(capUrl);
+    const marker = '/geoserver';
+    const idx = u.pathname.indexOf(marker);
+    if (idx !== -1) {
+      const basePath = u.pathname.slice(0, idx + marker.length);
+      return `${u.origin}${basePath}`;
+    }
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
+function geoserverRestAuthHeaders(runtimeConfig: ReturnType<typeof useRuntimeConfig>): Record<string, string> {
+  const user = String((runtimeConfig as any).geoserverRestUser || '').trim();
+  const pass = String((runtimeConfig as any).geoserverRestPassword || '').trim();
+  if (user && pass) {
+    return { Authorization: `Basic ${Buffer.from(`${user}:${pass}`).toString('base64')}` };
+  }
+  return { Authorization: `Basic ${Buffer.from('admin:geoserver').toString('base64')}` };
+}
+
+function pickWmtsStyleIdentifier(styleRaw: unknown): string {
+  if (styleRaw == null) return '';
+  const styles = Array.isArray(styleRaw) ? styleRaw : [styleRaw];
+  const chosen =
+    styles.find((s: any) => s?.['@_isDefault'] === true || s?.['@_isDefault'] === 'true') || styles[0];
+  const id = (chosen as any)?.['ows:Identifier'] ?? (chosen as any)?.Identifier ?? '';
+  return String(id || '');
+}
+
+function normalizeCatalogFromRuntime(geoserverPublic: any): GeoWorkspaceCatalogEntry[] | null {
+  const raw = geoserverPublic?.layerCatalog;
+  if (Array.isArray(raw) && raw.length) return raw as GeoWorkspaceCatalogEntry[];
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed) ? (parsed as GeoWorkspaceCatalogEntry[]) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
 
 export default defineEventHandler(async (event) => {
   if (import.meta.dev) {
     console.debug(`[API HIT] /api/geoserver-layers:`, event.node.req.url, 'from', event.node.req.headers['referer'] || 'SSR');
   }
   const runtimeConfig = useRuntimeConfig();
+  const geoserverPublic = (runtimeConfig.public as any)?.geoserver || {};
 
-  // Вспомогательная функция для ослабления строгой типизации MapLibre GL JS
-  // Превращает ["==", "mag", "1"] в ["any", ["==", "mag", "1"], ["==", "mag", 1], ["==", "mag", true]]
-  // Это решает проблему несовпадения типов, когда в БД (WFS) приходит boolean/integer, 
-  // а GeoServer MBStyle генерирует проверку на строку.
   const sanitizeFilterTypeCoercion = (f: any): any => {
     if (!Array.isArray(f)) return f;
-    
-    // Обработка операторов сравнения (legacy и expression syntax)
     if (['==', '!='].includes(f[0]) && f.length === 3) {
       const val = f[2];
-      
       if (val === '1' || val === '0') {
         const numVal = parseInt(val, 10);
         const boolVal = val === '1';
@@ -39,222 +112,229 @@ export default defineEventHandler(async (event) => {
         return ['any', [...f], [f[0], f[1], numVal], [f[0], f[1], strVal]];
       }
     }
-    
-    // Рекурсивный обход всех элементов (например, для "all", "any", "none")
     return f.map((k: any) => sanitizeFilterTypeCoercion(k));
   };
+
   const cacheKey = 'geoServerLayers';
   const cache = useStorage();
+  const mvtProbeTiles = Boolean((runtimeConfig as any).geoserverMvtProbeTiles);
 
-  // Разрешённые workspace берём из NUXT_PUBLIC_GEOSERVER_WORKSPACES,
-  // чтобы не тянуть демо-слои (sf, topp, tiger, ne, nurc и т.п.)
-  const geoserverPublic = (runtimeConfig.public as any)?.geoserver || {};
-  const envWorkspaces = Array.isArray(geoserverPublic.workspaces)
-    ? geoserverPublic.workspaces
-    : [];
-  const allowedWorkspaces = envWorkspaces
-    .map((ws: any) => ws.workspace || ws.id)
-    .filter((v: any) => typeof v === 'string' && v.length > 0);
-
-  // Проверяем кэш на сервере
   const query = getQuery(event);
   const refresh = query.refresh === 'true';
-  
+
   if (!refresh) {
     const cached = await cache.getItem(cacheKey) as LayerConfig[] | null;
     if (cached) return cached;
     const pending = pendingRequests.get(cacheKey);
     if (pending) return await pending;
   }
+
   const loadLayers = async (): Promise<LayerConfig[]> => {
-    const geoserverUrl = runtimeConfig.public?.geoserver?.url || 'https://itwin.kz/geoserver';
+    const catalog = normalizeCatalogFromRuntime(geoserverPublic);
+    if (!catalog?.length) {
+      console.error('[GEO] Укажите GEOSERVER_LAYER_CATALOG в env (JSON-массив workspace с полем layers).');
+      return [];
+    }
+
+    const defaultPublicUrl = String(geoserverPublic.url || 'https://itwin.kz/geoserver').replace(/\/$/, '');
+    const geoserverRestBaseUrl = resolveGeoserverRestBaseUrl(runtimeConfig);
     const capabilitiesUrl =
-      runtimeConfig.geoserverCapabilitiesUrl ||
-      `${geoserverUrl}/gwc/service/wmts?REQUEST=GetCapabilities`;
-    
+      runtimeConfig.geoserverCapabilitiesUrl || `${defaultPublicUrl}/gwc/service/wmts?REQUEST=GetCapabilities`;
+
     const mvtTemplateUrl =
       runtimeConfig.geoserverMvtTemplateUrl ||
-      `${geoserverUrl}/gwc/service/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER={layerName}&STYLE=&TILEMATRIXSET=EPSG:900913&TILEMATRIX=EPSG:900913:{z}&TILEROW={y}&TILECOL={x}&FORMAT=application/vnd.mapbox-vector-tile`;
-    const response = await $fetch(capabilitiesUrl);
-    const xmlText = response as string;
+      `${defaultPublicUrl}/gwc/service/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER={layerName}&STYLE=&TILEMATRIXSET=EPSG:900913&TILEMATRIX=EPSG:900913:{z}&TILEROW={y}&TILECOL={x}&FORMAT=application/vnd.mapbox-vector-tile`;
+
+    const xmlText = (await $fetch(capabilitiesUrl)) as string;
     const parser = new XMLParser({
       ignoreAttributes: false,
-      attributeNamePrefix: "@_",
+      attributeNamePrefix: '@_',
       parseAttributeValue: true
     });
     const result = parser.parse(xmlText);
-    
-    // Получаем слои из XML
     const wmtsLayers = result?.Capabilities?.Contents?.Layer || [];
     const layersArray = Array.isArray(wmtsLayers) ? wmtsLayers : [wmtsLayers];
 
-    const processedLayerNames = new Set<string>();
-    const layers: LayerConfig[] = [];
+    const wmtsByQualified = new Map<string, any>();
     for (const layer of layersArray) {
-    // Получаем идентификатор слоя
-    const layerName = layer?.['ows:Identifier'] || '';
-    if (!layerName || processedLayerNames.has(layerName)) continue;
-    processedLayerNames.add(layerName);
-
-     // Фильтруем по workspace: берем только те, что входят в NUXT_PUBLIC_GEOSERVER_WORKSPACES
-    const nameParts = String(layerName).split(':');
-    const workspaceName = nameParts[0];
-    if (allowedWorkspaces.length && !allowedWorkspaces.includes(workspaceName)) {
-      continue;
+      const id = layer?.['ows:Identifier'];
+      if (id) wmtsByQualified.set(String(id), layer);
     }
 
-    // Получаем название слоя
-    const title = layer?.['ows:Title'] || layerName;
-    
-    // Получаем границы слоя
-    const bounds = layer?.['ows:WGS84BoundingBox'] || {};
-    const lowerCorner = bounds?.['ows:LowerCorner'] || '';
-    const upperCorner = bounds?.['ows:UpperCorner'] || '';
-    
-    // Получаем стиль слоя
-    const style = layer?.Style || {};
-    const styleIdentifier = style?.['ows:Identifier'] || '';
-    const styleNameParts = String(styleIdentifier).split(':');
-    let cleanStyleName = styleNameParts.length > 1 ? styleNameParts[1] : styleNameParts[0];
-    
-    // Определяем sourceLayer (обычно это имя слоя в GeoServer)
-    const sourceLayer = nameParts.length > 1 ? nameParts[1] : nameParts[0];
-    
-    // ВРЕМЕННЫЙ ФИЛЬТР ДЛЯ ТЕСТИРОВАНИЯ (по просьбе пользователя)
-    const isTestLayer = (workspaceName === 'AlmatyGIS' && (sourceLayer === 'heatpipesections' || sourceLayer === 'uzel'));
-    if (!isTestLayer) {
-       continue; // Оставляем только два нужных слоя
-    }
-    
-    // Формируем URL для MVT
-    const mvtUrl = mvtTemplateUrl.replace('{layerName}', layerName);
-    
-    // Определяем тип и стили Maplibre
-    let type: any;
-    let paint: Record<string, any> = {};
-    let layout: Record<string, any> = {};
-    let mbLayers: any[] = [];
-    let hasMapboxStyle = false;
-    let sprite: string | undefined = undefined;
+    const authHeaders = geoserverRestAuthHeaders(runtimeConfig);
 
-    const auth = Buffer.from('admin:geoserver').toString('base64');
-    const authHeaders = { 'Authorization': `Basic ${auth}` };
+    async function fetchMvtStylePack(
+      workspaceName: string,
+      sourceLayer: string,
+      layerXml: any,
+      sanitize: (x: any) => any
+    ): Promise<{
+      type: string;
+      paint: Record<string, any>;
+      layout: Record<string, any>;
+      mbLayers: any[];
+      sprite?: string;
+    } | null> {
+      const styleIdentifier = pickWmtsStyleIdentifier(layerXml?.Style);
+      const styleNameParts = String(styleIdentifier).split(':');
+      let cleanStyleName = styleNameParts.length > 1 ? styleNameParts[1] : styleNameParts[0];
 
-    try {
-      // WMTS GetCapabilities часто даёт generic или не тот идентификатор; для MBStyle берём
-      // стиль по умолчанию из REST (как при пустом STYLE= в GetTile).
-      const layerInfoUrl = `${geoserverUrl}/rest/workspaces/${workspaceName}/layers/${sourceLayer}.json`;
-      const layerInfo: any = await $fetch(layerInfoUrl, { headers: authHeaders, timeout: 5000 }).catch(() => null);
-      if (layerInfo?.layer?.defaultStyle?.name) {
-        const rawName = layerInfo.layer.defaultStyle.name;
-        cleanStyleName = rawName.includes(':') ? rawName.split(':')[1] : rawName;
-      }
+      let type: any = 'circle';
+      let paint: Record<string, any> = {};
+      let layout: Record<string, any> = {};
+      let mbLayers: any[] = [];
+      let sprite: string | undefined;
 
-      if (cleanStyleName && cleanStyleName !== 'generic') {
+      try {
+        const layerInfoUrl = `${geoserverRestBaseUrl}/rest/workspaces/${workspaceName}/layers/${encodeURIComponent(sourceLayer)}.json`;
+        const layerInfo: any = await $fetch(layerInfoUrl, { headers: authHeaders, timeout: 5000 }).catch(() => null);
+        if (layerInfo?.layer?.defaultStyle?.name) {
+          const rawName = layerInfo.layer.defaultStyle.name;
+          cleanStyleName = rawName.includes(':') ? rawName.split(':')[1] : rawName;
+        }
+
+        if (!cleanStyleName || cleanStyleName === 'generic') return null;
+
         let mbStyle: any = null;
-        
         try {
-          // 1. Сначала пробуем запросить нативный файл .mbstyle (если пользователь создал именно его)
-          const mbUrl = `${geoserverUrl}/rest/workspaces/${workspaceName}/styles/${cleanStyleName}.mbstyle`;
-          mbStyle = await $fetch(mbUrl, {
-            headers: authHeaders,
-            timeout: 1000
-          });
-        } catch (eNative) {
-          // 2. Если нативного .mbstyle нет, просим GeoServer динамически конвертировать SLD -> MBStyle
-          const sldUrl = `${geoserverUrl}/rest/workspaces/${workspaceName}/styles/${cleanStyleName}`;
+          const mbUrl = `${geoserverRestBaseUrl}/rest/workspaces/${workspaceName}/styles/${encodeURIComponent(cleanStyleName)}.mbstyle`;
+          mbStyle = await $fetch(mbUrl, { headers: authHeaders, timeout: 1000 });
+        } catch {
+          const sldUrl = `${geoserverRestBaseUrl}/rest/workspaces/${workspaceName}/styles/${encodeURIComponent(cleanStyleName)}`;
           mbStyle = await $fetch(sldUrl, {
-            headers: {
-              'Accept': 'application/vnd.mapbox.style+json',
-              ...authHeaders
-            },
+            headers: { Accept: 'application/vnd.mapbox.style+json', ...authHeaders },
             timeout: 1500
           });
         }
 
         if (mbStyle && Array.isArray(mbStyle.layers) && mbStyle.layers.length > 0) {
-          // Исключаем фоновые слои, так как MVT - это оверлей, а не база
-          let rawMbLayers = mbStyle.layers.filter((l: any) => l.type !== 'background');
-          
-          // Применяем преобразование типов к фильтрам всех слоев
+          const rawMbLayers = mbStyle.layers.filter((l: any) => l.type !== 'background');
           mbLayers = rawMbLayers.map((l: any) => {
-            if (l.filter) {
-              l.filter = sanitizeFilterTypeCoercion(l.filter);
-            }
+            if (l.filter) l.filter = sanitize(l.filter);
             return l;
           });
-          
           if (mbLayers.length > 0) {
-            hasMapboxStyle = true;
-            paint = mbLayers[0].paint || {};
             paint = mbLayers[0].paint || {};
             layout = mbLayers[0].layout || {};
             type = mbLayers[0].type || 'circle';
-            console.log(`[GEO-STYLE] Loaded native MBStyle for ${layerName} with ${mbLayers.length} layers.`);
           }
         }
-        
-        if (mbStyle && mbStyle.sprite) {
-          // Resolve relative sprite path
-          if (typeof mbStyle.sprite === 'string' && !mbStyle.sprite.startsWith('http')) {
-             // For itwin.kz geoserver, sprites are typically here:
-             sprite = `${geoserverUrl}/www/sprites/sprite`;
-          } else {
-            sprite = mbStyle.sprite;
+
+        if (mbStyle?.sprite) {
+          sprite =
+            typeof mbStyle.sprite === 'string' && !mbStyle.sprite.startsWith('http')
+              ? `${geoserverRestBaseUrl}/www/sprites/sprite`
+              : mbStyle.sprite;
+        }
+
+        if (!mbLayers.length) return null;
+        return { type, paint, layout, mbLayers, sprite };
+      } catch (e: any) {
+        console.warn(`[GEO-STYLE] MBStyle ${workspaceName}:${sourceLayer}: ${e.message}`);
+        return null;
+      }
+    }
+
+    function resolveRenderFormat(le: GeoCatalogLayerEntry, hasMvt: boolean): 'mvt' | 'wms' {
+      const def = le.defaultRenderFormat;
+      if (def === 'mvt' && hasMvt && le.mvt) return 'mvt';
+      if (def === 'wms' && le.wms) return 'wms';
+      if (hasMvt && le.mvt) return 'mvt';
+      return 'wms';
+    }
+
+    const out: LayerConfig[] = [];
+
+    for (const wsEntry of catalog) {
+      if (wsEntry.enabled === false) continue;
+      const baseUrl = (wsEntry.url || defaultPublicUrl).replace(/\/$/, '');
+      const workspaceBaseUrl = wsEntry.url ? baseUrl : undefined;
+
+      for (const le of wsEntry.layers) {
+        const qualified = `${wsEntry.workspace}:${le.source}`;
+        const wmtsXml = wmtsByQualified.get(qualified);
+        const titleFallback = wmtsXml?.['ows:Title'] || qualified;
+        const label = le.label?.trim() ? le.label : titleFallback;
+
+        let mvtPack: Awaited<ReturnType<typeof fetchMvtStylePack>> = null;
+        let mvtUrl = '';
+
+        if (le.mvt && wmtsXml) {
+          mvtUrl = mvtTemplateUrl.replace('{layerName}', qualified);
+          mvtPack = await fetchMvtStylePack(wsEntry.workspace, le.source, wmtsXml, sanitizeFilterTypeCoercion);
+          if (mvtPack && mvtProbeTiles) {
+            const ok = await verifyMvtTileUrl(mvtUrl);
+            if (!ok) {
+              console.warn(`[GEO] MVT probe failed for ${qualified}, откат к WMS если доступен`);
+              mvtPack = null;
+            }
           }
         }
-      }
-    } catch (e: any) {
-      console.warn(`[GEO-STYLE] MBStyle fallback for ${layerName} (style: ${cleanStyleName}): ${e.message}`);
-    }
 
-    if (!hasMapboxStyle) {
-      const styleName = styleIdentifier.toLowerCase();
-      if (styleName.includes('point') || styleName.includes('circle')) {
-        type = 'circle';
-        paint = getDefaultPaint(type);
-      } else if (styleName.includes('line') || styleName.includes('linestring')) {
-        type = 'line';
-        paint = getDefaultPaint(type);
-      } else if (styleName.includes('polygon') || styleName.includes('fill')) {
-        type = 'fill';
-        paint = getDefaultPaint(type);
-      } else {
-        const layerConfig = getLayerType(layerName);
-        if (layerConfig) {
-          type = layerConfig.type;
-          paint = layerConfig.paint || getDefaultPaint(type);
-        } else {
-          type = determineLayerType(layerName, sourceLayer);
-          paint = getDefaultPaint(type);
+        const hasMvt = Boolean(mvtPack && mvtPack.mbLayers?.length);
+        const canWms = le.wms === true;
+
+        if (!hasMvt && !canWms) {
+          console.warn(`[GEO] Пропуск ${qualified}: нет ни MVT (MBStyle), ни WMS в каталоге`);
+          continue;
         }
+
+        const cleanSource = le.source.startsWith('id_') ? le.source.substring(3) : le.source;
+        const supportedFormats = { mvt: hasMvt && le.mvt === true, wms: canWms };
+
+        if (!hasMvt && canWms) {
+          const ids = buildWmsOnlyLayerIdentifiers(wsEntry.workspace, cleanSource);
+          const rId = buildWmsRasterSourceId(wsEntry.workspace, cleanSource);
+          out.push({
+            id: ids.id,
+            label,
+            displayName: label,
+            sourceId: ids.sourceId,
+            layerId: ids.layerId,
+            sourceLayer: le.source,
+            workspace: wsEntry.workspace,
+            workspaceBaseUrl,
+            type: 'line',
+            paint: {},
+            mvtUrl: undefined,
+            attributes: [],
+            visible: false,
+            renderFormat: 'wms',
+            supportedFormats: { mvt: false, wms: true },
+            wmsRasterSourceId: rId
+          } as LayerConfig);
+          continue;
+        }
+
+        const ids = buildMvtLayerIdentifiers(wsEntry.workspace, cleanSource);
+        const rf = resolveRenderFormat(le, true);
+
+        out.push({
+          id: ids.id,
+          label,
+          displayName: label,
+          sourceId: ids.sourceId,
+          layerId: ids.layerId,
+          sourceLayer: le.source,
+          workspace: wsEntry.workspace,
+          workspaceBaseUrl,
+          type: mvtPack.type,
+          mvtUrl,
+          paint: mvtPack.paint,
+          layout: mvtPack.layout,
+          mbLayers: mvtPack.mbLayers,
+          sprite: mvtPack.sprite,
+          wmsRasterSourceId: buildWmsRasterSourceId(wsEntry.workspace, cleanSource),
+          attributes: [],
+          visible: false,
+          renderFormat: rf,
+          supportedFormats
+        } as LayerConfig);
       }
     }
-    
-    // Очищаем префикс id_ для красоты отображения, если он есть
-    const cleanSourceLayer = sourceLayer.startsWith('id_') ? sourceLayer.substring(3) : sourceLayer;
-    
-    layers.push({ 
-      id: `mvt-almaty-${cleanSourceLayer}`,
-      label: title, 
-      displayName: title,
-      sourceId: `mvt-almaty-source-${cleanSourceLayer}`, 
-      layerId: `mvt-almaty-${cleanSourceLayer}`, 
-      sourceLayer, 
-      workspace: workspaceName,
-      type, 
-      mvtUrl, 
-      paint,
-      layout,
-      mbLayers,
-      sprite,
-      attributes: [],
-      visible: false
-    });
-    }
 
-    await cache.setItem(cacheKey, layers, { ttl: 3600 }); // Кэш на 1 час
-    return layers;
+    await cache.setItem(cacheKey, out, { ttl: 3600 });
+    return out;
   };
 
   const pending = loadLayers();

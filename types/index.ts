@@ -20,6 +20,12 @@ export interface LayerConfig {
   category?: string;
   renderFormat?: 'mvt' | 'wms' | 'wmts';
   workspace?: string;
+  /** Из GEOSERVER_LAYER_CATALOG — URL workspace для WMS/MVT */
+  workspaceBaseUrl?: string;
+  /** Что разрешено переключать в UI */
+  supportedFormats?: { mvt?: boolean; wms?: boolean };
+  /** Источник растра WMS (совпадает с buildWmsRasterSourceId), если слой поддерживает WMS */
+  wmsRasterSourceId?: string;
   mbLayers?: any[];
   bounds?: {
     lowerCorner: [number, number];

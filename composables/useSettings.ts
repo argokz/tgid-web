@@ -61,10 +61,7 @@ export const useSettings = () => {
       const runtimeConfig = useRuntimeConfig()
       const geoserver = (runtimeConfig.public as any).geoserver || {}
       const defaultUrl = geoserver.url || 'https://itwin.kz/geoserver'
-      const defaultWorkspaceName = geoserver.workspace || 'AlmatyGIS'
-      const defaultGroupName = geoserver.groupName || defaultWorkspaceName
-      
-      const workspaces = store.getDefaultWorkspaces(geoserver, defaultUrl, defaultWorkspaceName, defaultGroupName)
+      const workspaces = store.getDefaultWorkspaces(geoserver, defaultUrl)
       
       return {
         geoserverUrl: defaultUrl,

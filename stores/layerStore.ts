@@ -16,6 +16,7 @@ import {
   restackPlanetLayersBelowOverlays,
   applyContextLayersVisibility,
 } from '~/utils/contextMapLayers';
+import { buildMvtLayerIdentifiers, buildWmsOnlyLayerIdentifiers, buildWmsRasterSourceId } from '~/utils/geoserverMvtIds';
 
 const pbfAttributeRequests = new globalThis.Map<string, Promise<string[]>>();
 
@@ -306,10 +307,22 @@ export const useLayerStore = defineStore('layer', {
             cqlFilterStr = `"fileid" IN (${allIds.map(id => `'${id}'`).join(',')})`;
           }
 
+          const ws = layer.workspace || 'AlmatyGIS';
+          const rastSid =
+            layer.wmsRasterSourceId ||
+            buildWmsRasterSourceId(ws, layer.sourceLayer);
+          const settingsStore = useSettingsStore();
+          const baseUrl =
+            layer.workspaceBaseUrl ||
+            settingsStore.workspaces.find((w) => w.workspace === ws)?.url ||
+            (useRuntimeConfig().public as any).geoserver?.url ||
+            'https://itwin.kz/geoserver';
+
           const { addWmsLayer } = useWmsLayer();
-          addWmsLayer(mapStore.map as any, layer.sourceId, layer.layerId, {
-            workspace: layer.workspace || 'AlmatyGIS',
+          addWmsLayer(mapStore.map as any, rastSid, layer.layerId, {
+            workspace: ws,
             layerName: layer.sourceLayer,
+            url: baseUrl.replace(/\/$/, ''),
             cqlFilter: cqlFilterStr
           });
         }
@@ -333,8 +346,17 @@ export const useLayerStore = defineStore('layer', {
           labelStore.syncGlobalLabels();
         };
 
+        const wsNorm = layer.workspace || 'AlmatyGIS';
+        const rastSidNorm =
+          layer.wmsRasterSourceId || buildWmsRasterSourceId(wsNorm, layer.sourceLayer);
+        const watchSourceIds = new Set<string>(
+          layer.renderFormat === 'wms'
+            ? [rastSidNorm]
+            : [layer.sourceId].filter(Boolean) as string[]
+        );
+
         const checkReady = (e: any) => {
-          if (e.sourceId !== layer.sourceId) return;
+          if (!watchSourceIds.has(e.sourceId)) return;
           const ready = mapStore.getLayerIdsOnMap(layer.layerId).some((id) => mapStore.map!.getLayer(id));
           if (!ready) return;
           if (import.meta.dev) console.debug(`LayerStore: Layer ${layer.layerId} is ready`);
@@ -528,6 +550,10 @@ export const useLayerStore = defineStore('layer', {
     async changeLayerFormat(layerId: string, format: 'mvt' | 'wms' | 'wmts') {
       const layer = this.geoServerLayers.find(l => l.layerId === layerId);
       if (!layer) return;
+      const sup = layer.supportedFormats;
+      if (format === 'mvt' && sup && sup.mvt === false) return;
+      if (format === 'wms' && sup && sup.wms === false) return;
+
       const currentFormat = layer.renderFormat || 'mvt';
       if (currentFormat === format) return;
       
@@ -539,7 +565,14 @@ export const useLayerStore = defineStore('layer', {
         for (const lId of layersToRemove) {
           if (map.getLayer(lId)) map.removeLayer(lId);
         }
-        if (map.getSource(layer.sourceId)) map.removeSource(layer.sourceId);
+        const ws = layer.workspace || 'AlmatyGIS';
+        const sl = layer.sourceLayer;
+        const vecSid = buildMvtLayerIdentifiers(ws, sl).sourceId;
+        const rastSid = layer.wmsRasterSourceId || buildWmsRasterSourceId(ws, sl);
+        const wmsOnly = buildWmsOnlyLayerIdentifiers(ws, sl);
+        for (const sid of new Set([layer.sourceId, vecSid, rastSid, wmsOnly.sourceId])) {
+          if (sid && map.getSource(sid)) map.removeSource(sid);
+        }
       }
       
       layer.renderFormat = format;

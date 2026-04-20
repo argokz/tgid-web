@@ -17,10 +17,7 @@ export const useSettingsStore = defineStore('settings', {
       const runtimeConfig = useRuntimeConfig();
       const geoserver = (runtimeConfig.public as any).geoserver || {};
       const defaultUrl = geoserver.url || 'https://itwin.kz/geoserver';
-      const defaultWorkspaceName = geoserver.workspace || 'AlmatyGIS';
-      const defaultGroupName = geoserver.groupName || defaultWorkspaceName;
-      
-      const defaultWorkspaces = this.getDefaultWorkspaces(geoserver, defaultUrl, defaultWorkspaceName, defaultGroupName);
+      const defaultWorkspaces = this.getDefaultWorkspaces(geoserver, defaultUrl);
 
       if (process.client) {
         const stored = localStorage.getItem(STORAGE_KEY);
@@ -58,37 +55,35 @@ export const useSettingsStore = defineStore('settings', {
       });
     },
 
-    getDefaultWorkspaces(geoserver: any, defaultUrl: string, defaultWorkspaceName: string, defaultGroupName: string): WorkspaceConfig[] {
-      const envWorkspaces = geoserver.workspaces;
-      let workspaces: WorkspaceConfig[] = [];
-
-      if (envWorkspaces && Array.isArray(envWorkspaces) && envWorkspaces.length > 0) {
-        workspaces = envWorkspaces.map((ws: any, index: number) => ({
-          id: ws.id || `ws-${ws.workspace?.toLowerCase() || `workspace-${index}`}`,
-          name: ws.name || ws.workspace || 'Workspace',
-          url: ws.url || defaultUrl,
-          workspace: ws.workspace || defaultWorkspaceName,
-          groupName: ws.groupName || ws.workspace || defaultGroupName,
-          enabled: ws.enabled !== false,
-          order: ws.order !== undefined ? ws.order : index + 1,
-          center: ws.center || undefined,
-          zoom: ws.zoom || undefined
-        }));
+    getDefaultWorkspaces(geoserver: any, defaultUrl: string): WorkspaceConfig[] {
+      const catalog = geoserver.layerCatalog as any[] | undefined;
+      if (catalog && Array.isArray(catalog) && catalog.length > 0) {
+        return catalog
+          .filter((ws: any) => ws.enabled !== false)
+          .sort((a: any, b: any) => (a.order ?? 999) - (b.order ?? 999))
+          .map((ws: any, index: number) => ({
+            id: ws.id || `ws-${String(ws.workspace || '').toLowerCase() || index}`,
+            name: ws.name || ws.workspace || 'Workspace',
+            url: (ws.url || defaultUrl).replace(/\/$/, ''),
+            workspace: ws.workspace,
+            groupName: ws.groupName || ws.workspace,
+            enabled: ws.enabled !== false,
+            order: ws.order !== undefined ? ws.order : index + 1,
+            center: ws.center,
+            zoom: ws.zoom
+          }))
       }
 
-      if (workspaces.length === 0) {
-        workspaces = [{
-          id: `ws-${defaultWorkspaceName.toLowerCase()}`,
-          name: defaultWorkspaceName,
-          url: defaultUrl,
-          workspace: defaultWorkspaceName,
-          groupName: defaultGroupName,
-          enabled: true,
-          order: 1
-        }];
-      }
-
-      return workspaces;
+      const w = geoserver.workspace || 'AlmatyGIS';
+      return [{
+        id: `ws-${String(w).toLowerCase()}`,
+        name: w,
+        url: defaultUrl,
+        workspace: w,
+        groupName: geoserver.groupName || w,
+        enabled: true,
+        order: 1
+      }];
     },
 
     saveSettings() {

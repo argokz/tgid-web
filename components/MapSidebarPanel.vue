@@ -361,6 +361,7 @@
                   </v-list-item-subtitle>
 
                   <div
+                    v-if="layerSupportsFormatToggle(layer)"
                     class="format-row mt-1"
                     @click.stop
                   >
@@ -819,13 +820,26 @@ watch(
   { deep: true, immediate: true }
 )
 
+function layerSupportsFormatToggle(layer: { supportedFormats?: { mvt?: boolean; wms?: boolean } }) {
+  const s = layer.supportedFormats
+  if (!s) return true
+  const m = s.mvt !== false
+  const w = s.wms !== false
+  return m && w
+}
+
 watch(
   () => layerStore.geoServerLayers,
-  (layers: Array<{ layerId: string; renderFormat?: string }>) => {
+  (layers: Array<{ layerId: string; renderFormat?: string; supportedFormats?: { mvt?: boolean; wms?: boolean } }>) => {
     const next: Record<string, 'mvt' | 'wms'> = {}
     for (const layer of layers) {
       const key = layer.layerId
-      const current = layer.renderFormat === 'wms' ? 'wms' : 'mvt'
+      const s = layer.supportedFormats
+      const onlyWms = s && s.mvt === false && s.wms === true
+      const onlyMvt = s && s.mvt === true && s.wms === false
+      let current = layer.renderFormat === 'wms' ? 'wms' : 'mvt'
+      if (onlyWms) current = 'wms'
+      if (onlyMvt) current = 'mvt'
       next[key] = pendingFormats.value[key] ?? current
     }
     pendingFormats.value = next
@@ -846,7 +860,8 @@ const hasPendingLayerChanges = computed(() => {
   const b = sortIdsByListOrder([...layerStore.visibleGeoServerLayers]).join('\0')
   const contextA = JSON.stringify([...pendingContextLayers.value])
   const contextB = JSON.stringify([...visibleContextLayers.value])
-  const formatChanged = layerStore.geoServerLayers.some((layer: { layerId: string; renderFormat?: string }) => {
+  const formatChanged = layerStore.geoServerLayers.some((layer: { layerId: string; renderFormat?: string; supportedFormats?: { mvt?: boolean; wms?: boolean } }) => {
+    if (!layerSupportsFormatToggle(layer)) return false
     const current = layer.renderFormat === 'wms' ? 'wms' : 'mvt'
     return getPendingFormat(layer.layerId) !== current
   })
@@ -865,6 +880,7 @@ async function applyPendingLayers() {
   layersApplying.value = true
   try {
     for (const layer of layerStore.geoServerLayers) {
+      if (!layerSupportsFormatToggle(layer)) continue
       const desired = getPendingFormat(layer.layerId)
       const current = layer.renderFormat === 'wms' ? 'wms' : 'mvt'
       if (desired !== current) {

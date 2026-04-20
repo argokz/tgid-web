@@ -1,3 +1,5 @@
+import { parseMvtLayerId } from '~/utils/geoserverMvtIds';
+
 const GLOBAL_KEY = '__layerAttributesPending__';
 const pendingRequests: Map<string, Promise<any>> = (globalThis as any)[GLOBAL_KEY] || new Map();
 (globalThis as any)[GLOBAL_KEY] = pendingRequests;
@@ -28,24 +30,21 @@ export default defineEventHandler(async (event) => {
   }
 
   const loader = (async () => {
-    // Формируем URL для запроса к GeoServer
-    const geoserverUrl =
-      runtimeConfig.geoserverDescribeFeatureUrl ||
-      'http://145.249.247.138:8085/geoserver/almaty/ows';
-    const layerNamespace = runtimeConfig.geoserverLayerNamespace || 'almaty';
-    
-    // Извлекаем имя слоя из layerId (убираем префикс mvt-almaty-)
-    const layerName = layerId.replace('mvt-almaty-', '');
-    
+    const geoserverBase =
+      String((runtimeConfig.public as any)?.geoserver?.url || 'https://itwin.kz/geoserver').replace(/\/$/, '');
+    const fallbackWs =
+      String((runtimeConfig.public as any)?.geoserver?.workspace || 'AlmatyGIS');
+    const { workspace, sourceLayer } = parseMvtLayerId(layerId, fallbackWs);
+    const geoserverUrl = `${geoserverBase}/${encodeURIComponent(workspace)}/ows`;
+
     const params = new URLSearchParams({
       service: 'WFS',
       version: '1.0.0',
       request: 'DescribeFeatureType',
-      typeName: `${layerNamespace}:${layerName}`, // Добавляем пространство имен
+      typeName: `${workspace}:${sourceLayer}`,
       outputFormat: 'application/json'
     });
 
-    // Делаем запрос к GeoServer
     const response = await $fetch(`${geoserverUrl}?${params.toString()}`);
 
     // Парсим ответ и извлекаем атрибуты

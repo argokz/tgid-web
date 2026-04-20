@@ -37,6 +37,8 @@
     "jsdom": "^26.1.0",
     "nuxt": "^3.19.3",
     "pinia": "^3.0.1",
+    "three": "^0.184.0",
+    "threebox-plugin": "^2.2.7",
     "vue": "latest",
     "vue-router": "latest"
   },

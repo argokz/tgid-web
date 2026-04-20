@@ -2,6 +2,7 @@
 import vuetify from 'vite-plugin-vuetify'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
+import { parseGeoserverLayerCatalog } from './utils/geoserverLayerCatalog'
 
 // Загружаем переменные окружения явно из .env файла
 const env: Record<string, string> = {}
@@ -23,6 +24,11 @@ try {
   console.warn('[nuxt.config.ts] Не удалось загрузить .env:', e)
 }
 
+const geoserverLayerCatalog = parseGeoserverLayerCatalog(
+  process.env.GEOSERVER_LAYER_CATALOG || env.GEOSERVER_LAYER_CATALOG || ''
+)
+const geoserverCatalogFirst = geoserverLayerCatalog?.[0]
+
 export default defineNuxtConfig({
   runtimeConfig: {
     geoserverCapabilitiesUrl:
@@ -33,14 +39,23 @@ export default defineNuxtConfig({
       process.env.GEOSERVER_MVT_TEMPLATE_URL ||
       env.GEOSERVER_MVT_TEMPLATE_URL ||
       'https://itwin.kz/geoserver/ows?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS={layerName}&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&SRS=EPSG:3857&FORMAT=application/vnd.mapbox-vector-tile',
-    geoserverDescribeFeatureUrl:
-      process.env.GEOSERVER_DESCRIBE_FEATURE_URL ||
-      env.GEOSERVER_DESCRIBE_FEATURE_URL ||
-      'http://145.249.247.138:8085/geoserver/almaty/ows',
-    geoserverLayerNamespace:
-      process.env.GEOSERVER_LAYER_NAMESPACE ||
-      env.GEOSERVER_LAYER_NAMESPACE ||
-      'almaty',
+    /** true — перед добавлением слоя дернуть GET по MVT URL с тестовым BBOX (опционально). */
+    geoserverMvtProbeTiles:
+      process.env.GEOSERVER_MVT_PROBE_TILES === 'true' ||
+      env.GEOSERVER_MVT_PROBE_TILES === 'true',
+    /** Явный базовый URL для REST GeoServer (если пусто — берётся из GEOSERVER_CAPABILITIES_URL до сегмента `/geoserver`, иначе NUXT_PUBLIC_GEOSERVER_URL) */
+    geoserverRestUrl:
+      process.env.GEOSERVER_REST_URL ||
+      env.GEOSERVER_REST_URL ||
+      '',
+    geoserverRestUser:
+      process.env.GEOSERVER_REST_USER ||
+      env.GEOSERVER_REST_USER ||
+      '',
+    geoserverRestPassword:
+      process.env.GEOSERVER_REST_PASSWORD ||
+      env.GEOSERVER_REST_PASSWORD ||
+      '',
     public: {
       externalApiUrl: process.env.EXTERNAL_API_URL || env.EXTERNAL_API_URL || 'http://localhost:8000',
       mapApiBaseUrl:
@@ -51,23 +66,15 @@ export default defineNuxtConfig({
         'http://localhost:8000',
       maptilerKey: process.env.NUXT_PUBLIC_MAPTILER_KEY || env.NUXT_PUBLIC_MAPTILER_KEY || '',
       geoserver: {
-        url: process.env.NUXT_PUBLIC_GEOSERVER_URL || env.NUXT_PUBLIC_GEOSERVER_URL || 'https://itwin.kz/geoserver',
-        workspace: process.env.NUXT_PUBLIC_GEOSERVER_WORKSPACE || env.NUXT_PUBLIC_GEOSERVER_WORKSPACE || 'AlmatyGIS',
-        groupName: process.env.NUXT_PUBLIC_GEOSERVER_GROUP_NAME || env.NUXT_PUBLIC_GEOSERVER_GROUP_NAME || 'AlmatyGIS',
-        workspaces: (() => {
-          const workspacesEnv = env.NUXT_PUBLIC_GEOSERVER_WORKSPACES || process.env.NUXT_PUBLIC_GEOSERVER_WORKSPACES
-          if (!workspacesEnv) return undefined
-          try {
-            let cleaned = workspacesEnv.trim()
-            if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
-              cleaned = cleaned.slice(1, -1)
-            }
-            const parsed = JSON.parse(cleaned)
-            return Array.isArray(parsed) ? parsed as any : undefined
-          } catch (e) {
-            return undefined
-          }
-        })() as any
+        url:
+          process.env.NUXT_PUBLIC_GEOSERVER_URL ||
+          env.NUXT_PUBLIC_GEOSERVER_URL ||
+          geoserverCatalogFirst?.url ||
+          'https://itwin.kz/geoserver',
+        /** Каталог workspace + слои (подписи, mvt/wms). Единственный источник списка схем для UI. */
+        layerCatalog: geoserverLayerCatalog || undefined,
+        workspace: geoserverCatalogFirst?.workspace || 'AlmatyGIS',
+        groupName: geoserverCatalogFirst?.groupName || geoserverCatalogFirst?.workspace || 'AlmatyGIS'
       }
     }
   },

@@ -272,16 +272,6 @@ export const useMapStore = defineStore('map', {
         case 'google': source = this.googleSource; break;
         case 'dg':
         case '2gis': source = this.dgSource; break;
-        case 'satellite':
-          source = {
-            type: 'raster' as const,
-            tiles: ['http://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}'],
-            tileSize: 256,
-            attribution: '© Google',
-            minzoom: 0,
-            maxzoom: 21,
-          };
-          break;
         case 'stadia':
         default:
           source = getMapTilerKey() ? this.mapTilerSource : this.osmSource;

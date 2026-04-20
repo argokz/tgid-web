@@ -72,14 +72,6 @@ export const useBaseLayers = () => {
       attribution: '© Google',
       icon: 'mdi-google-maps',
       maxZoom: 20
-    },
-    {
-      id: 'satellite',
-      name: 'Спутник (Google)',
-      url: 'http://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}',
-      attribution: '© Google',
-      icon: 'mdi-satellite-variant',
-      maxZoom: 21
     }
   ]
 
