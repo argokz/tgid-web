@@ -55,8 +55,20 @@
             <div v-else-if="error" class="pa-6 text-center text-error">
               <v-icon size="48" class="mb-3">mdi-alert-circle</v-icon>
               <div>{{ error }}</div>
+              <v-btn class="mt-4" variant="tonal" color="primary" size="small" @click="fetchData">
+                Повторить
+              </v-btn>
             </div>
-            
+
+            <div v-else-if="!faults.length" class="pa-8 text-center text-medium-emphasis">
+              <v-icon size="48" class="mb-3" color="success">mdi-check-circle-outline</v-icon>
+              <div class="text-subtitle-1 mb-1">Неисправности не зарегистрированы</div>
+              <div class="text-caption">
+                В базе нет записей о дефектах и индикаторах коррозии —
+                они появятся здесь после регистрации в журналах.
+              </div>
+            </div>
+
             <v-list v-else lines="two" class="pa-0">
               <v-list-item v-for="(fault, index) in faults" :key="index" class="border-bottom" @click="locateFault(fault)">
                 <template v-slot:prepend>
@@ -113,13 +125,12 @@ const emit = defineEmits<{
 }>()
 
 const fetchData = async () => {
-  if (activeTab.value !== 'list') return;
   loading.value = true
   error.value = null
   try {
     const defectsRes = await fastApiService.getDefects({ page: 1, pageSize: 100 })
     const corrosionRes = await fastApiService.getCorrosionIndicators({ page: 1, pageSize: 100 })
-    
+
     const defects = (defectsRes.items || []).map((i: any) => ({
       id: i.id,
       type: 'defect',
@@ -141,7 +152,11 @@ const fetchData = async () => {
     // Combine and sort by ID descending (newest first roughly)
     faults.value = [...defects, ...corrosions].sort((a, b) => b.id - a.id)
   } catch (err: any) {
-    error.value = 'Не удалось загрузить неисправности: ' + err.message
+    // 404 на журнальных маршрутах = на сервере развёрнута устаревшая версия API
+    const status = err?.statusCode || err?.response?.status
+    error.value = status === 404
+      ? 'Маршруты журналов недоступны на сервере API. Похоже, развёрнута устаревшая версия itwin-api — обновите её.'
+      : 'Не удалось загрузить неисправности: ' + (err?.message || 'неизвестная ошибка')
     notificationStore.showError(error.value)
   } finally {
     loading.value = false
@@ -149,18 +164,23 @@ const fetchData = async () => {
 }
 
 watch(activeTab, () => {
-  if (activeTab.value === 'list' && faults.value.length === 0) {
+  if (activeTab.value === 'list' && faults.value.length === 0 && !loading.value) {
     fetchData()
   }
 })
+
+const hasLoaded = ref(false)
 
 watch(() => mapStore.isDefectsLayerVisible, () => mapStore.toggleDefectsLayer())
 watch(() => mapStore.isCorrosionLayerVisible, () => mapStore.toggleCorrosionLayer())
 
 const openDialog = () => {
   dialog.value = true
-  if (activeTab.value === 'list') {
-    fetchData()
+  // Данные грузим сразу: счётчик в подписи вкладки должен быть виден
+  // ещё до перехода на «Список неисправностей».
+  if (!hasLoaded.value) {
+    hasLoaded.value = true
+    void fetchData()
   }
 }
 

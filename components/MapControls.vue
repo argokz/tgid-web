@@ -256,1281 +256,124 @@
     <div class="control-buttons">
 
 
-      <!-- Node search -->
-
-
+      <!-- Поиск узлов -->
       <v-tooltip text="Поиск узлов" location="left">
-
-
         <template #activator="{ props: tp }">
-
-
           <v-btn
-
-
             v-bind="tp"
-
-
             icon
-
-
             size="large"
-
-
             elevation="4"
-
-
             color="white"
-
-
             class="control-btn"
-
-
             aria-label="Поиск узлов"
-
-
             @click="$emit('open-node-search')"
-
-
           >
-
-
             <v-icon color="primary">mdi-map-search</v-icon>
-
-
           </v-btn>
-
-
         </template>
-
-
       </v-tooltip>
 
-
-
-
-
-      <!-- Calculation Diagnostics -->
-
-
-      <v-tooltip text="Диагностика расчетов" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            color="white"
-
-
-            class="control-btn mt-2"
-
-
-            aria-label="Диагностика расчетов"
-
-
-            @click="$emit('open-calculation-diagnostics')"
-
-
-          >
-
-
-            <v-icon color="primary">mdi-calculator-variant</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Calculation Diagnostics -->
-
-
-
-
-
-      <!-- Topology Diagnostics -->
-
-
-      <v-tooltip text="Диагностика неисправностей" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            color="white"
-
-
-            class="control-btn mt-2"
-
-
-            aria-label="Диагностика неисправностей"
-
-
-            @click="$emit('open-fault-diagnostics')"
-
-
-          >
-
-
-            <v-icon color="error">mdi-alert-octagon</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Calculation Diagnostics -->
-
-
-      <v-tooltip text="Диагностика расчетов" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            color="white"
-
-
-            class="control-btn mt-2"
-
-
-            aria-label="Диагностика расчетов"
-
-
-            @click="$emit('open-calculation-diagnostics')"
-
-
-          >
-
-
-            <v-icon color="primary">mdi-calculator-variant</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Calculation Diagnostics -->
-
-
-
-
-
-      <!-- Topology Diagnostics -->
-
-
-      <v-tooltip text="Диагностика топологии" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            color="white"
-
-
-            class="control-btn"
-
-
-            aria-label="Диагностика топологии"
-
-
-            @click="$emit('open-topology-diagnostics')"
-
-
-          >
-
-
-            <v-icon color="deep-purple-darken-2">mdi-stethoscope</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Edit Topology Mode -->
-
-
-      <v-tooltip
-
-
-        v-if="topologyEditingEnabled"
-
-
-        :text="isEditTopologyMode ? 'Отключить режим редактирования топологии' : 'Редактировать топологию сети'"
-
-
+      <!--
+        Журналы, реестры и диагностика — единое меню вместо 20+ кнопок в столбце.
+        Каждый пункт с иконкой и подписью, сгруппирован по разделам.
+      -->
+      <v-menu
+        v-model="toolsMenuOpen"
         location="left"
-
-
+        :close-on-content-click="true"
+        transition="scale-transition"
+        max-height="80vh"
       >
+        <template #activator="{ props: menuProps }">
+          <v-tooltip text="Журналы, реестры и отчёты" location="left">
+            <template #activator="{ props: tp }">
+              <v-btn
+                v-bind="{ ...menuProps, ...tp }"
+                icon
+                size="large"
+                elevation="4"
+                :color="toolsMenuOpen ? 'primary' : 'white'"
+                class="control-btn mt-2"
+                aria-label="Журналы, реестры и отчёты"
+              >
+                <v-icon :color="toolsMenuOpen ? 'white' : 'primary'">mdi-view-grid-plus-outline</v-icon>
+              </v-btn>
+            </template>
+          </v-tooltip>
+        </template>
+
+        <v-card class="tools-menu-card" rounded="lg" elevation="8">
+          <div class="tools-menu-header px-4 py-3">
+            <v-icon size="20" color="primary" class="me-2">mdi-view-grid-plus-outline</v-icon>
+            <span class="text-subtitle-2 font-weight-bold">Журналы, реестры и отчёты</span>
+          </div>
+          <v-divider />
+          <v-text-field
+            v-model="toolsSearch"
+            density="compact"
+            variant="solo-filled"
+            flat
+            hide-details
+            clearable
+            prepend-inner-icon="mdi-magnify"
+            placeholder="Найти журнал или отчёт…"
+            aria-label="Поиск по журналам и отчётам"
+            class="tools-menu-search px-3 py-2"
+            @click.stop
+            @keydown.stop
+          />
+          <v-divider />
+
+          <div class="tools-menu-body">
+            <template v-for="group in filteredToolGroups" :key="group.title">
+              <div class="tools-group-title px-4 pt-3 pb-1">
+                <v-icon size="14" :color="group.color" class="me-1">{{ group.icon }}</v-icon>
+                <span class="text-caption font-weight-bold text-uppercase">{{ group.title }}</span>
+              </div>
+              <div class="tools-grid px-2 pb-2">
+                <button
+                  v-for="tool in group.items"
+                  :key="tool.event"
+                  type="button"
+                  class="tool-tile"
+                  :aria-label="tool.label"
+                  @click="runTool(tool)"
+                >
+                  <v-icon :color="tool.color" size="22">{{ tool.icon }}</v-icon>
+                  <span class="tool-tile__label">{{ tool.label }}</span>
+                </button>
+              </div>
+            </template>
+
+            <div v-if="!filteredToolGroups.length" class="pa-6 text-center text-medium-emphasis">
+              <v-icon size="32" class="mb-2">mdi-file-search-outline</v-icon>
+              <div class="text-body-2">Ничего не найдено</div>
+            </div>
+          </div>
+        </v-card>
+      </v-menu>
 
 
+
+      <!-- Edit Topology Mode (режим карты, поэтому остаётся отдельной кнопкой) -->
+      <v-tooltip
+        v-if="topologyEditingEnabled"
+        :text="isEditTopologyMode ? 'Выключить редактирование топологии' : 'Редактировать топологию сети'"
+        location="left"
+      >
         <template #activator="{ props: tp }">
-
-
           <v-btn
-
-
             v-bind="tp"
-
-
             icon
-
-
             size="large"
-
-
             elevation="4"
-
-
-            :color="isEditTopologyMode ? 'error' : 'white'"
-
-
-            class="control-btn"
-
-
-            :class="{ 'identify-active': isEditTopologyMode }"
-
-
+            :color="isEditTopologyMode ? 'red' : 'white'"
+            class="control-btn mt-2"
             aria-label="Редактировать топологию сети"
-
-
             @click="$emit('toggle-edit-topology-mode')"
-
-
           >
-
-
             <v-icon :color="isEditTopologyMode ? 'white' : 'red'">mdi-pencil-network</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Passports Tree Mode -->
-
-
-      <v-tooltip location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Дерево паспортов"
-
-
-            @click="openPassportDialog"
-
-
-          >
-
-
-            <v-icon color="success">mdi-file-tree</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-        <span>Отчеты и паспорта</span>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Defect journal migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Журнал нарушений" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть журнал нарушений"
-
-
-            @click="$emit('open-defect-journal')"
-
-
-          >
-
-
-            <v-icon color="deep-orange-darken-2">mdi-alert-decagram-outline</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Shurf journal migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Журнал шурфовок" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть журнал шурфовок"
-
-
-            @click="$emit('open-shurf-journal')"
-
-
-          >
-
-
-            <v-icon color="brown-darken-2">mdi-shovel</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Inspection journal migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Журнал осмотров" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть журнал осмотров"
-
-
-            @click="$emit('open-inspection-journal')"
-
-
-          >
-
-
-            <v-icon color="teal-darken-2">mdi-clipboard-search-outline</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Repair journal migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Журнал ремонтов" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть журнал ремонтов"
-
-
-            @click="$emit('open-repair-journal')"
-
-
-          >
-
-
-            <v-icon color="deep-purple-darken-2">mdi-hammer-wrench</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Pressure test journal migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Журнал опрессовок" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть журнал опрессовок"
-
-
-            @click="$emit('open-pressure-test-journal')"
-
-
-          >
-
-
-            <v-icon color="blue-darken-2">mdi-gauge</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Technical conditions registry migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Технические условия" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть реестр технических условий"
-
-
-            @click="$emit('open-technical-condition-journal')"
-
-
-          >
-
-
-            <v-icon color="cyan-darken-3">mdi-file-certificate-outline</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Corrosion indicators migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Индикаторы коррозии" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть журнал индикаторов коррозии"
-
-
-            @click="$emit('open-corrosion-indicator-journal')"
-
-
-          >
-
-
-            <v-icon color="orange-darken-3">mdi-test-tube</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- ALSEKO contractual loads migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Объекты АЛСЕКО" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть реестр объектов АЛСЕКО"
-
-
-            @click="$emit('open-alseko-journal')"
-
-
-          >
-
-
-            <v-icon color="indigo-darken-2">mdi-office-building-marker</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Electrical network inventory migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Электрическая сеть" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть журнал электрической сети"
-
-
-            @click="$emit('open-electrical-network-journal')"
-
-
-          >
-
-
-            <v-icon color="amber-darken-4">mdi-transmission-tower</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Heat-loss seasons and source readiness migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Тепловые потери" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть журнал тепловых потерь"
-
-
-            @click="$emit('open-heat-loss-journal')"
-
-
-          >
-
-
-            <v-icon color="deep-orange-darken-3">mdi-heat-wave</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Temperature graphs and source operating conditions migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Температурные графики" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть температурные графики источников"
-
-
-            @click="$emit('open-temperature-graph-journal')"
-
-
-          >
-
-
-            <v-icon color="purple-darken-3">mdi-chart-bell-curve-cumulative</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Consumer load diagnostics migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Диагностика тепловых нагрузок" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть диагностику тепловых нагрузок"
-
-
-            @click="$emit('open-consumer-load-diagnostics')"
-
-
-          >
-
-
-            <v-icon color="teal-darken-3">mdi-home-lightning-bolt-outline</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Pump inventory and characteristic curves migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Насосное оборудование" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть насосное оборудование"
-
-
-            @click="$emit('open-pump-equipment')"
-
-
-          >
-
-
-            <v-icon color="blue-grey-darken-3">mdi-pump</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <!-- Network dampers and regulating armatures migrated from TGID Desktop -->
-
-
-      <v-tooltip text="Запорная и регулирующая арматура" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть запорную и регулирующую арматуру"
-
-
-            @click="$emit('open-network-armatures')"
-
-
-          >
-
-
-            <v-icon color="deep-purple-darken-3">mdi-valve</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <v-tooltip text="Сетевые регуляторы" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть сетевые регуляторы"
-
-
-            @click="$emit('open-network-regulators')"
-
-
-          >
-
-
-            <v-icon color="indigo-darken-3">mdi-tune-vertical</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <v-tooltip text="Байпасы наружных теплопроводов" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть байпасы наружных теплопроводов"
-
-
-            @click="$emit('open-network-bypasses')"
-
-
-          >
-
-
-            <v-icon color="cyan-darken-4">mdi-pipe-valve</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <v-tooltip text="Диафрагмы наружных теплопроводов" location="left">
-
-
-        <template #activator="{ props: tp }">
-
-
-          <v-btn
-
-
-            v-bind="tp"
-
-
-            icon
-
-
-            size="large"
-
-
-            elevation="4"
-
-
-            class="control-btn bg-white"
-
-
-            aria-label="Открыть диафрагмы наружных теплопроводов"
-
-
-            @click="$emit('open-network-diaphragms')"
-
-
-          >
-
-
-            <v-icon color="teal-darken-4">mdi-circle-slice-8</v-icon>
-
-
-          </v-btn>
-
-
-        </template>
-
-
-      </v-tooltip>
-
-
-
-
-
-      <v-tooltip text="Элеваторы" location="left">
-        <template #activator="{ props: tp }">
-          <v-btn
-            v-bind="tp"
-            icon
-            size="large"
-            elevation="4"
-            class="control-btn bg-white"
-            aria-label="Открыть журнал элеваторов"
-            @click="$emit('open-elevators')"
-          >
-            <v-icon color="blue-grey-darken-4">mdi-elevator</v-icon>
           </v-btn>
         </template>
       </v-tooltip>
@@ -2659,6 +1502,109 @@ const toggle2D3D = () => {
 
 const openPassportDialog = () => emit('open-passport-dialog')
 
+/**
+ * Каталог инструментов для меню «Журналы, реестры и отчёты».
+ * Раньше это были 20+ отдельных кнопок в вертикальном столбце поверх карты:
+ * они занимали весь экран по высоте и не читались без наведения.
+ */
+// Параметризованный тип emit сводится к последней перегрузке, поэтому список
+// событий меню задан явно.
+type ToolEvent =
+  | 'open-topology-diagnostics'
+  | 'open-fault-diagnostics'
+  | 'open-calculation-diagnostics'
+  | 'open-passport-dialog'
+  | 'open-defect-journal'
+  | 'open-shurf-journal'
+  | 'open-inspection-journal'
+  | 'open-repair-journal'
+  | 'open-pressure-test-journal'
+  | 'open-technical-condition-journal'
+  | 'open-corrosion-indicator-journal'
+  | 'open-alseko-journal'
+  | 'open-electrical-network-journal'
+  | 'open-heat-loss-journal'
+  | 'open-temperature-graph-journal'
+  | 'open-consumer-load-diagnostics'
+  | 'open-pump-equipment'
+  | 'open-network-armatures'
+  | 'open-network-regulators'
+  | 'open-network-bypasses'
+  | 'open-network-diaphragms'
+  | 'open-elevators'
+interface ToolItem { label: string; icon: string; color: string; event: ToolEvent }
+interface ToolGroup { title: string; icon: string; color: string; items: ToolItem[] }
+
+const toolsMenuOpen = ref(false)
+const toolsSearch = ref('')
+
+const toolGroups: ToolGroup[] = [
+  {
+    title: 'Эксплуатация',
+    icon: 'mdi-clipboard-text-outline',
+    color: 'deep-orange-darken-2',
+    items: [
+      { label: 'Нарушения', icon: 'mdi-alert-decagram-outline', color: 'deep-orange-darken-2', event: 'open-defect-journal' },
+      { label: 'Шурфовки', icon: 'mdi-shovel', color: 'brown-darken-2', event: 'open-shurf-journal' },
+      { label: 'Осмотры', icon: 'mdi-clipboard-search-outline', color: 'teal-darken-2', event: 'open-inspection-journal' },
+      { label: 'Ремонты', icon: 'mdi-hammer-wrench', color: 'deep-purple-darken-2', event: 'open-repair-journal' },
+      { label: 'Опрессовки', icon: 'mdi-gauge', color: 'blue-darken-2', event: 'open-pressure-test-journal' },
+      { label: 'Индикаторы коррозии', icon: 'mdi-test-tube', color: 'orange-darken-3', event: 'open-corrosion-indicator-journal' },
+    ],
+  },
+  {
+    title: 'Оборудование сети',
+    icon: 'mdi-pipe-valve',
+    color: 'blue-grey-darken-3',
+    items: [
+      { label: 'Насосное оборудование', icon: 'mdi-pump', color: 'blue-grey-darken-3', event: 'open-pump-equipment' },
+      { label: 'Запорная арматура', icon: 'mdi-valve', color: 'deep-purple-darken-3', event: 'open-network-armatures' },
+      { label: 'Сетевые регуляторы', icon: 'mdi-tune-vertical', color: 'indigo-darken-3', event: 'open-network-regulators' },
+      { label: 'Байпасы', icon: 'mdi-pipe-valve', color: 'cyan-darken-4', event: 'open-network-bypasses' },
+      { label: 'Диафрагмы', icon: 'mdi-circle-slice-8', color: 'teal-darken-4', event: 'open-network-diaphragms' },
+      { label: 'Элеваторы', icon: 'mdi-elevator', color: 'blue-grey-darken-4', event: 'open-elevators' },
+    ],
+  },
+  {
+    title: 'Расчёты и диагностика',
+    icon: 'mdi-calculator-variant',
+    color: 'primary',
+    items: [
+      { label: 'Диагностика расчётов', icon: 'mdi-calculator-variant', color: 'primary', event: 'open-calculation-diagnostics' },
+      { label: 'Диагностика топологии', icon: 'mdi-stethoscope', color: 'deep-purple-darken-2', event: 'open-topology-diagnostics' },
+      { label: 'Поиск неисправностей', icon: 'mdi-alert-octagon', color: 'error', event: 'open-fault-diagnostics' },
+      { label: 'Тепловые нагрузки', icon: 'mdi-home-lightning-bolt-outline', color: 'teal-darken-3', event: 'open-consumer-load-diagnostics' },
+      { label: 'Тепловые потери', icon: 'mdi-heat-wave', color: 'deep-orange-darken-3', event: 'open-heat-loss-journal' },
+      { label: 'Температурные графики', icon: 'mdi-chart-bell-curve-cumulative', color: 'purple-darken-3', event: 'open-temperature-graph-journal' },
+    ],
+  },
+  {
+    title: 'Реестры и отчёты',
+    icon: 'mdi-file-tree',
+    color: 'success',
+    items: [
+      { label: 'Отчёты и паспорта', icon: 'mdi-file-tree', color: 'success', event: 'open-passport-dialog' },
+      { label: 'Технические условия', icon: 'mdi-file-certificate-outline', color: 'cyan-darken-3', event: 'open-technical-condition-journal' },
+      { label: 'Объекты АЛСЕКО', icon: 'mdi-office-building-marker', color: 'indigo-darken-2', event: 'open-alseko-journal' },
+      { label: 'Электрическая сеть', icon: 'mdi-transmission-tower', color: 'amber-darken-4', event: 'open-electrical-network-journal' },
+    ],
+  },
+]
+
+const filteredToolGroups = computed<ToolGroup[]>(() => {
+  const s = (toolsSearch.value || '').trim().toLowerCase()
+  if (!s) return toolGroups
+  return toolGroups
+    .map((g) => ({ ...g, items: g.items.filter((i) => i.label.toLowerCase().includes(s)) }))
+    .filter((g) => g.items.length > 0)
+})
+
+const runTool = (tool: ToolItem) => {
+  toolsMenuOpen.value = false
+  toolsSearch.value = ''
+  ;(emit as (event: ToolEvent) => void)(tool.event)
+}
+
 
 
 
@@ -2870,6 +1816,72 @@ defineExpose({ identifyMode })
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
 
+}
+
+/* --- Меню «Журналы, реестры и отчёты» --- */
+.tools-menu-card {
+  width: min(420px, calc(100vw - 32px));
+  overflow: hidden;
+}
+
+.tools-menu-header {
+  display: flex;
+  align-items: center;
+}
+
+.tools-menu-search :deep(.v-field) {
+  border-radius: 8px;
+}
+
+.tools-menu-body {
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.tools-group-title {
+  display: flex;
+  align-items: center;
+  color: rgb(var(--v-theme-on-surface));
+  opacity: 0.72;
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tool-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.tool-tile:hover,
+.tool-tile:focus-visible {
+  background: rgba(var(--v-theme-primary), 0.08);
+  border-color: rgba(var(--v-theme-primary), 0.24);
+  outline: none;
+}
+
+.tool-tile__label {
+  font-size: 13px;
+  line-height: 1.25;
+  color: rgb(var(--v-theme-on-surface));
+}
+
+@media (max-width: 600px) {
+  .tools-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 
