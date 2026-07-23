@@ -274,85 +274,42 @@
         </template>
       </v-tooltip>
 
-      <!--
-        Журналы, реестры и диагностика — единое меню вместо 20+ кнопок в столбце.
-        Каждый пункт с иконкой и подписью, сгруппирован по разделам.
-      -->
-      <v-menu
-        v-model="toolsMenuOpen"
-        location="left"
-        :close-on-content-click="true"
-        transition="scale-transition"
-        max-height="80vh"
-      >
-        <template #activator="{ props: menuProps }">
-          <v-tooltip text="Журналы, реестры и отчёты" location="left">
-            <template #activator="{ props: tp }">
-              <v-btn
-                v-bind="{ ...menuProps, ...tp }"
-                icon
-                size="large"
-                elevation="4"
-                :color="toolsMenuOpen ? 'primary' : 'white'"
-                class="control-btn mt-2"
-                aria-label="Журналы, реестры и отчёты"
-              >
-                <v-icon :color="toolsMenuOpen ? 'white' : 'primary'">mdi-view-grid-plus-outline</v-icon>
-              </v-btn>
-            </template>
-          </v-tooltip>
+      <!-- Инструменты приложения (журналы, реестры, отчёты) — отдельная панель -->
+      <v-tooltip text="Инструменты: журналы, реестры, отчёты" location="left">
+        <template #activator="{ props: tp }">
+          <v-btn
+            v-bind="tp"
+            icon
+            size="large"
+            elevation="4"
+            :color="uiStore.toolsPanelOpen ? 'primary' : 'white'"
+            class="control-btn mt-2"
+            aria-label="Инструменты: журналы, реестры, отчёты"
+            @click="uiStore.toggleToolsPanel()"
+          >
+            <v-icon :color="uiStore.toolsPanelOpen ? 'white' : 'primary'">mdi-toolbox-outline</v-icon>
+          </v-btn>
         </template>
+      </v-tooltip>
 
-        <v-card class="tools-menu-card" rounded="lg" elevation="8">
-          <div class="tools-menu-header px-4 py-3">
-            <v-icon size="20" color="primary" class="me-2">mdi-view-grid-plus-outline</v-icon>
-            <span class="text-subtitle-2 font-weight-bold">Журналы, реестры и отчёты</span>
-          </div>
-          <v-divider />
-          <v-text-field
-            v-model="toolsSearch"
-            density="compact"
-            variant="solo-filled"
-            flat
-            hide-details
-            clearable
-            prepend-inner-icon="mdi-magnify"
-            placeholder="Найти журнал или отчёт…"
-            aria-label="Поиск по журналам и отчётам"
-            class="tools-menu-search px-3 py-2"
-            @click.stop
-            @keydown.stop
-          />
-          <v-divider />
+      <!-- Рисование и измерения — отдельная панель на карте -->
+      <v-tooltip text="Рисование и измерения" location="left">
+        <template #activator="{ props: tp }">
+          <v-btn
+            v-bind="tp"
+            icon
+            size="large"
+            elevation="4"
+            :color="uiStore.drawPanelOpen ? 'primary' : 'white'"
+            class="control-btn mt-2"
+            aria-label="Рисование и измерения"
+            @click="uiStore.toggleDrawPanel()"
+          >
+            <v-icon :color="uiStore.drawPanelOpen ? 'white' : 'primary'">mdi-draw</v-icon>
+          </v-btn>
+        </template>
+      </v-tooltip>
 
-          <div class="tools-menu-body">
-            <template v-for="group in filteredToolGroups" :key="group.title">
-              <div class="tools-group-title px-4 pt-3 pb-1">
-                <v-icon size="14" :color="group.color" class="me-1">{{ group.icon }}</v-icon>
-                <span class="text-caption font-weight-bold text-uppercase">{{ group.title }}</span>
-              </div>
-              <div class="tools-grid px-2 pb-2">
-                <button
-                  v-for="tool in group.items"
-                  :key="tool.event"
-                  type="button"
-                  class="tool-tile"
-                  :aria-label="tool.label"
-                  @click="runTool(tool)"
-                >
-                  <v-icon :color="tool.color" size="22">{{ tool.icon }}</v-icon>
-                  <span class="tool-tile__label">{{ tool.label }}</span>
-                </button>
-              </div>
-            </template>
-
-            <div v-if="!filteredToolGroups.length" class="pa-6 text-center text-medium-emphasis">
-              <v-icon size="32" class="mb-2">mdi-file-search-outline</v-icon>
-              <div class="text-body-2">Ничего не найдено</div>
-            </div>
-          </div>
-        </v-card>
-      </v-menu>
 
 
 
@@ -934,6 +891,7 @@ import { useNotificationStore } from '~/stores/notificationStore'
 
 
 import { useCesiumStore } from '~/stores/cesiumStore'
+import { useUiStore } from '~/stores/uiStore'
 
 
 
@@ -1072,6 +1030,7 @@ const notificationStore = useNotificationStore()
 
 
 const cesiumStore = useCesiumStore()
+const uiStore = useUiStore()
 
 
 
@@ -1502,108 +1461,6 @@ const toggle2D3D = () => {
 
 const openPassportDialog = () => emit('open-passport-dialog')
 
-/**
- * Каталог инструментов для меню «Журналы, реестры и отчёты».
- * Раньше это были 20+ отдельных кнопок в вертикальном столбце поверх карты:
- * они занимали весь экран по высоте и не читались без наведения.
- */
-// Параметризованный тип emit сводится к последней перегрузке, поэтому список
-// событий меню задан явно.
-type ToolEvent =
-  | 'open-topology-diagnostics'
-  | 'open-fault-diagnostics'
-  | 'open-calculation-diagnostics'
-  | 'open-passport-dialog'
-  | 'open-defect-journal'
-  | 'open-shurf-journal'
-  | 'open-inspection-journal'
-  | 'open-repair-journal'
-  | 'open-pressure-test-journal'
-  | 'open-technical-condition-journal'
-  | 'open-corrosion-indicator-journal'
-  | 'open-alseko-journal'
-  | 'open-electrical-network-journal'
-  | 'open-heat-loss-journal'
-  | 'open-temperature-graph-journal'
-  | 'open-consumer-load-diagnostics'
-  | 'open-pump-equipment'
-  | 'open-network-armatures'
-  | 'open-network-regulators'
-  | 'open-network-bypasses'
-  | 'open-network-diaphragms'
-  | 'open-elevators'
-interface ToolItem { label: string; icon: string; color: string; event: ToolEvent }
-interface ToolGroup { title: string; icon: string; color: string; items: ToolItem[] }
-
-const toolsMenuOpen = ref(false)
-const toolsSearch = ref('')
-
-const toolGroups: ToolGroup[] = [
-  {
-    title: 'Эксплуатация',
-    icon: 'mdi-clipboard-text-outline',
-    color: 'deep-orange-darken-2',
-    items: [
-      { label: 'Нарушения', icon: 'mdi-alert-decagram-outline', color: 'deep-orange-darken-2', event: 'open-defect-journal' },
-      { label: 'Шурфовки', icon: 'mdi-shovel', color: 'brown-darken-2', event: 'open-shurf-journal' },
-      { label: 'Осмотры', icon: 'mdi-clipboard-search-outline', color: 'teal-darken-2', event: 'open-inspection-journal' },
-      { label: 'Ремонты', icon: 'mdi-hammer-wrench', color: 'deep-purple-darken-2', event: 'open-repair-journal' },
-      { label: 'Опрессовки', icon: 'mdi-gauge', color: 'blue-darken-2', event: 'open-pressure-test-journal' },
-      { label: 'Индикаторы коррозии', icon: 'mdi-test-tube', color: 'orange-darken-3', event: 'open-corrosion-indicator-journal' },
-    ],
-  },
-  {
-    title: 'Оборудование сети',
-    icon: 'mdi-pipe-valve',
-    color: 'blue-grey-darken-3',
-    items: [
-      { label: 'Насосное оборудование', icon: 'mdi-pump', color: 'blue-grey-darken-3', event: 'open-pump-equipment' },
-      { label: 'Запорная арматура', icon: 'mdi-valve', color: 'deep-purple-darken-3', event: 'open-network-armatures' },
-      { label: 'Сетевые регуляторы', icon: 'mdi-tune-vertical', color: 'indigo-darken-3', event: 'open-network-regulators' },
-      { label: 'Байпасы', icon: 'mdi-pipe-valve', color: 'cyan-darken-4', event: 'open-network-bypasses' },
-      { label: 'Диафрагмы', icon: 'mdi-circle-slice-8', color: 'teal-darken-4', event: 'open-network-diaphragms' },
-      { label: 'Элеваторы', icon: 'mdi-elevator', color: 'blue-grey-darken-4', event: 'open-elevators' },
-    ],
-  },
-  {
-    title: 'Расчёты и диагностика',
-    icon: 'mdi-calculator-variant',
-    color: 'primary',
-    items: [
-      { label: 'Диагностика расчётов', icon: 'mdi-calculator-variant', color: 'primary', event: 'open-calculation-diagnostics' },
-      { label: 'Диагностика топологии', icon: 'mdi-stethoscope', color: 'deep-purple-darken-2', event: 'open-topology-diagnostics' },
-      { label: 'Поиск неисправностей', icon: 'mdi-alert-octagon', color: 'error', event: 'open-fault-diagnostics' },
-      { label: 'Тепловые нагрузки', icon: 'mdi-home-lightning-bolt-outline', color: 'teal-darken-3', event: 'open-consumer-load-diagnostics' },
-      { label: 'Тепловые потери', icon: 'mdi-heat-wave', color: 'deep-orange-darken-3', event: 'open-heat-loss-journal' },
-      { label: 'Температурные графики', icon: 'mdi-chart-bell-curve-cumulative', color: 'purple-darken-3', event: 'open-temperature-graph-journal' },
-    ],
-  },
-  {
-    title: 'Реестры и отчёты',
-    icon: 'mdi-file-tree',
-    color: 'success',
-    items: [
-      { label: 'Отчёты и паспорта', icon: 'mdi-file-tree', color: 'success', event: 'open-passport-dialog' },
-      { label: 'Технические условия', icon: 'mdi-file-certificate-outline', color: 'cyan-darken-3', event: 'open-technical-condition-journal' },
-      { label: 'Объекты АЛСЕКО', icon: 'mdi-office-building-marker', color: 'indigo-darken-2', event: 'open-alseko-journal' },
-      { label: 'Электрическая сеть', icon: 'mdi-transmission-tower', color: 'amber-darken-4', event: 'open-electrical-network-journal' },
-    ],
-  },
-]
-
-const filteredToolGroups = computed<ToolGroup[]>(() => {
-  const s = (toolsSearch.value || '').trim().toLowerCase()
-  if (!s) return toolGroups
-  return toolGroups
-    .map((g) => ({ ...g, items: g.items.filter((i) => i.label.toLowerCase().includes(s)) }))
-    .filter((g) => g.items.length > 0)
-})
-
-const runTool = (tool: ToolItem) => {
-  toolsMenuOpen.value = false
-  toolsSearch.value = ''
-  ;(emit as (event: ToolEvent) => void)(tool.event)
-}
 
 
 

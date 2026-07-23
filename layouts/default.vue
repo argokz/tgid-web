@@ -67,6 +67,18 @@
         </v-btn>
 
         <v-btn
+          prepend-icon="mdi-toolbox-outline"
+          :color="uiStore.toolsPanelOpen ? 'primary' : undefined"
+          :class="['nav-btn', 'ms-1', { 'active-link': uiStore.toolsPanelOpen }]"
+          variant="text"
+          rounded="lg"
+          size="small"
+          @click="uiStore.toggleToolsPanel()"
+        >
+          Инструменты
+        </v-btn>
+
+        <v-btn
           prepend-icon="mdi-export"
           class="nav-btn ms-1"
           variant="text"
@@ -151,6 +163,18 @@
       </v-menu>
     </v-app-bar>
 
+    <!-- Деградация API: видно сразу, а не через пустые диалоги -->
+    <v-alert
+      v-if="!apiHealth.reachable || apiHealth.outdatedRoutes"
+      :type="apiHealth.reachable ? 'warning' : 'error'"
+      variant="tonal"
+      density="compact"
+      class="api-health-alert"
+      :icon="apiHealth.reachable ? 'mdi-alert-outline' : 'mdi-lan-disconnect'"
+    >
+      <span class="text-body-2">{{ apiHealth.lastError }}</span>
+    </v-alert>
+
     <v-main class="app-main">
       <slot />
     </v-main>
@@ -173,15 +197,17 @@
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useMobile } from '~/composables/useMobile';
-import { fastApiService } from '~/services/fastApiService';
+import { apiHealth, fastApiService } from '~/services/fastApiService';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { useAuthStore } from '~/stores/authStore';
+import { useUiStore } from '~/stores/uiStore';
 import PlanningCalculationModal from '~/components/PlanningCalculationModal.vue';
 import CalculationProtocol from '~/components/CalculationProtocol.vue';
 
 const { isMobile: mobile } = useMobile();
 const route = useRoute();
 const authStore = useAuthStore();
+const uiStore = useUiStore();
 const mainMenuOpen = ref(false);
 const showCalculationModal = ref(false);
 const showProtocol = ref(false);
@@ -255,6 +281,16 @@ const downloadExcel = async (docType: string) => {
 </script>
 
 <style scoped>
+.api-health-alert {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  max-width: min(760px, calc(100vw - 32px));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
 .app-brand {
   user-select: none;
 }

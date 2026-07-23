@@ -1,3 +1,4 @@
+import { reactive } from 'vue';
 import type { FeatureData, Fragment } from '~/types';
 
 export interface ColumnTranslation {
@@ -256,23 +257,137 @@ const getApiBaseUrl = (): string => {
 
 const buildApiUrl = (path: string): string => `${getApiBaseUrl()}/${path.replace(/^\/+/, '')}`;
 
-const fetchWithRetry = async <T>(url: string, options: any = {}, retries = 2): Promise<T> => {
-  try {
-    return await $fetch<T>(url, options);
-  } catch (error) {
-    if (retries > 0) {
-      console.warn(`Retry fetching ${url}, retries left: ${retries}`);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      return fetchWithRetry<T>(url, options, retries - 1);
-    }
-    throw error;
+/** Ошибка API с разобранным статусом и текстом для пользователя */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly detail: string;
+  readonly path: string;
+  readonly userMessage: string;
+
+  constructor(params: { status: number; detail: string; path: string; userMessage: string }) {
+    super(params.userMessage);
+    this.name = 'ApiError';
+    this.status = params.status;
+    this.detail = params.detail;
+    this.path = params.path;
+    this.userMessage = params.userMessage;
   }
+
+  /** Маршрута нет на сервере — обычно развёрнута устаревшая версия API */
+  get isRouteMissing(): boolean {
+    return this.status === 404 && !this.path.match(/\/\d+$/);
+  }
+
+  /** Сеть/сервер недоступны */
+  get isUnavailable(): boolean {
+    return this.status === 0 || this.status === 502 || this.status === 503 || this.status === 504;
+  }
+}
+
+const DEFAULT_TIMEOUT_MS = 30_000;
+const MAX_RETRIES = 2;
+
+/** Ретраим только то, что имеет шанс пройти со второй попытки */
+const isRetriableStatus = (status: number) =>
+  status === 0 || status === 408 || status === 429 || (status >= 500 && status < 600);
+
+const extractStatus = (error: any): number =>
+  Number(error?.statusCode ?? error?.status ?? error?.response?.status ?? 0) || 0;
+
+const extractDetail = (error: any): string => {
+  const data = error?.data ?? error?.response?._data;
+  if (typeof data === 'string') return data;
+  if (data?.detail) {
+    return typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+  }
+  return error?.message || 'неизвестная ошибка';
 };
 
-const request = <T>(path: string, options?: any): Promise<T> => {
-  const url = buildApiUrl(path.startsWith('/') ? path.slice(1) : path);
-  return options === undefined ? $fetch<T>(url) : $fetch<T>(url, options);
+const userMessageFor = (status: number, detail: string, path: string): string => {
+  if (status === 0) return 'Сервер API недоступен. Проверьте подключение к сети.';
+  if (status === 401) return 'Требуется авторизация.';
+  if (status === 403) return 'Недостаточно прав для этой операции.';
+  if (status === 404) {
+    return path.match(/\/\d+$/)
+      ? 'Запись не найдена.'
+      : 'Маршрут отсутствует на сервере API — вероятно, развёрнута устаревшая версия.';
+  }
+  if (status === 408 || status === 504) return 'Сервер не ответил вовремя. Попробуйте ещё раз.';
+  if (status === 422) return `Некорректные параметры запроса: ${detail}`;
+  if (status === 429) return 'Слишком много запросов, попробуйте позже.';
+  if (status >= 500) return `Ошибка на сервере: ${detail}`;
+  return detail;
 };
+
+/** Доступность API — для индикатора деградации в интерфейсе */
+export const apiHealth = reactive({
+  reachable: true,
+  outdatedRoutes: false,
+  lastError: '' as string,
+});
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Единая точка сетевых вызовов: таймаут, ретраи с экспоненциальной паузой
+ * только для сетевых сбоев и 5xx, нормализация ошибки.
+ * Мутации (POST/PUT/DELETE) не повторяются — чтобы не задвоить запись.
+ */
+const request = async <T>(path: string, options?: any): Promise<T> => {
+  const url = buildApiUrl(path.startsWith('/') ? path.slice(1) : path);
+  const method = String(options?.method || 'GET').toUpperCase();
+  const isMutation = method !== 'GET' && method !== 'HEAD';
+  const maxAttempts = isMutation ? 1 : MAX_RETRIES + 1;
+
+  let lastError: any = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const result = await $fetch<T>(url, {
+        timeout: DEFAULT_TIMEOUT_MS,
+        ...(options || {}),
+      });
+      apiHealth.reachable = true;
+      apiHealth.lastError = '';
+      return result;
+    } catch (error: any) {
+      lastError = error;
+      const status = extractStatus(error);
+
+      if (attempt < maxAttempts && isRetriableStatus(status)) {
+        // экспоненциальная пауза с джиттером — чтобы не «долбить» сервер синхронно
+        const backoff = 400 * 2 ** (attempt - 1) + Math.random() * 200;
+        console.warn(`[api] ${method} ${path} → ${status}, повтор через ${Math.round(backoff)}ms`);
+        await sleep(backoff);
+        continue;
+      }
+
+      const detail = extractDetail(error);
+      const apiError = new ApiError({
+        status,
+        detail,
+        path,
+        userMessage: userMessageFor(status, detail, path),
+      });
+
+      if (apiError.isUnavailable) {
+        apiHealth.reachable = false;
+        apiHealth.lastError = apiError.userMessage;
+      } else if (apiError.isRouteMissing) {
+        apiHealth.outdatedRoutes = true;
+        apiHealth.lastError = apiError.userMessage;
+      }
+
+      throw apiError;
+    }
+  }
+
+  throw lastError;
+};
+
+/** Совместимость: раньше использовался отдельный хелпер с ретраями */
+const fetchWithRetry = <T>(url: string, options: any = {}): Promise<T> =>
+  request<T>(url.replace(getApiBaseUrl(), ''), options);
 
 const encodePath = (value: string | number): string => encodeURIComponent(String(value));
 

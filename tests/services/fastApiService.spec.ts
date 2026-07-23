@@ -18,7 +18,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/topology/line',
-      { method: 'POST', body: { nodeid1: 4, nodeid2: 9 } }
+      expect.objectContaining({ method: 'POST', body: { nodeid1: 4, nodeid2: 9 } })
     )
   })
 
@@ -27,7 +27,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/topology/line/17',
-      { method: 'DELETE' }
+      expect.objectContaining({ method: 'DELETE' })
     )
   })
 
@@ -38,10 +38,10 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/topology/split-line',
-      {
+      expect.objectContaining({
         method: 'POST',
         body: { line_id: 17, lng: 76.91, lat: 43.25 }
-      }
+      })
     )
     expect(result.new_node_id).toBe(21)
   })
@@ -60,7 +60,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/defects',
-      {
+      expect.objectContaining({
         query: {
           page: 2,
           source_id: 3,
@@ -69,7 +69,7 @@ describe('fastApiService topology contracts', () => {
           date_from: '2025-09-01',
           date_to: '2026-05-31'
         }
-      }
+      })
     )
   })
 
@@ -77,8 +77,8 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getDefectLookups()
     await fastApiService.getDefect(77)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/defects/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/defects/77')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/defects/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/defects/77', expect.anything())
   })
 
   it('passes desktop shurf journal filters through the read-only API', async () => {
@@ -96,7 +96,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/shurfs',
-      {
+      expect.objectContaining({
         query: {
           page: 3,
           page_size: 25,
@@ -106,7 +106,7 @@ describe('fastApiService topology contracts', () => {
           node_id: 51,
           date_from: '2026-01-01'
         }
-      }
+      })
     )
   })
 
@@ -114,8 +114,8 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getShurfLookups()
     await fastApiService.getShurf(19)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/shurfs/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/shurfs/19')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/shurfs/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/shurfs/19', expect.anything())
   })
 
   it('passes desktop inspection filters through the read-only API', async () => {
@@ -133,7 +133,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/inspections',
-      {
+      expect.objectContaining({
         query: {
           page: 2,
           responsible_id: 7,
@@ -143,7 +143,7 @@ describe('fastApiService topology contracts', () => {
           date_from: '2025-09-01',
           date_to: '2026-05-31'
         }
-      }
+      })
     )
   })
 
@@ -151,8 +151,8 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getInspectionLookups()
     await fastApiService.getInspection(23)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/inspections/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/inspections/23')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/inspections/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/inspections/23', expect.anything())
   })
 
   it('passes desktop repair journal filters through the read-only API', async () => {
@@ -173,7 +173,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/repairs',
-      {
+      expect.objectContaining({
         query: {
           page: 2,
           page_size: 25,
@@ -186,7 +186,7 @@ describe('fastApiService topology contracts', () => {
           date_from: '2026-01-01',
           date_to: '2026-12-31'
         }
-      }
+      })
     )
   })
 
@@ -194,8 +194,8 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getRepairLookups()
     await fastApiService.getRepair(31)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/repairs/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/repairs/31')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/repairs/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/repairs/31', expect.anything())
   })
 
   it('passes desktop pressure test filters through the read-only API', async () => {
@@ -216,7 +216,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/pressure-tests',
-      {
+      expect.objectContaining({
         query: {
           page: 2,
           page_size: 25,
@@ -229,7 +229,7 @@ describe('fastApiService topology contracts', () => {
           date_from: '2026-01-01',
           date_to: '2026-12-31'
         }
-      }
+      })
     )
   })
 
@@ -237,8 +237,8 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getPressureTestLookups()
     await fastApiService.getPressureTest(41)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/pressure-tests/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/pressure-tests/41')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/pressure-tests/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/pressure-tests/41', expect.anything())
   })
 
   it('passes desktop technical condition filters through the read-only API', async () => {
@@ -259,7 +259,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/technical-conditions',
-      {
+      expect.objectContaining({
         query: {
           page: 2,
           page_size: 25,
@@ -272,7 +272,7 @@ describe('fastApiService topology contracts', () => {
           date_from: '2025-01-01',
           date_to: '2025-12-31'
         }
-      }
+      })
     )
   })
 
@@ -280,8 +280,8 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getTechnicalConditionLookups()
     await fastApiService.getTechnicalCondition(12711)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/technical-conditions/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/technical-conditions/12711')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/technical-conditions/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/technical-conditions/12711', expect.anything())
   })
 
   it('passes desktop corrosion indicator filters through the read-only API', async () => {
@@ -302,7 +302,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/corrosion-indicators',
-      {
+      expect.objectContaining({
         query: {
           page: 2,
           page_size: 25,
@@ -315,7 +315,7 @@ describe('fastApiService topology contracts', () => {
           date_from: '2025-09-01',
           date_to: '2026-05-31'
         }
-      }
+      })
     )
   })
 
@@ -323,8 +323,8 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getCorrosionIndicatorLookups()
     await fastApiService.getCorrosionIndicator(73)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/corrosion-indicators/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/corrosion-indicators/73')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/corrosion-indicators/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/corrosion-indicators/73', expect.anything())
   })
 
   it('passes ALSEKO reconciliation filters through the read-only API', async () => {
@@ -344,7 +344,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/alseko/loads',
-      { query: {
+      expect.objectContaining({ query: {
         page: 2,
         page_size: 25,
         match_status: 'unmatched',
@@ -354,7 +354,7 @@ describe('fastApiService topology contracts', () => {
         heat_source: 'ТЭЦ-1',
         temperature_graph: '132-70',
         search: 'Абая'
-      } }
+      } })
     )
   })
 
@@ -363,9 +363,9 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getAlsekoLoad(17)
     await fastApiService.getAlsekoBuilding(29)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/alseko/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/alseko/loads/17')
-    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/alseko/buildings/29')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/alseko/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/alseko/loads/17', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/alseko/buildings/29', expect.anything())
   })
 
   it('uses the ALSEKO unassigned-building report endpoint', async () => {
@@ -373,7 +373,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/alseko/buildings/unassigned',
-      { query: { page: 3, page_size: 50, search: 'Сейфуллина' } }
+      expect.objectContaining({ query: { page: 3, page_size: 50, search: 'Сейфуллина' } })
     )
   })
 
@@ -392,7 +392,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/electrical-network/objects',
-      { query: { page: 2, page_size: 25, object_type: 'line', owner_id: 7, parent_line_id: 42, voltage_kv: 10, search: 'фидер' } }
+      expect.objectContaining({ query: { page: 2, page_size: 25, object_type: 'line', owner_id: 7, parent_line_id: 42, voltage_kv: 10, search: 'фидер' } })
     )
   })
 
@@ -400,8 +400,8 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getElectricalNetworkLookups()
     await fastApiService.getElectricalObject('receiver', 19)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/electrical-network/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/electrical-network/objects/receiver/19')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/electrical-network/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/electrical-network/objects/receiver/19', expect.anything())
   })
 
   it('passes heat-loss season and source filters to the read-only API', async () => {
@@ -411,12 +411,12 @@ describe('fastApiService topology contracts', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       'https://api.example.test/api/heat-losses/seasons',
-      { query: { page: 2, page_size: 25, city: 'Алматы', search: '2025' } }
+      expect.objectContaining({ query: { page: 2, page_size: 25, city: 'Алматы', search: '2025' } })
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'https://api.example.test/api/heat-losses/sources',
-      { query: { page: 3, page_size: 50, fragment_id: 41, readiness: 'ready', search: 'ТЭЦ' } }
+      expect.objectContaining({ query: { page: 3, page_size: 50, fragment_id: 41, readiness: 'ready', search: 'ТЭЦ' } })
     )
   })
 
@@ -425,9 +425,9 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getHeatLossSeason(3)
     await fastApiService.getHeatLossSource(48)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/heat-losses/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/heat-losses/seasons/3')
-    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/heat-losses/sources/48')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/heat-losses/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/heat-losses/seasons/3', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/heat-losses/sources/48', expect.anything())
   })
 
   it('passes consumer-load diagnostic filters to the read-only API', async () => {
@@ -443,7 +443,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/consumer-load-diagnostics/consumers',
-      { query: { page: 2, page_size: 25, diagnostic: 'zero_load', consumer_type: 'generalized', fragment_id: 41, state_id: 1, search: 'узел 10' } }
+      expect.objectContaining({ query: { page: 2, page_size: 25, diagnostic: 'zero_load', consumer_type: 'generalized', fragment_id: 41, state_id: 1, search: 'узел 10' } })
     )
   })
 
@@ -451,8 +451,8 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getConsumerLoadLookups()
     await fastApiService.getConsumerLoadDiagnostic('real', 19)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/consumer-load-diagnostics/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/consumer-load-diagnostics/consumers/real/19')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/consumer-load-diagnostics/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/consumer-load-diagnostics/consumers/real/19', expect.anything())
   })
 
   it('passes temperature-graph source filters to the read-only API', async () => {
@@ -468,7 +468,7 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/temperature-graphs/sources',
-      { query: { page: 2, page_size: 25, graph_status: 'duplicates', summer_status: 'missing', graph_type_id: 1, fragment_id: 41, search: 'ТЭЦ' } }
+      expect.objectContaining({ query: { page: 2, page_size: 25, graph_status: 'duplicates', summer_status: 'missing', graph_type_id: 1, fragment_id: 41, search: 'ТЭЦ' } })
     )
   })
 
@@ -476,8 +476,8 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getTemperatureGraphLookups()
     await fastApiService.getTemperatureGraphSource(193)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/temperature-graphs/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/temperature-graphs/sources/193')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/temperature-graphs/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/temperature-graphs/sources/193', expect.anything())
   })
 
   it('passes installed-pump and catalog filters to the read-only API', async () => {
@@ -493,12 +493,12 @@ describe('fastApiService topology contracts', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       'https://api.example.test/api/pump-equipment/pumps',
-      { query: { page: 2, page_size: 25, configuration_status: 'missing_model', fragment_id: 41, state_id: 1, line_id: 77, search: 'НС №7' } }
+      expect.objectContaining({ query: { page: 2, page_size: 25, configuration_status: 'missing_model', fragment_id: 41, state_id: 1, line_id: 77, search: 'НС №7' } })
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'https://api.example.test/api/pump-equipment/catalog',
-      { query: { page: 3, page_size: 50, quality_status: 'non_monotonic', pump_type: 'СЭ2500-60', search: 'насос' } }
+      expect.objectContaining({ query: { page: 3, page_size: 50, quality_status: 'non_monotonic', pump_type: 'СЭ2500-60', search: 'насос' } })
     )
   })
 
@@ -507,9 +507,9 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getInstalledPump(217)
     await fastApiService.getStandardPump(25)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/pump-equipment/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/pump-equipment/pumps/217')
-    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/pump-equipment/catalog/25')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/pump-equipment/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/pump-equipment/pumps/217', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/pump-equipment/catalog/25', expect.anything())
   })
 
   it('passes network-armature filters to the read-only API', async () => {
@@ -522,12 +522,12 @@ describe('fastApiService topology contracts', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       'https://api.example.test/api/network-armatures/items',
-      { query: { page: 2, page_size: 25, equipment_type: 'damper', quality_status: 'purpose_unknown', state_id: 1, fragment_id: 74, purpose: 'Вход ТП', line_id: 2159, search: 'задвижка' } }
+      expect.objectContaining({ query: { page: 2, page_size: 25, equipment_type: 'damper', quality_status: 'purpose_unknown', state_id: 1, fragment_id: 74, purpose: 'Вход ТП', line_id: 2159, search: 'задвижка' } })
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'https://api.example.test/api/network-armatures/catalog',
-      { query: { page: 1, page_size: 20, search: '30ч47бр' } }
+      expect.objectContaining({ query: { page: 1, page_size: 20, search: '30ч47бр' } })
     )
   })
 
@@ -536,9 +536,9 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getNetworkArmature('damper', 21)
     await fastApiService.getStandardDamper(1)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/network-armatures/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/network-armatures/items/damper/21')
-    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/network-armatures/catalog/1')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/network-armatures/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/network-armatures/items/damper/21', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/network-armatures/catalog/1', expect.anything())
   })
 
   it('passes network-regulator filters to inventory and catalog APIs', async () => {
@@ -553,12 +553,12 @@ describe('fastApiService topology contracts', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       'https://api.example.test/api/network-regulators/items',
-      { query: { page: 3, page_size: 25, regulator_type: 'pressure', quality_status: 'control_node_missing', state_id: 1, fragment_id: 74, work_attribute_id: 1, line_id: 64, search: 'регулятор' } }
+      expect.objectContaining({ query: { page: 3, page_size: 25, regulator_type: 'pressure', quality_status: 'control_node_missing', state_id: 1, fragment_id: 74, work_attribute_id: 1, line_id: 64, search: 'регулятор' } })
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'https://api.example.test/api/network-regulators/catalog',
-      { query: { page: 2, page_size: 20, catalog_type: 'differential', quality_status: 'ready', search: 'Danfoss' } }
+      expect.objectContaining({ query: { page: 2, page_size: 20, catalog_type: 'differential', quality_status: 'ready', search: 'Danfoss' } })
     )
   })
 
@@ -567,9 +567,9 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getNetworkRegulator('pressure', 1)
     await fastApiService.getRegulatorCatalogItem('differential', 1)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/network-regulators/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/network-regulators/items/pressure/1')
-    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/network-regulators/catalog/differential/1')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/network-regulators/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/network-regulators/items/pressure/1', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/network-regulators/catalog/differential/1', expect.anything())
   })
 
   it('passes network-bypass filters to inventory and tube APIs', async () => {
@@ -584,12 +584,12 @@ describe('fastApiService topology contracts', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       'https://api.example.test/api/network-bypasses/items',
-      { query: { page: 2, page_size: 25, quality_status: 'connection_node_missing', state_id: 1, pipeline_sign_id: 2, fragment_id: 74, line_id: 321695, search: 'байпас' } }
+      expect.objectContaining({ query: { page: 2, page_size: 25, quality_status: 'connection_node_missing', state_id: 1, pipeline_sign_id: 2, fragment_id: 74, line_id: 321695, search: 'байпас' } })
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'https://api.example.test/api/network-bypasses/tubes',
-      { query: { page: 3, page_size: 20, standard: 'ППУ', quality_status: 'ready', search: 'DN 100' } }
+      expect.objectContaining({ query: { page: 3, page_size: 20, standard: 'ППУ', quality_status: 'ready', search: 'DN 100' } })
     )
   })
 
@@ -598,9 +598,9 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getNetworkBypass(17)
     await fastApiService.getStandardTube(64)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/network-bypasses/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/network-bypasses/items/17')
-    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/network-bypasses/tubes/64')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/network-bypasses/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/network-bypasses/items/17', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/network-bypasses/tubes/64', expect.anything())
   })
 
   it('passes network-diaphragm filters to the journal API', async () => {
@@ -612,11 +612,11 @@ describe('fastApiService topology contracts', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/api/network-diaphragms/items',
-      { query: {
+      expect.objectContaining({ query: {
         page: 4, page_size: 25, quality_status: 'topology_missing',
         diameter_mode: 'pending_calculation', state_id: 1, external_sign_line_id: 2,
         fragment_id: 74, line_id: 185900, installation_place: 'Отопление', search: '19657'
-      } }
+      } })
     )
   })
 
@@ -624,8 +624,8 @@ describe('fastApiService topology contracts', () => {
     await fastApiService.getNetworkDiaphragmLookups()
     await fastApiService.getNetworkDiaphragm(19657)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/network-diaphragms/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/network-diaphragms/items/19657')
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/network-diaphragms/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/network-diaphragms/items/19657', expect.anything())
   })
 
   it('uses elevator journal, lookup, and card endpoints', async () => {
@@ -639,12 +639,12 @@ describe('fastApiService topology contracts', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       'https://api.example.test/api/elevators',
-      { query: {
+      expect.objectContaining({ query: {
         page: 2, page_size: 25, quality_status: 'pending_calculation',
         state_id: 1, fragment_id: 74, line_id: 185900, node_id: 812, search: 'ЭЛ-1'
-      } }
+      } })
     )
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/elevators/lookups')
-    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/elevators/42')
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/elevators/lookups', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/elevators/42', expect.anything())
   })
 })

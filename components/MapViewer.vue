@@ -86,6 +86,20 @@
       <!-- Left Sidebar -->
       <MapSidebar />
 
+      <!-- Панель инструментов приложения (журналы, реестры, отчёты) -->
+      <LazyToolsPanel
+        v-if="uiStore.toolsPanelOpen || toolsPanelMounted"
+        v-model="uiStore.toolsPanelOpen"
+        @open-tool="onOpenTool"
+      />
+
+      <!-- Панель рисования и измерений на карте -->
+      <LazyDrawPanel
+        v-if="uiStore.drawPanelOpen"
+        v-model="uiStore.drawPanelOpen"
+        :map="mapStore.map"
+      />
+
       <!-- Right Map Controls -->
       <MapControls
         :map="mapStore.map"
@@ -349,6 +363,8 @@ import { useMapStore } from '~/stores/mapStore';
 import { usePopupStore } from '~/stores/popupStore';
 import { useLayerStore } from '~/stores/layerStore';
 import { useCesiumStore } from '~/stores/cesiumStore';
+import { useUiStore } from '~/stores/uiStore';
+import type { ToolEvent } from '~/utils/toolCatalog';
 import type { LayerConfig } from '~/types';
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import type { Ref } from 'vue';
@@ -368,6 +384,12 @@ const mapStore = useMapStore();
 const popupStore = usePopupStore();
 const layerStore = useLayerStore();
 const cesiumStore = useCesiumStore();
+const uiStore = useUiStore();
+/** Панель инструментов остаётся смонтированной после первого открытия (сохраняет поиск/скролл) */
+const toolsPanelMounted = ref(false);
+watch(() => uiStore.toolsPanelOpen, (isOpen: boolean) => {
+  if (isOpen) toolsPanelMounted.value = true;
+});
 const CesiumViewer = defineAsyncComponent(() => import('./CesiumViewer.vue'));
 const runtimeConfig = useRuntimeConfig();
 const topologyEditingEnabled = computed(
@@ -624,6 +646,37 @@ const lazyDialogRefs: Record<LazyDialogKey, Ref<LazyDialogInstance | null>> = {
   networkBypass: networkBypassJournalRef,
   networkDiaphragm: networkDiaphragmJournalRef,
   elevator: elevatorJournalRef,
+};
+
+/** Событие панели инструментов → ключ ленивого диалога */
+const TOOL_EVENT_TO_DIALOG: Record<ToolEvent, LazyDialogKey> = {
+  'open-topology-diagnostics': 'topologyDiagnostics',
+  'open-fault-diagnostics': 'faultDiagnostics',
+  'open-calculation-diagnostics': 'calculationDiagnostics',
+  'open-passport-dialog': 'passport',
+  'open-defect-journal': 'defect',
+  'open-shurf-journal': 'shurf',
+  'open-inspection-journal': 'inspection',
+  'open-repair-journal': 'repair',
+  'open-pressure-test-journal': 'pressureTest',
+  'open-technical-condition-journal': 'technicalCondition',
+  'open-corrosion-indicator-journal': 'corrosionIndicator',
+  'open-alseko-journal': 'alseko',
+  'open-electrical-network-journal': 'electricalNetwork',
+  'open-heat-loss-journal': 'heatLoss',
+  'open-temperature-graph-journal': 'temperatureGraph',
+  'open-consumer-load-diagnostics': 'consumerLoad',
+  'open-pump-equipment': 'pumpEquipment',
+  'open-network-armatures': 'networkArmature',
+  'open-network-regulators': 'networkRegulator',
+  'open-network-bypasses': 'networkBypass',
+  'open-network-diaphragms': 'networkDiaphragm',
+  'open-elevators': 'elevator',
+};
+
+const onOpenTool = (event: ToolEvent) => {
+  const key = TOOL_EVENT_TO_DIALOG[event];
+  if (key) openLazyDialog(key);
 };
 
 const openLazyDialog = (key: LazyDialogKey, scope?: unknown) => {
