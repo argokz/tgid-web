@@ -26,6 +26,16 @@ export interface LayerConfig {
   supportedFormats?: { mvt?: boolean; wms?: boolean };
   /** Источник растра WMS (совпадает с buildWmsRasterSourceId), если слой поддерживает WMS */
   wmsRasterSourceId?: string;
+  /**
+   * Роль слоя: data — рабочий слой схемы; service — вспомогательный
+   * (city_center, file, find_node, fragments…), показывается в отдельной группе.
+   * Слои id_* в панель не попадают — они подключаются через queryLayerName.
+   */
+  role?: 'data' | 'service';
+  /** Имя парного слоя id_* в GeoServer — используется для GetFeatureInfo/запросов вместо основного */
+  queryLayerName?: string;
+  /** false — слой доступен в панели, но не включается по умолчанию (автообнаруженные) */
+  defaultVisible?: boolean;
   mbLayers?: any[];
   bounds?: {
     lowerCorner: [number, number];

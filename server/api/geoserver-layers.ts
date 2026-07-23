@@ -145,10 +145,9 @@ export default defineEventHandler(async (event) => {
   }
 
   const loadLayers = async (): Promise<LayerConfig[]> => {
-    const catalog = normalizeCatalogFromRuntime(geoserverPublic);
-    if (!catalog?.length) {
-      console.error('[GEO] Укажите GEOSERVER_LAYER_CATALOG в env (JSON-массив workspace с полем layers).');
-      return [];
+    const catalog = normalizeCatalogFromRuntime(geoserverPublic) || [];
+    if (!catalog.length) {
+      console.warn('[GEO] GEOSERVER_LAYER_CATALOG пуст — используется только автообнаружение слоёв GeoServer.');
     }
 
     const defaultPublicUrl = String(geoserverPublic.url || 'https://itwin.kz/geoserver').replace(/\/$/, '');
@@ -286,96 +285,238 @@ export default defineEventHandler(async (event) => {
       return 'wms';
     }
 
-    const out: LayerConfig[] = [];
+    /**
+     * Автообнаружение: каталог задаёт подписи/режимы для «своих» слоёв,
+     * все остальные опубликованные слои GeoServer добавляются автоматически.
+     * Слои id_* в панель не попадают — подключаются к базовому слою как queryLayerName.
+     * Вспомогательные слои (city_center, file, find_node, fragments…) идут
+     * в отдельную группу и не включаются по умолчанию.
+     */
+    interface EffectiveLayerEntry extends GeoCatalogLayerEntry {
+      workspace: string;
+      workspaceBaseUrl?: string;
+      role: 'data' | 'service';
+      fromCatalog: boolean;
+    }
+
+    const discoverWorkspacesRaw = String(
+      process.env.GEOSERVER_DISCOVER_WORKSPACES ||
+      (runtimeConfig as any).geoserverDiscoverWorkspaces ||
+      ''
+    ).trim();
+    const discoverAll = discoverWorkspacesRaw === '*';
+    const allowedWorkspaces = new Set<string>([
+      ...catalog.map((w) => w.workspace),
+      ...(discoverAll
+        ? []
+        : discoverWorkspacesRaw.split(',').map((s) => s.trim()).filter(Boolean))
+    ]);
+    const serviceLayerNames = new Set(
+      String(
+        process.env.GEOSERVER_SERVICE_LAYERS ||
+        (runtimeConfig as any).geoserverServiceLayers ||
+        'city_center,file,find_node,fragments'
+      )
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+    const effective: EffectiveLayerEntry[] = [];
+    const seenQualified = new Set<string>();
 
     for (const wsEntry of catalog) {
       if (wsEntry.enabled === false) continue;
       const baseUrl = (wsEntry.url || defaultPublicUrl).replace(/\/$/, '');
       const workspaceBaseUrl = wsEntry.url ? baseUrl : undefined;
-
       for (const le of wsEntry.layers) {
-        const qualified = `${wsEntry.workspace}:${le.source}`;
-        const wmtsXml = wmtsByQualified.get(qualified);
-        const titleFallback = wmtsXml?.['ows:Title'] || qualified;
-        const label = le.label?.trim() ? le.label : titleFallback;
+        seenQualified.add(`${wsEntry.workspace}:${le.source}`);
+        effective.push({
+          ...le,
+          workspace: wsEntry.workspace,
+          workspaceBaseUrl,
+          role: serviceLayerNames.has(le.source.toLowerCase()) ? 'service' : 'data',
+          fromCatalog: true
+        });
+      }
+    }
 
-        let mvtPack: Awaited<ReturnType<typeof fetchMvtStylePack>> = null;
-        let mvtUrl = '';
+    // Кандидаты автообнаружения: WMTS (тайловые, возможен MVT) + WMS GetCapabilities
+    // (ловит слои, опубликованные без GWC-кэша, например find_node/fragments/file).
+    const discoveredCandidates = new Map<string, { title: string; hasWmts: boolean }>();
+    for (const [qualified, xml] of wmtsByQualified) {
+      discoveredCandidates.set(qualified, {
+        title: String(xml?.['ows:Title'] || ''),
+        hasWmts: true
+      });
+    }
+    try {
+      const wmsCapsUrl = `${defaultPublicUrl}/ows?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities`;
+      const wmsCapsText = await fetchText(wmsCapsUrl);
+      const wmsParsed = parser.parse(wmsCapsText);
+      const wmsRoot = wmsParsed?.WMT_MS_Capabilities?.Capability?.Layer;
+      const walkWmsLayers = (node: any) => {
+        if (!node) return;
+        for (const l of (Array.isArray(node) ? node : [node])) {
+          const name = l?.Name != null ? String(l.Name) : '';
+          if (name.includes(':') && !discoveredCandidates.has(name)) {
+            discoveredCandidates.set(name, { title: String(l?.Title || ''), hasWmts: false });
+          }
+          if (l?.Layer) walkWmsLayers(l.Layer);
+        }
+      };
+      walkWmsLayers(wmsRoot?.Layer || wmsRoot);
+    } catch (e: any) {
+      console.warn(`[GEO] WMS GetCapabilities недоступен (${e?.message}) — обнаружение только по WMTS`);
+    }
 
-        if (le.mvt && wmtsXml) {
-          mvtUrl = mvtTemplateUrl.replace('{layerName}', qualified);
-          mvtPack = await fetchMvtStylePack(wsEntry.workspace, le.source, wmtsXml, sanitizeFilterTypeCoercion);
-          if (mvtPack && mvtProbeTiles) {
-            const ok = await verifyMvtTileUrl(mvtUrl);
-            if (!ok) {
-              console.warn(`[GEO] MVT probe failed for ${qualified}, откат к WMS если доступен`);
-              mvtPack = null;
-            }
+    const discovered: EffectiveLayerEntry[] = [];
+    for (const [qualified, cand] of discoveredCandidates) {
+      const sep = qualified.indexOf(':');
+      if (sep <= 0) continue;
+      const ws = qualified.slice(0, sep);
+      const name = qualified.slice(sep + 1);
+      if (!discoverAll && !allowedWorkspaces.has(ws)) continue;
+      if (seenQualified.has(qualified)) continue;
+      // Слой-группа workspace (Almaty2:Almaty2) — агрегат, дублирующий все слои разом
+      if (name === ws) continue;
+      // id_* — «только для запросов»: не отображаем, подключим к базовому слою ниже
+      if (name.toLowerCase().startsWith('id_')) continue;
+      const isService = serviceLayerNames.has(name.toLowerCase());
+      discovered.push({
+        source: name,
+        label: cand.title || name,
+        // MVT возможен только у тайловых (GWC) слоёв; вспомогательные держим на WMS
+        mvt: !isService && cand.hasWmts,
+        wms: true,
+        workspace: ws,
+        role: isService ? 'service' : 'data',
+        fromCatalog: false
+      });
+    }
+    discovered.sort((a, b) =>
+      a.role === b.role
+        ? String(a.label).localeCompare(String(b.label), 'ru')
+        : a.role === 'data' ? -1 : 1
+    );
+    effective.push(...discovered);
+
+    const buildLayer = async (le: EffectiveLayerEntry): Promise<LayerConfig | null> => {
+      const qualified = `${le.workspace}:${le.source}`;
+      const wmtsXml = wmtsByQualified.get(qualified);
+      const titleFallback = wmtsXml?.['ows:Title'] || qualified;
+      const label = le.label?.trim() ? le.label : String(titleFallback);
+      // Явный queryLayer из каталога (uzel → id_nodes) либо парный id_<source> из GeoServer
+      const queryLayerName =
+        (le as { queryLayer?: string }).queryLayer ||
+        (wmtsByQualified.has(`${le.workspace}:id_${le.source}`) ? `id_${le.source}` : undefined);
+      const defaultVisible = le.fromCatalog && le.role !== 'service';
+
+      let mvtPack: Awaited<ReturnType<typeof fetchMvtStylePack>> = null;
+      let mvtUrl = '';
+
+      if (le.mvt && wmtsXml) {
+        mvtUrl = mvtTemplateUrl.replace('{layerName}', qualified);
+        mvtPack = await fetchMvtStylePack(le.workspace, le.source, wmtsXml, sanitizeFilterTypeCoercion);
+        if (mvtPack && mvtProbeTiles) {
+          const ok = await verifyMvtTileUrl(mvtUrl);
+          if (!ok) {
+            console.warn(`[GEO] MVT probe failed for ${qualified}, откат к WMS если доступен`);
+            mvtPack = null;
           }
         }
+      }
 
-        const hasMvt = Boolean(mvtPack && mvtPack.mbLayers?.length);
-        const canWms = le.wms === true;
+      const hasMvt = Boolean(mvtPack && mvtPack.mbLayers?.length);
+      const canWms = le.wms === true;
 
-        if (!hasMvt && !canWms) {
-          console.warn(`[GEO] Пропуск ${qualified}: нет ни MVT (MBStyle), ни WMS в каталоге`);
-          continue;
-        }
+      if (!hasMvt && !canWms) {
+        console.warn(`[GEO] Пропуск ${qualified}: нет ни MVT (MBStyle), ни WMS`);
+        return null;
+      }
 
-        const cleanSource = le.source.startsWith('id_') ? le.source.substring(3) : le.source;
-        const supportedFormats = { mvt: hasMvt && le.mvt === true, wms: canWms };
+      const cleanSource = le.source.startsWith('id_') ? le.source.substring(3) : le.source;
+      const supportedFormats = { mvt: hasMvt && le.mvt === true, wms: canWms };
 
-        if (!hasMvt && canWms) {
-          const ids = buildWmsOnlyLayerIdentifiers(wsEntry.workspace, cleanSource);
-          const rId = buildWmsRasterSourceId(wsEntry.workspace, cleanSource);
-          out.push({
-            id: ids.id,
-            label,
-            displayName: label,
-            sourceId: ids.sourceId,
-            layerId: ids.layerId,
-            sourceLayer: le.source,
-            workspace: wsEntry.workspace,
-            workspaceBaseUrl,
-            type: 'line',
-            paint: {},
-            mvtUrl: undefined,
-            attributes: [],
-            visible: false,
-            renderFormat: 'wms',
-            supportedFormats: { mvt: false, wms: true },
-            wmsRasterSourceId: rId
-          } as LayerConfig);
-          continue;
-        }
-
-        const ids = buildMvtLayerIdentifiers(wsEntry.workspace, cleanSource);
-        const rf = resolveRenderFormat(le, true);
-        if (!mvtPack) continue;
-
-        out.push({
+      if (!hasMvt && canWms) {
+        const ids = buildWmsOnlyLayerIdentifiers(le.workspace, cleanSource);
+        const rId = buildWmsRasterSourceId(le.workspace, cleanSource);
+        return {
           id: ids.id,
           label,
           displayName: label,
           sourceId: ids.sourceId,
           layerId: ids.layerId,
           sourceLayer: le.source,
-          workspace: wsEntry.workspace,
-          workspaceBaseUrl,
-          type: mvtPack.type,
-          mvtUrl,
-          paint: mvtPack.paint,
-          layout: mvtPack.layout,
-          mbLayers: mvtPack.mbLayers,
-          sprite: mvtPack.sprite,
-          wmsRasterSourceId: buildWmsRasterSourceId(wsEntry.workspace, cleanSource),
+          workspace: le.workspace,
+          workspaceBaseUrl: le.workspaceBaseUrl,
+          type: 'line',
+          paint: {},
+          mvtUrl: undefined,
           attributes: [],
           visible: false,
-          renderFormat: rf,
-          supportedFormats
-        } as LayerConfig);
+          renderFormat: 'wms',
+          supportedFormats: { mvt: false, wms: true },
+          wmsRasterSourceId: rId,
+          role: le.role,
+          queryLayerName,
+          defaultVisible
+        } as LayerConfig;
       }
-    }
+
+      if (!mvtPack) return null;
+      const ids = buildMvtLayerIdentifiers(le.workspace, cleanSource);
+      const rf = resolveRenderFormat(le, true);
+
+      return {
+        id: ids.id,
+        label,
+        displayName: label,
+        sourceId: ids.sourceId,
+        layerId: ids.layerId,
+        sourceLayer: le.source,
+        workspace: le.workspace,
+        workspaceBaseUrl: le.workspaceBaseUrl,
+        type: mvtPack.type,
+        mvtUrl,
+        paint: mvtPack.paint,
+        layout: mvtPack.layout,
+        mbLayers: mvtPack.mbLayers,
+        sprite: mvtPack.sprite,
+        wmsRasterSourceId: buildWmsRasterSourceId(le.workspace, cleanSource),
+        attributes: [],
+        visible: false,
+        renderFormat: rf,
+        supportedFormats,
+        role: le.role,
+        queryLayerName,
+        defaultVisible
+      } as LayerConfig;
+    };
+
+    // Стили MBStyle/SLD — самая дорогая часть (2–4 REST-запроса на слой):
+    // строим слои параллельно с ограничением, сохраняя порядок каталога.
+    const CONCURRENCY = 6;
+    const results: (LayerConfig | null)[] = new Array(effective.length).fill(null);
+    let cursor = 0;
+    const workers = Array.from(
+      { length: Math.min(CONCURRENCY, Math.max(effective.length, 1)) },
+      async () => {
+        while (cursor < effective.length) {
+          const i = cursor++;
+          try {
+            results[i] = await buildLayer(effective[i]);
+          } catch (e: any) {
+            console.warn(`[GEO] Ошибка сборки слоя ${effective[i]?.workspace}:${effective[i]?.source}: ${e?.message}`);
+            results[i] = null;
+          }
+        }
+      }
+    );
+    await Promise.all(workers);
+    const out = results.filter((x): x is LayerConfig => Boolean(x));
+
+    console.log(`[GEO] Слои: каталог ${effective.filter(e => e.fromCatalog).length}, автообнаружено ${discovered.length}, итог ${out.length}`);
 
     await cache.setItem(cacheKey, out, { ttl: 3600 });
     return out;

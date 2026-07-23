@@ -48,6 +48,12 @@ export default defineNuxtConfig({
       process.env.GEOSERVER_REST_URL ||
       env.GEOSERVER_REST_URL ||
       '',
+    /** Автообнаружение слоёв: workspace через запятую или '*' (все опубликованные) */
+    geoserverDiscoverWorkspaces:
+      process.env.GEOSERVER_DISCOVER_WORKSPACES || env.GEOSERVER_DISCOVER_WORKSPACES || '',
+    /** Вспомогательные слои (отдельная группа, скрыты по умолчанию) */
+    geoserverServiceLayers:
+      process.env.GEOSERVER_SERVICE_LAYERS || env.GEOSERVER_SERVICE_LAYERS || '',
     geoserverRestUser: process.env.GEOSERVER_REST_USER || env.GEOSERVER_REST_USER || 'admin',
     // Пароль только из окружения (.env / CI secrets) — не хардкодить в репозитории
     geoserverRestPassword: process.env.GEOSERVER_REST_PASSWORD || env.GEOSERVER_REST_PASSWORD || '',

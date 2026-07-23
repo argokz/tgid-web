@@ -299,6 +299,19 @@
               </div>
             </template>
 
+            <div class="px-3 pt-2 pb-1">
+              <v-text-field
+                v-model="layerSearchLocal"
+                density="compact"
+                variant="outlined"
+                hide-details
+                clearable
+                prepend-inner-icon="mdi-magnify"
+                placeholder="Поиск слоя…"
+                aria-label="Поиск по слоям"
+              />
+            </div>
+
             <div
               v-for="group in layerGroups"
               :key="group.name"
@@ -769,13 +782,16 @@ function togglePlanetGroupAll(pg: { group: PlanetLayerGroup; layers: PlanetLayer
 const collapsedGroups = ref<Record<string, boolean>>({})
 
 function isGroupCollapsed(groupName: string) {
-  return Boolean(collapsedGroups.value[groupName])
+  const explicit = collapsedGroups.value[groupName]
+  if (explicit !== undefined) return explicit
+  // Группы вспомогательных слоёв по умолчанию свёрнуты
+  return groupName.endsWith(SERVICE_GROUP_SUFFIX)
 }
 
 function toggleGroupCollapsed(groupName: string) {
   collapsedGroups.value = {
     ...collapsedGroups.value,
-    [groupName]: !collapsedGroups.value[groupName],
+    [groupName]: !isGroupCollapsed(groupName),
   }
 }
 
@@ -1020,17 +1036,36 @@ const sidebarIcon  = computed(() => tabMeta[activeTabLocal.value]?.icon      ?? 
 // Layer groups
 interface LayerGroup { name: string; layers: typeof layerStore.geoServerLayers }
 
+const layerSearchLocal = ref('')
+
+const SERVICE_GROUP_SUFFIX = ' — вспомогательные'
+
 const layerGroups = computed((): LayerGroup[] => {
+  const s = (layerSearchLocal.value || '').trim().toLowerCase()
+  const matchesSearch = (layer: any) =>
+    !s ||
+    String(layer.label || '').toLowerCase().includes(s) ||
+    String(layer.displayName || '').toLowerCase().includes(s) ||
+    String(layer.sourceLayer || '').toLowerCase().includes(s)
+
   const groups = new Map<string, typeof layerStore.geoServerLayers>()
   for (const layer of layerStore.geoServerLayers) {
-    const key = (layer as any).workspace || (layer as any).groupName || 'default'
+    if (!matchesSearch(layer)) continue
+    const ws = (layer as any).workspace || (layer as any).groupName || 'default'
+    // Вспомогательные слои (fragments, find_node, city_center, file…) — отдельной группой в конце
+    const key = (layer as any).role === 'service' ? `${ws}${SERVICE_GROUP_SUFFIX}` : ws
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key)!.push(layer)
   }
-  return Array.from(groups.entries()).map(([name, layers]) => ({ name, layers }))
+  return Array.from(groups.entries())
+    .map(([name, layers]) => ({ name, layers }))
+    .sort((a, b) =>
+      Number(a.name.endsWith(SERVICE_GROUP_SUFFIX)) - Number(b.name.endsWith(SERVICE_GROUP_SUFFIX))
+    )
 })
 
-const formatGroupName = (n: string) => n.replace(/([A-Z])/g, ' $1').replace(/^\s/, '').trim()
+// Пробел только на границе слов: AlmatyGIS → Almaty GIS (а не A l m a t y …)
+const formatGroupName = (n: string) => n.replace(/([a-zа-яё0-9])([A-ZА-ЯЁ])/g, '$1 $2').trim()
 
 const layerOrderMap = computed(() => {
   const m: Record<string, number> = {}

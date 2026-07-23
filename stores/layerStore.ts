@@ -83,9 +83,19 @@ export const useLayerStore = defineStore('layer', {
       const mapStore = useMapStore();
       const map = mapStore.map;
       if (!map) return;
-      if (!ensureContextMapLayers(map as any)) return;
-      applyContextLayersVisibility(map as any, new Set(this.visibleContextLayers));
-      restackContextMapLayers(map as any);
+      // Ранний вызов до загрузки стиля не должен ронять initializeLayers —
+      // откладываем синхронизацию до события load
+      if (typeof (map as any).isStyleLoaded === 'function' && !(map as any).isStyleLoaded()) {
+        (map as any).once('load', () => this.syncContextLayersToMap());
+        return;
+      }
+      try {
+        if (!ensureContextMapLayers(map as any)) return;
+        applyContextLayersVisibility(map as any, new Set(this.visibleContextLayers));
+        restackContextMapLayers(map as any);
+      } catch (e) {
+        console.warn('[layerStore] Контекстные слои недоступны:', e);
+      }
     },
 
     setContextLayerVisible(key: ContextLayerKey, visible: boolean) {
@@ -382,18 +392,25 @@ export const useLayerStore = defineStore('layer', {
     },
 
     loadVisibleLayers() {
+      // По умолчанию включаем только слои каталога (defaultVisible !== false):
+      // автообнаруженные и вспомогательные доступны в панели, но не грузятся сами —
+      // иначе первая загрузка тянула бы все 30+ опубликованных слоёв.
+      const defaultVisibleIds = () =>
+        this.geoServerLayers
+          .filter((l) => (l as any).defaultVisible !== false)
+          .map((l) => l.layerId);
       const saved = localStorage.getItem('visibleGeoServerLayers');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
           const raw = Array.isArray(parsed) ? parsed : [];
           const sorted = this.sortVisibleLayerIdsByGeoOrder(raw);
-          this.visibleGeoServerLayers = sorted.length > 0 ? sorted : this.geoServerLayers.map((l) => l.layerId);
+          this.visibleGeoServerLayers = sorted.length > 0 ? sorted : defaultVisibleIds();
         } catch {
-          this.visibleGeoServerLayers = this.geoServerLayers.map((l) => l.layerId);
+          this.visibleGeoServerLayers = defaultVisibleIds();
         }
       } else {
-        this.visibleGeoServerLayers = this.geoServerLayers.map((l) => l.layerId);
+        this.visibleGeoServerLayers = defaultVisibleIds();
         this.saveVisibleLayers();
       }
     },
