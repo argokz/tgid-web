@@ -118,6 +118,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import type { CSSProperties } from 'vue'
 import { useMapStore } from '~/stores/mapStore'
 
 const mapStore = useMapStore()
@@ -153,7 +154,7 @@ const menuSizeClass = computed(() => {
   return 'feature-menu--desktop'
 })
 
-const menuStyle = computed(() => {
+const menuStyle = computed<CSSProperties>(() => {
   const vh = viewportHeight.value || 900
   const pos = mapStore.featureMenuPosition
 

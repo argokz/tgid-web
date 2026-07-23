@@ -3,7 +3,45 @@ import type { ExtendedLayerConfig } from '~/types';
 
 const loadedSprites = new Set<string>();
 
+function sanitizeMapLibreFilter(f: any): any {
+  if (!Array.isArray(f) || f.length === 0) return f;
+  const op = f[0];
+  if (['==', '!='].includes(op) && f.length === 3) {
+    const left = f[1];
+    const right = f[2];
+    if (right === null || right === 'null' || right === 'NULL') {
+      const propName = typeof left === 'string' ? left : (Array.isArray(left) && left[0] === 'get' ? left[1] : null);
+      if (propName) {
+        return op === '==' ? ['!', ['has', propName]] : ['has', propName];
+      }
+    }
+    if (left === null || left === 'null' || left === 'NULL') {
+      const propName = typeof right === 'string' ? right : (Array.isArray(right) && right[0] === 'get' ? right[1] : null);
+      if (propName) {
+        return op === '==' ? ['!', ['has', propName]] : ['has', propName];
+      }
+    }
+  }
+  return f.map((k: any) => sanitizeMapLibreFilter(k));
+}
+
 export const mapService = {
+  async loadStyleImage(map: Map, imageId: string, imageUrl: string) {
+    if (!imageId || !imageUrl || map.hasImage(imageId)) return;
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const element = new Image();
+        element.crossOrigin = 'Anonymous';
+        element.onload = () => resolve(element);
+        element.onerror = (e) => reject(new Error(`Unable to load style image: ${imageUrl}`));
+        element.src = imageUrl;
+      });
+      if (!map.hasImage(imageId)) map.addImage(imageId, image, { pixelRatio: 1 });
+    } catch (err) {
+      console.warn(`[mapService] Failed to load style image ${imageId}:`, err);
+    }
+  },
+
   async loadSprite(map: Map, spriteUrl: string) {
     if (loadedSprites.has(spriteUrl)) return;
     loadedSprites.add(spriteUrl);
@@ -29,15 +67,19 @@ export const mapService = {
 
       for (const [id, info] of Object.entries(jsonRes)) {
         if (!map.hasImage(id)) {
-          const { x, y, width, height, pixelRatio } = info as any;
-          canvas.width = width;
-          canvas.height = height;
-          ctx.clearRect(0, 0, width, height);
-          ctx.drawImage(img, x, y, width, height, 0, 0, width, height);
-          
-          const imageData = ctx.getImageData(0, 0, width, height);
-          // Set pixelRatio to 2 so 100px icons render at 50px logical pixels (as requested by user)
-          map.addImage(id, imageData, { pixelRatio: 2 });
+          try {
+            const { x, y, width, height, pixelRatio } = info as any;
+            canvas.width = width;
+            canvas.height = height;
+            ctx.clearRect(0, 0, width, height);
+            ctx.drawImage(img, x, y, width, height, 0, 0, width, height);
+            
+            const imageData = ctx.getImageData(0, 0, width, height);
+            // Set pixelRatio to 2 so 100px icons render at 50px logical pixels (as requested by user)
+            map.addImage(id, imageData, { pixelRatio: 2 });
+          } catch (e) {
+            console.warn(`[mapService] Failed to decode sprite icon ${id}:`, e);
+          }
         }
       }
       console.log(`[mapService] Loaded ${Object.keys(jsonRes).length} icons from sprite ${spriteUrl}`);
@@ -99,6 +141,18 @@ export const mapService = {
         maxzoom: 22,
       });
 
+      const styleImages = new globalThis.Map<string, string>();
+      for (const mbLayer of layer.mbLayers || []) {
+        const imageId = String(mbLayer?.metadata?.geoserverIconId || '');
+        const imageUrl = String(mbLayer?.metadata?.geoserverIconUrl || '');
+        if (imageId && imageUrl) styleImages.set(imageId, imageUrl);
+      }
+      await Promise.all(
+        [...styleImages.entries()].map(([imageId, imageUrl]) =>
+          this.loadStyleImage(map, imageId, imageUrl)
+        )
+      );
+
       // Добавляем слой/слои
       if (layer.mbLayers && layer.mbLayers.length > 0) {
         // Если это нативный MBStyle с несколькими слоями (например, обводка + заливка + текст)
@@ -144,7 +198,8 @@ export const mapService = {
           } else {
             layerConfig.filter = ['all'];
           }
-          
+          layerConfig.filter = sanitizeMapLibreFilter(layerConfig.filter);
+
           if (mbLayer.minzoom !== undefined) layerConfig.minzoom = mbLayer.minzoom;
           if (mbLayer.maxzoom !== undefined) layerConfig.maxzoom = mbLayer.maxzoom;
           
@@ -173,7 +228,7 @@ export const mapService = {
           'source-layer': layer.sourceLayer,
           paint: layer.paint || {},
           layout: { ...defaultLayout, ...(layer.layout || {}) },
-          filter: (layer.filter || ['all']) as any,
+          filter: sanitizeMapLibreFilter(layer.filter || ['all']) as any,
         };
         map.addLayer(layerConfig);
       }

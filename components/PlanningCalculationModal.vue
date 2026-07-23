@@ -84,7 +84,7 @@
           <FragmentSelectModal
             v-model="fragmentSelectModal"
             :model-value-id="selectedFragmentId"
-            @update:model-value-id="val => selectedFragmentId = val"
+            @update:model-value-id="(val: number | null) => selectedFragmentId = val"
           />
           
           <div class="d-flex flex-wrap mt-2 calc-form-row">
@@ -250,6 +250,7 @@ import { ref, computed, watch } from 'vue';
 import { useDisplay } from 'vuetify';
 import FragmentSelectModal from '~/components/FragmentSelectModal.vue';
 import { useFragmentStore } from '~/stores/fragmentStore';
+import { useLayerStore } from '~/stores/layerStore';
 import { fastApiService } from '~/services/fastApiService';
 
 const heatLossTemperatureOptions = [
@@ -283,7 +284,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   'calculate': []
-  'protocol-log': [{timestamp: string, message: string, type: string}]
+  'protocol-log': [{ timestamp: string; message: string; type: string; html: boolean }]
   'show-protocol': [value: boolean]
 }>();
 
@@ -339,11 +340,10 @@ const close = () => {
   isOpen.value = false;
 };
 
-const addProtocolLog = (message: string, type: string = 'info') => {
+const addProtocolLog = (message: string, type: string = 'info', html = false) => {
   const now = new Date();
   const timestamp = now.toLocaleTimeString('ru-RU');
-  const log = { timestamp, message, type };
-  emit('protocol-log', log);
+  emit('protocol-log', { timestamp, message, type, html });
 };
 
 const buildApiString = () => {
@@ -388,24 +388,55 @@ const calculate = async () => {
   isOpen.value = false;
 
   const apiString = buildApiString();
-  addProtocolLog('Начало расчета...', 'info');
-  addProtocolLog(`Параметры расчета: ${apiString}`, 'info');
+  addProtocolLog('Отправка запроса на расчет...', 'info');
+  addProtocolLog(`Параметры: ${apiString}`, 'info');
 
   calculating.value = true;
   try {
     const result = await fastApiService.postRunSetyCmd(apiString);
-    console.log(result);
-    if (result.message == 'Расчет окончен') {
-      addProtocolLog(result.message, 'success');
-      addProtocolLog(result.output, 'success');
+    if (!result.task_id) {
+      addProtocolLog(result.message || 'Ошибка: сервер не вернул ID задачи', 'error');
+      calculating.value = false;
       return;
-    } else {
-      addProtocolLog(result.message, 'error');
-      console.log('result.output', result.output);
-      addProtocolLog(result.output, 'error');
+    }
+    
+    addProtocolLog(result.message || 'Задача добавлена в очередь', 'success');
+    addProtocolLog(`Task ID: ${result.task_id}`, 'info');
+    
+    // Polling logic
+    let isDone = false;
+    let lastStatus = '';
+    
+    while (!isDone) {
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Poll every 2 seconds
+      const statusResponse = await fastApiService.getTaskStatus(result.task_id);
+      
+      if (statusResponse.status !== lastStatus) {
+        lastStatus = statusResponse.status;
+        addProtocolLog(`Статус: ${lastStatus}`, 'info');
+      }
+      
+      if (statusResponse.status === 'SUCCESS') {
+        const finalResult = statusResponse.result;
+        addProtocolLog(finalResult.message || 'Расчет окончен', 'success');
+        if (finalResult.output) {
+          addProtocolLog(finalResult.output, 'success', true);
+        }
+        isDone = true;
+        
+        // Refresh map layers to show new colors
+        const layerStore = useLayerStore();
+        layerStore.visibleGeoServerLayers.forEach(id => layerStore.refreshLayerSource(id));
+      } else if (statusResponse.status === 'FAILURE') {
+        addProtocolLog('Ошибка при выполнении расчета на сервере', 'error');
+        if (statusResponse.error) {
+          addProtocolLog(statusResponse.error, 'error', true);
+        }
+        isDone = true;
+      }
     }
   } catch (error) {
-    addProtocolLog('Ошибка при выполнении расчета', 'error');
+    addProtocolLog('Ошибка при связи с сервером', 'error');
     addProtocolLog(`Детали ошибки: ${error}`, 'error');
   } finally {
     calculating.value = false;

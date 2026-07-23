@@ -6,6 +6,7 @@ import {
   buildWmsRasterSourceId
 } from '~/utils/geoserverMvtIds';
 import type { GeoCatalogLayerEntry, GeoWorkspaceCatalogEntry } from '~/utils/geoserverLayerCatalog';
+import { convertSldToMapLibre } from '~/utils/sldToMapLibre';
 
 /** Тестовый BBOX Web Mercator (Алматы), чтобы подставить вместо {bbox-epsg-3857}. */
 const MVT_PROBE_BBOX_3857 = '8500000,5280000,8580000,5360000';
@@ -54,12 +55,12 @@ function resolveGeoserverRestBaseUrl(runtimeConfig: ReturnType<typeof useRuntime
 }
 
 function geoserverRestAuthHeaders(runtimeConfig: ReturnType<typeof useRuntimeConfig>): Record<string, string> {
-  const user = String((runtimeConfig as any).geoserverRestUser || '').trim();
-  const pass = String((runtimeConfig as any).geoserverRestPassword || '').trim();
+  const user = String(process.env.GEOSERVER_REST_USER || (runtimeConfig as any).geoserverRestUser || '').trim();
+  const pass = String(process.env.GEOSERVER_REST_PASSWORD || (runtimeConfig as any).geoserverRestPassword || '').trim();
   if (user && pass) {
     return { Authorization: `Basic ${Buffer.from(`${user}:${pass}`).toString('base64')}` };
   }
-  return { Authorization: `Basic ${Buffer.from('admin:geoserver').toString('base64')}` };
+  return {};
 }
 
 function pickWmtsStyleIdentifier(styleRaw: unknown): string {
@@ -93,8 +94,22 @@ export default defineEventHandler(async (event) => {
   const geoserverPublic = (runtimeConfig.public as any)?.geoserver || {};
 
   const sanitizeFilterTypeCoercion = (f: any): any => {
-    if (!Array.isArray(f)) return f;
+    if (!Array.isArray(f) || f.length === 0) return f;
     if (['==', '!='].includes(f[0]) && f.length === 3) {
+      const left = f[1];
+      const right = f[2];
+      if (right === null || right === 'null' || right === 'NULL') {
+        const propName = typeof left === 'string' ? left : (Array.isArray(left) && left[0] === 'get' ? left[1] : null);
+        if (propName) {
+          return f[0] === '==' ? ['!', ['has', propName]] : ['has', propName];
+        }
+      }
+      if (left === null || left === 'null' || left === 'NULL') {
+        const propName = typeof right === 'string' ? right : (Array.isArray(right) && right[0] === 'get' ? right[1] : null);
+        if (propName) {
+          return f[0] === '==' ? ['!', ['has', propName]] : ['has', propName];
+        }
+      }
       const val = f[2];
       if (val === '1' || val === '0') {
         const numVal = parseInt(val, 10);
@@ -145,7 +160,10 @@ export default defineEventHandler(async (event) => {
       runtimeConfig.geoserverMvtTemplateUrl ||
       `${defaultPublicUrl}/gwc/service/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER={layerName}&STYLE=&TILEMATRIXSET=EPSG:900913&TILEMATRIX=EPSG:900913:{z}&TILEROW={y}&TILECOL={x}&FORMAT=application/vnd.mapbox-vector-tile`;
 
-    const xmlText = (await $fetch(capabilitiesUrl)) as string;
+    // Явная сигнатура вместо типизированного $fetch: динамический URL заставляет TS
+    // перебирать все nitro-маршруты и падать с "Excessive stack depth".
+    const fetchText = $fetch as unknown as (url: string) => Promise<string>;
+    const xmlText = await fetchText(capabilitiesUrl);
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '@_',
@@ -162,6 +180,9 @@ export default defineEventHandler(async (event) => {
     }
 
     const authHeaders = geoserverRestAuthHeaders(runtimeConfig);
+    const appBaseUrl = String((runtimeConfig as any).app?.baseURL || '/').replace(/\/$/, '');
+    const styleResourceUrl = (workspace: string, resourcePath: string) =>
+      `${appBaseUrl}/api/geoserver-style-resource?workspace=${encodeURIComponent(workspace)}&path=${encodeURIComponent(resourcePath)}`;
 
     async function fetchMvtStylePack(
       workspaceName: string,
@@ -198,13 +219,13 @@ export default defineEventHandler(async (event) => {
         let mbStyle: any = null;
         try {
           const mbUrl = `${geoserverRestBaseUrl}/rest/workspaces/${workspaceName}/styles/${encodeURIComponent(cleanStyleName)}.mbstyle`;
-          mbStyle = await $fetch(mbUrl, { headers: authHeaders, timeout: 1000 });
+          mbStyle = await $fetch(mbUrl, { headers: authHeaders, timeout: 5000 });
         } catch {
-          const sldUrl = `${geoserverRestBaseUrl}/rest/workspaces/${workspaceName}/styles/${encodeURIComponent(cleanStyleName)}`;
-          mbStyle = await $fetch(sldUrl, {
+          const styleUrl = `${geoserverRestBaseUrl}/rest/workspaces/${workspaceName}/styles/${encodeURIComponent(cleanStyleName)}`;
+          mbStyle = await $fetch(styleUrl, {
             headers: { Accept: 'application/vnd.mapbox.style+json', ...authHeaders },
-            timeout: 1500
-          });
+            timeout: 5000
+          }).catch(() => null);
         }
 
         if (mbStyle && Array.isArray(mbStyle.layers) && mbStyle.layers.length > 0) {
@@ -225,6 +246,28 @@ export default defineEventHandler(async (event) => {
             typeof mbStyle.sprite === 'string' && !mbStyle.sprite.startsWith('http')
               ? `${geoserverRestBaseUrl}/www/sprites/sprite`
               : mbStyle.sprite;
+        }
+
+        if (!mbLayers.length) {
+          const sldUrl = `${geoserverRestBaseUrl}/rest/workspaces/${workspaceName}/styles/${encodeURIComponent(cleanStyleName)}.sld`;
+          const sldText = await $fetch<string>(sldUrl, {
+            headers: { Accept: 'application/vnd.ogc.sld+xml', ...authHeaders },
+            responseType: 'text',
+            timeout: 7000
+          });
+          const converted = convertSldToMapLibre(sldText, {
+            workspace: workspaceName,
+            resourceUrl: styleResourceUrl
+          });
+          mbLayers = converted.layers.map((layer: any) => {
+            if (layer.filter) layer.filter = sanitize(layer.filter);
+            return layer;
+          });
+          if (mbLayers.length > 0) {
+            paint = mbLayers[0].paint || {};
+            layout = mbLayers[0].layout || {};
+            type = mbLayers[0].type || 'circle';
+          }
         }
 
         if (!mbLayers.length) return null;
@@ -308,6 +351,7 @@ export default defineEventHandler(async (event) => {
 
         const ids = buildMvtLayerIdentifiers(wsEntry.workspace, cleanSource);
         const rf = resolveRenderFormat(le, true);
+        if (!mvtPack) continue;
 
         out.push({
           id: ids.id,

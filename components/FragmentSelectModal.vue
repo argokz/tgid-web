@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <v-dialog
     v-model="isOpen"
     :max-width="mobile ? undefined : 500"
@@ -8,45 +8,39 @@
     :transition="mobile ? 'dialog-bottom-transition' : 'dialog-transition'"
   >
     <v-card :rounded="mobile ? '0' : undefined">
-      <v-card-title class="primary-text d-flex align-center py-2">
+      <v-card-title class="primary-text d-flex align-center py-3 px-4 bg-primary text-white">
         <v-icon class="mr-2">
           mdi-puzzle
         </v-icon>
-        Выбор фрагмента
+        Выбор фрагмента (района)
         <v-spacer />
         <v-btn
-          icon
+          icon="mdi-close"
+          variant="text"
           density="compact"
           @click="close"
-        >
-          <v-icon>mdiClose</v-icon>
-        </v-btn>
+        />
       </v-card-title>
-      <v-card-text>
+      <v-card-text class="pa-4">
         <v-radio-group v-model="selectedId">
           <v-radio
             v-for="fragment in fragments"
             :key="fragment.id"
             :label="fragment.name"
             :value="fragment.id"
+            color="primary"
           />
         </v-radio-group>
       </v-card-text>
-      <v-card-actions class="pa-3">
+      <v-card-actions class="pa-3 bg-grey-lighten-4 border-top">
         <v-spacer />
         <v-btn
           color="primary"
           variant="elevated"
           :disabled="selectedId === null"
-          @click="select"
+          @click="apply"
         >
-          Выбрать
-        </v-btn>
-        <v-btn
-          variant="outlined"
-          @click="close"
-        >
-          Отмена
+          Применить
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -54,38 +48,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { useDisplay } from 'vuetify';
+import { ref, computed } from 'vue';
 import { useFragmentStore } from '~/stores/fragmentStore';
-import type { Fragment } from '~/types';
+import { useMobile } from '~/composables/useMobile';
 
-const props = defineProps<{
-  modelValue: boolean,
-  modelValueId: number | null
-}>();
-const emit = defineEmits<{
-  'update:modelValue': [value: boolean],
-  'update:modelValueId': [value: number | null]
-}>();
-
-const isOpen = computed({
-  get: () => props.modelValue,
-  set: (v) => emit('update:modelValue', v)
-});
-
+const isOpen = ref(false);
+const selectedId = ref<number | null>(null);
 const fragmentStore = useFragmentStore();
-const fragments = computed(() => fragmentStore.getFragments);
+const { isMobile: mobile } = useMobile();
 
-const { mobile } = useDisplay();
+const fragments = computed(() => fragmentStore.fragments);
 
-const selectedId = ref<number | null>(props.modelValueId ?? null);
-watch(() => props.modelValueId, (v) => selectedId.value = v);
+const openDialog = () => {
+  isOpen.value = true;
+  selectedId.value = fragmentStore.selectedFragmentId;
+};
 
 const close = () => {
   isOpen.value = false;
 };
-const select = () => {
-  emit('update:modelValueId', selectedId.value);
+
+const apply = () => {
+  if (selectedId.value !== null) {
+    fragmentStore.applyVisibleFragmentsSelection([selectedId.value]);
+  }
   close();
 };
-</script> 
+
+defineExpose({ openDialog });
+</script>

@@ -1,16 +1,18 @@
-/**
- * Ленивая загрузка maplibre-gl — отдельный async-чанк, сторы не тянут GL в начальный бандл.
- */
-let cached: typeof import('maplibre-gl').default | null = null
-let loading: Promise<typeof import('maplibre-gl').default> | null = null
+/**
+ * Ленивая загрузка maplibre-gl — отдельный async-чанк, сторы не тянут GL в начальный бандл.
+ */
+type MapLibreModule = typeof import('maplibre-gl')
 
-export async function getMaplibreDefault(): Promise<typeof import('maplibre-gl').default> {
-  if (cached) return cached
-  if (!loading) {
-    loading = import('maplibre-gl').then((m) => {
-      cached = m.default
-      return cached
-    })
-  }
-  return loading
-}
+let cached: MapLibreModule | null = null
+let loading: Promise<MapLibreModule> | null = null
+
+export async function getMaplibreDefault(): Promise<MapLibreModule> {
+  if (cached) return cached
+  if (!loading) {
+    loading = import('maplibre-gl').then((m) => {
+      cached = ((m as unknown as { default?: MapLibreModule }).default || m)
+      return cached
+    })
+  }
+  return loading
+}

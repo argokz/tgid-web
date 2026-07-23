@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <v-app>
     <v-app-bar
       app
@@ -19,7 +19,7 @@
         <v-icon>mdi-menu</v-icon>
       </v-btn>
 
-      <!-- Логотип -->
+      <!-- Брендинг -->
       <div class="app-brand d-flex align-center" :class="mobile ? 'ms-1 me-2' : 'ms-3 me-4'">
         <v-icon size="26" color="primary" class="brand-icon">mdi-layers</v-icon>
         <span class="brand-title ms-2">ITwin</span>
@@ -65,11 +65,45 @@
         >
           {{ showProtocol ? 'Скрыть протокол' : 'Протокол' }}
         </v-btn>
+
+        <v-btn
+          prepend-icon="mdi-export"
+          class="nav-btn ms-1"
+          variant="text"
+          rounded="lg"
+          size="small"
+          @click="downloadShp"
+          :loading="exportingShp"
+        >
+          Экспорт SHP
+        </v-btn>
+
+        <v-menu offset-y>
+          <template v-slot:activator="{ props }">
+            <v-btn
+              v-bind="props"
+              prepend-icon="mdi-file-excel"
+              class="nav-btn ms-1"
+              variant="text"
+              rounded="lg"
+              size="small"
+            >
+              Ведомости Excel
+            </v-btn>
+          </template>
+          <v-list density="compact">
+            <v-list-item title="Участки теплопроводов" prepend-icon="mdi-pipe" @click="downloadExcel('ut')" />
+            <v-list-item title="Задвижки и арматура" prepend-icon="mdi-valve" @click="downloadExcel('zd')" />
+            <v-list-item title="Байпасы" prepend-icon="mdi-dip-switch" @click="downloadExcel('bp')" />
+            <v-list-item title="Насосные агрегаты" prepend-icon="mdi-water-pump" @click="downloadExcel('ns')" />
+            <v-list-item title="Потребители" prepend-icon="mdi-home-city" @click="downloadExcel('pt')" />
+          </v-list>
+        </v-menu>
       </nav>
 
       <v-spacer />
 
-      <!-- Меню пользователя -->
+      <!-- Пользователь -->
       <v-menu
         location="bottom end"
         :close-on-content-click="true"
@@ -80,305 +114,172 @@
             v-bind="menuProps"
             icon
             variant="text"
-            class="me-2 user-menu-btn"
+            class="user-avatar-btn me-2"
             aria-label="Меню пользователя"
           >
-            <v-avatar size="32" color="primary" class="user-avatar">
-              <v-icon size="20">mdi-account</v-icon>
+            <v-avatar size="34" color="primary">
+              <v-icon color="white" size="20">mdi-account</v-icon>
             </v-avatar>
           </v-btn>
         </template>
-
-        <v-card min-width="220" elevation="8" rounded="xl" class="user-dropdown mt-1">
-          <!-- Шапка пользователя -->
-          <div class="user-dropdown__header pa-4 pb-3">
-            <div class="d-flex align-center" style="gap: 12px;">
-              <v-avatar size="42" color="primary" class="user-avatar">
-                <v-icon size="22">mdi-account</v-icon>
-              </v-avatar>
-              <div>
-                <div class="text-body-2 font-weight-semibold">Пользователь</div>
-                <div class="text-caption text-medium-emphasis">ITwin Map</div>
-              </div>
-            </div>
-          </div>
-
-          <v-divider />
-
-          <v-list density="compact" nav class="pa-2">
+        <v-card min-width="240" rounded="lg" elevation="4">
+          <v-list density="compact" class="py-1">
             <v-list-item
-              prepend-icon="mdi-account-circle-outline"
-              title="Профиль"
-              rounded="lg"
-              class="user-menu-item"
+              v-if="authStore.isAuthenticated"
+              :title="authStore.username"
+              :subtitle="authStore.role || 'пользователь'"
+              prepend-icon="mdi-account-check"
             />
             <v-list-item
-              prepend-icon="mdi-cog-outline"
-              title="Настройки"
-              rounded="lg"
-              class="user-menu-item"
+              v-else
+              prepend-icon="mdi-login"
+              title="Войти (dev)"
+              @click="onDevLogin"
             />
-          </v-list>
-
-          <v-divider class="mx-3" />
-
-          <v-list density="compact" nav class="pa-2">
+            <v-list-item prepend-icon="mdi-account-outline" title="Профиль" disabled />
+            <v-list-item prepend-icon="mdi-cog-outline" title="Настройки" disabled />
+            <v-divider class="my-1" />
             <v-list-item
               prepend-icon="mdi-logout"
               title="Выйти"
-              rounded="lg"
-              class="user-menu-item user-menu-item--danger"
+              color="error"
+              :disabled="!authStore.isAuthenticated"
+              @click="authStore.logout()"
             />
           </v-list>
         </v-card>
       </v-menu>
     </v-app-bar>
 
-    <!-- Навигация: выдвижная панель на мобильных -->
-    <v-navigation-drawer
-      v-model="mainMenuOpen"
-      location="start"
-      temporary
-      width="300"
-      class="main-nav-drawer"
-    >
-      <v-list nav density="comfortable" class="pt-2">
-        <v-list-subheader class="text-uppercase text-caption font-weight-bold">
-          Меню
-        </v-list-subheader>
-        <v-list-item
-          v-for="link in links"
-          :key="link.to"
-          :to="link.to"
-          :prepend-icon="link.icon"
-          :title="link.text"
-          :active="isActive(link.to)"
-          rounded="lg"
-          @click="mainMenuOpen = false"
-        />
-        <v-list-item
-          prepend-icon="mdi-calculator-variant"
-          title="Расчет"
-          rounded="lg"
-          :active="showCalculationModal"
-          @click="onDrawerOpenCalculation"
-        />
-        <v-list-item
-          :prepend-icon="showProtocol ? 'mdi-console' : 'mdi-console-line'"
-          :title="showProtocol ? 'Скрыть протокол' : 'Протокол'"
-          rounded="lg"
-          :active="showProtocol"
-          @click="onDrawerToggleProtocol"
-        />
-      </v-list>
-    </v-navigation-drawer>
-
-    <!-- Контент страницы: фиксированная min-height под app-bar — меньше CLS от v-container при гидрации -->
-    <v-main tag="main">
-      <v-container class="pa-0 layout-content-root" fluid>
-        <slot />
-        <!-- Протокол расчета -->
-        <CalculationProtocol
-          v-if="showProtocol"
-          ref="protocolRef"
-          :show="showProtocol"
-          @update:show="showProtocol = $event"
-          @open-calculation="showCalculationModal = true"
-        />
-      </v-container>
+    <v-main class="app-main">
+      <slot />
     </v-main>
 
     <!-- Модальное окно расчета -->
     <PlanningCalculationModal
-      v-if="showCalculationModal"
       v-model="showCalculationModal"
-      @calculate="handleCalculate"
-      @protocol-log="handleProtocolLog"
-      @show-protocol="showProtocol = $event"
+      @log="onCalculationLog"
     />
 
-    <!-- Глобальные уведомления -->
-    <v-snackbar
-      v-model="notificationStore.show"
-      :color="notificationStore.type"
-      location="bottom"
-      multi-line
-      timeout="5000"
-    >
-      {{ notificationStore.message }}
-    </v-snackbar>
+    <!-- Окно протокола -->
+    <CalculationProtocol
+      ref="protocolRef"
+      v-model:show="showProtocol"
+    />
   </v-app>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { defineAsyncComponent, ref } from 'vue';
-import { useDisplay } from 'vuetify';
+import { useMobile } from '~/composables/useMobile';
+import { fastApiService } from '~/services/fastApiService';
 import { useNotificationStore } from '~/stores/notificationStore';
+import { useAuthStore } from '~/stores/authStore';
+import PlanningCalculationModal from '~/components/PlanningCalculationModal.vue';
+import CalculationProtocol from '~/components/CalculationProtocol.vue';
 
-const PlanningCalculationModal = defineAsyncComponent(() => import('~/components/PlanningCalculationModal.vue'));
-const CalculationProtocol = defineAsyncComponent(() => import('~/components/CalculationProtocol.vue'));
-
-interface NavLink {
-  text: string;
-  to: string;
-  icon: string;
-}
-
-const links: NavLink[] = [
-  { text: 'Главная', to: '/', icon: 'mdi-home-outline' },
-];
-
+const { isMobile: mobile } = useMobile();
 const route = useRoute();
-const isActive = (path: string) => route.path === path;
-
-const { mobile } = useDisplay();
+const authStore = useAuthStore();
 const mainMenuOpen = ref(false);
-
-const notificationStore = useNotificationStore();
-
 const showCalculationModal = ref(false);
 const showProtocol = ref(false);
-const protocolRef = ref();
+const exportingShp = ref(false);
+const protocolRef = ref<{ addLog: (log: any) => void } | null>(null);
 
-const onDrawerOpenCalculation = () => {
-  mainMenuOpen.value = false;
-  showCalculationModal.value = true;
+onMounted(() => {
+  authStore.hydrate();
+});
+
+const onDevLogin = async () => {
+  try {
+    const username = window.prompt('Логин', authStore.username || 'editor') || '';
+    if (!username) return;
+    const password = window.prompt('Пароль (dev)', 'dev') || '';
+    await authStore.loginDev(username, password, 'editor');
+    useNotificationStore().showSuccess(`Вход выполнен: ${authStore.username} (${authStore.role})`);
+  } catch (err: any) {
+    useNotificationStore().showError('Вход не удался: ' + (err?.message || err));
+  }
 };
 
-const onDrawerToggleProtocol = () => {
-  showProtocol.value = !showProtocol.value;
-  mainMenuOpen.value = false;
+const links = [
+  { text: 'Карта', to: '/', icon: 'mdi-map' }
+];
+
+const isActive = (to: string) => route.path === to;
+
+const onCalculationLog = (log: any) => {
+  if (protocolRef.value) {
+    protocolRef.value.addLog(log);
+  }
 };
 
-const handleCalculate = () => {
-  showProtocol.value = true;
+const downloadShp = async () => {
+  exportingShp.value = true;
+  try {
+    const { blob, filename } = await fastApiService.downloadShpExport();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    useNotificationStore().showSuccess('Экспорт SHP успешно завершен');
+  } catch (err: any) {
+    useNotificationStore().showError('Ошибка экспорта SHP: ' + err.message);
+  } finally {
+    exportingShp.value = false;
+  }
 };
 
-const handleProtocolLog = (log: { timestamp: string; message: string; type: string }) => {
-  protocolRef.value?.addLog(log);
+const downloadExcel = async (docType: string) => {
+  try {
+    const { blob, filename } = await fastApiService.downloadExcelReport(docType);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url)
+    useNotificationStore().showSuccess('Ведомость ' + docType.toUpperCase() + ' успешно скачана');
+  } catch (err: any) {
+    useNotificationStore().showError('Ошибка скачивания ведомости: ' + err.message);
+  }
 };
 </script>
 
 <style scoped>
-/* Одна высота с первого кадра (v-app-bar = 56px), без flex-схлопывания → меньше CLS Lighthouse */
-.layout-content-root {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  /* Только min-height: не конкурируем с внутренней геометрией v-main (padding под app-bar) */
-  min-height: calc(100svh - 56px);
-}
-
 .app-brand {
   user-select: none;
-  text-decoration: none;
 }
-
-.brand-icon {
-  flex-shrink: 0;
-}
-
 .brand-title {
   font-weight: 700;
   font-size: 1.1rem;
-  letter-spacing: -0.3px;
-  color: #1565c0;
-  line-height: 1;
+  letter-spacing: -0.02em;
 }
-
 .brand-subtitle {
-  font-weight: 300;
-  font-size: 1.1rem;
-  color: #546e7a;
-  line-height: 1;
-  margin-left: 1px;
+  font-weight: 400;
+  font-size: 0.85rem;
+  opacity: 0.7;
+  margin-left: 3px;
 }
-
 .nav-links {
-  gap: 2px;
+  gap: 4px;
 }
-
 .nav-btn {
-  font-size: 0.8125rem;
   font-weight: 500;
-  text-transform: none;
-  letter-spacing: 0;
-  color: #546e7a;
+  letter-spacing: 0.01em;
 }
-
-.nav-btn:hover {
-  color: #1565c0;
-}
-
-/* Иконка в активной nav-кнопке синяя (SVG fill:currentColor) */
-.nav-btn.active-link :deep(svg),
-.nav-btn.active-link :deep(path) {
-  fill: #1565c0;
-  color: #1565c0;
-}
-
 .active-link {
-  position: relative;
+  font-weight: 600;
 }
-
-.active-link::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 60%;
-  height: 2px;
-  background-color: #1565c0;
-  border-radius: 2px 2px 0 0;
-}
-
-/* ── Аватар пользователя — белая иконка через CSS (SVG fill:currentColor) ── */
-.user-avatar :deep(svg),
-.user-avatar :deep(path) {
-  fill: white;
-  color: white;
-}
-
-/* ── Выпадающее меню пользователя ── */
-.user-dropdown {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14) !important;
-  overflow: hidden;
-}
-
-.user-dropdown__header {
-  background: linear-gradient(135deg, #1565c0 0%, #1976d2 100%);
-  color: white;
-}
-
-.user-dropdown__header :deep(.text-medium-emphasis) {
-  color: rgba(255, 255, 255, 0.75) !important;
-}
-
-/* Иконка аватара в шапке dropdown тоже белая */
-.user-dropdown__header .user-avatar :deep(svg),
-.user-dropdown__header .user-avatar :deep(path) {
-  fill: white;
-  color: white;
-}
-
-.user-menu-item {
-  transition: background 0.15s, color 0.15s;
-  border-radius: 8px !important;
-  margin-bottom: 2px;
-}
-
-.user-menu-item:hover {
-  background: rgba(21, 101, 192, 0.07) !important;
-}
-
-.user-menu-item--danger :deep(.v-list-item__prepend .v-icon),
-.user-menu-item--danger :deep(.v-list-item-title) {
-  color: #e53935 !important;
-}
-
-.user-menu-item--danger:hover {
-  background: rgba(229, 57, 53, 0.07) !important;
+.app-main {
+  min-height: calc(100vh - 56px);
 }
 </style>

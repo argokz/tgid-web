@@ -698,7 +698,8 @@ const emit = defineEmits<{
 const layerStore = useLayerStore()
 const { visibleGeoServerLayers, visibleContextLayers } = storeToRefs(layerStore)
 const mapStore = useMapStore()
-const { contextHoverInspectEnabled, planetLayerStyleOverrides } = storeToRefs(mapStore)
+const contextHoverInspectEnabled = computed(() => mapStore.contextHoverInspectEnabled)
+const planetLayerStyleOverrides = computed(() => mapStore.planetLayerStyleOverrides)
 
 const mapTilerReady = computed(() => Boolean(getMapTilerKey()))
 

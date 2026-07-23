@@ -3,6 +3,7 @@ node_modules/
 .output/
 dist/
 coverage/
+public/cesium/
 
 .env
 .env.local

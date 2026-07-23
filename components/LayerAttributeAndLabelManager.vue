@@ -394,6 +394,14 @@ interface Attribute {
   showAsLabel: boolean;
 }
 
+interface LayerVisualStyle {
+  color: string;
+  opacity: number;
+  circleRadius?: number;
+  icon?: { url: string; width: number; height: number };
+  [key: string]: any;
+}
+
 // Props
 const props = defineProps<{
   layer: ExtendedLayerConfig;
@@ -411,6 +419,17 @@ const { mobile } = useDisplay();
 const loading = ref(false);
 const selectedAttrs = ref<string[]>([]);
 const availableAttributes = ref<Attribute[]>([]);
+const layerStyle = ref<LayerVisualStyle>({
+  color: '#3388ff',
+  opacity: 1,
+  circleRadius: 5,
+  ...(layerStore.layerStyles[props.layer.layerId] || {})
+});
+
+const updateStyle = (key: string, value: any) => {
+  layerStyle.value[key] = value;
+  layerStore.updateLayerStyle(props.layer.layerId, { [key]: value });
+};
 
 // Label settings
 const labelSettingsDialog = ref(false);

@@ -387,13 +387,13 @@ export const useLayerStore = defineStore('layer', {
         try {
           const parsed = JSON.parse(saved);
           const raw = Array.isArray(parsed) ? parsed : [];
-          this.visibleGeoServerLayers = this.sortVisibleLayerIdsByGeoOrder(raw);
+          const sorted = this.sortVisibleLayerIdsByGeoOrder(raw);
+          this.visibleGeoServerLayers = sorted.length > 0 ? sorted : this.geoServerLayers.map((l) => l.layerId);
         } catch {
-          this.visibleGeoServerLayers = [];
+          this.visibleGeoServerLayers = this.geoServerLayers.map((l) => l.layerId);
         }
       } else {
-        // По умолчанию ни один MVT-слой не включён — пользователь включает вручную
-        this.visibleGeoServerLayers = [];
+        this.visibleGeoServerLayers = this.geoServerLayers.map((l) => l.layerId);
         this.saveVisibleLayers();
       }
     },
@@ -676,7 +676,7 @@ export const useLayerStore = defineStore('layer', {
     /**
      * Refreshes a single layer's source with current viewparams
      */
-    refreshLayerSource(layerId: string) {
+    refreshLayerSource(layerId: string, force = false) {
       const mapStore = useMapStore();
       const layer = this.geoServerLayers.find(l => l.layerId === layerId);
       if (!mapStore.map || !layer) return;
@@ -697,10 +697,11 @@ export const useLayerStore = defineStore('layer', {
         const viewparams = `${fragmentsPart}${fieldsPart}${fieldsPart.endsWith(';') || !fieldsPart ? '' : ';'}nach:2;`;
         
         const separator = originalUrl.includes('?') ? '&' : '?';
-        const newTileUrl = `${originalUrl}${separator}viewparams=${viewparams}`;
+        const cacheBust = force ? `&_=${Date.now()}` : '';
+        const newTileUrl = `${originalUrl}${separator}viewparams=${viewparams}${cacheBust}`;
         
         const prev = Array.isArray(source.tiles) ? source.tiles[0] : '';
-        if (prev === newTileUrl) {
+        if (prev === newTileUrl && !force) {
           return;
         }
 
@@ -714,6 +715,12 @@ export const useLayerStore = defineStore('layer', {
           mapStore.map.triggerRepaint();
         }
       }
+    },
+
+    refreshVisibleDataLayers() {
+      this.visibleGeoServerLayers.forEach(layerId => this.refreshLayerSource(layerId, true));
+      const mapStore = useMapStore();
+      mapStore.map?.triggerRepaint();
     },
 
     syncLayerVisibility(visibleLayers: string[]) {

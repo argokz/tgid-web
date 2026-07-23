@@ -84,9 +84,18 @@
                 class="protocol-line"
               >
                 <span class="protocol-timestamp">{{ log.timestamp }}</span>
-                <span :class="['protocol-message', log.type]">{{ log.message }}</span>
+                <!-- Вывод расчёта с бэкенда — HTML (цвета, ссылки); прочие строки остаются текстом -->
+                <div
+                  v-if="log.html"
+                  class="protocol-message protocol-html"
+                  v-html="log.message"
+                />
+                <span
+                  v-else
+                  :class="['protocol-message', log.type]"
+                >{{ log.message }}</span>
                 <v-btn
-                  v-if="log.message.includes('Начало расчета')"
+                  v-if="!log.html && log.message.includes('Начало расчета')"
                   size="small"
                   variant="text"
                   color="primary"
@@ -130,7 +139,7 @@ const emit = defineEmits<{
   'open-calculation': []
 }>();
 
-const logs = ref<Array<{id: string; timestamp: string; message: string; type: string}>>([]);
+const logs = ref<Array<{ id: string; timestamp: string; message: string; type: string; html: boolean }>>([]);
 const protocolHeight = ref(300);
 const activeTab = ref('calculation');
 const isMinimized = ref(false);
@@ -172,7 +181,7 @@ const startResize = (e: MouseEvent) => {
   document.addEventListener('mouseup', handleMouseUp);
 };
 
-const addLog = (log: {timestamp: string; message: string; type: string}) => {
+const addLog = (log: { timestamp: string; message: string; type: string; html: boolean }) => {
   logs.value.push({
     ...log,
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -321,6 +330,24 @@ defineExpose({
 
 .protocol-message.info {
   color: #1565c0;
+}
+
+/* HTML-протокол расчёта: переносы \\n и таблица с &nbsp; */
+.protocol-html {
+  display: block;
+  margin-top: 2px;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.protocol-html :deep(a) {
+  color: #1565c0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.protocol-html :deep(a:hover) {
+  color: #0d47a1;
 }
 
 /* Стили для кнопок в светлой теме */

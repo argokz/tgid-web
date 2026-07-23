@@ -31,7 +31,7 @@ export const CONTEXT_MAP_LAYER_IDS = {
   hillshade: 'context-hillshade',
 } as const
 
-const ALL_CONTEXT_MAP_LAYER_ID_SET = new Set(Object.values(CONTEXT_MAP_LAYER_IDS))
+const ALL_CONTEXT_MAP_LAYER_ID_SET = new Set<string>(Object.values(CONTEXT_MAP_LAYER_IDS))
 
 /** Актуальные paint/layout для подписей 3D-зданий (подхватывается и для уже созданного слоя). */
 function refreshContextBuildingsLabelStyle(map: Map): void {

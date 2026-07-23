@@ -10,7 +10,9 @@
   ],
   "scripts": {
     "build": "nuxt build",
+    "prebuild": "node ./scripts/copy-cesium-assets.mjs",
     "dev": "nuxt dev",
+    "predev": "node ./scripts/copy-cesium-assets.mjs",
     "generate": "nuxt generate",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -26,20 +28,23 @@
     "ci": "npm run check && npm run build"
   },
   "dependencies": {
-    "@birkskyum/maplibre-gl-draw": "npm:@jsr/birkskyum__maplibre-gl-draw@^2.1.2",
     "@fontsource-variable/roboto": "^5.2.10",
-    "@mapbox/mapbox-gl-draw": "^1.5.0",
-    "@maplibre/maplibre-gl-geocoder": "^1.8.0",
+    "@mapbox/mapbox-gl-draw": "^1.5.1",
+    "@maplibre/maplibre-gl-geocoder": "^1.9.4",
     "@mdi/js": "^7.4.47",
     "@pinia/nuxt": "^0.10.1",
     "@types/jsdom": "^21.1.7",
+    "cesium": "^1.142.0",
+    "echarts": "^6.1.0",
     "fast-xml-parser": "^4.0.0",
     "jsdom": "^26.1.0",
+    "maplibre-gl": "^4.7.1",
     "nuxt": "^3.19.3",
     "pinia": "^3.0.1",
     "three": "^0.184.0",
     "threebox-plugin": "^2.2.7",
     "vue": "latest",
+    "vue-echarts": "^8.0.1",
     "vue-router": "latest"
   },
   "overrides": {
@@ -56,9 +61,11 @@
     "happy-dom": "^20.8.4",
     "patch-package": "^8.0.1",
     "prettier": "^3.5.3",
+    "typescript": "^5.9.3",
     "typescript-eslint": "^8.26.1",
     "vite-plugin-vuetify": "^2.1.0",
     "vitest": "^3.0.9",
+    "vue-tsc": "^3.3.7",
     "vuetify": "^3.7.16"
   }
 }

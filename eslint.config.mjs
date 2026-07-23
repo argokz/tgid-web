@@ -5,7 +5,15 @@ import vueParser from 'vue-eslint-parser';
 
 export default tseslint.config(
   {
-    ignores: ['node_modules/**', '.nuxt/**', '.output/**', 'dist/**', 'coverage/**'],
+    ignores: [
+      'node_modules/**',
+      '.nuxt/**',
+      '.output/**',
+      '3007/**',
+      'public/cesium/**',
+      'dist/**',
+      'coverage/**'
+    ],
   },
   js.configs.recommended,
   ...vue.configs['flat/recommended'],
@@ -26,7 +34,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.{ts,tsx,js,vue}'],
+    files: ['**/*.{ts,tsx,js,mjs,cjs,vue}'],
     rules: {
       'no-console': 'off',
       'no-undef': 'off',

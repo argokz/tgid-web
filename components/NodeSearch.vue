@@ -131,11 +131,10 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, computed } from 'vue'
 import { useDisplay } from 'vuetify'
-import type { Map } from 'maplibre-gl'
-import { useRuntimeConfig } from '#app'
+import type { Map as MapLibreMap } from 'maplibre-gl'
 
 interface Props {
-  map?: Map | null
+  map?: MapLibreMap | null
 }
 
 const props = defineProps<Props>()

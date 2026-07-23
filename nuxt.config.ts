@@ -48,14 +48,9 @@ export default defineNuxtConfig({
       process.env.GEOSERVER_REST_URL ||
       env.GEOSERVER_REST_URL ||
       '',
-    geoserverRestUser:
-      process.env.GEOSERVER_REST_USER ||
-      env.GEOSERVER_REST_USER ||
-      '',
-    geoserverRestPassword:
-      process.env.GEOSERVER_REST_PASSWORD ||
-      env.GEOSERVER_REST_PASSWORD ||
-      '',
+    geoserverRestUser: process.env.GEOSERVER_REST_USER || env.GEOSERVER_REST_USER || 'admin',
+    // Пароль только из окружения (.env / CI secrets) — не хардкодить в репозитории
+    geoserverRestPassword: process.env.GEOSERVER_REST_PASSWORD || env.GEOSERVER_REST_PASSWORD || '',
     public: {
       externalApiUrl: process.env.EXTERNAL_API_URL || env.EXTERNAL_API_URL || 'http://localhost:8000',
       mapApiBaseUrl:
@@ -65,6 +60,17 @@ export default defineNuxtConfig({
         env.EXTERNAL_API_URL ||
         'http://localhost:8000',
       maptilerKey: process.env.NUXT_PUBLIC_MAPTILER_KEY || env.NUXT_PUBLIC_MAPTILER_KEY || '',
+      cesiumIonToken:
+        process.env.NUXT_PUBLIC_CESIUM_ION_TOKEN ||
+        env.NUXT_PUBLIC_CESIUM_ION_TOKEN ||
+        '',
+      topologyEditingEnabled:
+        process.env.NUXT_PUBLIC_TOPOLOGY_EDITING_ENABLED === 'true' ||
+        env.NUXT_PUBLIC_TOPOLOGY_EDITING_ENABLED === 'true',
+      /** Journal/attribute write UI. Requires API MUTATIONS_ENABLED + auth. */
+      mutationsEnabled:
+        process.env.NUXT_PUBLIC_MUTATIONS_ENABLED === 'true' ||
+        env.NUXT_PUBLIC_MUTATIONS_ENABLED === 'true',
       geoserver: {
         url:
           process.env.NUXT_PUBLIC_GEOSERVER_URL ||
@@ -113,12 +119,17 @@ export default defineNuxtConfig({
   css: [
     '~/assets/styles/roboto.css',
     'vuetify/styles',
+    'cesium/Build/Cesium/Widgets/widgets.css',
     '~/assets/styles/main.scss',
     '~/assets/styles/popup.scss',
   ],
 
   nitro: {
-    compressPublicAssets: true,
+    // Cesium ships thousands of runtime files. Precompressing all of them is
+    // useful for a direct production deployment, but makes local/CI builds
+    // several minutes longer. Set false when the reverse proxy handles gzip.
+    compressPublicAssets:
+      (process.env.NITRO_COMPRESS_PUBLIC_ASSETS || env.NITRO_COMPRESS_PUBLIC_ASSETS || 'true') !== 'false',
     prerender: {
       failOnError: false
     },
@@ -147,6 +158,9 @@ export default defineNuxtConfig({
   },
 
   vite: {
+    define: {
+      CESIUM_BASE_URL: JSON.stringify('/itwin-map/cesium/')
+    },
     css: {
       preprocessorOptions: {
         scss: {
@@ -169,7 +183,7 @@ export default defineNuxtConfig({
        * Без `styles: { configFile }` — иначе стили компонентов идут через sass-цепочку и часто
        * выглядят «сломано» (нет размеров/цветов). Дефолт `styles: true` + `css: ['vuetify/styles']` — надёжно.
        */
-      vuetify({ autoImport: true }),
+      vuetify({ autoImport: true })
     ],
     build: {
       /** Меньше legacy-полифиллов (в т.ч. Math.hypot) в отчётах Lighthouse */
