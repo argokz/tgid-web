@@ -259,6 +259,23 @@ export interface PiezometerRouteResponse {
   has_calculation: boolean;
 }
 
+export interface SplitTransferReport {
+  /** Реально перенесено на новую половину: {таблица: количество} */
+  moved: Record<string, number>;
+  /** Оставлено на первой половине, требует ручной проверки оператора */
+  review: Record<string, number>;
+  /** Таблицы/колонки, отсутствующие в схеме — пропущены */
+  skipped: string[];
+}
+
+export interface SplitPreview {
+  status: string;
+  dry_run: boolean;
+  new_node_id: number;
+  new_line_id: number;
+  transferred: SplitTransferReport;
+}
+
 const translationCache: TranslationCache = {};
 const pendingTranslationRequests = new Map<string, Promise<ColumnTranslation>>();
 const DEFAULT_MAP_API_BASE_URL = 'http://localhost:8000';
@@ -506,6 +523,14 @@ export const fastApiService = {
     return request('api/topology/split-line', {
       method: 'POST',
       body: { line_id: lineId, lng, lat },
+    });
+  },
+
+  /** Превью разрезания участка: что будет перенесено/помечено, без сохранения */
+  async previewSplitLine(lineId: number, lng: number, lat: number): Promise<SplitPreview> {
+    return request<SplitPreview>('api/topology/split-line', {
+      method: 'POST',
+      body: { line_id: lineId, lng, lat, dry_run: true },
     });
   },
 
