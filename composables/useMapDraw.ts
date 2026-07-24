@@ -151,8 +151,22 @@ export function useMapDraw() {
 
   const ensureLayers = (map: MapLibreMap) => {
     if (map.getSource(SOURCE_ID)) return;
-    if (typeof map.isStyleLoaded === 'function' && !map.isStyleLoaded()) return;
+    // isStyleLoaded() иногда возвращает true, пока стиль ещё диффится (HMR,
+    // смена подложки) — addSource в этот момент бросает. Ловим и повторяем
+    // на следующем idle, чтобы не терять инициализацию слоёв рисования.
+    if (typeof map.isStyleLoaded === 'function' && !map.isStyleLoaded()) {
+      map.once('idle', () => { if (mapRef.value === map) ensureLayers(map); });
+      return;
+    }
 
+    try {
+      addDrawLayers(map);
+    } catch {
+      map.once('idle', () => { if (mapRef.value === map) ensureLayers(map); });
+    }
+  };
+
+  const addDrawLayers = (map: MapLibreMap) => {
     map.addSource(SOURCE_ID, { type: 'geojson', data: featureCollection() });
     map.addSource(SOURCE_DRAFT_ID, { type: 'geojson', data: draftCollection() });
 

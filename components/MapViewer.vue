@@ -323,6 +323,63 @@
         :map="mapStore.map"
       />
 
+      <!-- Панель трассировки маршрута пьезометра -->
+      <v-card
+        v-if="isTraceMode"
+        class="trace-panel"
+        elevation="8"
+        rounded="lg"
+        role="region"
+        aria-label="Построение маршрута пьезометра"
+      >
+        <div class="trace-panel__header px-3 py-2">
+          <v-icon size="18" color="primary" class="me-2">mdi-chart-line-variant</v-icon>
+          <span class="text-subtitle-2 font-weight-bold">Маршрут пьезометра</span>
+          <v-spacer />
+          <v-btn icon size="x-small" variant="text" aria-label="Закрыть трассировку" @click="toggleTraceMode">
+            <v-icon size="18">mdi-close</v-icon>
+          </v-btn>
+        </div>
+        <v-divider />
+        <div class="pa-3">
+          <div class="text-caption text-medium-emphasis mb-2">
+            Кликайте по узлам сети — маршрут пройдёт через них по порядку.
+          </div>
+          <div v-if="traceNodes.length" class="trace-chips mb-2">
+            <v-chip
+              v-for="(nodeId, idx) in traceNodes"
+              :key="`${nodeId}-${idx}`"
+              size="small"
+              class="me-1 mb-1"
+              :color="idx === 0 ? 'success' : idx === traceNodes.length - 1 ? 'error' : 'primary'"
+              variant="tonal"
+            >
+              {{ idx + 1 }}. Узел {{ nodeId }}
+            </v-chip>
+          </div>
+          <div v-else class="text-caption text-disabled mb-2">Узлы не выбраны</div>
+          <div class="d-flex flex-wrap" style="gap: 6px;">
+            <v-btn
+              size="small"
+              color="primary"
+              variant="flat"
+              :disabled="traceNodes.length < 2 || piezometerLoading"
+              :loading="piezometerLoading"
+              @click="buildPiezometerRoute"
+            >
+              Построить график
+            </v-btn>
+            <v-btn size="small" variant="text" :disabled="!traceNodes.length" @click="undoTraceNode">
+              Отменить точку
+            </v-btn>
+            <v-spacer />
+            <v-btn size="small" variant="text" color="error" :disabled="!traceNodes.length" @click="clearTrace">
+              Очистить
+            </v-btn>
+          </div>
+        </div>
+      </v-card>
+
       <!-- Piezometer modal (лениво: ECharts-чанк подгружается при первом построении графика) -->
       <LazyPiezometerModal
         v-if="piezometerActivated"
@@ -330,6 +387,8 @@
         :path-data="piezometerPathData"
         :loading="piezometerLoading"
         :error="piezometerError"
+        :has-calculation="piezometerHasCalc"
+        :total-length="piezometerTotalLength"
         @node-hover="onPiezometerNodeHover"
       />
 
@@ -1015,9 +1074,10 @@ const onLocateElevator = (coordinates: {
 };
 
 // === Trace Mode for Piezometric Graph ===
+// Маршрут задаётся последовательностью узлов (waypoints), как выделение
+// направления в десктопе: путь строится через все выбранные точки по порядку.
 const isTraceMode = ref(false);
-const traceStartNode = ref<number | null>(null);
-const traceEndNode = ref<number | null>(null);
+const traceNodes = ref<number[]>([]);
 const piezometerModalOpen = ref(false);
 /** Модал с ECharts монтируется лениво — только после первого открытия */
 const piezometerActivated = ref(false);
@@ -1027,58 +1087,164 @@ watch(piezometerModalOpen, (open: boolean) => {
 const piezometerPathData = ref<any[]>([]);
 const piezometerLoading = ref(false);
 const piezometerError = ref<string | null>(null);
+const piezometerHasCalc = ref(false);
+const piezometerTotalLength = ref(0);
+const routeSourceId = 'piezo-route-source';
+const routeLineLayer = 'piezo-route-line';
+const routeNodeLayer = 'piezo-route-nodes';
+const traceNodeMarkers: maplibregl.Marker[] = [];
 
 const toggleTraceMode = () => {
   isTraceMode.value = !isTraceMode.value;
   if (isTraceMode.value) {
-    traceStartNode.value = null;
-    traceEndNode.value = null;
-    mapStore.setIdentifyMode(false); // Disable normal click
-    useNotificationStore().showSuccess('Режим трассировки включен. Выберите начальный узел.');
+    clearTrace();
+    mapStore.setIdentifyMode(false); // отключаем обычный identify-клик
+    useNotificationStore().showSuccess('Режим трассировки: кликайте по узлам маршрута.');
   } else {
+    clearTrace();
     mapStore.setIdentifyMode(true);
   }
 };
 
-const buildPiezometerGraph = async () => {
-  if (!traceStartNode.value || !traceEndNode.value) return;
+const clearRouteHighlight = () => {
+  const map = mapStore.map;
+  traceNodeMarkers.forEach((m) => m.remove());
+  traceNodeMarkers.length = 0;
+  if (!map) return;
+  if (map.getLayer(routeNodeLayer)) map.removeLayer(routeNodeLayer);
+  if (map.getLayer(routeLineLayer)) map.removeLayer(routeLineLayer);
+  if (map.getSource(routeSourceId)) map.removeSource(routeSourceId);
+};
+
+/** Подсветка построенного маршрута линией + маркерами по узлам */
+const highlightRoute = (path: Array<{ node_id: number; lng: number | null; lat: number | null; label: string }>) => {
+  const map = mapStore.map;
+  if (!map) return;
+  // Стиль мог быть не готов (HMR / смена подложки) — addSource тогда бросает
+  if (typeof map.isStyleLoaded === 'function' && !map.isStyleLoaded()) {
+    map.once('idle', () => highlightRoute(path));
+    return;
+  }
+  clearRouteHighlight();
+
+  const coords = path
+    .filter((p) => p.lng != null && p.lat != null)
+    .map((p) => [p.lng as number, p.lat as number]);
+  if (coords.length < 2) return;
+
+  try {
+    addRouteLayers(map, path, coords);
+  } catch (e) {
+    console.warn('[piezometer] не удалось подсветить маршрут:', e);
+  }
+};
+
+const addRouteLayers = (
+  map: maplibregl.Map,
+  path: Array<{ lng: number | null; lat: number | null }>,
+  coords: number[][]
+) => {
+  map.addSource(routeSourceId, {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: [
+        { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } },
+        ...path
+          .filter((p) => p.lng != null && p.lat != null)
+          .map((p) => ({
+            type: 'Feature' as const,
+            properties: { node: true },
+            geometry: { type: 'Point' as const, coordinates: [p.lng as number, p.lat as number] },
+          })),
+      ],
+    },
+  });
+  map.addLayer({
+    id: routeLineLayer,
+    type: 'line',
+    source: routeSourceId,
+    filter: ['==', ['geometry-type'], 'LineString'],
+    paint: { 'line-color': '#ff6f00', 'line-width': 4, 'line-opacity': 0.85 },
+  });
+  map.addLayer({
+    id: routeNodeLayer,
+    type: 'circle',
+    source: routeSourceId,
+    filter: ['==', ['get', 'node'], true],
+    paint: {
+      'circle-radius': 4,
+      'circle-color': '#ff6f00',
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#fff',
+    },
+  });
+
+  // Центрируем карту на маршруте
+  const lngs = coords.map((c) => c[0]);
+  const lats = coords.map((c) => c[1]);
+  mapStore.map?.fitBounds(
+    [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+    { padding: 80, maxZoom: 18, duration: 800 }
+  );
+};
+
+const undoTraceNode = () => {
+  traceNodes.value = traceNodes.value.slice(0, -1);
+};
+
+const clearTrace = () => {
+  traceNodes.value = [];
+  clearRouteHighlight();
+};
+
+const buildPiezometerRoute = async () => {
+  if (traceNodes.value.length < 2) return;
   piezometerModalOpen.value = true;
   piezometerLoading.value = true;
   piezometerError.value = null;
   try {
-    const data = await fastApiService.getPiezometerPath(traceStartNode.value, traceEndNode.value);
-    piezometerPathData.value = data;
+    const res = await fastApiService.buildPiezometerRoute([...traceNodes.value]);
+    piezometerPathData.value = res.path;
+    piezometerHasCalc.value = res.has_calculation;
+    piezometerTotalLength.value = res.total_length;
+    highlightRoute(res.path);
   } catch (e: any) {
-    piezometerError.value = e.message || 'Ошибка построения графа';
+    piezometerError.value = e?.userMessage || e?.message || 'Ошибка построения маршрута';
   } finally {
     piezometerLoading.value = false;
   }
 };
 
-const onPiezometerNodeHover = (_nodeId: number) => {
-  // Can be implemented to highlight node on map
+const onPiezometerNodeHover = (nodeId: number) => {
+  const node = piezometerPathData.value.find((p: any) => p.node_id === nodeId);
+  if (!node || node.lng == null || node.lat == null || !mapStore.map) return;
+  mapStore.map.flyTo({ center: [node.lng, node.lat], zoom: 18, duration: 600, essential: true });
 };
 
 const onMapClickForTrace = (e: any) => {
   if (!isTraceMode.value) return;
   const features = mapStore.map?.queryRenderedFeatures(e.point);
   const nodeFeature = features?.find((feature: any) => getFeatureKind(feature) === 'node');
-  
-  if (nodeFeature && nodeFeature.properties) {
-    const id = nodeFeature.properties.id || nodeFeature.properties.Id || nodeFeature.id;
-    if (!id) return;
-    
-    if (!traceStartNode.value) {
-      traceStartNode.value = Number(id);
-      useNotificationStore().showSuccess(`Выбран начальный узел: ${id}. Выберите конечный узел.`);
-    } else if (!traceEndNode.value) {
-      traceEndNode.value = Number(id);
-      useNotificationStore().showSuccess(`Выбран конечный узел: ${id}. Строим график...`);
-      void buildPiezometerGraph();
-      // Reset mode after building
-      isTraceMode.value = false;
-      mapStore.setIdentifyMode(true);
-    }
+  if (!nodeFeature || !nodeFeature.properties) {
+    useNotificationStore().showWarning('Кликните точнее по узлу сети.');
+    return;
+  }
+  const id = nodeFeature.properties.id || nodeFeature.properties.Id || nodeFeature.id;
+  if (!id) return;
+  const nodeId = Number(id);
+  // Не добавляем тот же узел дважды подряд
+  if (traceNodes.value[traceNodes.value.length - 1] === nodeId) return;
+  traceNodes.value = [...traceNodes.value, nodeId];
+
+  // Маркер выбранной точки
+  if (mapStore.map) {
+    const marker = new maplibregl.Marker({
+      color: traceNodes.value.length === 1 ? '#2e7d32' : '#1976d2',
+    })
+      .setLngLat(e.lngLat)
+      .addTo(mapStore.map);
+    traceNodeMarkers.push(marker);
   }
 };
 
@@ -1457,6 +1623,7 @@ onBeforeUnmount(() => {
   mapStore.map?.off('mouseup', onNodeDragEnd);
   mapStore.map?.off('click', onMapClickForTopology);
   if (draggedNodeMarker) draggedNodeMarker.remove();
+  clearRouteHighlight();
   if (defectLocateMarker) defectLocateMarker.remove();
   if (shurfLocateMarker) shurfLocateMarker.remove();
   if (inspectionLocateMarker) inspectionLocateMarker.remove();
@@ -1484,6 +1651,34 @@ watch(
 </script>
 
 <style lang="scss" scoped>
+/* Панель построения маршрута пьезометра */
+.trace-panel {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  width: min(360px, calc(100vw - 32px));
+  background: rgb(var(--v-theme-surface));
+
+  &__header {
+    display: flex;
+    align-items: center;
+  }
+
+  .trace-chips {
+    max-height: 96px;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .trace-panel {
+    top: 8px;
+    width: calc(100vw - 16px);
+  }
+}
+
 /* Высоту задаёт layout (layout-content-root + index-page); здесь только заполняем родителя — без второго calc(100svh) */
 .map-viewer-root {
   width: 100%;

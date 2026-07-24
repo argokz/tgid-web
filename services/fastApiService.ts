@@ -238,6 +238,27 @@ export interface TopologyDiagnosticsResponse {
   [key: string]: any;
 }
 
+export interface PiezometerPathNode {
+  node_id: number;
+  distance: number;
+  label: string;
+  z: number;
+  h_pod: number | null;
+  h_obr: number | null;
+  t_pod: number | null;
+  t_obr: number | null;
+  lng: number | null;
+  lat: number | null;
+}
+
+export interface PiezometerRouteResponse {
+  path: PiezometerPathNode[];
+  waypoints: number[];
+  node_count: number;
+  total_length: number;
+  has_calculation: boolean;
+}
+
 const translationCache: TranslationCache = {};
 const pendingTranslationRequests = new Map<string, Promise<ColumnTranslation>>();
 const DEFAULT_MAP_API_BASE_URL = 'http://localhost:8000';
@@ -463,6 +484,14 @@ export const fastApiService = {
 
   async getPiezometerPath(start: number, end: number): Promise<any> {
     return request('piezometer/path', { query: { start, end } });
+  },
+
+  /** Маршрут пьезометра через последовательность узлов (waypoints) */
+  async buildPiezometerRoute(nodes: number[]): Promise<PiezometerRouteResponse> {
+    return request<PiezometerRouteResponse>('piezometer/route', {
+      method: 'POST',
+      body: { nodes },
+    });
   },
 
   async createLine(nodeid1: number, nodeid2: number): Promise<any> {
