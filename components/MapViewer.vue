@@ -392,6 +392,19 @@
         @node-hover="onPiezometerNodeHover"
       />
 
+      <!-- Превью разрезания участка (dry-run → подтверждение) -->
+      <LazySplitPreviewDialog
+        v-if="splitPreviewOpen"
+        v-model="splitPreviewOpen"
+        :line-id="splitPreviewTarget?.lineId ?? null"
+        :report="splitPreviewReport"
+        :loading="splitPreviewLoading"
+        :confirming="splitPreviewConfirming"
+        :error="splitPreviewError"
+        @confirm="confirmSplit"
+        @cancel="cancelSplit"
+      />
+
       <!-- Feature selection menu -->
       <FeatureMenu />
     </div>
@@ -1255,6 +1268,53 @@ let draggedNodeMarker: maplibregl.Marker | null = null;
 let draggedNodeId: number | null = null;
 let suppressTopologyClickUntil = 0;
 
+// Превью разрезания линии (dry-run → подтверждение → запись)
+const splitPreviewOpen = ref(false);
+const splitPreviewLoading = ref(false);
+const splitPreviewConfirming = ref(false);
+const splitPreviewError = ref<string | null>(null);
+const splitPreviewReport = ref<import('~/services/fastApiService').SplitTransferReport | null>(null);
+const splitPreviewTarget = ref<{ lineId: number; lng: number; lat: number } | null>(null);
+
+const openSplitPreview = async (lineId: number, lng: number, lat: number) => {
+  splitPreviewTarget.value = { lineId, lng, lat };
+  splitPreviewReport.value = null;
+  splitPreviewError.value = null;
+  splitPreviewLoading.value = true;
+  splitPreviewOpen.value = true;
+  try {
+    const preview = await fastApiService.previewSplitLine(lineId, lng, lat);
+    splitPreviewReport.value = preview.transferred;
+  } catch (err: any) {
+    splitPreviewError.value = err?.userMessage || err?.message || 'Не удалось получить превью';
+  } finally {
+    splitPreviewLoading.value = false;
+  }
+};
+
+const confirmSplit = async () => {
+  const target = splitPreviewTarget.value;
+  if (!target) return;
+  splitPreviewConfirming.value = true;
+  try {
+    const result = await fastApiService.splitLine(target.lineId, target.lng, target.lat);
+    useNotificationStore().showSuccess(
+      `Участок ${target.lineId} разрезан: узел ${result.new_node_id}, участок ${result.new_line_id}`
+    );
+    layerStore.refreshVisibleDataLayers();
+    splitPreviewOpen.value = false;
+  } catch (err: any) {
+    useNotificationStore().showError('Ошибка разрезания: ' + (err?.userMessage || err?.message || ''));
+  } finally {
+    splitPreviewConfirming.value = false;
+    splitPreviewTarget.value = null;
+  }
+};
+
+const cancelSplit = () => {
+  splitPreviewTarget.value = null;
+};
+
 const getFeatureKind = (feature: any): 'node' | 'line' | null => {
   const signature = [
     feature?.layer?.id,
@@ -1402,16 +1462,8 @@ const onMapClickForTopology = async (e: any) => {
   if (lineFeature && lineFeature.properties) {
     const lineId = getFeatureId(lineFeature);
     if (!lineId) return;
-
-    try {
-      const result = await fastApiService.splitLine(lineId, e.lngLat.lng, e.lngLat.lat);
-      useNotificationStore().showSuccess(
-        `Труба ${lineId} разрезана. Создан узел ${result.new_node_id} и труба ${result.new_line_id}`
-      );
-      layerStore.refreshVisibleDataLayers();
-    } catch (err: any) {
-      useNotificationStore().showError('Ошибка разрезания трубы: ' + err.message);
-    }
+    // Сначала превью (dry-run): показываем, что перенесётся, до записи
+    await openSplitPreview(lineId, e.lngLat.lng, e.lngLat.lat);
     return;
   }
 
