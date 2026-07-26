@@ -1,5 +1,19 @@
 # Статус реализации плана миграции (2026-07-24)
 
+## Backlog переноса gid6/gid8/potr5 → web (2026-07-24)
+
+- **Deploy:** `itwin-api/Dockerfile`, `docker-compose.yml`, [docs/deploy-map-api.md](../../docs/deploy-map-api.md), `scripts/verify_prod_routes.py`, workflow `.github/workflows/api-deploy.yml` (manual; нужны `DEPLOY_SSH_*` secrets).
+- **P0 auth:** passlib/bcrypt, UsersDB login, `AUTH_REQUIRED_GET`, `STRICT_AUTH`, LoginDialog (вместо prompt), UsersDB pool в lifespan.
+- **P1:** passport `belong*Site` fallback + SQL backfill; расширен `p1_smoke.py`.
+- **P2 ТУ:** dedicated CRUD `/api/technical-conditions`, field allow-list, Excel `tu` + `tu-balance` (gid6).
+- **P2 ops:** field allow-list на defect/shurf/osmotr/remont2/opres + Word acts с русскими полями.
+- **P3:** `POST /api/heat-losses/run` (+ poll в UI), TG stationary UI + recalculate, armature `dampers`/`regularmatures`.
+- **P4:** DXF export, ochered RO, `NUXT_PUBLIC_NETWORK_TILESET_URL`.
+- **Auth:** `STRICT_AUTH` запрещает `DEV_LOGIN`; публичный `/api/v1/auth/config` для LoginDialog.
+- **Анализ:** RO Zap1/2/3/7 (`/api/network-queries/*` + NetworkQueriesDialog); DXF/SHP по выбранному фрагменту.
+
+# Статус реализации плана миграции (2026-07-24)
+
 ## Этап B: move-node и safe-delete (2026-07-24)
 
 - **B4 — баг длины исправлен**: `move_node` теперь пересчитывает `heatpipesections.pipesectlength` у всех инцидентных участков (раньше двигал точку, но длина трубы оставалась устаревшей → неверный гидравлический расчёт).
@@ -87,4 +101,6 @@ JWT_SECRET=...
 NUXT_PUBLIC_MUTATIONS_ENABLED=true
 ```
 
-Меню пользователя → «Войти (dev)» сохраняет `itwin_access_token`.
+Меню пользователя → «Войти» открывает LoginDialog; JWT в `itwin_access_token`.
+На стенде: `AUTH_DISABLED=false`, `AUTH_REQUIRED_GET=true`, `STRICT_AUTH=true`.
+Деплой map-api: [docs/deploy-map-api.md](../../docs/deploy-map-api.md).

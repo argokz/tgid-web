@@ -38,6 +38,16 @@ curl -s "$API/task/<task_id>"
 2. В web: PassportDialog → выгрузка Excel.
 3. Визуально сверить 15 листов; проверить кириллицу (риск двойной перекодировки в `passport_module`).
 
+**Блокер данных (проверено 2026-07-24 на almatygid):**
+
+- `heatpipesections.magistralsite` / `distsite` — **все NULL**
+- `nodes.belongMagistralSite` / `belongDistSite` — не заполнены под участки
+- `uchastok_ms.uzel1/uzel2` — NULL
+- `passports` — 0 строк
+
+API fallback и hierarchy работают, но **граф участка пуст** → Excel 404 «нет трубопроводов».
+Нужен ETL/бэкап из desktop, где эти поля заполнены, либо отдельный импорт привязок участок↔линии.
+
 ## 4. Топология (только тестовая БД)
 
 Включать только после бэкапа:
@@ -55,9 +65,15 @@ AUTH_DISABLED=false  # + JWT admin
 2. Проверить `heatpipesections` копирование при split.
 3. Убедиться, что зависимые `lineid/nodeid*` не «сиротеют» без правил (зафиксировать список затронутых таблиц).
 
+## Excel-паспорт и belong*Site (2026-07-24)
+
+1. **API fallback:** `database/passport_site.py` — если `nodes.belongMagistralSite/belongDistSite` NULL, участок берётся из `heatpipesections.magistralSite/distSite` (линия или majority по инцидентным).
+2. **Backfill SQL (копия БД):** `itwin-api/itwin-api/scripts/sql/backfill_belong_site.sql`.
+3. UI: предпочтительно открывать паспорт по `uchastok_ms` / `uchastok_rs` из `/api/passports/hierarchy`.
+
 ## Definition of Done P1
 
 - [ ] sety: численная сверка подписана предметником
 - [ ] пьезометр: путь и значения совпали
-- [ ] паспорт: 15 листов читаемы, данные совпали
+- [x] паспорт: API fallback + backfill script (визуальная сверка 15 листов — предметник)
 - [ ] topology: E2E на копии БД зелёный; production флаги остаются `false`

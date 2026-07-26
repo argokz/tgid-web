@@ -27,8 +27,11 @@
 
 ## DoD модуля CRUD
 
-- [ ] RBAC: viewer не пишет; editor пишет
+- [x] RBAC: viewer не пишет; editor пишет (JWT + require_roles)
+- [x] Field allow-list для ТУ (`database/tu_mutations.py`) и ops (`ops_mutations.py`)
+- [x] Dedicated `POST/PUT/DELETE /api/technical-conditions` (+ generic `/api/v1/*`)
+- [x] Excel свод ТУ: `/api/reports/excel/tu`
 - [ ] Optimistic locking / version (следующий шаг — колонка version или updated_at check)
-- [ ] Contract + E2E тест
-- [ ] Журнал действий
-- [ ] Word/Excel акты — отдельный подпункт, не блокирует минимальный CRUD
+- [ ] Contract + E2E тест на копии БД со стендовыми флагами
+- [x] Журнал действий (audit_log)
+- [ ] Word/Excel акты gid6 html/tu — полный пакет; минимальный Excel свод есть
