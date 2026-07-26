@@ -361,8 +361,31 @@ const userMessageFor = (status: number, detail: string, path: string): string =>
 export const apiHealth = reactive({
   reachable: true,
   outdatedRoutes: false,
+  redisOk: true,
   lastError: '' as string,
 });
+
+export const refreshApiHealth = async () => {
+  try {
+    const health = await fastApiService.getHealth();
+    apiHealth.reachable = true;
+    apiHealth.outdatedRoutes = (health.routes || 0) < 80;
+    apiHealth.redisOk = health.redis?.ok !== false;
+    if (apiHealth.outdatedRoutes) {
+      apiHealth.lastError =
+        `На сервере устаревший API (${health.routes} маршрутов). Нужен деплой актуального itwin-api.`;
+    } else if (!apiHealth.redisOk) {
+      apiHealth.lastError =
+        health.redis?.note ||
+        'Redis недоступен: расчёт sety и запуск теплопотерь не будут работать.';
+    } else {
+      apiHealth.lastError = '';
+    }
+  } catch (e: any) {
+    apiHealth.reachable = false;
+    apiHealth.lastError = e?.message || 'API недоступен';
+  }
+};
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -472,16 +495,32 @@ export const fastApiService = {
     return request('run-sety-cmd', mutationOptions('POST', { params }));
   },
 
-  async login(username: string, password: string, role = 'editor'): Promise<{
+  async login(
+    username: string,
+    password: string,
+    role?: string
+  ): Promise<{
     access_token: string;
     token_type: string;
     role: string;
     username: string;
   }> {
+    const body: Record<string, string> = { username, password };
+    if (role) body.role = role;
     return request('api/v1/auth/login', {
       method: 'POST',
-      body: { username, password, role },
+      body,
     });
+  },
+
+  async getAuthConfig(): Promise<{
+    auth_disabled: boolean;
+    dev_login_enabled: boolean;
+    strict_auth: boolean;
+    mutations_enabled: boolean;
+    topology_mutations_enabled: boolean;
+  }> {
+    return request('api/v1/auth/config');
   },
 
   async authMe(): Promise<{
@@ -491,6 +530,8 @@ export const fastApiService = {
     mutations_enabled: boolean;
     topology_mutations_enabled: boolean;
     auth_disabled: boolean;
+    dev_login_enabled?: boolean;
+    strict_auth?: boolean;
   }> {
     return request('api/v1/auth/me', mutationOptions('GET'));
   },
@@ -614,6 +655,38 @@ export const fastApiService = {
   async getTechnicalConditionLookups(): Promise<TechnicalConditionLookups> {
     return request('api/technical-conditions/lookups');
   },
+  async getTechnicalConditionBalance(year?: number): Promise<{
+    year: number | null;
+    capacity_year?: number | null;
+    notes?: string | null;
+    items: Array<Record<string, number | string>>;
+    totals: Record<string, number>;
+  }> {
+    return request('api/technical-conditions/balance', {
+      query: year ? { year } : {},
+    });
+  },
+  async createTechnicalCondition(fields: Record<string, any>): Promise<{ id: number }> {
+    return request(
+      'api/v1/technical-conditions',
+      mutationOptions('POST', { fields })
+    );
+  },
+  async updateTechnicalCondition(
+    id: number,
+    fields: Record<string, any>
+  ): Promise<{ success: boolean }> {
+    return request(
+      `api/v1/technical-conditions/${encodePath(id)}`,
+      mutationOptions('PUT', { fields })
+    );
+  },
+  async deleteTechnicalCondition(id: number): Promise<{ success: boolean }> {
+    return request(
+      `api/v1/technical-conditions/${encodePath(id)}`,
+      mutationOptions('DELETE')
+    );
+  },
 
   async getCorrosionIndicators(
     filters: JournalFilters = {}
@@ -681,6 +754,18 @@ export const fastApiService = {
   async getHeatLossSource(id: number): Promise<HeatLossSourceDetails> {
     return request(`api/heat-losses/sources/${encodePath(id)}`);
   },
+  async runHeatLosses(
+    fragmentId: number,
+    extraParams = ''
+  ): Promise<{ task_id: string; params: string; success: boolean }> {
+    return request(
+      'api/v1/heat-losses/run',
+      mutationOptions('POST', {
+        fragment_id: fragmentId,
+        extra_params: extraParams,
+      })
+    );
+  },
 
   async getConsumerLoadDiagnostics(
     filters: JournalFilters = {}
@@ -707,6 +792,23 @@ export const fastApiService = {
   },
   async getTemperatureGraphSource(id: number): Promise<TemperatureGraphSourceDetails> {
     return request(`api/temperature-graphs/sources/${encodePath(id)}`);
+  },
+  async recalculateTemperatureGraph(
+    sourceId: number
+  ): Promise<{ success: boolean; points: number }> {
+    return request(
+      `api/temperature-graphs/sources/${encodePath(sourceId)}/recalculate`,
+      mutationOptions('POST', {})
+    );
+  },
+  async applyStationaryTemperatureGraph(
+    sourceId: number,
+    body: { t1: number; t2: number; t3: number; tv: number }
+  ): Promise<{ success: boolean; updated_points: number }> {
+    return request(
+      `api/temperature-graphs/sources/${encodePath(sourceId)}/stationary`,
+      mutationOptions('POST', body)
+    );
   },
 
   async getInstalledPumps(
@@ -1005,16 +1107,75 @@ export const fastApiService = {
     return { blob, filename: `defect_${defectId}.docx` };
   },
 
-  async downloadShpExport(): Promise<{ blob: Blob; filename: string }> {
-    const blob = await request<Blob>('api/export/shp', { responseType: 'blob' });
-    return { blob, filename: 'network_export.zip' };
-  },
-
-  async downloadExcelReport(docType: string): Promise<{ blob: Blob; filename: string }> {
-    const blob = await request<Blob>(`api/reports/excel/${encodePath(docType)}`, {
+  async downloadOpsWordReport(
+    journal: 'shurf' | 'osmotr' | 'remont' | 'opres',
+    recordId: number
+  ): Promise<{ blob: Blob; filename: string }> {
+    const blob = await request<Blob>(`reports/word/${encodePath(journal)}/${encodePath(recordId)}`, {
       responseType: 'blob',
     });
-    return { blob, filename: `report_${docType}.xlsx` };
+    return { blob, filename: `${journal}_${recordId}.docx` };
+  },
+
+  async downloadShpExport(fragmentIds?: number[]): Promise<{ blob: Blob; filename: string }> {
+    const blob = await request<Blob>('api/export/shp', {
+      responseType: 'blob',
+      query: fragmentIds?.length
+        ? fragmentIds.length === 1
+          ? { fragment_id: fragmentIds[0] }
+          : { fragments: fragmentIds.join(',') }
+        : undefined,
+    });
+    const suffix = fragmentIds?.length === 1 ? `_f${fragmentIds[0]}` : fragmentIds?.length ? '_frag' : '';
+    return { blob, filename: `network_export${suffix}.zip` };
+  },
+
+  async downloadDxfExport(fragmentId?: number): Promise<{ blob: Blob; filename: string }> {
+    const blob = await request<Blob>('api/export/dxf', {
+      responseType: 'blob',
+      query: fragmentId ? { fragment_id: fragmentId } : undefined,
+    });
+    return { blob, filename: fragmentId ? `network_f${fragmentId}.dxf` : 'network.dxf' };
+  },
+
+  async getNetworkQueryVolume(fragmentIds?: number[]): Promise<any> {
+    return request('api/network-queries/volume', {
+      query: fragmentIds?.length ? { fragments: fragmentIds.join(',') } : {},
+    });
+  },
+  async getNetworkQueryLength(fragmentIds?: number[]): Promise<any> {
+    return request('api/network-queries/length', {
+      query: fragmentIds?.length ? { fragments: fragmentIds.join(',') } : {},
+    });
+  },
+  async getNetworkQueryLengthByDiameter(fragmentIds?: number[]): Promise<any> {
+    return request('api/network-queries/length-by-diameter', {
+      query: fragmentIds?.length ? { fragments: fragmentIds.join(',') } : {},
+    });
+  },
+  async getNetworkQueryHeatConsumption(fragmentIds?: number[]): Promise<any> {
+    return request('api/network-queries/heat-consumption', {
+      query: fragmentIds?.length ? { fragments: fragmentIds.join(',') } : {},
+    });
+  },
+
+  async getOcheredOpressovok(page = 1, pageSize = 50): Promise<any> {
+    return request('api/ochered-opressovok', {
+      query: { page, page_size: pageSize },
+    });
+  },
+
+  async downloadExcelReport(
+    docType: string,
+    query?: Record<string, string | number | boolean | undefined | null>,
+  ): Promise<{ blob: Blob; filename: string }> {
+    const blob = await request<Blob>(`api/reports/excel/${encodePath(docType)}`, {
+      responseType: 'blob',
+      query,
+    });
+    const year = query?.year;
+    const suffix = year != null && year !== '' ? `_${year}` : '';
+    return { blob, filename: `report_${docType}${suffix}.xlsx` };
   },
 
   async downloadCalculationExcel(calculationId: number): Promise<{ blob: Blob; filename: string }> {
@@ -1027,6 +1188,25 @@ export const fastApiService = {
 
   async getPassportHierarchy(): Promise<PassportHierarchyGroup[]> {
     return request('api/passports/hierarchy');
+  },
+
+  async getPassportDiagnostics(): Promise<{
+    ready_for_passport: boolean;
+    blockers: string[];
+    counts: Record<string, number>;
+    remediation?: string[];
+  }> {
+    return request('api/passports/diagnostics');
+  },
+
+  async getHealth(): Promise<{
+    status: string;
+    routes: number;
+    database: { ok: boolean; latency_ms?: number; error?: string | null };
+    redis?: { ok: boolean; latency_ms?: number; error?: string | null; note?: string | null };
+    flags?: Record<string, boolean>;
+  }> {
+    return request('health');
   },
 
   async downloadPassport(
