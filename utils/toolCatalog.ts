@@ -14,6 +14,7 @@ export type ToolEvent =
   | 'open-inspection-journal'
   | 'open-repair-journal'
   | 'open-pressure-test-journal'
+  | 'open-ochered-opressovok'
   | 'open-technical-condition-journal'
   | 'open-corrosion-indicator-journal'
   | 'open-alseko-journal'
@@ -21,6 +22,7 @@ export type ToolEvent =
   | 'open-heat-loss-journal'
   | 'open-temperature-graph-journal'
   | 'open-consumer-load-diagnostics'
+  | 'open-network-queries'
   | 'open-pump-equipment'
   | 'open-network-armatures'
   | 'open-network-regulators'
@@ -55,6 +57,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
       { label: 'Осмотры', hint: 'Контуры осмотра и результаты', icon: 'mdi-clipboard-search-outline', color: 'teal-darken-2', event: 'open-inspection-journal' },
       { label: 'Ремонты', hint: 'План и факт по контурам', icon: 'mdi-hammer-wrench', color: 'deep-purple-darken-2', event: 'open-repair-journal' },
       { label: 'Опрессовки', hint: 'Испытания и акты', icon: 'mdi-gauge', color: 'blue-darken-2', event: 'open-pressure-test-journal' },
+      { label: 'Очередь опрессовок', hint: 'Отдельный legacy-реестр очередей', icon: 'mdi-format-list-numbered', color: 'indigo-darken-2', event: 'open-ochered-opressovok' },
       { label: 'Индикаторы коррозии', hint: 'Сезонная история и оценки', icon: 'mdi-test-tube', color: 'orange-darken-3', event: 'open-corrosion-indicator-journal' },
     ],
   },
@@ -80,6 +83,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
       { label: 'Диагностика топологии', hint: 'Разрывы и висячие узлы', icon: 'mdi-stethoscope', color: 'deep-purple-darken-2', event: 'open-topology-diagnostics' },
       { label: 'Поиск неисправностей', hint: 'Дефекты и коррозия на карте', icon: 'mdi-alert-octagon', color: 'error', event: 'open-fault-diagnostics' },
       { label: 'Тепловые нагрузки', hint: 'Нулевые, закрытые, отключённые', icon: 'mdi-home-lightning-bolt-outline', color: 'teal-darken-3', event: 'open-consumer-load-diagnostics' },
+      { label: 'Запросы по сети', hint: 'Объём, длина, диаметры, теплопотребление (Zap)', icon: 'mdi-sigma', color: 'blue-grey-darken-2', event: 'open-network-queries' },
       { label: 'Тепловые потери', hint: 'Сезоны и готовность источников', icon: 'mdi-heat-wave', color: 'deep-orange-darken-3', event: 'open-heat-loss-journal' },
       { label: 'Температурные графики', hint: 'Кривые t1/t2/t3 источников', icon: 'mdi-chart-bell-curve-cumulative', color: 'purple-darken-3', event: 'open-temperature-graph-journal' },
     ],

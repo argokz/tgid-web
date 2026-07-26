@@ -179,6 +179,11 @@
         @open-defect="openLazyDialog('defect', { defectId: $event })"
       />
 
+      <LazyOcheredOpressovokDialog
+        v-if="mountedDialogs.ocheredOpressovok"
+        ref="ocheredOpressovokRef"
+      />
+
       <!-- Desktop TGID technical conditions registry -->
       <LazyTechnicalConditionJournalDialog
         v-if="mountedDialogs.technicalCondition"
@@ -268,6 +273,11 @@
         v-if="mountedDialogs.elevator"
         ref="elevatorJournalRef"
         @locate-elevator="onLocateElevator"
+      />
+
+      <LazyNetworkQueriesDialog
+        v-if="mountedDialogs.networkQueries"
+        ref="networkQueriesRef"
       />
 
       <!-- Topology diagnostics modal -->
@@ -620,6 +630,9 @@ const repairJournalRef = ref<{
 const pressureTestJournalRef = ref<{
   openDialog: (scope?: { lineId?: number; nodeId?: number; testId?: number }) => void
 } | null>(null);
+const ocheredOpressovokRef = ref<{
+  openDialog: () => void
+} | null>(null);
 const technicalConditionJournalRef = ref<{
   openDialog: (scope?: { buildingId?: number; pipeId?: number; conditionId?: number }) => void
 } | null>(null);
@@ -659,6 +672,7 @@ const networkDiaphragmJournalRef = ref<{
 const elevatorJournalRef = ref<{
   openDialog: (scope?: { elevatorId?: number; lineId?: number; nodeId?: number }) => void
 } | null>(null);
+const networkQueriesRef = ref<{ openDialog: () => void } | null>(null);
 
 /**
  * Ленивое монтирование диалогов: тяжёлые журналы не попадают в основной чанк карты,
@@ -676,6 +690,7 @@ type LazyDialogKey =
   | 'inspection'
   | 'repair'
   | 'pressureTest'
+  | 'ocheredOpressovok'
   | 'technicalCondition'
   | 'corrosionIndicator'
   | 'alseko'
@@ -688,7 +703,8 @@ type LazyDialogKey =
   | 'networkRegulator'
   | 'networkBypass'
   | 'networkDiaphragm'
-  | 'elevator';
+  | 'elevator'
+  | 'networkQueries';
 
 type LazyDialogInstance = { openDialog: (scope?: any) => void };
 
@@ -705,6 +721,7 @@ const lazyDialogRefs: Record<LazyDialogKey, Ref<LazyDialogInstance | null>> = {
   inspection: inspectionJournalRef,
   repair: repairJournalRef,
   pressureTest: pressureTestJournalRef,
+  ocheredOpressovok: ocheredOpressovokRef,
   technicalCondition: technicalConditionJournalRef,
   corrosionIndicator: corrosionIndicatorJournalRef,
   alseko: alsekoJournalRef,
@@ -718,6 +735,7 @@ const lazyDialogRefs: Record<LazyDialogKey, Ref<LazyDialogInstance | null>> = {
   networkBypass: networkBypassJournalRef,
   networkDiaphragm: networkDiaphragmJournalRef,
   elevator: elevatorJournalRef,
+  networkQueries: networkQueriesRef,
 };
 
 /** Событие панели инструментов → ключ ленивого диалога */
@@ -731,6 +749,7 @@ const TOOL_EVENT_TO_DIALOG: Record<ToolEvent, LazyDialogKey> = {
   'open-inspection-journal': 'inspection',
   'open-repair-journal': 'repair',
   'open-pressure-test-journal': 'pressureTest',
+  'open-ochered-opressovok': 'ocheredOpressovok',
   'open-technical-condition-journal': 'technicalCondition',
   'open-corrosion-indicator-journal': 'corrosionIndicator',
   'open-alseko-journal': 'alseko',
@@ -744,6 +763,7 @@ const TOOL_EVENT_TO_DIALOG: Record<ToolEvent, LazyDialogKey> = {
   'open-network-bypasses': 'networkBypass',
   'open-network-diaphragms': 'networkDiaphragm',
   'open-elevators': 'elevator',
+  'open-network-queries': 'networkQueries',
 };
 
 const onOpenTool = (event: ToolEvent) => {

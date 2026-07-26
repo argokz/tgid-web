@@ -12,6 +12,10 @@ const emit = defineEmits<{ ready: [] }>()
 onMounted(async () => {
   if (!cesiumContainer.value) return
   try {
+    const tilesetUrl = String(runtimeConfig.public.networkTilesetUrl || '')
+    if (tilesetUrl) {
+      cesiumStore.networkTilesetUrl = tilesetUrl
+    }
     await cesiumStore.initializeViewer(
       cesiumContainer.value,
       String(runtimeConfig.public.cesiumIonToken || '')

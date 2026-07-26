@@ -77,6 +77,10 @@ export default defineNuxtConfig({
       mutationsEnabled:
         process.env.NUXT_PUBLIC_MUTATIONS_ENABLED === 'true' ||
         env.NUXT_PUBLIC_MUTATIONS_ENABLED === 'true',
+      networkTilesetUrl:
+        process.env.NUXT_PUBLIC_NETWORK_TILESET_URL ||
+        env.NUXT_PUBLIC_NETWORK_TILESET_URL ||
+        '',
       geoserver: {
         url:
           process.env.NUXT_PUBLIC_GEOSERVER_URL ||

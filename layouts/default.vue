@@ -90,6 +90,18 @@
           Экспорт SHP
         </v-btn>
 
+        <v-btn
+          prepend-icon="mdi-vector-polyline"
+          class="nav-btn ms-1"
+          variant="text"
+          rounded="lg"
+          size="small"
+          @click="downloadDxf"
+          :loading="exportingDxf"
+        >
+          Экспорт DXF
+        </v-btn>
+
         <v-menu offset-y>
           <template v-slot:activator="{ props }">
             <v-btn
@@ -109,6 +121,7 @@
             <v-list-item title="Байпасы" prepend-icon="mdi-dip-switch" @click="downloadExcel('bp')" />
             <v-list-item title="Насосные агрегаты" prepend-icon="mdi-water-pump" @click="downloadExcel('ns')" />
             <v-list-item title="Потребители" prepend-icon="mdi-home-city" @click="downloadExcel('pt')" />
+            <v-list-item title="Технические условия" prepend-icon="mdi-file-certificate-outline" @click="downloadExcel('tu')" />
           </v-list>
         </v-menu>
       </nav>
@@ -145,8 +158,8 @@
             <v-list-item
               v-else
               prepend-icon="mdi-login"
-              title="Войти (dev)"
-              @click="onDevLogin"
+              title="Войти"
+              @click="showLogin = true"
             />
             <v-list-item prepend-icon="mdi-account-outline" title="Профиль" disabled />
             <v-list-item prepend-icon="mdi-cog-outline" title="Настройки" disabled />
@@ -165,7 +178,7 @@
 
     <!-- Деградация API: видно сразу, а не через пустые диалоги -->
     <v-alert
-      v-if="!apiHealth.reachable || apiHealth.outdatedRoutes"
+      v-if="!apiHealth.reachable || apiHealth.outdatedRoutes || !apiHealth.redisOk"
       :type="apiHealth.reachable ? 'warning' : 'error'"
       variant="tonal"
       density="compact"
@@ -178,6 +191,8 @@
     <v-main class="app-main">
       <slot />
     </v-main>
+
+    <LoginDialog v-model="showLogin" />
 
     <!-- Модальное окно расчета -->
     <PlanningCalculationModal
@@ -197,38 +212,31 @@
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useMobile } from '~/composables/useMobile';
-import { apiHealth, fastApiService } from '~/services/fastApiService';
+import { apiHealth, fastApiService, refreshApiHealth } from '~/services/fastApiService';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { useAuthStore } from '~/stores/authStore';
+import { useFragmentStore } from '~/stores/fragmentStore';
 import { useUiStore } from '~/stores/uiStore';
 import PlanningCalculationModal from '~/components/PlanningCalculationModal.vue';
 import CalculationProtocol from '~/components/CalculationProtocol.vue';
+import LoginDialog from '~/components/LoginDialog.vue';
 
 const { isMobile: mobile } = useMobile();
 const route = useRoute();
 const authStore = useAuthStore();
 const uiStore = useUiStore();
 const mainMenuOpen = ref(false);
+const showLogin = ref(false);
 const showCalculationModal = ref(false);
 const showProtocol = ref(false);
 const exportingShp = ref(false);
+const exportingDxf = ref(false);
 const protocolRef = ref<{ addLog: (log: any) => void } | null>(null);
 
 onMounted(() => {
   authStore.hydrate();
+  void refreshApiHealth();
 });
-
-const onDevLogin = async () => {
-  try {
-    const username = window.prompt('Логин', authStore.username || 'editor') || '';
-    if (!username) return;
-    const password = window.prompt('Пароль (dev)', 'dev') || '';
-    await authStore.loginDev(username, password, 'editor');
-    useNotificationStore().showSuccess(`Вход выполнен: ${authStore.username} (${authStore.role})`);
-  } catch (err: any) {
-    useNotificationStore().showError('Вход не удался: ' + (err?.message || err));
-  }
-};
 
 const links = [
   { text: 'Карта', to: '/', icon: 'mdi-map' }
@@ -242,10 +250,22 @@ const onCalculationLog = (log: any) => {
   }
 };
 
+const resolveExportFragmentIds = (): number[] | undefined => {
+  const fragmentStore = useFragmentStore();
+  if (fragmentStore.selectedFragmentId != null) return [fragmentStore.selectedFragmentId];
+  if (fragmentStore.visibleFragments.length) return [...fragmentStore.visibleFragments];
+  return undefined;
+};
+
 const downloadShp = async () => {
   exportingShp.value = true;
   try {
-    const { blob, filename } = await fastApiService.downloadShpExport();
+    const fragmentIds = resolveExportFragmentIds();
+    if (!fragmentIds?.length) {
+      useNotificationStore().showError('Выберите фрагмент на карте перед экспортом SHP');
+      return;
+    }
+    const { blob, filename } = await fastApiService.downloadShpExport(fragmentIds);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -254,11 +274,36 @@ const downloadShp = async () => {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    useNotificationStore().showSuccess('Экспорт SHP успешно завершен');
+    useNotificationStore().showSuccess(`Экспорт SHP (фрагменты: ${fragmentIds.join(', ')})`);
   } catch (err: any) {
     useNotificationStore().showError('Ошибка экспорта SHP: ' + err.message);
   } finally {
     exportingShp.value = false;
+  }
+};
+
+const downloadDxf = async () => {
+  exportingDxf.value = true;
+  try {
+    const fragmentIds = resolveExportFragmentIds();
+    if (!fragmentIds?.length) {
+      useNotificationStore().showError('Выберите фрагмент на карте перед экспортом DXF');
+      return;
+    }
+    const { blob, filename } = await fastApiService.downloadDxfExport(fragmentIds[0]);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    useNotificationStore().showSuccess(`Экспорт DXF (фрагмент ${fragmentIds[0]})`);
+  } catch (err: any) {
+    useNotificationStore().showError('Ошибка экспорта DXF: ' + err.message);
+  } finally {
+    exportingDxf.value = false;
   }
 };
 
