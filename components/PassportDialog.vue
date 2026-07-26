@@ -8,6 +8,20 @@
       </v-card-title>
       
       <v-card-text class="pa-0" style="height: 600px;">
+        <v-alert
+          v-if="diagnostics && !diagnostics.ready_for_passport"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="ma-3"
+        >
+          <div class="text-body-2 font-weight-medium mb-1">Привязки участков в БД не заполнены</div>
+          <div class="text-caption" v-for="(b, i) in diagnostics.blockers" :key="i">• {{ b }}</div>
+          <div class="text-caption mt-1">
+            HPS с MS/RS: {{ diagnostics.counts?.heatpipesections_with_magistral_site || 0 }} /
+            {{ diagnostics.counts?.heatpipesections_with_dist_site || 0 }}
+          </div>
+        </v-alert>
         <v-container v-if="loading" class="d-flex justify-center align-center h-100">
           <v-progress-circular indeterminate color="primary"></v-progress-circular>
         </v-container>
@@ -74,12 +88,22 @@ const loading = ref(false)
 const hierarchy = ref<PassportHierarchyGroup[]>([])
 const open = ref<string[]>([])
 const downloadingSiteId = ref<string | null>(null)
+const diagnostics = ref<{
+  ready_for_passport: boolean
+  blockers: string[]
+  counts: Record<string, number>
+} | null>(null)
 const notificationStore = useNotificationStore()
 
 const fetchHierarchy = async () => {
   loading.value = true
   try {
-    hierarchy.value = await fastApiService.getPassportHierarchy()
+    const [hier, diag] = await Promise.all([
+      fastApiService.getPassportHierarchy(),
+      fastApiService.getPassportDiagnostics().catch(() => null),
+    ])
+    hierarchy.value = hier
+    diagnostics.value = diag
   } catch (e: any) {
     notificationStore.showError('Ошибка загрузки паспортов: ' + e.message)
   } finally {

@@ -678,6 +678,14 @@
 
             <v-btn v-if="mutationsEnabled" color="primary" variant="tonal" @click="startEdit">Редактировать</v-btn>
 
+            <v-btn
+              v-if="selected"
+              variant="tonal"
+              prepend-icon="mdi-file-word-outline"
+              :loading="exportingWord"
+              @click="exportWord"
+            >Word</v-btn>
+
             <v-btn variant="text" @click="detailsVisible = false">Закрыть</v-btn>
 
           </template>
@@ -805,6 +813,7 @@ const selected = ref<InspectionDetails | null>(null)
 const creating = ref(false)
 
 const deleting = ref(false)
+const exportingWord = ref(false)
 
 
 
@@ -1319,6 +1328,26 @@ watch(search, () => {
 })
 
 
+
+const exportWord = async () => {
+  if (!selected.value) return
+  exportingWord.value = true
+  try {
+    const { blob, filename } = await fastApiService.downloadOpsWordReport('osmotr', selected.value.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e: any) {
+    detailsError.value = e?.message || 'Не удалось сформировать Word'
+  } finally {
+    exportingWord.value = false
+  }
+}
 
 defineExpose({ openDialog })
 

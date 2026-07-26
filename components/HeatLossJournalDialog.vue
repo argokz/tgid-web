@@ -335,6 +335,18 @@
           <v-chip :color="sourceDetails.ready_to_calculate ? 'green' : 'orange'">
             {{ sourceDetails.ready_to_calculate ? 'Готов к расчёту' : 'Исходные данные неполные' }}
           </v-chip>
+          <v-btn
+            v-if="mutationsEnabled && sourceDetails.fragment_id"
+            class="ml-2"
+            color="primary"
+            variant="tonal"
+            size="small"
+            prepend-icon="mdi-play"
+            :loading="runningHeatLoss"
+            @click="runHeatLossForSource"
+          >
+            Запуск теплопотерь
+          </v-btn>
           <v-chip
             variant="outlined"
             :color="sourceDetails.has_source_parameters ? 'green' : 'grey'"
@@ -432,6 +444,7 @@ const visible = ref(false)
 const detailsVisible = ref(false)
 const loading = ref(false)
 const detailLoading = ref(false)
+const runningHeatLoss = ref(false)
 const activeTab = ref<'seasons' | 'sources'>('seasons')
 const lookups = ref<HeatLossLookups>({ fragments: [], cities: [], source_counts: {}, season_counts: {}, result_availability: { calculation_count: 0, heat_loss_row_count: 0 } })
 const seasons = ref<HeatLossSeasonSummary[]>([])
@@ -498,6 +511,48 @@ const saveSeason = async () => {
     // We could handle errors globally or locally
   } finally {
     saving.value = false
+  }
+}
+
+const runHeatLossForSource = async () => {
+  const src = sourceDetails.value
+  if (!src?.fragment_id) return
+  runningHeatLoss.value = true
+  try {
+    const result = await fastApiService.runHeatLosses(Number(src.fragment_id))
+    const taskId = result.task_id
+    if (!taskId) {
+      useNotificationStore().showError('Сервер не вернул task_id')
+      return
+    }
+    useNotificationStore().showSuccess(`Теплопотери в очереди: ${taskId}`)
+    let lastStatus = ''
+    for (let i = 0; i < 180; i++) {
+      await new Promise((r) => setTimeout(r, 2000))
+      const statusResponse = await fastApiService.getTaskStatus(taskId)
+      const st = String(statusResponse.status || '')
+      if (st && st !== lastStatus) {
+        lastStatus = st
+        if (st !== 'SUCCESS' && st !== 'FAILURE') {
+          useNotificationStore().showSuccess(`Теплопотери: ${st}`)
+        }
+      }
+      if (st === 'SUCCESS') {
+        const msg = statusResponse.result?.message || 'Теплопотери завершены'
+        useNotificationStore().showSuccess(msg)
+        await openSource(src.id)
+        return
+      }
+      if (st === 'FAILURE') {
+        useNotificationStore().showError(statusResponse.error || 'Ошибка расчёта теплопотерь')
+        return
+      }
+    }
+    useNotificationStore().showError('Таймаут ожидания теплопотерь (6 мин)')
+  } catch (err: any) {
+    useNotificationStore().showError(err?.message || 'Не удалось запустить теплопотери')
+  } finally {
+    runningHeatLoss.value = false
   }
 }
 

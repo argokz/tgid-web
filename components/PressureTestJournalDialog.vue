@@ -184,6 +184,13 @@
           <v-btn v-if="!isEditing && selected && hasCoordinates(selected)" prepend-icon="mdi-crosshairs-gps" variant="tonal" color="blue-darken-2"
             @click="locate(selected, selected.name || `Опрессовка ${selected.id}`)">На карте</v-btn>
           <v-btn v-if="mutationsEnabled && (!isEditing)" variant="text" prepend-icon="mdi-pencil" @click="startEdit">Редактировать</v-btn>
+          <v-btn
+            v-if="!isEditing && selected && !isNew"
+            variant="text"
+            prepend-icon="mdi-file-word-outline"
+            :loading="exportingWord"
+            @click="exportWord"
+          >Word</v-btn>
           <v-btn v-if="mutationsEnabled && !isEditing && selected && !isNew" color="error" variant="text" prepend-icon="mdi-delete" :loading="deleting" @click="deletePressureTest(selected.id)">Удалить</v-btn>
           <v-spacer />
           <template v-if="isEditing">
@@ -230,6 +237,7 @@ const isNew = ref(false)
 const saving = ref(false)
 const creating = ref(false)
 const deleting = ref(false)
+const exportingWord = ref(false)
 const editFields = ref<Record<string, any>>({})
 
 const scopeTitle = computed(() => scope.lineId ? `опрессовки трубопровода ${scope.lineId}` : scope.nodeId ? `опрессовки у узла ${scope.nodeId}` : 'вся тепловая сеть')
@@ -398,6 +406,26 @@ const deletePressureTest = async (id: number) => {
     detailsError.value = 'Ошибка при удалении: ' + (e?.message || '')
   } finally {
     deleting.value = false
+  }
+}
+
+const exportWord = async () => {
+  if (!selected.value) return
+  exportingWord.value = true
+  try {
+    const { blob, filename } = await fastApiService.downloadOpsWordReport('opres', selected.value.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e: any) {
+    detailsError.value = e?.message || 'Не удалось сформировать Word'
+  } finally {
+    exportingWord.value = false
   }
 }
 

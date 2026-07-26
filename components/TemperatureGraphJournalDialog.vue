@@ -319,6 +319,27 @@
               <v-card-title class="text-subtitle-1 d-flex justify-space-between align-center">
                 <span>Исходные параметры desktop</span>
                 <div>
+                  <v-btn
+                    v-if="mutationsEnabled && details"
+                    color="deep-orange"
+                    variant="text"
+                    prepend-icon="mdi-calculator"
+                    class="mr-1"
+                    :loading="recalculating"
+                    @click="recalculateGraph"
+                  >
+                    Расчёт TG
+                  </v-btn>
+                  <v-btn
+                    v-if="mutationsEnabled && details"
+                    color="indigo"
+                    variant="text"
+                    prepend-icon="mdi-thermometer-lines"
+                    class="mr-1"
+                    @click="stationaryDialog = true"
+                  >
+                    Стационарный
+                  </v-btn>
                   <v-btn v-if="mutationsEnabled && (!isEditing)" color="primary" variant="text" prepend-icon="mdi-pencil" @click="startEdit">Редактировать</v-btn>
                   <div v-else class="d-flex ga-2">
                     <v-btn v-if="mutationsEnabled" color="error" variant="text" @click="cancelEdit" :disabled="saving">Отмена</v-btn>
@@ -389,6 +410,28 @@
           </table>
         </div>
       </template>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="stationaryDialog" max-width="420">
+    <v-card rounded="lg">
+      <v-card-title>Стационарный график</v-card-title>
+      <v-card-text>
+        <p class="text-body-2 text-medium-emphasis mb-3">
+          Задаёт постоянные t1/t2/t3/tv на всех точках источника (как desktop «Стационарный»).
+        </p>
+        <v-row dense>
+          <v-col cols="6"><v-text-field v-model.number="stationary.t1" label="t1 подача" type="number" density="compact" variant="outlined" hide-details /></v-col>
+          <v-col cols="6"><v-text-field v-model.number="stationary.t2" label="t2 обратка" type="number" density="compact" variant="outlined" hide-details /></v-col>
+          <v-col cols="6"><v-text-field v-model.number="stationary.t3" label="t3 смешение" type="number" density="compact" variant="outlined" hide-details class="mt-2" /></v-col>
+          <v-col cols="6"><v-text-field v-model.number="stationary.tv" label="tv ветер" type="number" density="compact" variant="outlined" hide-details class="mt-2" /></v-col>
+        </v-row>
+      </v-card-text>
+      <v-card-actions class="px-4 pb-4">
+        <v-spacer />
+        <v-btn variant="text" @click="stationaryDialog = false">Отмена</v-btn>
+        <v-btn color="primary" variant="flat" :loading="applyingStationary" @click="applyStationary">Применить</v-btn>
+      </v-card-actions>
     </v-card>
   </v-dialog>
 </template>
@@ -501,6 +544,44 @@ const saveInputs = async () => {
     // We could handle errors globally or locally
   } finally {
     saving.value = false
+  }
+}
+
+const recalculating = ref(false)
+const recalculateGraph = async () => {
+  if (!details.value) return
+  recalculating.value = true
+  try {
+    const result = await fastApiService.recalculateTemperatureGraph(details.value.id)
+    useNotificationStore().showSuccess(`TG пересчитан: ${result.points} точек`)
+    await openDetails(details.value.id)
+  } catch (err: any) {
+    useNotificationStore().showError(err?.message || 'Не удалось пересчитать TG')
+  } finally {
+    recalculating.value = false
+  }
+}
+
+const stationaryDialog = ref(false)
+const applyingStationary = ref(false)
+const stationary = ref({ t1: 95, t2: 70, t3: 70, tv: 0 })
+const applyStationary = async () => {
+  if (!details.value) return
+  applyingStationary.value = true
+  try {
+    const result = await fastApiService.applyStationaryTemperatureGraph(details.value.id, {
+      t1: Number(stationary.value.t1),
+      t2: Number(stationary.value.t2),
+      t3: Number(stationary.value.t3),
+      tv: Number(stationary.value.tv),
+    })
+    useNotificationStore().showSuccess(`Стационарный: обновлено ${result.updated_points} точек`)
+    stationaryDialog.value = false
+    await openDetails(details.value.id)
+  } catch (err: any) {
+    useNotificationStore().showError(err?.message || 'Не удалось применить стационарный график')
+  } finally {
+    applyingStationary.value = false
   }
 }
 

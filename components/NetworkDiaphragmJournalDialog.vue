@@ -66,8 +66,18 @@
               <td><v-chip size="x-small" :color="item.calculation_writeback_allowed ? 'green' : 'grey'">{{ item.entry_mark || 'не разрешена' }}</v-chip></td>
               <td>{{ item.external_sign_line_name || '—' }}</td>
               <td>{{ item.state_name || '—' }}</td>
-              <td><v-chip size="x-small" :color="qualityColor(item.quality_status)">{{ qualityLabel(item.quality_status) }}</v-chip></td>
-              <td><v-btn v-if="hasCoordinates(item)" icon="mdi-map-marker" size="x-small" variant="text" aria-label="Показать диафрагму на карте" @click.stop="locate(item)" /></td>
+              <td>
+                <v-chip size="x-small" :color="qualityColor(item.quality_status)">{{ qualityLabel(item.quality_status) }}</v-chip>
+                <div v-if="!hasCoordinates(item)" class="muted">карта недоступна</div>
+              </td>
+              <td>
+                <v-tooltip v-if="!hasCoordinates(item)" text="Нет координат: линия отсутствует или без узлов" location="left">
+                  <template #activator="{ props }">
+                    <v-btn v-bind="props" icon="mdi-map-marker-off" size="x-small" variant="text" disabled />
+                  </template>
+                </v-tooltip>
+                <v-btn v-else icon="mdi-map-marker" size="x-small" variant="text" aria-label="Показать диафрагму на карте" @click.stop="locate(item)" />
+              </td>
             </tr>
           </tbody>
         </table>

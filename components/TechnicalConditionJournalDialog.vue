@@ -26,6 +26,16 @@
 
           </div>
 
+          <v-btn
+            color="cyan-darken-1"
+            variant="tonal"
+            prepend-icon="mdi-chart-box-outline"
+            class="mr-2"
+            :loading="loadingBalance"
+            @click="downloadBalance"
+          >
+            Свод
+          </v-btn>
           <v-btn v-if="mutationsEnabled" color="cyan-darken-3" variant="flat" prepend-icon="mdi-plus" class="mr-2" @click="createTechnicalCondition" :loading="creating">
 
             Создать
@@ -492,6 +502,8 @@ const creating = ref(false)
 
 const deleting = ref(false)
 
+const loadingBalance = ref(false)
+
 const editFields = ref<Record<string, any>>({})
 
 
@@ -746,7 +758,7 @@ const saveChanges = async () => {
 
     if (isNew.value) {
 
-      const result = await fastApiService.createObject('tehnicheskie_usloviya', editFields.value)
+      const result = await fastApiService.createTechnicalCondition(editFields.value)
 
       if (result && result.id) {
 
@@ -774,7 +786,7 @@ const saveChanges = async () => {
 
       if (Object.keys(changes).length > 0) {
 
-        await fastApiService.updateObjectAttributes('tehnicheskie_usloviya', selected.value.id.toString(), changes)
+        await fastApiService.updateTechnicalCondition(selected.value.id, changes)
 
       }
 
@@ -800,6 +812,59 @@ const saveChanges = async () => {
 
 
 
+const downloadBalance = async () => {
+
+  loadingBalance.value = true
+
+  try {
+
+    const year = issueYear.value ? Number(issueYear.value) : undefined
+
+    const balance = await fastApiService.getTechnicalConditionBalance(year)
+
+    const { blob, filename } = await fastApiService.downloadExcelReport(
+      'tu-balance',
+      balance.year ? { year: Number(balance.year) } : undefined,
+    )
+
+    const url = URL.createObjectURL(blob)
+
+    const link = document.createElement('a')
+
+    link.href = url
+
+    link.download = filename || `tu_balance_${balance.year || 'all'}.xlsx`
+
+    document.body.appendChild(link)
+
+    link.click()
+
+    link.remove()
+
+    URL.revokeObjectURL(url)
+
+    const note = balance.notes ? ` (${balance.notes})` : ''
+
+    useNotificationStore().showSuccess(
+
+      `Свод ТУ ${balance.year || ''}: ${balance.totals?.tu_count ?? 0} записей${note}`
+
+    )
+
+  } catch (e: any) {
+
+    useNotificationStore().showError(e?.message || 'Не удалось выгрузить свод ТУ')
+
+  } finally {
+
+    loadingBalance.value = false
+
+  }
+
+}
+
+
+
 const deleteTechnicalCondition = async (id: number) => {
 
   if (!confirm(`Вы действительно хотите удалить ТУ #${id}?`)) return
@@ -808,7 +873,7 @@ const deleteTechnicalCondition = async (id: number) => {
 
     deleting.value = true
 
-    await fastApiService.deleteObject('tehnicheskie_usloviya', id)
+    await fastApiService.deleteTechnicalCondition(id)
 
     detailsVisible.value = false
 

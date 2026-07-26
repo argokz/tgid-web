@@ -443,7 +443,7 @@ const saveChanges = async () => {
   if (!itemDetails.value) return
   saving.value = true
   try {
-    const table = itemDetails.value.equipment_type === 'damper' ? 'zadv' : 'zadv2'
+    const table = itemDetails.value.equipment_type === 'damper' ? 'dampers' : 'regularmatures'
     
     // Process number fields to not pass empty strings as numbers
     const processedFields: Record<string, any> = {}
