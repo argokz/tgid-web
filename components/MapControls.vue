@@ -330,7 +330,7 @@
             aria-label="Редактировать топологию сети"
             @click="$emit('toggle-edit-topology-mode')"
           >
-            <v-icon :color="isEditTopologyMode ? 'white' : 'red'">mdi-pencil-network</v-icon>
+            <v-icon :color="isEditTopologyMode ? 'white' : 'red'">mdi-vector-polyline-edit</v-icon>
           </v-btn>
         </template>
       </v-tooltip>

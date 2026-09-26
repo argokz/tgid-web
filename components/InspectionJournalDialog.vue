@@ -548,7 +548,7 @@
 
                       :key="Number(risk.id)"
 
-                      prepend-icon="mdi-shield-search-outline"
+                      prepend-icon="mdi-shield-search"
 
                       :title="`Участок ${risk.legacy_pipe_section_id || 'не указан'}`"
 
