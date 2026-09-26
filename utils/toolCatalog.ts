@@ -17,6 +17,7 @@ export type ToolEvent =
   | 'open-ochered-opressovok'
   | 'open-technical-condition-journal'
   | 'open-corrosion-indicator-journal'
+  | 'open-outage-simulation'
   | 'open-alseko-journal'
   | 'open-electrical-network-journal'
   | 'open-heat-loss-journal'
@@ -29,6 +30,8 @@ export type ToolEvent =
   | 'open-network-bypasses'
   | 'open-network-diaphragms'
   | 'open-elevators'
+  | 'open-throttling-calculator'
+  | 'open-hydraulic-thematic'
 
 export interface ToolDescriptor {
   label: string
@@ -52,6 +55,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     icon: 'mdi-clipboard-text-outline',
     color: 'deep-orange-darken-2',
     items: [
+      { label: 'Локализация аварий', hint: 'Отсекающие задвижки и отключенные потребители', icon: 'mdi-valve-closed', color: 'error', event: 'open-outage-simulation' },
       { label: 'Нарушения', hint: 'Журнал дефектов и повреждений', icon: 'mdi-alert-decagram-outline', color: 'deep-orange-darken-2', event: 'open-defect-journal' },
       { label: 'Шурфовки', hint: 'План, предписания, выполнение', icon: 'mdi-shovel', color: 'brown-darken-2', event: 'open-shurf-journal' },
       { label: 'Осмотры', hint: 'Контуры осмотра и результаты', icon: 'mdi-clipboard-search-outline', color: 'teal-darken-2', event: 'open-inspection-journal' },
@@ -79,6 +83,8 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     icon: 'mdi-calculator-variant',
     color: 'primary',
     items: [
+      { label: 'Гидравлический режим на карте', hint: 'Стрелки потоков, hуд > 80 Па/м, скорости и напоры', icon: 'mdi-map-clock-outline', color: 'indigo-darken-2', event: 'open-hydraulic-thematic' },
+      { label: 'Калькулятор дросселирования', hint: 'Расчет шайб и сопел элеваторов', icon: 'mdi-calculator', color: 'teal-darken-3', event: 'open-throttling-calculator' },
       { label: 'Диагностика расчётов', hint: 'Готовность исходных данных', icon: 'mdi-calculator-variant', color: 'primary', event: 'open-calculation-diagnostics' },
       { label: 'Диагностика топологии', hint: 'Разрывы и висячие узлы', icon: 'mdi-stethoscope', color: 'deep-purple-darken-2', event: 'open-topology-diagnostics' },
       { label: 'Поиск неисправностей', hint: 'Дефекты и коррозия на карте', icon: 'mdi-alert-octagon', color: 'error', event: 'open-fault-diagnostics' },

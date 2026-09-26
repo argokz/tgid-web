@@ -280,6 +280,30 @@
         ref="networkQueriesRef"
       />
 
+      <!-- Outage simulation dialog (локализация аварий и задвижек) -->
+      <LazyOutageSimulationDialog
+        v-if="mountedDialogs.outageSimulation"
+        ref="outageSimulationRef"
+        @show-on-map="onShowOutageOnMap"
+        @clear-highlight="onClearOutageHighlight"
+        @focus-coords="onFocusCoords"
+      />
+
+      <!-- Throttling calculator dialog (шайбы и элеваторы) -->
+      <LazyThrottlingCalculatorDialog
+        v-if="mountedDialogs.throttlingCalculator"
+        ref="throttlingCalculatorRef"
+      />
+
+      <!-- Hydraulic Thematic dialog (гидравлический режим и стрелки потоков) -->
+      <LazyHydraulicThematicDialog
+        v-if="mountedDialogs.hydraulicThematic"
+        ref="hydraulicThematicRef"
+        @apply-thematic="onApplyHydraulicThematic"
+        @update-thematic-settings="onUpdateHydraulicThematicSettings"
+        @clear-thematic="onClearHydraulicThematic"
+      />
+
       <!-- Topology diagnostics modal -->
       <LazyTopologyDiagnosticsModal
         v-if="mountedDialogs.topologyDiagnostics"
@@ -307,6 +331,7 @@
         ref="attributePanelRef"
         :is-edit-topology-mode="isEditTopologyMode"
         @delete-feature="onDeleteFeature"
+        @refresh-layers="layerStore.refreshVisibleDataLayers()"
         @open-defect-journal="openLazyDialog('defect', $event)"
         @open-shurf-journal="openLazyDialog('shurf', $event)"
         @open-inspection-journal="openLazyDialog('inspection', $event)"
@@ -324,6 +349,7 @@
         @open-network-regulators="openLazyDialog('networkRegulator', $event)"
         @open-network-bypasses="openLazyDialog('networkBypass', $event)"
         @open-network-diaphragms="openLazyDialog('networkDiaphragm', $event)"
+        @open-outage-simulation="openLazyDialog('outageSimulation', $event)"
       />
 
       <!-- Node search dialog -->
@@ -399,6 +425,7 @@
         :error="piezometerError"
         :has-calculation="piezometerHasCalc"
         :total-length="piezometerTotalLength"
+        :waypoints="traceNodes"
         @node-hover="onPiezometerNodeHover"
       />
 
@@ -414,6 +441,52 @@
         @confirm="confirmSplit"
         @cancel="cancelSplit"
       />
+
+      <!-- Панель инструментов CAD топологии -->
+      <div v-if="isEditTopologyMode" class="topology-edit-toolbar elevation-4">
+        <div class="d-flex align-center ga-2 pa-2">
+          <v-chip size="small" color="primary" variant="flat">
+            CAD Топология
+          </v-chip>
+          <v-btn
+            size="small"
+            :color="isMergeMode ? 'warning' : 'default'"
+            :variant="isMergeMode ? 'flat' : 'outlined'"
+            @click="toggleMergeMode"
+          >
+            <v-icon start size="16">mdi-call-merge</v-icon>
+            {{ isMergeMode ? 'Отменить слияние' : 'Слияние узлов' }}
+          </v-btn>
+          <span v-if="isMergeMode && !mergeTargetNodeId" class="text-caption text-medium-emphasis">
+            Кликните целевой узел
+          </span>
+          <span v-else-if="isMergeMode && mergeTargetNodeId" class="text-caption text-warning font-weight-medium">
+            Узел {{ mergeTargetNodeId }} выбран. Кликните узел для слияния.
+          </span>
+        </div>
+      </div>
+
+      <!-- Диалог подтверждения слияния узлов -->
+      <v-dialog v-model="mergeConfirmDialogOpen" max-width="450">
+        <v-card>
+          <v-card-title class="d-flex align-center">
+            <v-icon color="warning" class="mr-2">mdi-call-merge</v-icon>
+            Слияние узлов
+          </v-card-title>
+          <v-card-text>
+            Вы уверены, что хотите объединить узел <strong>{{ mergeSourceNodeId }}</strong> в узел <strong>{{ mergeTargetNodeId }}</strong>?
+            <br><br>
+            Участки и потребители узла <strong>{{ mergeSourceNodeId }}</strong> перейдут на узел <strong>{{ mergeTargetNodeId }}</strong>,
+            участок между ними будет снят, узел <strong>{{ mergeSourceNodeId }}</strong> — удалён.
+            Если на узле есть другое оборудование или внутренняя схема, сервер откажет и покажет, что мешает.
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" @click="cancelMerge">Отмена</v-btn>
+            <v-btn color="primary" :loading="mergeLoading" @click="confirmMerge">Объединить</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
 
       <!-- Feature selection menu -->
       <FeatureMenu />
@@ -441,6 +514,7 @@
 </template>
 
 <script setup lang="ts">
+import { activeDrawMode } from '~/composables/useMapDraw';
 import { useMapStore } from '~/stores/mapStore';
 import { usePopupStore } from '~/stores/popupStore';
 import { useLayerStore } from '~/stores/layerStore';
@@ -673,6 +747,9 @@ const elevatorJournalRef = ref<{
   openDialog: (scope?: { elevatorId?: number; lineId?: number; nodeId?: number }) => void
 } | null>(null);
 const networkQueriesRef = ref<{ openDialog: () => void } | null>(null);
+const outageSimulationRef = ref<{ openDialog: (scope?: { lineId?: number; nodeId?: number }) => void } | null>(null);
+const throttlingCalculatorRef = ref<{ openDialog: (scope?: any) => void } | null>(null);
+const hydraulicThematicRef = ref<{ openDialog: (scope?: any) => void } | null>(null);
 
 /**
  * Ленивое монтирование диалогов: тяжёлые журналы не попадают в основной чанк карты,
@@ -704,7 +781,10 @@ type LazyDialogKey =
   | 'networkBypass'
   | 'networkDiaphragm'
   | 'elevator'
-  | 'networkQueries';
+  | 'networkQueries'
+  | 'outageSimulation'
+  | 'throttlingCalculator'
+  | 'hydraulicThematic';
 
 type LazyDialogInstance = { openDialog: (scope?: any) => void };
 
@@ -736,6 +816,9 @@ const lazyDialogRefs: Record<LazyDialogKey, Ref<LazyDialogInstance | null>> = {
   networkDiaphragm: networkDiaphragmJournalRef,
   elevator: elevatorJournalRef,
   networkQueries: networkQueriesRef,
+  outageSimulation: outageSimulationRef,
+  throttlingCalculator: throttlingCalculatorRef,
+  hydraulicThematic: hydraulicThematicRef,
 };
 
 /** Событие панели инструментов → ключ ленивого диалога */
@@ -752,6 +835,9 @@ const TOOL_EVENT_TO_DIALOG: Record<ToolEvent, LazyDialogKey> = {
   'open-ochered-opressovok': 'ocheredOpressovok',
   'open-technical-condition-journal': 'technicalCondition',
   'open-corrosion-indicator-journal': 'corrosionIndicator',
+  'open-outage-simulation': 'outageSimulation',
+  'open-throttling-calculator': 'throttlingCalculator',
+  'open-hydraulic-thematic': 'hydraulicThematic',
   'open-alseko-journal': 'alseko',
   'open-electrical-network-journal': 'electricalNetwork',
   'open-heat-loss-journal': 'heatLoss',
@@ -1106,6 +1192,273 @@ const onLocateElevator = (coordinates: {
   elevatorLocateMarker.togglePopup();
 };
 
+// === Outage Simulation Map Visualization ===
+const onShowOutageOnMap = (res: any) => {
+  const map = mapStore.map;
+  if (!map) return;
+  onClearOutageHighlight();
+
+  // Highlight isolated pipes
+  if (res.geojson?.isolated_pipes?.features?.length) {
+    map.addSource('outage-isolated-pipes', {
+      type: 'geojson',
+      data: res.geojson.isolated_pipes,
+    });
+    map.addLayer({
+      id: 'outage-isolated-pipes-glow',
+      type: 'line',
+      source: 'outage-isolated-pipes',
+      paint: {
+        'line-color': '#ff1744',
+        'line-width': 8,
+        'line-opacity': 0.45,
+      },
+    });
+    map.addLayer({
+      id: 'outage-isolated-pipes-line',
+      type: 'line',
+      source: 'outage-isolated-pipes',
+      paint: {
+        'line-color': '#d50000',
+        'line-width': 4,
+      },
+    });
+  }
+
+  // Highlight isolating valves
+  if (res.geojson?.valves_to_close?.features?.length) {
+    map.addSource('outage-valves-to-close', {
+      type: 'geojson',
+      data: res.geojson.valves_to_close,
+    });
+    map.addLayer({
+      id: 'outage-valves-to-close-points',
+      type: 'circle',
+      source: 'outage-valves-to-close',
+      paint: {
+        'circle-radius': 9,
+        'circle-color': '#ffd600',
+        'circle-stroke-width': 3,
+        'circle-stroke-color': '#d50000',
+      },
+    });
+  }
+
+  // Center map on isolated zone
+  const firstValve = res.valves_to_close?.find((v: any) => v.lng && v.lat);
+  if (firstValve && firstValve.lng && firstValve.lat) {
+    map.flyTo({ center: [firstValve.lng, firstValve.lat], zoom: 17 });
+  } else if (res.affected_consumers?.length) {
+    const firstC = res.affected_consumers.find((c: any) => c.longitude && c.latitude);
+    if (firstC && firstC.longitude && firstC.latitude) {
+      map.flyTo({ center: [firstC.longitude, firstC.latitude], zoom: 17 });
+    }
+  }
+};
+
+const onClearOutageHighlight = () => {
+  const map = mapStore.map;
+  if (!map) return;
+  if (map.getLayer('outage-isolated-pipes-glow')) map.removeLayer('outage-isolated-pipes-glow');
+  if (map.getLayer('outage-isolated-pipes-line')) map.removeLayer('outage-isolated-pipes-line');
+  if (map.getSource('outage-isolated-pipes')) map.removeSource('outage-isolated-pipes');
+  if (map.getLayer('outage-valves-to-close-points')) map.removeLayer('outage-valves-to-close-points');
+  if (map.getSource('outage-valves-to-close')) map.removeSource('outage-valves-to-close');
+};
+
+const onFocusCoords = (lng: number, lat: number) => {
+  mapStore.map?.flyTo({ center: [lng, lat], zoom: 18 });
+};
+
+// === Hydraulic Thematic Maps & Flow Arrows ===
+const FLOW_ARROW_ICON = 'hydraulic-flow-arrow';
+const HAS_DELTA_H = ['==', ['typeof', ['get', 'delta_h']], 'number'] as any;
+
+/** Треугольная стрелка «по линии» (острие по +x); после смены стиля регистрируется заново */
+const ensureFlowArrowIcon = (m: any) => {
+  if (m.hasImage(FLOW_ARROW_ICON)) return;
+  const size = 24;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.beginPath();
+  ctx.moveTo(5, 5);
+  ctx.lineTo(20, 12);
+  ctx.lineTo(5, 19);
+  ctx.closePath();
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2;
+  ctx.fill();
+  ctx.stroke();
+  m.addImage(FLOW_ARROW_ICON, ctx.getImageData(0, 0, size, size), { pixelRatio: 2 });
+};
+
+const onClearHydraulicThematic = () => {
+  const map = mapStore.map;
+  if (!map) return;
+  const layers = [
+    'hydraulic-nodes-labels-layer',
+    'hydraulic-nodes-layer',
+    'hydraulic-flow-arrows-layer',
+    'hydraulic-pipes-layer',
+  ];
+  for (const id of layers) {
+    if (map.getLayer(id)) map.removeLayer(id);
+  }
+  if (map.getSource('hydraulic-calc-source')) {
+    map.removeSource('hydraulic-calc-source');
+  }
+};
+
+const onApplyHydraulicThematic = (payload: {
+  geojson: any;
+  showArrows: boolean;
+  colorPipes: boolean;
+  colorNodes: boolean;
+  showNodeLabels: boolean;
+}) => {
+  const map = mapStore.map;
+  if (!map) return;
+
+  onClearHydraulicThematic();
+
+  map.addSource('hydraulic-calc-source', {
+    type: 'geojson',
+    data: payload.geojson,
+  });
+
+  const pipeColor = payload.colorPipes
+    ? [
+        'case',
+        ['==', ['get', 'is_over_resistance'], true], '#d32f2f',
+        ['==', ['get', 'velocity_status'], 'high'], '#f57c00',
+        ['==', ['get', 'velocity_status'], 'low'], '#7b1fa2',
+        '#2e7d32',
+      ]
+    : '#1976d2';
+
+  // 1. Участки с раскраской
+  map.addLayer({
+    id: 'hydraulic-pipes-layer',
+    type: 'line',
+    source: 'hydraulic-calc-source',
+    filter: ['==', ['get', 'kind'], 'line'],
+    paint: {
+      'line-color': pipeColor as any,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 15, 5, 18, 8],
+    },
+  });
+
+  // 2. Стрелки направления потоков вдоль участков. Иконка, а не символ шрифта:
+  //    в глифах Open Sans (MapTiler) нет «▶», и текстовые стрелки не рисовались
+  ensureFlowArrowIcon(map);
+  map.addLayer({
+    id: 'hydraulic-flow-arrows-layer',
+    type: 'symbol',
+    source: 'hydraulic-calc-source',
+    filter: ['==', ['get', 'kind'], 'line'],
+    layout: {
+      'symbol-placement': 'line',
+      'symbol-spacing': 80,
+      'icon-image': FLOW_ARROW_ICON,
+      'icon-rotation-alignment': 'map',
+      'icon-rotate': ['case', ['<', ['get', 'flow_dir'], 0], 180, 0] as any,
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+      'visibility': payload.showArrows ? 'visible' : 'none',
+    },
+  });
+
+  // 3. Узлы с раскраской по ΔH
+  map.addLayer({
+    id: 'hydraulic-nodes-layer',
+    type: 'circle',
+    source: 'hydraulic-calc-source',
+    filter: ['==', ['get', 'kind'], 'node'],
+    layout: {
+      visibility: payload.colorNodes ? 'visible' : 'none',
+    },
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 4, 15, 7, 18, 10],
+      // ΔH есть только у узлов, где считались обе трубы; остальные — серые
+      'circle-color': [
+        'case',
+        HAS_DELTA_H,
+        [
+          'interpolate',
+          ['linear'],
+          ['get', 'delta_h'],
+          0, '#304ffe',
+          15, '#00b0ff',
+          30, '#00e676',
+          50, '#ffeb3b',
+          70, '#ff1744',
+        ],
+        '#9e9e9e',
+      ] as any,
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': 1.5,
+    },
+  });
+
+  // 4. Подписи напора узлов
+  map.addLayer({
+    id: 'hydraulic-nodes-labels-layer',
+    type: 'symbol',
+    source: 'hydraulic-calc-source',
+    filter: ['all', ['==', ['get', 'kind'], 'node'], HAS_DELTA_H] as any,
+    minzoom: 14,
+    layout: {
+      'text-field': ['concat', 'ΔH=', ['to-string', ['get', 'delta_h']], ' м'] as any,
+      'text-font': ['Open Sans Regular'],
+      'text-size': 11,
+      'text-offset': [0, 1.4],
+      'text-anchor': 'top',
+      'visibility': payload.showNodeLabels ? 'visible' : 'none',
+    },
+    paint: {
+      'text-color': '#1a237e',
+      'text-halo-color': '#ffffff',
+      'text-halo-width': 2,
+    },
+  });
+};
+
+const onUpdateHydraulicThematicSettings = (payload: {
+  showArrows: boolean;
+  colorPipes: boolean;
+  colorNodes: boolean;
+  showNodeLabels: boolean;
+}) => {
+  const map = mapStore.map;
+  if (!map || !map.getSource('hydraulic-calc-source')) return;
+
+  if (map.getLayer('hydraulic-flow-arrows-layer')) {
+    map.setLayoutProperty('hydraulic-flow-arrows-layer', 'visibility', payload.showArrows ? 'visible' : 'none');
+  }
+  if (map.getLayer('hydraulic-nodes-layer')) {
+    map.setLayoutProperty('hydraulic-nodes-layer', 'visibility', payload.colorNodes ? 'visible' : 'none');
+  }
+  if (map.getLayer('hydraulic-nodes-labels-layer')) {
+    map.setLayoutProperty('hydraulic-nodes-labels-layer', 'visibility', payload.showNodeLabels ? 'visible' : 'none');
+  }
+  if (map.getLayer('hydraulic-pipes-layer')) {
+    const pipeColor = payload.colorPipes
+      ? [
+          'case',
+          ['==', ['get', 'is_over_resistance'], true], '#d32f2f',
+          ['==', ['get', 'velocity_status'], 'high'], '#f57c00',
+          ['==', ['get', 'velocity_status'], 'low'], '#7b1fa2',
+          '#2e7d32',
+        ]
+      : '#1976d2';
+    map.setPaintProperty('hydraulic-pipes-layer', 'line-color', pipeColor as any);
+  }
+};
+
 // === Trace Mode for Piezometric Graph ===
 // Маршрут задаётся последовательностью узлов (waypoints), как выделение
 // направления в десктопе: путь строится через все выбранные точки по порядку.
@@ -1130,6 +1483,7 @@ const traceNodeMarkers: maplibregl.Marker[] = [];
 const toggleTraceMode = () => {
   isTraceMode.value = !isTraceMode.value;
   if (isTraceMode.value) {
+    if (isEditTopologyMode.value) toggleEditTopologyMode();
     clearTrace();
     mapStore.setIdentifyMode(false); // отключаем обычный identify-клик
     useNotificationStore().showSuccess('Режим трассировки: кликайте по узлам маршрута.');
@@ -1287,6 +1641,54 @@ const topologyStartNode = ref<number | null>(null);
 let draggedNodeMarker: maplibregl.Marker | null = null;
 let draggedNodeId: number | null = null;
 let suppressTopologyClickUntil = 0;
+// Клик по узлу — это mousedown+mouseup без сдвига: он не должен записывать moveNode
+const DRAG_THRESHOLD_PX = 4;
+let dragStartPoint: { x: number; y: number } | null = null;
+let dragMoved = false;
+
+const isMergeMode = ref(false);
+const mergeTargetNodeId = ref<number | null>(null);
+const mergeSourceNodeId = ref<number | null>(null);
+const mergeConfirmDialogOpen = ref(false);
+const mergeLoading = ref(false);
+
+const toggleMergeMode = () => {
+  isMergeMode.value = !isMergeMode.value;
+  mergeTargetNodeId.value = null;
+  mergeSourceNodeId.value = null;
+  if (isMergeMode.value) {
+    topologyStartNode.value = null;
+    useNotificationStore().showInfo('Режим слияния узлов: выберите целевой узел, затем узел для объединения.');
+  }
+};
+
+const cancelMerge = () => {
+  mergeConfirmDialogOpen.value = false;
+  mergeTargetNodeId.value = null;
+  mergeSourceNodeId.value = null;
+};
+
+const confirmMerge = async () => {
+  if (!mergeTargetNodeId.value || !mergeSourceNodeId.value) return;
+  mergeLoading.value = true;
+  try {
+    const res = await fastApiService.mergeNodes({
+      target_node_id: mergeTargetNodeId.value,
+      source_node_id: mergeSourceNodeId.value,
+    });
+    const removed = res.removed_lines?.length ? `, снят соединяющий участок: ${res.removed_lines.join(', ')}` : '';
+    useNotificationStore().showSuccess(`Узлы объединены. Перепривязано участков: ${res.merged_lines}${removed}`);
+    layerStore.refreshVisibleDataLayers();
+    mergeConfirmDialogOpen.value = false;
+    isMergeMode.value = false;
+    mergeTargetNodeId.value = null;
+    mergeSourceNodeId.value = null;
+  } catch (err: any) {
+    useNotificationStore().showError('Ошибка слияния: ' + (err?.userMessage || err?.message || ''));
+  } finally {
+    mergeLoading.value = false;
+  }
+};
 
 // Превью разрезания линии (dry-run → подтверждение → запись)
 const splitPreviewOpen = ref(false);
@@ -1368,6 +1770,10 @@ const getFeatureId = (feature: any): number | null => {
 };
 
 const toggleEditTopologyMode = () => {
+  if (!isEditTopologyMode.value && activeDrawMode.value !== 'none') {
+    useNotificationStore().showWarning('Сначала завершите рисование или измерение на панели рисования.');
+    return;
+  }
   isEditTopologyMode.value = !isEditTopologyMode.value;
   if (isEditTopologyMode.value) {
     topologyStartNode.value = null;
@@ -1381,11 +1787,16 @@ const toggleEditTopologyMode = () => {
       draggedNodeMarker = null;
     }
     draggedNodeId = null;
+    isMergeMode.value = false;
+    mergeTargetNodeId.value = null;
+    mergeSourceNodeId.value = null;
   }
 };
 
 const onMapMouseDownForTopology = (e: any) => {
-  if (!isEditTopologyMode.value) return;
+  if (!isEditTopologyMode.value || activeDrawMode.value !== 'none') return;
+  // В режиме слияния узлы только выбираются кликом
+  if (isMergeMode.value) return;
   const features = mapStore.map?.queryRenderedFeatures(e.point);
   const nodeFeature = features?.find((feature: any) => getFeatureKind(feature) === 'node');
   
@@ -1398,6 +1809,8 @@ const onMapMouseDownForTopology = (e: any) => {
     mapStore.map?.dragPan.disable();
     
     draggedNodeId = id;
+    dragStartPoint = { x: e.point.x, y: e.point.y };
+    dragMoved = false;
     const pointCoordinates = nodeFeature.geometry?.type === 'Point'
       ? nodeFeature.geometry.coordinates
       : null;
@@ -1415,11 +1828,26 @@ const onMapMouseDownForTopology = (e: any) => {
 
 const onMapMouseMoveForTopology = (e: any) => {
   if (!isEditTopologyMode.value || !draggedNodeMarker || draggedNodeId === null) return;
+  if (!dragMoved && dragStartPoint) {
+    const dx = e.point.x - dragStartPoint.x;
+    const dy = e.point.y - dragStartPoint.y;
+    if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+    dragMoved = true;
+  }
   draggedNodeMarker.setLngLat(e.lngLat);
 };
 
 const onNodeDragEnd = async () => {
   if (!draggedNodeMarker || !draggedNodeId) return;
+  if (!dragMoved) {
+    // Сдвига не было: это клик — пусть его обработает onMapClickForTopology
+    mapStore.map?.dragPan.enable();
+    draggedNodeMarker.remove();
+    draggedNodeMarker = null;
+    draggedNodeId = null;
+    dragStartPoint = null;
+    return;
+  }
   
   const lngLat = draggedNodeMarker.getLngLat();
   const id = draggedNodeId;
@@ -1438,12 +1866,14 @@ const onNodeDragEnd = async () => {
     draggedNodeMarker.remove();
     draggedNodeMarker = null;
     draggedNodeId = null;
+    dragStartPoint = null;
+    dragMoved = false;
     suppressTopologyClickUntil = Date.now() + 250;
   }
 };
 
 const onMapClickForTopology = async (e: any) => {
-  if (!isEditTopologyMode.value) return;
+  if (!isEditTopologyMode.value || activeDrawMode.value !== 'none') return;
   if (draggedNodeId !== null || Date.now() < suppressTopologyClickUntil) return;
   
   const features = mapStore.map?.queryRenderedFeatures(e.point);
@@ -1453,6 +1883,21 @@ const onMapClickForTopology = async (e: any) => {
   if (nodeFeature && nodeFeature.properties) {
     const id = getFeatureId(nodeFeature);
     if (!id) return;
+    
+    if (isMergeMode.value) {
+      if (!mergeTargetNodeId.value) {
+        mergeTargetNodeId.value = id;
+        useNotificationStore().showInfo(`Целевой узел ${id} выбран. Теперь кликните узел, который будет слит в него.`);
+      } else {
+        if (mergeTargetNodeId.value === id) {
+          useNotificationStore().showWarning('Нельзя слить узел с самим собой.');
+          return;
+        }
+        mergeSourceNodeId.value = id;
+        mergeConfirmDialogOpen.value = true;
+      }
+      return;
+    }
     
     // Line creation logic
     if (!topologyStartNode.value) {
@@ -1476,6 +1921,11 @@ const onMapClickForTopology = async (e: any) => {
         topologyStartNode.value = null;
       }
     }
+    return;
+  }
+
+  if (isMergeMode.value) {
+    useNotificationStore().showInfo('Режим слияния: кликните по узлу.');
     return;
   }
 
@@ -1834,5 +2284,17 @@ watch(
   transform: translate(-50%, -50%);
   z-index: 1;
   pointer-events: none;
+}
+
+.topology-edit-toolbar {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 24px;
+  z-index: 10;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 </style>

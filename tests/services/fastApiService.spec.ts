@@ -647,4 +647,179 @@ describe('fastApiService topology contracts', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/elevators/lookups', expect.anything())
     expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/elevators/42', expect.anything())
   })
+
+  it('calls simulateValveIsolation with correct payload', async () => {
+    fetchMock.mockResolvedValueOnce({
+      success: true,
+      summary: { valves_count: 3, consumers_count: 5 },
+      valves_to_close: [{ id: 1, lineid: 100 }],
+      affected_consumers: [{ id: 10, name: 'Дом 1' }],
+    })
+
+    const res = await fastApiService.simulateValveIsolation({ line_id: 371424 })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/api/analysis/valve-isolation',
+      expect.objectContaining({
+        method: 'POST',
+        body: { line_id: 371424 },
+      })
+    )
+    expect(res.success).toBe(true)
+    expect(res.summary.valves_count).toBe(3)
+  })
+
+  it('calls calculateOrificePlate and calculateElevatorNozzle endpoints', async () => {
+    fetchMock.mockResolvedValueOnce({ diameter_orifice_mm: 14.5, flow_g: 10.0, delta_h: 15.0 })
+    fetchMock.mockResolvedValueOnce({ mixing_ratio_u: 1.4, nozzle_diameter_mm: 8.2, elevator_number: 3 })
+
+    const resOrifice = await fastApiService.calculateOrificePlate({ flow_g: 10.0, delta_h: 15.0 })
+    const resElevator = await fastApiService.calculateElevatorNozzle({ p1: 6.0, p2: 4.0, flow_g: 5.0 })
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://api.example.test/api/calc/orifice-plate',
+      expect.objectContaining({ method: 'POST', body: { flow_g: 10.0, delta_h: 15.0 } })
+    )
+    expect(resOrifice.diameter_orifice_mm).toBe(14.5)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://api.example.test/api/calc/elevator-nozzle',
+      expect.objectContaining({ method: 'POST', body: { p1: 6.0, p2: 4.0, flow_g: 5.0 } })
+    )
+    expect(resElevator.elevator_number).toBe(3)
+  })
+
+  it('calls downloadThrottlingSheet with correct payload and returns blob', async () => {
+    const fakeBlob = new Blob(['fake-excel-data'], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    fetchMock.mockResolvedValueOnce(fakeBlob)
+
+    const res = await fastApiService.downloadThrottlingSheet({ consumer_name: 'Школа №10', p1: 6.0, p2: 4.0 })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/api/calc/throttling-sheet',
+      expect.objectContaining({
+        method: 'POST',
+        body: { consumer_name: 'Школа №10', p1: 6.0, p2: 4.0 },
+        responseType: 'blob',
+      })
+    )
+    expect(res.blob).toBe(fakeBlob)
+    expect(res.filename).toContain('.xlsx')
+  })
+
+  it('calls reverseLine, mergeNodes, and updateLineGeometry with correct payloads', async () => {
+    fetchMock.mockResolvedValueOnce({ success: true, line_id: 100, nodeid1: 20, nodeid2: 10 })
+    fetchMock.mockResolvedValueOnce({ success: true, target_node_id: 1, merged_lines: 3 })
+    fetchMock.mockResolvedValueOnce({ success: true, line_id: 100, new_length: 55.4 })
+
+    const resReverse = await fastApiService.reverseLine(100)
+    const resMerge = await fastApiService.mergeNodes({ target_node_id: 1, source_node_id: 2 })
+    const resGeom = await fastApiService.updateLineGeometry(100, [[76.9, 43.2], [76.91, 43.21]])
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://api.example.test/api/topology/reverse-line',
+      expect.objectContaining({ method: 'POST', body: { line_id: 100 } })
+    )
+    expect(resReverse.nodeid1).toBe(20)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://api.example.test/api/topology/merge-nodes',
+      expect.objectContaining({ method: 'POST', body: { target_node_id: 1, source_node_id: 2 } })
+    )
+    expect(resMerge.merged_lines).toBe(3)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'https://api.example.test/api/topology/line/100/geometry',
+      expect.objectContaining({ method: 'PUT', body: { coordinates: [[76.9, 43.2], [76.91, 43.21]] } })
+    )
+    expect(resGeom.new_length).toBe(55.4)
+  })
+
+  it('calls getLatestCalculations and getCalculationResultsGeoJson', async () => {
+    fetchMock.mockResolvedValueOnce([{ id: 1, name: 'Расчет 1' }])
+    fetchMock.mockResolvedValueOnce({
+      type: 'FeatureCollection',
+      summary: { lines_count: 5, nodes_count: 6, over_resistance_count: 1, high_velocity_count: 2 },
+      features: [],
+    })
+
+    const list = await fastApiService.getLatestCalculations(10)
+    const geo = await fastApiService.getCalculationResultsGeoJson(1)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/calculations/latest', expect.objectContaining({ query: { limit: 10 } }))
+    expect(list).toHaveLength(1)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/calculations/1/results/geojson', expect.anything())
+    expect(geo.summary?.lines_count).toBe(5)
+  })
+
+  it('calls downloadPiezometerExcel with waypoints and returns blob', async () => {
+    const fakeBlob = new Blob(['fake-piezo-excel'], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    fetchMock.mockResolvedValueOnce(fakeBlob)
+
+    const res = await fastApiService.downloadPiezometerExcel([1, 2, 3])
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/api/piezometer/excel',
+      expect.objectContaining({
+        method: 'POST',
+        body: { waypoints: [1, 2, 3] },
+        responseType: 'blob',
+      })
+    )
+    expect(res.blob).toBe(fakeBlob)
+    expect(res.filename).toContain('Piezometer_Profile_')
+  })
+})
+
+
+describe('fastApiService auth and topology errors', () => {
+  const fetchMock = vi.fn()
+  const store: Record<string, string> = {}
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    fetchMock.mockResolvedValue({ success: true, line_id: 5, nodeid1: 2, nodeid2: 1 })
+    vi.stubGlobal('$fetch', fetchMock)
+    vi.stubGlobal('useRuntimeConfig', () => ({
+      public: { mapApiBaseUrl: 'https://api.example.test/' }
+    }))
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => { store[k] = v },
+      removeItem: (k: string) => { delete store[k] },
+    })
+    store.itwin_access_token = 'jwt-123'
+  })
+
+  it('sends the bearer token with topology writes and compute POSTs', async () => {
+    await fastApiService.reverseLine(5)
+    await fastApiService.moveNode(7, 76.9, 43.2)
+    await fastApiService.buildPiezometerRoute([1, 2])
+    await fastApiService.calculateOrificePlate({ flow_g: 5, delta_h: 20 })
+
+    for (const call of fetchMock.mock.calls) {
+      expect(call[1].headers).toMatchObject({ Authorization: 'Bearer jwt-123' })
+    }
+  })
+
+  it('omits the header when there is no token', async () => {
+    delete store.itwin_access_token
+    await fastApiService.createNode(76.9, 43.2)
+    expect(fetchMock.mock.calls[0][1].headers?.Authorization).toBeUndefined()
+  })
+
+  it('turns a 409 with blockers into a readable message', async () => {
+    fetchMock.mockRejectedValue({
+      statusCode: 409,
+      data: { detail: { message: 'Узлы нельзя объединить', blockers: { connecting_lines: { 324106: { pressregulators: 1 } } } } },
+    })
+    await expect(fastApiService.mergeNodes({ target_node_id: 1, source_node_id: 2 }))
+      .rejects.toThrow('Узлы нельзя объединить: соединяющие участки с оборудованием — 324106: pressregulators ×1')
+  })
 })

@@ -328,7 +328,7 @@
                     :loading="recalculating"
                     @click="recalculateGraph"
                   >
-                    Расчёт TG
+                    Расчёт OTOP
                   </v-btn>
                   <v-btn
                     v-if="mutationsEnabled && details"
@@ -553,7 +553,9 @@ const recalculateGraph = async () => {
   recalculating.value = true
   try {
     const result = await fastApiService.recalculateTemperatureGraph(details.value.id)
-    useNotificationStore().showSuccess(`TG пересчитан: ${result.points} точек`)
+    useNotificationStore().showSuccess(
+      `TG OTOP: ${result.points} точек${result.mode ? ` (${result.mode})` : ''}`,
+    )
     await openDetails(details.value.id)
   } catch (err: any) {
     useNotificationStore().showError(err?.message || 'Не удалось пересчитать TG')

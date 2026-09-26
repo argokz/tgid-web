@@ -97,7 +97,7 @@
             <v-btn
 
 
-              v-if="propsData.id && (propsData.gistable === 'linesobj' || propsData.gistable === 'nodes')"
+              v-if="propsData.id && (isLineObject || propsData.gistable === 'nodes')"
 
 
               icon
@@ -124,6 +124,33 @@
               <v-tooltip activator="parent" location="bottom">Скачать паспорт (Excel)</v-tooltip>
 
 
+            </v-btn>
+
+
+            <v-btn
+              v-if="propsData.id && isLineObject"
+              icon
+              variant="text"
+              size="small"
+              color="error"
+              @click="emit('open-outage-simulation', { lineId: Number(propsData.id) })"
+            >
+              <v-icon size="18">mdi-valve-closed</v-icon>
+              <v-tooltip activator="parent" location="bottom">Анализ отключения: какие задвижки закрыть</v-tooltip>
+            </v-btn>
+
+            <!-- Разворот меняет топологию: только в режиме редактирования сети -->
+            <v-btn
+              v-if="propsData.id && isLineObject && isEditTopologyMode"
+              icon
+              variant="text"
+              size="small"
+              color="primary"
+              :loading="reversingLine"
+              @click="reverseLineDirection"
+            >
+              <v-icon size="18">mdi-swap-horizontal</v-icon>
+              <v-tooltip activator="parent" location="bottom">Развернуть направление линии</v-tooltip>
             </v-btn>
 
 
@@ -1454,6 +1481,9 @@ const emit = defineEmits<{
   'open-repair-journal': [scope: { lineId?: number; nodeId?: number; repairId?: number }]
 
 
+  'open-outage-simulation': [scope: { lineId?: number; nodeId?: number }]
+
+
   'open-pressure-test-journal': [scope: { lineId?: number; nodeId?: number; testId?: number }]
 
 
@@ -1491,6 +1521,9 @@ const emit = defineEmits<{
 
 
   'open-network-diaphragms': [scope: { diaphragmId?: number; lineId?: number }]
+
+
+  'refresh-layers': []
 
 
 }>()
@@ -1554,6 +1587,15 @@ const objectNamesData = ref<Record<string, string> | null>(null)
 
 
 const isEditTopologyMode = computed(() => componentProps.isEditTopologyMode)
+
+
+// Слои GeoServer не несут gistable: участок узнаём по полям записи linesobj
+const isLineObject = computed(() => {
+  const p = propsData.value
+  const table = String(p.gistable || '').toLowerCase()
+  if (table) return table === 'linesobj'
+  return 'externalsignlineid' in p || ('nodeid1' in p && 'nodeid2' in p)
+})
 
 
 const canOpenDefectJournal = computed(() => {
@@ -2498,6 +2540,29 @@ const downloadPassport = async () => {
   }
 
 
+}
+
+
+const reversingLine = ref(false)
+
+
+const reverseLineDirection = async () => {
+  const lineId = Number(propsData.value.id)
+  if (!Number.isFinite(lineId)) return
+  if (!confirm(`Развернуть направление участка ${lineId}? Начальный и конечный узлы поменяются местами.`)) return
+  reversingLine.value = true
+  try {
+    const res = await fastApiService.reverseLine(lineId)
+    propsData.value = { ...propsData.value, nodeid1: res.nodeid1, nodeid2: res.nodeid2 }
+    notificationMessage.value = `Направление участка ${lineId} изменено (узлы ${res.nodeid1} → ${res.nodeid2})`
+    showNotification.value = true
+    emit('refresh-layers')
+  } catch (error: any) {
+    notificationMessage.value = error?.userMessage || error?.message || 'Не удалось развернуть участок'
+    showNotification.value = true
+  } finally {
+    reversingLine.value = false
+  }
 }
 
 

@@ -1,3 +1,23 @@
+# Статус реализации плана миграции (2026-09-26)
+
+## Новые функции 2026-09-25/26 (оценка, не паритет)
+
+Добавлены 24–25.09, исправлены и проверены на копии БД (`almatygid_copy`) 25–26.09.
+
+- **Локализация аварии** (`POST /api/analysis/valve-isolation`, `OutageSimulationDialog`): аналога в gid8 нет.
+  Граница зоны — задвижки на участках и во внутренних схемах камер/ТРП; отключённые трубы
+  и потребители учитываются. Потребители ниже по течению за закрытыми задвижками — не считаются.
+  Открывается из карточки участка (кнопка задвижки). Линии ГИС без nodeid (≈40 тыс.) не рассчитываются.
+- **Калькулятор шайб и элеваторов** (`/api/calc/*`, `ThrottlingCalculatorDialog`): формулы сверены
+  с `gid8/python/dross/dross.py` и `sety/dross/drsh2.py` тестами (горловина, номер элеватора,
+  расход ГВС, все 7 диафрагм бланка).
+- **Гидравлический режим на карте** (`HydraulicThematicDialog`): результаты читаются по смыслу колонок
+  `ut_out` (a13 расход, a10 скорость, a14 удельные потери); стрелки потока — иконкой.
+- **CAD-операции**: слияние узлов и разворот участка с проверкой зависимостей (409 с блокерами);
+  правка вершин — только API, без UI. Стадия B (undo, блокировки, golden-приёмка) не закрыта.
+- **Экспорт пьезометрии в Excel**, GeoJSON/«Zulu»-экспорт (второе — GeoJSON с атрибутами, UI нет).
+- **Проверки**: pytest 85, vitest 61, typecheck без ошибок. Численная сверка расчётов с десктопом — этап 5.
+
 # Статус реализации плана миграции (2026-07-24)
 
 ## Backlog переноса gid6/gid8/potr5 → web (2026-07-24)
@@ -7,7 +27,7 @@
 - **P1:** passport `belong*Site` fallback + SQL backfill; расширен `p1_smoke.py`.
 - **P2 ТУ:** dedicated CRUD `/api/technical-conditions`, field allow-list, Excel `tu` + `tu-balance` (gid6).
 - **P2 ops:** field allow-list на defect/shurf/osmotr/remont2/opres + Word acts с русскими полями.
-- **P3:** `POST /api/heat-losses/run` (+ poll в UI), TG stationary UI + recalculate, armature `dampers`/`regularmatures`.
+- **P3:** `POST /api/heat-losses/run` (+ poll в UI), TG stationary + **OTOP recalculate**, armature `dampers`/`regularmatures`.
 - **P4:** DXF export, ochered RO, `NUXT_PUBLIC_NETWORK_TILESET_URL`.
 - **Auth:** `STRICT_AUTH` запрещает `DEV_LOGIN`; публичный `/api/v1/auth/config` для LoginDialog.
 - **Анализ:** RO Zap1/2/3/7 (`/api/network-queries/*` + NetworkQueriesDialog); DXF/SHP по выбранному фрагменту.

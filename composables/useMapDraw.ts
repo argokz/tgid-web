@@ -11,6 +11,9 @@ import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
 
 export type DrawMode = 'none' | 'point' | 'line' | 'polygon' | 'measure-distance' | 'measure-area';
 
+/** Текущий режим панели рисования — чтобы редактор сети не принимал её клики за свои */
+export const activeDrawMode = ref<DrawMode>('none');
+
 export interface DrawFeature {
   id: string;
   type: 'point' | 'line' | 'polygon';
@@ -85,7 +88,29 @@ export function useMapDraw() {
   const features = ref<DrawFeature[]>([]);
   const draftPoints = ref<number[][]>([]);
   const mapRef = shallowRef<MapLibreMap | null>(null);
+  const snapEnabled = ref<boolean>(true);
+  const snapRadiusPx = ref<number>(15);
   let hoverPoint: number[] | null = null;
+
+  const findSnapPoint = (screenPoint: { x: number; y: number }): number[] | null => {
+    const map = mapRef.value;
+    if (!map || !snapEnabled.value) return null;
+    const r = snapRadiusPx.value;
+    try {
+      const rendered = map.queryRenderedFeatures([
+        [screenPoint.x - r, screenPoint.y - r],
+        [screenPoint.x + r, screenPoint.y + r],
+      ]);
+      for (const f of rendered) {
+        if (f.geometry?.type === 'Point' && Array.isArray(f.geometry.coordinates)) {
+          return f.geometry.coordinates as number[];
+        }
+      }
+    } catch {
+      // MapLibre may throw if query outside viewport
+    }
+    return null;
+  };
 
   const isDrawing = computed(() => mode.value !== 'none');
   const isMeasuring = computed(
@@ -232,7 +257,8 @@ export function useMapDraw() {
 
   const onMapClick = (e: MapMouseEvent) => {
     if (mode.value === 'none') return;
-    const point = [e.lngLat.lng, e.lngLat.lat];
+    const snapped = findSnapPoint(e.point);
+    const point = snapped || [e.lngLat.lng, e.lngLat.lat];
 
     if (mode.value === 'point') {
       features.value = [
@@ -249,7 +275,8 @@ export function useMapDraw() {
 
   const onMapMove = (e: MapMouseEvent) => {
     if (mode.value === 'none' || mode.value === 'point' || draftPoints.value.length === 0) return;
-    hoverPoint = [e.lngLat.lng, e.lngLat.lat];
+    const snapped = findSnapPoint(e.point);
+    hoverPoint = snapped || [e.lngLat.lng, e.lngLat.lat];
     refresh();
   };
 
@@ -302,6 +329,7 @@ export function useMapDraw() {
     draftPoints.value = [];
     hoverPoint = null;
     mode.value = next;
+    activeDrawMode.value = next;
     const map = mapRef.value;
     if (map) map.getCanvas().style.cursor = next === 'none' ? '' : 'crosshair';
     refresh();
@@ -325,6 +353,7 @@ export function useMapDraw() {
   };
 
   const detach = () => {
+    activeDrawMode.value = 'none';
     const map = mapRef.value;
     if (!map) return;
     map.off('click', onMapClick);
@@ -358,5 +387,7 @@ export function useMapDraw() {
     attach,
     detach,
     exportGeoJson,
+    snapEnabled,
+    snapRadiusPx,
   };
 }

@@ -34,6 +34,15 @@
           {{ lookups.source_counts.ready || 0 }}/{{ lookups.source_counts.total || 0 }} источников готовы
         </v-chip>
         <v-btn
+          class="mr-1"
+          variant="text"
+          prepend-icon="mdi-microsoft-excel"
+          :loading="exportingSeasons"
+          @click="downloadSeasonsExcel"
+        >
+          Excel сезонов
+        </v-btn>
+        <v-btn
           icon="mdi-close"
           aria-label="Закрыть"
           @click="visible = false"
@@ -445,6 +454,27 @@ const detailsVisible = ref(false)
 const loading = ref(false)
 const detailLoading = ref(false)
 const runningHeatLoss = ref(false)
+const exportingSeasons = ref(false)
+
+const downloadSeasonsExcel = async () => {
+  exportingSeasons.value = true
+  try {
+    const { blob, filename } = await fastApiService.downloadExcelReport('heat-loss-seasons')
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename || 'heat_loss_seasons.xlsx'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    useNotificationStore().showSuccess('Ведомость сезонов теплопотерь')
+  } catch (err: any) {
+    useNotificationStore().showError(err?.message || 'Не удалось выгрузить Excel')
+  } finally {
+    exportingSeasons.value = false
+  }
+}
 const activeTab = ref<'seasons' | 'sources'>('seasons')
 const lookups = ref<HeatLossLookups>({ fragments: [], cities: [], source_counts: {}, season_counts: {}, result_availability: { calculation_count: 0, heat_loss_row_count: 0 } })
 const seasons = ref<HeatLossSeasonSummary[]>([])

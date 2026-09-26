@@ -144,8 +144,12 @@ def main() -> int:
             if isinstance(item, dict) and item.get("code"):
                 codes.add(str(item["code"]))
     has_balance = "tu-balance" in codes or "tu_balance" in codes
+    has_hl = "heat-loss-seasons" in codes
     print(f"[{'OK' if has_balance else 'FAIL'}] excel-types contains tu-balance: {sorted(codes)}")
     if not has_balance:
+        failed += 1
+    print(f"[{'OK' if has_hl else 'FAIL'}] excel-types contains heat-loss-seasons")
+    if not has_hl:
         failed += 1
 
     # Word route present (empty journals → 404 record; unknown journal → 404)

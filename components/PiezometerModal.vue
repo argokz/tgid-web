@@ -15,6 +15,18 @@
           @click="exportCsv"
         >
           <v-icon>mdi-download</v-icon>
+          <v-tooltip activator="parent" location="bottom">Выгрузить CSV</v-tooltip>
+        </v-btn>
+        <v-btn
+          v-if="!loading && !error && pathData.length"
+          icon
+          size="small"
+          aria-label="Выгрузить в Excel (p_excel)"
+          :loading="exportingExcel"
+          @click="exportExcel"
+        >
+          <v-icon>mdi-file-excel</v-icon>
+          <v-tooltip activator="parent" location="bottom">Скачать официальный профиль (Excel)</v-tooltip>
         </v-btn>
         <v-btn icon size="small" aria-label="Закрыть" @click="$emit('update:modelValue', false)">
           <v-icon>mdi-close</v-icon>
@@ -100,7 +112,9 @@
 </template>
 
 <script setup lang="ts">
+import { useNotificationStore } from '~/stores/notificationStore';
 import { computed, ref } from 'vue';
+import { fastApiService } from '~/services/fastApiService';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart } from 'echarts/charts';
@@ -130,6 +144,8 @@ const props = defineProps<{
   error: string | null;
   hasCalculation?: boolean;
   totalLength?: number;
+  /** Точки, выбранные пользователем: сервер строит по ним тот же маршрут */
+  waypoints?: number[];
 }>();
 
 const emit = defineEmits<{
@@ -281,6 +297,32 @@ const exportCsv = () => {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+};
+
+const exportingExcel = ref(false);
+
+const exportExcel = async () => {
+  if (!props.pathData.length) return;
+  exportingExcel.value = true;
+  try {
+    // Все узлы пути как точки маршрута упираются в лимит сервера (200) на длинных трассах
+    const waypoints = props.waypoints && props.waypoints.length >= 2
+      ? props.waypoints
+      : props.pathData.map((d: any) => d.node_id);
+    const { blob, filename } = await fastApiService.downloadPiezometerExcel(waypoints);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || `piezometer-${Date.now()}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (err: any) {
+    useNotificationStore().showError(`Экспорт Excel: ${err?.message || 'ошибка сервера'}`);
+  } finally {
+    exportingExcel.value = false;
+  }
 };
 </script>
 

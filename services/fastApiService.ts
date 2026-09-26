@@ -276,6 +276,160 @@ export interface SplitPreview {
   transferred: SplitTransferReport;
 }
 
+export interface OutageSimulationSummary {
+  isolated_lines_count: number;
+  isolated_nodes_count: number;
+  valves_count: number;
+  valves_already_closed_count?: number;
+  boundary_nodes_count?: number;
+  consumers_count: number;
+  total_heating_load_gcal_h: number;
+  total_gvs_load_gcal_h: number;
+  total_vent_load_gcal_h: number;
+  total_load_gcal_h: number;
+  total_pipe_length_m: number;
+  total_pipe_volume_m3: number;
+}
+
+export interface ValveToClose {
+  id: number;
+  lineid: number;
+  display_name: string;
+  nominal_diameter: number;
+  state_id: number;
+  state_name: string;
+  lng: number | null;
+  lat: number | null;
+}
+
+export interface AffectedConsumer {
+  id: number;
+  consumer_type: 'generalized' | 'real';
+  node_id: number;
+  name: string;
+  heating_load: number;
+  ventilation_load: number;
+  hot_water_load: number;
+  total_load: number;
+  longitude: number | null;
+  latitude: number | null;
+}
+
+export interface OutageSimulationResponse {
+  success: boolean;
+  target: { line_id?: number | null; node_id?: number | null };
+  summary: OutageSimulationSummary;
+  valves_to_close: ValveToClose[];
+  /** Уже закрытые задвижки на границе зоны — закрывать не нужно */
+  valves_already_closed: ValveToClose[];
+  /** Камеры/ТРП с задвижками во внутренней схеме, на которых остановлена зона */
+  boundary_nodes: number[];
+  affected_consumers: AffectedConsumer[];
+  geojson: {
+    isolated_pipes: any;
+    valves_to_close: any;
+    affected_consumers: any;
+  };
+}
+
+/** Схемы установки шайбы бланка dross.py (поправка к располагаемому напору) */
+export type OrificeScheme =
+  | 'bezelevator' // безэлеваторный ввод, Нрас − 5
+  | 'pump_mix' // перед насосами смешения, Нрас − 2
+  | 'pre_nozzle' // перед соплом элеватора, Нрас
+  | 'nozzle' // сопло элеватора (коэффициент 9.6), Нрас
+  | 'ventilation' // на вентиляцию, Нрас − 5
+  | 'heater' // перед водоводяным подогревателем, Нрас − 5
+  | 'gvs_circulation'; // на циркуляционную линию ГВС, Нрас − 5
+
+/** Расход — flow_g или нагрузка q_heating_*; напор — delta_h или p1/p2 */
+export interface OrificePlateParams {
+  flow_g?: number; // т/ч
+  delta_h?: number; // располагаемый напор, м
+  p1?: number; // атм
+  p2?: number; // атм
+  q_heating_gcal?: number; // Гкал/ч
+  q_heating_kcal?: number; // ккал/ч
+  t_supply?: number; // °С
+  t_return?: number; // °С
+  scheme?: OrificeScheme;
+}
+
+export interface OrificePlateResult {
+  /** null — гасимого напора нет, шайба не рассчитывается (см. warning) */
+  diameter_orifice_mm: number | null;
+  recommended_standard_diameter: number | null;
+  flow_g: number;
+  available_head_m: number;
+  head_loss_dissipated: number;
+  scheme: OrificeScheme;
+  warning: string | null;
+}
+
+export interface ElevatorNozzleParams {
+  q_heating_gcal?: number; // Гкал/ч
+  flow_g?: number; // т/ч
+  p1: number; // атм
+  p2: number; // атм
+  t1?: number; // °C
+  t2?: number; // °C
+  t3?: number; // °C
+  delta_h_system?: number; // м.в.ст
+}
+
+export interface ElevatorNozzleResult {
+  mixing_ratio_u: number;
+  nozzle_diameter_mm: number;
+  mixing_chamber_diameter_mm: number;
+  elevator_number: number;
+  available_head_m: number;
+  dissipated_head_m: number;
+  /** ≈ 1.4·hс·(1+u)² — ниже него элеватор не обеспечит смешение */
+  required_head_m: number;
+  flow_g: number;
+  t1: number;
+  t2: number;
+  t3: number;
+  warnings: string[];
+}
+
+export interface ThrottlingSheetParams {
+  district?: string;
+  site_name?: string;
+  consumer_name?: string;
+  address?: string;
+  p1: number; // атм
+  p2: number; // атм
+  q_heating_gcal?: number;
+  q_vent_gcal?: number;
+  q_gvs_gcal?: number; // максимальная нагрузка ГВС
+  t1?: number;
+  t2?: number;
+  t3?: number;
+  signers?: { position?: string; name?: string }[];
+  organization?: string;
+}
+
+export interface CalculationSummaryItem {
+  id: number;
+  name: string;
+  calculated_at: string;
+  fileid: number | null;
+}
+
+export interface CalculationGeoJsonResponse {
+  type: 'FeatureCollection';
+  summary?: {
+    calculation_id: number;
+    lines_count: number;
+    nodes_count: number;
+    high_velocity_count: number;
+    over_resistance_count: number;
+  };
+  features: any[];
+}
+
+
 const translationCache: TranslationCache = {};
 const pendingTranslationRequests = new Map<string, Promise<ColumnTranslation>>();
 const DEFAULT_MAP_API_BASE_URL = 'http://localhost:8000';
@@ -332,11 +486,39 @@ const isRetriableStatus = (status: number) =>
 const extractStatus = (error: any): number =>
   Number(error?.statusCode ?? error?.status ?? error?.response?.status ?? 0) || 0;
 
+const BLOCKER_LABELS: Record<string, string> = {
+  references: 'ссылки на узел',
+  incident_lines: 'инцидентные участки',
+  internal_scheme_lines: 'линии внутренней схемы узла',
+  connecting_lines: 'соединяющие участки с оборудованием',
+  equipment: 'оборудование, зависящее от направления',
+};
+
+const formatBlockerValue = (value: any): string => {
+  if (Array.isArray(value)) return value.join(', ');
+  if (value && typeof value === 'object') {
+    return Object.entries(value)
+      .map(([k, v]) => (v && typeof v === 'object' ? `${k}: ${formatBlockerValue(v)}` : `${k} ×${v}`))
+      .join('; ');
+  }
+  return String(value);
+};
+
+/** 409 топологии: {message, blockers} → «сообщение: ссылки на узел — pressregulators.nodeid ×1» */
+export const formatTopologyBlockers = (detail: { message?: string; blockers?: Record<string, any> }): string => {
+  const parts = Object.entries(detail.blockers || {}).map(
+    ([key, value]) => `${BLOCKER_LABELS[key] || key} — ${formatBlockerValue(value)}`
+  );
+  return [detail.message, parts.join('; ')].filter(Boolean).join(': ');
+};
+
 const extractDetail = (error: any): string => {
   const data = error?.data ?? error?.response?._data;
   if (typeof data === 'string') return data;
   if (data?.detail) {
-    return typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+    if (typeof data.detail === 'string') return data.detail;
+    if (data.detail.blockers) return formatTopologyBlockers(data.detail);
+    return JSON.stringify(data.detail);
   }
   return error?.message || 'неизвестная ошибка';
 };
@@ -389,6 +571,14 @@ export const refreshApiHealth = async () => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const ACCESS_TOKEN_KEY = 'itwin_access_token';
+
+const authHeaders = (): Record<string, string> => {
+  if (typeof localStorage === 'undefined') return {};
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 /**
  * Единая точка сетевых вызовов: таймаут, ретраи с экспоненциальной паузой
  * только для сетевых сбоев и 5xx, нормализация ошибки.
@@ -400,6 +590,10 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
   const isMutation = method !== 'GET' && method !== 'HEAD';
   const maxAttempts = isMutation ? 1 : MAX_RETRIES + 1;
 
+  // JWT уходит со всеми вызовами API: при AUTH_REQUIRED_GET сервер закрывает
+  // и POST-расчёты (пьезометр, калькуляторы, локализация), не только чтение
+  const headers = { ...authHeaders(), ...(options?.headers || {}) };
+
   let lastError: any = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -407,6 +601,7 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
       const result = await $fetch<T>(url, {
         timeout: DEFAULT_TIMEOUT_MS,
         ...(options || {}),
+        headers,
       });
       apiHealth.reachable = true;
       apiHealth.lastError = '';
@@ -453,12 +648,8 @@ const fetchWithRetry = <T>(url: string, options: any = {}): Promise<T> =>
 const encodePath = (value: string | number): string => encodeURIComponent(String(value));
 
 const mutationOptions = (method: string, body?: any): Record<string, any> => {
-  const options: Record<string, any> = { method };
+  const options: Record<string, any> = { method, headers: authHeaders() };
   if (body !== undefined) options.body = body;
-  if (typeof localStorage !== 'undefined') {
-    const token = localStorage.getItem('itwin_access_token');
-    if (token) options.headers = { Authorization: `Bearer ${token}` };
-  }
   return options;
 };
 
@@ -795,7 +986,7 @@ export const fastApiService = {
   },
   async recalculateTemperatureGraph(
     sourceId: number
-  ): Promise<{ success: boolean; points: number }> {
+  ): Promise<{ success: boolean; points: number; mode?: string }> {
     return request(
       `api/temperature-graphs/sources/${encodePath(sourceId)}/recalculate`,
       mutationOptions('POST', {})
@@ -1079,12 +1270,16 @@ export const fastApiService = {
     return request('api/defects/geojson');
   },
 
-  async getLatestCalculations(limit = 20): Promise<any> {
-    return request('api/calculations/latest', { query: { limit } });
+  async getLatestCalculations(limit = 20): Promise<CalculationSummaryItem[]> {
+    return request<CalculationSummaryItem[]>('api/calculations/latest', { query: { limit } });
   },
 
-  async getCalculationResultsGeoJSON(calculationId: number): Promise<any> {
-    return request(`api/calculations/${encodePath(calculationId)}/results/geojson`);
+  async getCalculationResultsGeoJSON(calculationId: number): Promise<CalculationGeoJsonResponse> {
+    return request<CalculationGeoJsonResponse>(`api/calculations/${encodePath(calculationId)}/results/geojson`);
+  },
+
+  async getCalculationResultsGeoJson(calculationId: number): Promise<CalculationGeoJsonResponse> {
+    return this.getCalculationResultsGeoJSON(calculationId);
   },
 
   async getCorrosionIndicatorsGeoJSON(): Promise<any> {
@@ -1235,5 +1430,75 @@ export const fastApiService = {
     if (value === null || value === undefined) return '-';
     if (typeof value === 'boolean') return value ? 'Да' : 'Нет';
     return String(value);
+  },
+
+  async simulateValveIsolation(params: {
+    line_id?: number | null;
+    node_id?: number | null;
+  }): Promise<OutageSimulationResponse> {
+    return request<OutageSimulationResponse>('api/analysis/valve-isolation', {
+      method: 'POST',
+      body: params,
+    });
+  },
+
+  async calculateOrificePlate(params: OrificePlateParams): Promise<OrificePlateResult> {
+    return request<OrificePlateResult>('api/calc/orifice-plate', {
+      method: 'POST',
+      body: params,
+    });
+  },
+
+  async calculateElevatorNozzle(params: ElevatorNozzleParams): Promise<ElevatorNozzleResult> {
+    return request<ElevatorNozzleResult>('api/calc/elevator-nozzle', {
+      method: 'POST',
+      body: params,
+    });
+  },
+
+  async downloadThrottlingSheet(params: ThrottlingSheetParams): Promise<{ blob: Blob; filename: string }> {
+    const blob = await request<Blob>('api/calc/throttling-sheet', {
+      method: 'POST',
+      body: params,
+      responseType: 'blob',
+    });
+    return { blob, filename: `Расчет_дросселирования_${Date.now()}.xlsx` };
+  },
+
+  async reverseLine(lineId: number): Promise<{ success: boolean; line_id: number; nodeid1: number; nodeid2: number }> {
+    return request('api/topology/reverse-line', {
+      method: 'POST',
+      body: { line_id: lineId },
+    });
+  },
+
+  /** 409 — слияние заблокировано зависимостями (detail.blockers) */
+  async mergeNodes(params: { target_node_id: number; source_node_id: number }): Promise<{
+    success: boolean;
+    target_node_id: number;
+    source_node_id: number;
+    merged_lines: number;
+    removed_lines: number[];
+  }> {
+    return request('api/topology/merge-nodes', {
+      method: 'POST',
+      body: params,
+    });
+  },
+
+  async updateLineGeometry(lineId: number, coordinates: number[][]): Promise<{ success: boolean; line_id: number; new_length: number }> {
+    return request(`api/topology/line/${encodePath(lineId)}/geometry`, {
+      method: 'PUT',
+      body: { coordinates },
+    });
+  },
+
+  async downloadPiezometerExcel(waypoints: number[]): Promise<{ blob: Blob; filename: string }> {
+    const blob = await request<Blob>('api/piezometer/excel', {
+      method: 'POST',
+      body: { waypoints },
+      responseType: 'blob',
+    });
+    return { blob, filename: `Piezometer_Profile_${Date.now()}.xlsx` };
   },
 };
