@@ -212,6 +212,36 @@ export type ElevatorSummary = JournalSummary;
 export type ElevatorDetails = JournalDetails;
 export type ElevatorLookups = JournalLookups;
 
+export type RegimeAnalysisKind =
+  | 'negative-dp'
+  | 'airlock'
+  | 'low-temperature'
+  | 'closed-sections'
+  | 'hydrostatic-zones';
+
+export interface RegimeAnalysisResult {
+  query: string;
+  title: string;
+  fragment_id: number;
+  calculation_id?: number | null;
+  calculation_date?: string | null;
+  tn?: number | null;
+  count: number;
+  items: Array<Record<string, any> & { longitude?: number | null; latitude?: number | null }>;
+  note?: string;
+  /** Анализ режима: порядок колонок и колонка с оценкой режима */
+  columns?: string[];
+  mode_column?: string | null;
+  summary?: Record<string, number>;
+  object?: 'node' | 'line';
+  /** Гидростатические зоны */
+  full_static_head_m?: number;
+  piezometric_static_head_m?: number;
+  min_geo_mark_m?: number;
+  min_geo_node?: { node_id: number; code?: string; name?: string };
+  max_level_node?: { node_id: number; code?: string; name?: string; level_m: number };
+}
+
 export interface PassportSite {
   id: string;
   name: string;
@@ -1348,9 +1378,42 @@ export const fastApiService = {
       query: fragmentIds?.length ? { fragments: fragmentIds.join(',') } : {},
     });
   },
-  async getNetworkQueryHeatConsumption(fragmentIds?: number[]): Promise<any> {
+  /** Zap3; system: closed — Zap4 (закрытые системы), open — Zap5 (открытые). */
+  async getNetworkQueryHeatConsumption(fragmentIds?: number[], system?: 'closed' | 'open'): Promise<any> {
     return request('api/network-queries/heat-consumption', {
+      query: {
+        ...(fragmentIds?.length ? { fragments: fragmentIds.join(',') } : {}),
+        ...(system ? { system } : {}),
+      },
+    });
+  },
+  /** Zap7_1: длина по диаметрам и способам прокладки. */
+  async getNetworkQueryLengthByDiameterLaying(fragmentIds?: number[]): Promise<any> {
+    return request('api/network-queries/length-by-diameter-laying', {
       query: fragmentIds?.length ? { fragments: fragmentIds.join(',') } : {},
+    });
+  },
+
+  /** Анализ режима по последнему расчёту фрагмента (десктоп «Анализ»). */
+  async getRegimeAnalysis(
+    kind: RegimeAnalysisKind,
+    fragmentId: number,
+    options: { calculationId?: number; includeUncalculated?: boolean } = {},
+  ): Promise<RegimeAnalysisResult> {
+    return request<RegimeAnalysisResult>(`api/analysis/regime/${kind}`, {
+      query: {
+        fragment_id: fragmentId,
+        ...(options.calculationId ? { calculation_id: options.calculationId } : {}),
+        ...(options.includeUncalculated ? { include_uncalculated: true } : {}),
+      },
+    });
+  },
+  async getAdmissibilityCatalog(): Promise<{ id: number; title: string; object: 'node' | 'line' }[]> {
+    return request('api/analysis/admissibility');
+  },
+  async getAdmissibility(queryId: number, fragmentId: number): Promise<RegimeAnalysisResult> {
+    return request<RegimeAnalysisResult>(`api/analysis/admissibility/${queryId}`, {
+      query: { fragment_id: fragmentId },
     });
   },
 

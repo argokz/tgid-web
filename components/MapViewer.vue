@@ -280,6 +280,13 @@
         ref="networkQueriesRef"
       />
 
+      <!-- Desktop TGID «Анализ»: режим, допустимость, гидростатические зоны -->
+      <LazyRegimeAnalysisDialog
+        v-if="mountedDialogs.regimeAnalysis"
+        ref="regimeAnalysisRef"
+        @locate="handleLocateFault"
+      />
+
       <!-- Outage simulation dialog (локализация аварий и задвижек) -->
       <LazyOutageSimulationDialog
         v-if="mountedDialogs.outageSimulation"
@@ -747,6 +754,7 @@ const elevatorJournalRef = ref<{
   openDialog: (scope?: { elevatorId?: number; lineId?: number; nodeId?: number }) => void
 } | null>(null);
 const networkQueriesRef = ref<{ openDialog: () => void } | null>(null);
+const regimeAnalysisRef = ref<{ openDialog: () => void } | null>(null);
 const outageSimulationRef = ref<{ openDialog: (scope?: { lineId?: number; nodeId?: number }) => void } | null>(null);
 const throttlingCalculatorRef = ref<{ openDialog: (scope?: any) => void } | null>(null);
 const hydraulicThematicRef = ref<{ openDialog: (scope?: any) => void } | null>(null);
@@ -782,6 +790,7 @@ type LazyDialogKey =
   | 'networkDiaphragm'
   | 'elevator'
   | 'networkQueries'
+  | 'regimeAnalysis'
   | 'outageSimulation'
   | 'throttlingCalculator'
   | 'hydraulicThematic';
@@ -816,6 +825,7 @@ const lazyDialogRefs: Record<LazyDialogKey, Ref<LazyDialogInstance | null>> = {
   networkDiaphragm: networkDiaphragmJournalRef,
   elevator: elevatorJournalRef,
   networkQueries: networkQueriesRef,
+  regimeAnalysis: regimeAnalysisRef,
   outageSimulation: outageSimulationRef,
   throttlingCalculator: throttlingCalculatorRef,
   hydraulicThematic: hydraulicThematicRef,
@@ -850,6 +860,7 @@ const TOOL_EVENT_TO_DIALOG: Record<ToolEvent, LazyDialogKey> = {
   'open-network-diaphragms': 'networkDiaphragm',
   'open-elevators': 'elevator',
   'open-network-queries': 'networkQueries',
+  'open-regime-analysis': 'regimeAnalysis',
 };
 
 const onOpenTool = (event: ToolEvent) => {

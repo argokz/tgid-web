@@ -24,6 +24,7 @@ export type ToolEvent =
   | 'open-temperature-graph-journal'
   | 'open-consumer-load-diagnostics'
   | 'open-network-queries'
+  | 'open-regime-analysis'
   | 'open-pump-equipment'
   | 'open-network-armatures'
   | 'open-network-regulators'
@@ -90,6 +91,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
       { label: 'Поиск неисправностей', hint: 'Дефекты и коррозия на карте', icon: 'mdi-alert-octagon', color: 'error', event: 'open-fault-diagnostics' },
       { label: 'Тепловые нагрузки', hint: 'Нулевые, закрытые, отключённые', icon: 'mdi-home-lightning-bolt-outline', color: 'teal-darken-3', event: 'open-consumer-load-diagnostics' },
       { label: 'Запросы по сети', hint: 'Объём, длина, диаметры, теплопотребление (Zap)', icon: 'mdi-sigma', color: 'blue-grey-darken-2', event: 'open-network-queries' },
+      { label: 'Анализ режима', hint: 'Перепады, завоздушивание, температуры, допустимость, зоны', icon: 'mdi-gauge', color: 'indigo-darken-3', event: 'open-regime-analysis' },
       { label: 'Тепловые потери', hint: 'Сезоны и готовность источников', icon: 'mdi-heat-wave', color: 'deep-orange-darken-3', event: 'open-heat-loss-journal' },
       { label: 'Температурные графики', hint: 'Кривые t1/t2/t3 источников', icon: 'mdi-chart-bell-curve-cumulative', color: 'purple-darken-3', event: 'open-temperature-graph-journal' },
     ],

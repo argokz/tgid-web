@@ -9,7 +9,7 @@
       </v-card-title>
       <v-card-text>
         <p class="text-body-2 text-medium-emphasis mb-3">
-          Аналог desktop Zap1 / Zap2 / Zap3 / Zap7. По умолчанию — видимые фрагменты карты.
+          Аналог desktop «Запросы» (Zap1–Zap7). По умолчанию — видимые фрагменты карты.
         </p>
         <v-chip
           v-if="scopeLabel"
@@ -58,10 +58,34 @@
           <v-btn
             color="primary"
             variant="tonal"
+            :loading="loading === 'laying'"
+            @click="run('laying')"
+          >
+            Диаметры и прокладка (Zap7_1)
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="tonal"
             :loading="loading === 'heat'"
             @click="run('heat')"
           >
             Теплопотребление (Zap3)
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="tonal"
+            :loading="loading === 'heat-closed'"
+            @click="run('heat-closed')"
+          >
+            Закрытые системы (Zap4)
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="tonal"
+            :loading="loading === 'heat-open'"
+            @click="run('heat-open')"
+          >
+            Открытые системы (Zap5)
           </v-btn>
         </div>
 
@@ -93,13 +117,40 @@
               </tbody>
             </table>
           </div>
-          <div v-else-if="result.query === 'heat_consumption'">
-            <p class="text-caption text-medium-emphasis mb-2">{{ result.note }}</p>
+          <div v-else-if="result.query === 'length_by_diameter_and_laying'">
+            <div class="mb-2">Итого: <strong>{{ formatNum(result.total_length_m) }}</strong> м</div>
+            <div class="nq-scroll">
+              <table class="nq-table">
+                <thead>
+                  <tr>
+                    <th>Øусл</th>
+                    <th v-for="col in result.columns || []" :key="col.key">{{ col.title }}</th>
+                    <th>Всего, м</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in result.items || []" :key="String(row.diameter_condit)">
+                    <td>{{ row.diameter_condit ?? '—' }}</td>
+                    <td v-for="col in result.columns || []" :key="col.key">{{ formatNum(row.lengths?.[col.key] ?? 0) }}</td>
+                    <td><strong>{{ formatNum(row.total_m) }}</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div v-else-if="String(result.query).startsWith('heat_consumption')">
+            <p class="text-caption text-medium-emphasis mb-2">
+              {{ result.note }}<template v-if="result.consumers != null"> · потребителей: {{ result.consumers }}</template>
+            </p>
             <table class="nq-table">
+              <thead>
+                <tr><th>Показатель, Гкал/ч</th><th>Задано</th><th>Получено</th></tr>
+              </thead>
               <tbody>
-                <tr v-for="(val, key) in result.totals || {}" :key="String(key)">
-                  <td>{{ key }}</td>
-                  <td>{{ formatNum(val as number) }}</td>
+                <tr v-for="row in heatRows" :key="row.key">
+                  <td>{{ row.label }}</td>
+                  <td>{{ formatNum(row.given) }}</td>
+                  <td>{{ formatNum(row.received) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -143,7 +194,24 @@ const formatNum = (v: number | null | undefined) =>
     ? '—'
     : new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 3 }).format(Number(v))
 
-const run = async (kind: 'volume' | 'length' | 'diameter' | 'heat') => {
+// Итоги теплопотребления: n_* — заданная нагрузка, q_* — полученная по расчёту (desktop ITOG)
+const HEAT_ROWS = [
+  { key: 'otz', label: 'Отопление, зависимые системы' },
+  { key: 'otn', label: 'Отопление, независимые системы' },
+  { key: 'vn', label: 'Вентиляция' },
+  { key: 'gvop', label: 'ГВС открытое из подачи' },
+  { key: 'gvoo', label: 'ГВС открытое из обратки' },
+  { key: 'rez', label: 'Рециркуляция открытого ГВС' },
+  { key: 'gvz', label: 'ГВС закрытое' },
+]
+const heatRows = computed(() => {
+  const totals = result.value?.totals || {}
+  return HEAT_ROWS.map((r) => ({ ...r, given: totals[`n_${r.key}`], received: totals[`q_${r.key}`] }))
+})
+
+type QueryKind = 'volume' | 'length' | 'diameter' | 'laying' | 'heat' | 'heat-closed' | 'heat-open'
+
+const run = async (kind: QueryKind) => {
   loading.value = kind
   error.value = ''
   result.value = null
@@ -152,6 +220,9 @@ const run = async (kind: 'volume' | 'length' | 'diameter' | 'heat') => {
     if (kind === 'volume') result.value = await fastApiService.getNetworkQueryVolume(ids)
     else if (kind === 'length') result.value = await fastApiService.getNetworkQueryLength(ids)
     else if (kind === 'diameter') result.value = await fastApiService.getNetworkQueryLengthByDiameter(ids)
+    else if (kind === 'laying') result.value = await fastApiService.getNetworkQueryLengthByDiameterLaying(ids)
+    else if (kind === 'heat-closed') result.value = await fastApiService.getNetworkQueryHeatConsumption(ids, 'closed')
+    else if (kind === 'heat-open') result.value = await fastApiService.getNetworkQueryHeatConsumption(ids, 'open')
     else result.value = await fastApiService.getNetworkQueryHeatConsumption(ids)
   } catch (e: any) {
     error.value = e?.message || String(e)
@@ -173,4 +244,5 @@ defineExpose({ openDialog })
 .nq-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
 .nq-table th, .nq-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eceff1; }
 .nq-table th { background: #eceff1; color: #546e7a; }
+.nq-scroll { overflow-x: auto; }
 </style>
