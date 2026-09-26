@@ -43,12 +43,12 @@
     "pinia": "^3.0.1",
     "three": "^0.184.0",
     "threebox-plugin": "^2.2.7",
-    "vue": "latest",
+    "vue": "^3.5.13",
     "vue-echarts": "^8.0.1",
-    "vue-router": "latest"
+    "vue-router": "^4.6.4"
   },
   "overrides": {
-    "vue": "latest",
+    "vue": "^3.5.13",
     "@rollup/plugin-terser": "^1.0.0",
     "serialize-javascript": "^7.0.4"
   },

@@ -12,3 +12,7 @@ public/cesium/
 .DS_Store
 *.log
 *.bak
+
+# Локальные сборки Nuxt с другим base/портом
+127.0.0.1/
+3007/
