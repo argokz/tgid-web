@@ -15,6 +15,9 @@
           <v-btn color="secondary" variant="tonal" prepend-icon="mdi-printer" class="mr-2" @click="openForm10Report">
             Печать (Форма 10)
           </v-btn>
+          <v-btn v-if="mutationsEnabled" color="teal" variant="tonal" prepend-icon="mdi-stamper" class="mr-2" @click="batchApprovalRef?.open()">
+            Утвердить план
+          </v-btn>
           <v-btn v-if="mutationsEnabled" color="primary" variant="flat" prepend-icon="mdi-plus" class="mr-2" @click="createRepair" :loading="creating">
             Создать
           </v-btn>
@@ -224,7 +227,7 @@
 
 
 
-    <v-dialog v-model="detailsVisible" :fullscreen="isMobile" max-width="1040" scrollable>
+    <v-dialog v-model="detailsVisible" :fullscreen="isMobile" max-width="1040" scrollable eager>
 
       <v-card :rounded="isMobile ? 0 : 'lg'">
 
@@ -266,6 +269,10 @@
 
           <template v-else-if="selected || isEditing">
 
+            <v-btn-toggle v-if="isNew" v-model="createMode" mandatory density="compact" color="deep-purple" class="mb-3">
+              <v-btn value="plan">План (капитальный / инвестиционный)</v-btn>
+              <v-btn value="current">Текущий ремонт</v-btn>
+            </v-btn-toggle>
             <v-expansion-panels multiple variant="accordion" :model-value="[0, 1]">
 
               <v-expansion-panel v-for="(group, index) in detailGroups" :key="group.title" :value="index">
@@ -280,7 +287,7 @@
 
                       <div class="detail-label mb-1">{{ field.label }}</div>
 
-                      <template v-if="isEditing && field.key">
+                      <template v-if="isEditing && field.key && isWritable(field.key)">
 
                         <v-select
 
@@ -475,6 +482,9 @@
               </v-expansion-panel>
 
             </v-expansion-panels>
+            <JournalRecordPanels v-if="selected && !isEditing" class="mt-4" journal="repairs" :record-id="selected.id"
+              :record-label="selected.name || `Ремонт ${selected.id}`"
+              @changed="refreshSelected" @hide="hideForMap" @restore="restoreAfterMap" />
 
           </template>
 
@@ -522,6 +532,7 @@
 
     </v-dialog>
 
+    <JournalBatchApprovalDialog ref="batchApprovalRef" journal="repairs" @approved="loadRepairs" />
   </Teleport>
 
 </template>
@@ -534,6 +545,7 @@ import { computed, reactive, ref, watch } from 'vue'
 
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useJournalRecordForm } from '~/composables/useJournalRecordForm'
 
 import { fastApiService, type RepairDetails, type RepairLookups, type RepairSummary } from '~/services/fastApiService'
 
@@ -725,7 +737,7 @@ const openDialog = async (nextScope: RepairJournalScope = {}) => {
 
   try {
 
-    await Promise.all([loadLookups(), loadRepairs()])
+    await Promise.all([loadLookups(), loadRepairs(), recordForm.loadSchema()])
 
     if (nextScope.repairId) await openDetails(nextScope.repairId)
 
@@ -737,142 +749,85 @@ const clearScope = () => { scope.lineId = undefined; scope.nodeId = undefined; p
 
 
 
-const createRepair = () => {
+const recordForm = useJournalRecordForm('repairs')
+const batchApprovalRef = ref<{ open: () => Promise<void> } | null>(null)
+const isWritable = recordForm.isWritable
+const createMode = ref<'plan' | 'current'>('plan')
+const networkTypes = [{ id: 1, name: 'Магистральная сеть' }, { id: 2, name: 'Внутриквартальная сеть' }]
 
+const createRepair = async () => {
+  await recordForm.loadSchema()
   isNew.value = true
-
   isEditing.value = true
-
-  editFields.value = {
-
-    name: 'Новый ремонт'
-
-  }
-
+  createMode.value = 'plan'
+  editFields.value = { name: '' }
   selected.value = null
-
   detailsVisible.value = true
-
   detailsError.value = ''
-
 }
-
-
 
 const startEdit = () => {
-
   if (!selected.value) return
-
   isNew.value = false
-
   isEditing.value = true
-
   editFields.value = { ...selected.value }
-
 }
-
-
 
 const cancelEdit = () => {
-
   isEditing.value = false
-
-  if (isNew.value) {
-
-    detailsVisible.value = false
-
-  }
-
+  if (isNew.value) detailsVisible.value = false
 }
-
-
 
 const saveChanges = async () => {
-
   saving.value = true
-
+  detailsError.value = ''
   try {
-
-    if (isNew.value) {
-
-      const result = await fastApiService.createObject('remont2', editFields.value)
-
-      if (result && result.id) {
-
-        isEditing.value = false
-
-        await loadRepairs()
-
-        await openDetails(result.id)
-
-      }
-
-    } else if (selected.value) {
-
-      const changes: Record<string, any> = {}
-
-      for (const [k, v] of Object.entries(editFields.value)) {
-
-        if (v !== selected.value[k as keyof RepairDetails]) {
-
-          changes[k] = v
-
-        }
-
-      }
-
-      if (Object.keys(changes).length > 0) {
-
-        await fastApiService.updateObjectAttributes('remont2', selected.value.id.toString(), changes)
-
-      }
-
-      isEditing.value = false
-
-      await loadRepairs()
-
-      await openDetails(selected.value.id)
-
-    }
-
+    const id = await recordForm.save({
+      isNew: isNew.value, id: selected.value?.id, original: selected.value as Record<string, unknown> | null,
+      edited: editFields.value, mode: createMode.value,
+    })
+    isEditing.value = false
+    isNew.value = false
+    await loadRepairs()
+    if (id) await openDetails(id)
   } catch (e: any) {
-
-    detailsError.value = 'Ошибка при сохранении: ' + (e?.message || '')
-
+    recordForm.showError(e?.message || 'Ошибка при сохранении')
   } finally {
-
     saving.value = false
-
   }
-
 }
 
-
-
 const deleteRepair = async (id: number) => {
-
-  if (!confirm(`Вы действительно хотите удалить ремонт #${id}?`)) return
-
+  deleting.value = true
   try {
-
-    deleting.value = true
-
-    await fastApiService.deleteObject('remont2', id)
-
-    detailsVisible.value = false
-
-    await loadRepairs()
-
-  } catch (e: any) {
-
-    detailsError.value = 'Ошибка при удалении ремонта: ' + (e?.message || '')
-
+    if (await recordForm.remove(id, selected.value?.name || `Ремонт ${id}`)) {
+      detailsVisible.value = false
+      await loadRepairs()
+    }
   } finally {
-
     deleting.value = false
-
   }
+}
 
+/** Перечитать карточку после утверждения/контура, не закрывая её */
+const refreshSelected = async () => {
+  if (!selected.value) return
+  try { selected.value = await fastApiService.getRepair(selected.value.id) } catch { /* карточка останется прежней */ }
+  void loadRepairs()
+}
+
+/** Выбор участков контура на карте: журнал скрывается и возвращается после выбора */
+let restoreState: { list: boolean; details: boolean } | null = null
+const hideForMap = () => {
+  restoreState = { list: visible.value, details: detailsVisible.value }
+  detailsVisible.value = false
+  visible.value = false
+}
+const restoreAfterMap = () => {
+  if (!restoreState) return
+  visible.value = restoreState.list
+  detailsVisible.value = restoreState.details
+  restoreState = null
 }
 
 const resetFilters = () => {
@@ -949,7 +904,7 @@ const detailGroups = computed(() => {
 
       ['Наименование', item?.name, 'name', 'text'], ['Состояние', item?.state_name, 'state_id', 'select', lookups.states], ['Вид ремонта', item?.repair_type_name, 'repair_type_id', 'select', lookups.repair_types], ['Категория', item?.category_name, 'category_id', 'select', lookups.categories],
 
-      ['Тип тепловой сети', item?.network_type_name], ['Утверждение', item?.approval_name], ['Ответственный', item?.responsible_name, 'responsible_id', 'select', lookups.responsible_people],
+      ['Тип тепловой сети', item?.network_type_name, 'network_type_id', 'select', networkTypes], ['Утверждение', item?.approval_name], ['Ответственный', item?.responsible_name, 'responsible_id', 'select', lookups.responsible_people],
 
       ['Подразделение', item?.subdivision_name, 'subdivision_id', 'select', lookups.subdivisions], ['Характеристика участков', item?.section_characteristics, 'section_characteristics', 'textarea'], ['Описание работ', item?.work_description, 'work_description', 'textarea']
 
@@ -985,7 +940,7 @@ const detailGroups = computed(() => {
 
       ['Номер приказа', item?.commissioning_order_number, 'commissioning_order_number', 'text'], ['Дата приказа', item?.commissioning_order_date, 'commissioning_order_date', 'date'],
 
-      ['Файл приказа', item?.commissioning_order_file], ['Примечание', item?.note, 'note', 'textarea']
+      ['Файл приказа', item?.commissioning_order_file, 'commissioning_order_file', 'text'], ['Примечание', item?.note, 'note', 'textarea']
 
     ]) }
 

@@ -8,6 +8,9 @@
             <div class="text-subtitle-1 font-weight-bold">Журнал опрессовок</div>
             <div class="text-caption text-medium-emphasis text-truncate">{{ scopeTitle }} · найдено {{ total }}</div>
           </div>
+          <v-btn v-if="mutationsEnabled" color="teal" variant="tonal" prepend-icon="mdi-stamper" class="mr-2" @click="batchApprovalRef?.open()">
+            Утвердить план
+          </v-btn>
           <v-btn v-if="mutationsEnabled" color="blue-darken-2" variant="flat" prepend-icon="mdi-plus" class="mr-2" @click="createPressureTest" :loading="creating">
             Создать
           </v-btn>
@@ -99,7 +102,7 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="detailsVisible" :fullscreen="isMobile" max-width="1040" scrollable>
+    <v-dialog v-model="detailsVisible" :fullscreen="isMobile" max-width="1040" scrollable eager>
       <v-card :rounded="isMobile ? 0 : 'lg'">
         <v-card-title class="d-flex align-center ga-3 px-4 py-3">
           <v-icon color="blue-darken-2">mdi-gauge</v-icon>
@@ -120,7 +123,7 @@
                 <v-expansion-panel-text><v-row dense>
                   <v-col v-for="field in group.fields" :key="field.label" cols="12" sm="6">
                     <div class="detail-label mb-1">{{ field.label }}</div>
-                    <template v-if="isEditing && field.key">
+                    <template v-if="isEditing && field.key && isWritable(field.key)">
                       <v-select v-if="field.type === 'select'" v-model="editFields[field.key]" :items="field.items" item-title="name" item-value="id" density="compact" hide-details variant="outlined" clearable />
                       <v-text-field v-else-if="field.type === 'date'" v-model="editFields[field.key]" type="date" density="compact" hide-details variant="outlined" clearable />
                       <v-text-field v-else-if="field.type === 'time'" v-model="editFields[field.key]" type="time" density="compact" hide-details variant="outlined" clearable />
@@ -177,6 +180,9 @@
               </v-expansion-panel>
               </template>
             </v-expansion-panels>
+            <JournalRecordPanels v-if="selected && !isEditing" class="mt-4" journal="pressure-tests" :record-id="selected.id"
+              :record-label="selected.name || `Опрессовка ${selected.id}`"
+              @changed="refreshSelected" @hide="hideForMap" @restore="restoreAfterMap" />
           </template>
         </v-card-text>
         <v-divider />
@@ -201,6 +207,7 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    <JournalBatchApprovalDialog ref="batchApprovalRef" journal="pressure-tests" @approved="loadTests" />
   </Teleport>
 </template>
 
@@ -208,6 +215,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useJournalRecordForm } from '~/composables/useJournalRecordForm'
 import { fastApiService, type PressureTestDetails, type PressureTestLookups, type PressureTestSummary } from '~/services/fastApiService'
 
 export interface PressureTestJournalScope { lineId?: number; nodeId?: number; testId?: number }
@@ -276,7 +284,7 @@ const openDetails = async (id: number) => {
 const openDialog = async (nextScope: PressureTestJournalScope = {}) => {
   Object.assign(scope, { lineId: undefined, nodeId: undefined, testId: undefined }, nextScope)
   page.value = 1; visible.value = true
-  try { await Promise.all([loadLookups(), loadTests()]); if (nextScope.testId) await openDetails(nextScope.testId) }
+  try { await Promise.all([loadLookups(), loadTests(), recordForm.loadSchema()]); if (nextScope.testId) await openDetails(nextScope.testId) }
   catch (loadError: any) { error.value = loadError?.message || 'Не удалось открыть журнал опрессовок' }
 }
 const clearScope = () => { scope.lineId = undefined; scope.nodeId = undefined; page.value = 1; void loadTests() }
@@ -312,26 +320,26 @@ const detailGroups = computed(() => {
     { title: 'Контур испытаний', fields: buildFields([
       ['Наименование', item?.name, 'name', 'text'], ['Описание контура', item?.contour_description, 'contour_description', 'textarea'], ['Граница раздела', item?.boundary_description, 'boundary_description', 'textarea'],
       ['Источник тепла', item?.heat_source_name, 'heat_source_id', 'select', lookups.heat_sources], ['Вид испытания', item?.test_type_name, 'test_type_id', 'select', lookups.test_types], ['Состояние', item?.state_name, 'state_id', 'select', lookups.states],
-      ['Утверждение', item?.approval_name, 'approval_id', 'select', approvalOptions], ['Ответственный', item?.responsible_name, 'responsible_id', 'select', lookups.responsible_people], ['Подразделение', item?.subdivision_name, 'subdivision_id', 'select', lookups.subdivisions],
+      ['Утверждение', item?.approval_name], ['Ответственный', item?.responsible_name, 'responsible_id', 'select', lookups.responsible_people], ['Подразделение', item?.subdivision_name, 'subdivision_id', 'select', lookups.subdivisions],
       ['Узел опрессовочного насоса', item?.pump_node_name || item?.pump_node_id, 'pump_node_id', 'number'], ['Объект насоса', item?.pump_object_name, 'pump_object_id', 'select', lookups.pump_objects]
     ]) },
     { title: 'План опрессовки', fields: buildFields([
-      ['Начало по плану', item?.planned_start, 'planned_start', 'date'], ['Окончание по плану', item?.planned_finish, 'planned_finish', 'date'], ['Утверждение плана', item?.plan_approved_on, 'plan_approved_on', 'date'],
+      ['Начало по плану', item?.planned_start, 'planned_start', 'date'], ['Окончание по плану', item?.planned_finish, 'planned_finish', 'date'], ['Утверждение плана', item?.plan_approved_on],
       ['Давление I этапа, кгс/см²', item?.stage_one_pressure, 'stage_one_pressure', 'number'], ['Давление II этапа, кгс/см²', item?.stage_two_pressure, 'stage_two_pressure', 'number'],
       ['Температура расхолаживания, °C', item?.cooling_temperature, 'cooling_temperature', 'number'], ['Количество звеньев обходчиков', item?.inspection_team_count, 'inspection_team_count', 'number']
     ]) },
     { title: 'Проведение и результат', fields: buildFields([
       ['Дата проведения', item?.tested_at, 'tested_at', 'date'], ['Время проведения', item?.tested_time, 'tested_time', 'time'], ['Продолжительность, мин', item?.duration_minutes, 'duration_minutes', 'number'],
       ['Решение комиссии', item?.commission_decision, 'commission_decision', 'text'], ['Отчёт', item?.report, 'report', 'textarea'], ['Текст нарушений', item?.defects_text, 'defects_text', 'textarea'],
-      ['Неучаствующие трубопроводы', item?.excluded_pipelines, 'excluded_pipelines', 'textarea'], ['Непредупреждённые потребители', item?.unnotified_consumers, 'unnotified_consumers', 'number'],
+      ['Неучаствующие трубопроводы', item?.excluded_pipelines, 'excluded_pipelines', 'textarea'], ['Непредупреждённые потребители', item?.unnotified_consumers, 'unnotified_consumers', 'text'],
       ['Список непредупреждённых потребителей', item?.unnotified_consumer_list, 'unnotified_consumer_list', 'textarea'], ['Дата утверждения акта', item?.act_approved_on, 'act_approved_on', 'date'],
       ['Файл акта', item?.act_file, 'act_file', 'text'], ['Примечание', item?.note, 'note', 'textarea']
     ]) },
     { title: 'Ответственные и руководители', fields: buildFields([
-      ['Утверждающий', item?.approver_name, 'approver_id', 'select', lookups.responsible_people], ['Руководитель испытаний', item?.test_manager_name, 'test_manager_id', 'select', lookups.responsible_people], ['Обеспечение режимов', item?.mode_manager_name, 'mode_manager_id', 'select', lookups.responsible_people],
-      ['Бланк переключений', item?.switching_manager_name, 'switching_manager_id', 'select', lookups.responsible_people], ['Манометры и расходомеры', item?.meter_manager_name, 'meter_manager_id', 'select', lookups.responsible_people],
-      ['Автотранспорт', item?.transport_manager_name, 'transport_manager_id', 'select', lookups.responsible_people], ['Электрооборудование', item?.electrical_manager_name, 'electrical_manager_id', 'select', lookups.responsible_people],
-      ['Безопасность контура источника', item?.source_safety_manager_name, 'source_safety_manager_id', 'select', lookups.responsible_people], ['Оповещение населения', item?.public_notification_manager_name, 'public_notification_manager_id', 'select', lookups.responsible_people]
+      ['Утверждающий', item?.approver_name], ['Руководитель испытаний', item?.test_manager_name, 'test_manager_name', 'text'], ['Обеспечение режимов', item?.mode_manager_name, 'mode_manager_name', 'text'],
+      ['Бланк переключений', item?.switching_manager_name, 'switching_manager_name', 'text'], ['Манометры и расходомеры', item?.meter_manager_name, 'meter_manager_name', 'text'],
+      ['Автотранспорт', item?.transport_manager_name, 'transport_manager_name', 'text'], ['Электрооборудование', item?.electrical_manager_name, 'electrical_manager_name', 'text'],
+      ['Безопасность контура источника', item?.source_safety_manager_name, 'source_safety_manager_name', 'text'], ['Оповещение населения', item?.public_notification_manager_name, 'public_notification_manager_name', 'text']
     ]) }
   ].filter(group => group.fields.length)
 })
@@ -340,6 +348,10 @@ const boundaryNodes = computed(() => selected.value?.relations?.boundary_nodes |
 const measures = computed(() => selected.value?.relations?.measures || [])
 const relatedDefects = computed(() => selected.value?.relations?.defects || [])
 const documents = computed(() => selected.value?.relations?.documents || [])
+
+const recordForm = useJournalRecordForm('pressure-tests')
+const batchApprovalRef = ref<{ open: () => Promise<void> } | null>(null)
+const isWritable = recordForm.isWritable
 
 const startEdit = () => {
   if (!selected.value) return
@@ -355,58 +367,65 @@ const cancelEdit = () => {
 
 const createPressureTest = async () => {
   creating.value = true
-  await loadLookups()
+  await Promise.all([loadLookups(), recordForm.loadSchema()])
   creating.value = false
   selected.value = null
   isEditing.value = true
   isNew.value = true
-  editFields.value = {}
+  detailsError.value = ''
+  // gid6 OnOpresAddPlan: вид испытания 1, состояние «План»
+  editFields.value = { name: 'Контур опрессовки', state_id: 1 }
   detailsVisible.value = true
 }
 
 const saveChanges = async () => {
   saving.value = true
+  detailsError.value = ''
   try {
-    if (isNew.value) {
-      const result = await fastApiService.createObject('opres', editFields.value)
-      if (result && result.id) {
-        isEditing.value = false
-        await loadTests()
-        await openDetails(result.id)
-      }
-    } else if (selected.value) {
-      const changes: Record<string, any> = {}
-      for (const [k, v] of Object.entries(editFields.value)) {
-        if (v !== selected.value[k as keyof PressureTestDetails]) {
-          changes[k] = v
-        }
-      }
-      if (Object.keys(changes).length > 0) {
-        await fastApiService.updateObjectAttributes('opres', selected.value.id.toString(), changes)
-      }
-      isEditing.value = false
-      await loadTests()
-      await openDetails(selected.value.id)
-    }
+    const id = await recordForm.save({
+      isNew: isNew.value, id: selected.value?.id, original: selected.value as Record<string, unknown> | null,
+      edited: editFields.value, mode: isNew.value ? 'plan' : undefined,
+    })
+    isEditing.value = false
+    isNew.value = false
+    await loadTests()
+    if (id) await openDetails(id)
   } catch (e: any) {
-    detailsError.value = 'Ошибка при сохранении: ' + (e?.message || '')
+    recordForm.showError(e?.message || 'Ошибка при сохранении')
   } finally {
     saving.value = false
   }
 }
 
 const deletePressureTest = async (id: number) => {
-  if (!confirm(`Вы действительно хотите удалить опрессовку #${id}?`)) return
+  deleting.value = true
   try {
-    deleting.value = true
-    await fastApiService.deleteObject('opres', id)
-    detailsVisible.value = false
-    await loadTests()
-  } catch (e: any) {
-    detailsError.value = 'Ошибка при удалении: ' + (e?.message || '')
+    if (await recordForm.remove(id, selected.value?.name || `Опрессовка ${id}`)) {
+      detailsVisible.value = false
+      await loadTests()
+    }
   } finally {
     deleting.value = false
   }
+}
+
+const refreshSelected = async () => {
+  if (!selected.value) return
+  try { selected.value = await fastApiService.getPressureTest(selected.value.id) } catch { /* остаётся прежняя */ }
+  void loadTests()
+}
+
+let restoreState: { list: boolean; details: boolean } | null = null
+const hideForMap = () => {
+  restoreState = { list: visible.value, details: detailsVisible.value }
+  detailsVisible.value = false
+  visible.value = false
+}
+const restoreAfterMap = () => {
+  if (!restoreState) return
+  visible.value = restoreState.list
+  detailsVisible.value = restoreState.details
+  restoreState = null
 }
 
 const exportWord = async () => {

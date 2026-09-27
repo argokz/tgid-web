@@ -342,7 +342,7 @@
 
 
 
-    <v-dialog v-model="detailsVisible" :fullscreen="isMobile" max-width="980" scrollable>
+    <v-dialog v-model="detailsVisible" :fullscreen="isMobile" max-width="980" scrollable eager>
 
       <v-card :rounded="isMobile ? 0 : 'lg'">
 
@@ -402,7 +402,7 @@
 
                       <div class="detail-label mb-1">{{ field.label }}</div>
 
-                      <template v-if="isEditing && field.key">
+                      <template v-if="isEditing && field.key && isWritable(field.key)">
 
                         <v-select
 
@@ -625,6 +625,9 @@
               </v-expansion-panel>
 
             </v-expansion-panels>
+            <JournalRecordPanels v-if="selected && !isEditing" class="mt-4" journal="inspections" :record-id="selected.id"
+              :record-label="selected.name || `Осмотр ${selected.id}`"
+              @changed="refreshSelected" @hide="hideForMap" @restore="restoreAfterMap" />
 
           </template>
 
@@ -708,6 +711,7 @@ import { computed, reactive, ref, watch } from 'vue'
 
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useJournalRecordForm } from '~/composables/useJournalRecordForm'
 
 import {
 
@@ -991,7 +995,7 @@ const openDialog = async (nextScope: InspectionJournalScope = {}) => {
 
   try {
 
-    await Promise.all([loadLookups(), loadInspections()])
+    await Promise.all([loadLookups(), loadInspections(), recordForm.loadSchema()])
 
     if (nextScope.inspectionId) await openDetails(nextScope.inspectionId)
 
@@ -1017,142 +1021,82 @@ const clearScope = () => {
 
 
 
-const createInspection = () => {
+const recordForm = useJournalRecordForm('inspections')
+const isWritable = recordForm.isWritable
+const positions = computed(() => recordForm.schema.value?.positions || [])
+const subdivisions = computed(() => recordForm.schema.value?.subdivisions || [])
 
+const createInspection = async () => {
+  await recordForm.loadSchema()
   isNew.value = true
-
   isEditing.value = true
-
-  editFields.value = {
-
-    name: 'Новый осмотр'
-
-  }
-
+  // gid6 SaveOpresNew("osmotr", …): наименование «Осмотр», дата — сегодня
+  editFields.value = { name: 'Осмотр', inspected_on: new Date().toISOString().slice(0, 10) }
   selected.value = null
-
   detailsVisible.value = true
-
   detailsError.value = ''
-
 }
-
-
 
 const startEdit = () => {
-
   if (!selected.value) return
-
   isNew.value = false
-
   isEditing.value = true
-
   editFields.value = { ...selected.value }
-
 }
-
-
 
 const cancelEdit = () => {
-
   isEditing.value = false
-
-  if (isNew.value) {
-
-    detailsVisible.value = false
-
-  }
-
+  if (isNew.value) detailsVisible.value = false
 }
-
-
 
 const saveChanges = async () => {
-
   saving.value = true
-
+  detailsError.value = ''
   try {
-
-    if (isNew.value) {
-
-      const result = await fastApiService.createObject('osmotr', editFields.value)
-
-      if (result && result.id) {
-
-        isEditing.value = false
-
-        await loadInspections()
-
-        await openDetails(result.id)
-
-      }
-
-    } else if (selected.value) {
-
-      const changes: Record<string, any> = {}
-
-      for (const [k, v] of Object.entries(editFields.value)) {
-
-        if (v !== selected.value[k as keyof InspectionDetails]) {
-
-          changes[k] = v
-
-        }
-
-      }
-
-      if (Object.keys(changes).length > 0) {
-
-        await fastApiService.updateObjectAttributes('osmotr', selected.value.id.toString(), changes)
-
-      }
-
-      isEditing.value = false
-
-      await loadInspections()
-
-      await openDetails(selected.value.id)
-
-    }
-
+    const id = await recordForm.save({
+      isNew: isNew.value, id: selected.value?.id, original: selected.value as Record<string, unknown> | null,
+      edited: editFields.value,
+    })
+    isEditing.value = false
+    isNew.value = false
+    await loadInspections()
+    if (id) await openDetails(id)
   } catch (e: any) {
-
-    detailsError.value = 'Ошибка при сохранении: ' + (e?.message || '')
-
+    recordForm.showError(e?.message || 'Ошибка при сохранении')
   } finally {
-
     saving.value = false
-
   }
-
 }
 
-
-
 const deleteInspection = async (id: number) => {
-
-  if (!confirm(`Вы действительно хотите удалить осмотр #${id}?`)) return
-
+  deleting.value = true
   try {
-
-    deleting.value = true
-
-    await fastApiService.deleteObject('osmotr', id)
-
-    detailsVisible.value = false
-
-    await loadInspections()
-
-  } catch (e: any) {
-
-    detailsError.value = 'Ошибка при удалении осмотра: ' + (e?.message || '')
-
+    if (await recordForm.remove(id, selected.value?.name || `Осмотр ${id}`)) {
+      detailsVisible.value = false
+      await loadInspections()
+    }
   } finally {
-
     deleting.value = false
-
   }
+}
 
+const refreshSelected = async () => {
+  if (!selected.value) return
+  try { selected.value = await fastApiService.getInspection(selected.value.id) } catch { /* остаётся прежняя */ }
+  void loadInspections()
+}
+
+let restoreState: { list: boolean; details: boolean } | null = null
+const hideForMap = () => {
+  restoreState = { list: visible.value, details: detailsVisible.value }
+  detailsVisible.value = false
+  visible.value = false
+}
+const restoreAfterMap = () => {
+  if (!restoreState) return
+  visible.value = restoreState.list
+  detailsVisible.value = restoreState.details
+  restoreState = null
 }
 
 const resetFilters = () => {
@@ -1277,13 +1221,13 @@ const detailGroups = computed(() => {
 
     { title: 'Утверждение и комиссия', fields: buildFields([
 
-      ['ФИО утверждающего', item?.approver_name, 'approver_name', 'text'], ['Должность утверждающего', item?.approver_position, 'approver_position', 'text'],
+      ['ФИО утверждающего', item?.approver_name, 'approver_name', 'text'], ['Должность утверждающего', item?.approver_position, 'approver_position_id', 'select', positions],
 
-      ['Служба утверждающего', item?.approver_service, 'approver_service', 'text'], ['Член комиссии 1', item?.commission_member_1, 'commission_member_1', 'text'],
+      ['Служба утверждающего', item?.approver_service, 'approver_service_id', 'select', subdivisions], ['Член комиссии 1', item?.commission_member_1, 'commission_member_1', 'text'],
 
-      ['Должность члена комиссии 1', item?.commission_position_1, 'commission_position_1', 'text'], ['Член комиссии 2', item?.commission_member_2, 'commission_member_2', 'text'],
+      ['Должность члена комиссии 1', item?.commission_position_1, 'commission_position_1_id', 'select', positions], ['Член комиссии 2', item?.commission_member_2, 'commission_member_2', 'text'],
 
-      ['Должность члена комиссии 2', item?.commission_position_2, 'commission_position_2', 'text'],
+      ['Должность члена комиссии 2', item?.commission_position_2, 'commission_position_2_id', 'select', positions],
 
       ['Не участвовавшие трубопроводы', item?.excluded_pipes, 'excluded_pipes', 'textarea'],
 

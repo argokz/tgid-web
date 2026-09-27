@@ -444,7 +444,7 @@
 
                       <div class="detail-label mb-1">{{ field.label }}</div>
 
-                      <template v-if="isEditing && field.key">
+                      <template v-if="isEditing && field.key && isWritable(field.key)">
 
                         <v-select
 
@@ -555,6 +555,8 @@
               </v-expansion-panel>
 
             </v-expansion-panels>
+            <JournalRecordPanels v-if="selected && !isEditing" class="mt-4" journal="defects" :record-id="selected.id"
+              :record-label="selected.name || `Нарушение ${selected.id}`" @changed="refreshSelected" />
 
           </template>
 
@@ -662,6 +664,7 @@ import { computed, reactive, ref, watch } from 'vue'
 
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useJournalRecordForm } from '~/composables/useJournalRecordForm'
 
 import {
 
@@ -938,7 +941,7 @@ const openDialog = async (nextScope: DefectJournalScope = {}) => {
 
   try {
 
-    await Promise.all([loadLookups(), loadDefects()])
+    await Promise.all([loadLookups(), loadDefects(), recordForm.loadSchema()])
 
     if (nextScope.defectId) await openDetails(nextScope.defectId)
 
@@ -966,149 +969,67 @@ const clearScope = () => {
 
 
 
-const createDefect = () => {
+const recordForm = useJournalRecordForm('defects')
+const isWritable = recordForm.isWritable
 
+const createDefect = async () => {
+  await recordForm.loadSchema()
   isNew.value = true
-
   isEditing.value = true
-
-  editFields.value = {
-
-    name: 'Новое нарушение',
-
-    detected_at: new Date().toISOString().split('T')[0]
-
-  }
-
+  // точка нарушения ставится на середину выбранного трубопровода (сервер), дата — сегодня
+  editFields.value = { detected_at: new Date().toISOString().split('T')[0], line_id: scope.lineId ?? null }
   selected.value = null
-
   detailsVisible.value = true
-
   detailsError.value = ''
-
 }
-
-
 
 const startEdit = () => {
-
   if (!selected.value) return
-
   isNew.value = false
-
   isEditing.value = true
-
-  // Copy all keys to editFields
-
   editFields.value = { ...selected.value }
-
 }
-
-
 
 const cancelEdit = () => {
-
   isEditing.value = false
-
-  if (isNew.value) {
-
-    detailsVisible.value = false
-
-  }
-
+  if (isNew.value) detailsVisible.value = false
 }
-
-
 
 const saveChanges = async () => {
-
   saving.value = true
-
+  detailsError.value = ''
   try {
-
-    if (isNew.value) {
-
-      const result = await fastApiService.createObject('defect', editFields.value)
-
-      if (result && result.id) {
-
-        isEditing.value = false
-
-        await loadDefects()
-
-        await openDetails(result.id)
-
-      }
-
-    } else if (selected.value) {
-
-      const changes: Record<string, any> = {}
-
-      for (const [k, v] of Object.entries(editFields.value)) {
-
-        if (v !== selected.value[k as keyof DefectDetails]) {
-
-          changes[k] = v
-
-        }
-
-      }
-
-      if (Object.keys(changes).length > 0) {
-
-        await fastApiService.updateObjectAttributes('defect', selected.value.id.toString(), changes)
-
-      }
-
-      isEditing.value = false
-
-      await loadDefects()
-
-      await openDetails(selected.value.id)
-
-    }
-
+    const id = await recordForm.save({
+      isNew: isNew.value, id: selected.value?.id, original: selected.value as Record<string, unknown> | null,
+      edited: editFields.value,
+    })
+    isEditing.value = false
+    isNew.value = false
+    await loadDefects()
+    if (id) await openDetails(id)
   } catch (e: any) {
-
-    detailsError.value = 'Ошибка при сохранении: ' + (e?.message || '')
-
+    recordForm.showError(e?.message || 'Ошибка при сохранении')
   } finally {
-
     saving.value = false
-
   }
-
 }
-
-
 
 const deleteDefect = async (id: number) => {
-
-  if (!confirm(`Вы действительно хотите удалить нарушение #${id}?`)) return
-
+  deleting.value = true
   try {
-
-    deleting.value = true
-
-    await fastApiService.deleteObject('defect', id)
-
-    detailsVisible.value = false
-
-    await loadDefects()
-
-  } catch (e: any) {
-
-    detailsError.value = 'Ошибка при удалении нарушения: ' + (e?.message || '')
-
+    if (await recordForm.remove(id, selected.value?.name || `Нарушение ${id}`)) {
+      detailsVisible.value = false
+      await loadDefects()
+    }
   } finally {
-
     deleting.value = false
-
   }
-
 }
 
-
+const refreshSelected = async () => {
+  if (!selected.value) return
+  try { selected.value = await fastApiService.getDefect(selected.value.id) } catch { /* остаётся прежняя */ }
+}
 
 const resetFilters = () => {
 
@@ -1260,7 +1181,7 @@ const detailGroups = computed(() => {
 
         ['Категория', item?.category_name, 'category_id', 'select', lookups.categories],
 
-        ['Адрес', item?.address, 'address', 'text'],
+        ['Адрес', item?.address], ['Номер дома', item?.house_number, 'house_number', 'text'],
 
         ['Трубопровод', item?.line_id, 'line_id', 'number'],
 

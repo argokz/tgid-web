@@ -26,6 +26,9 @@
 
           </div>
 
+          <v-btn v-if="mutationsEnabled" color="teal" variant="tonal" prepend-icon="mdi-stamper" class="mr-2" @click="batchApprovalRef?.open()">
+            Утвердить план
+          </v-btn>
           <v-btn v-if="mutationsEnabled" color="primary" variant="flat" prepend-icon="mdi-plus" class="mr-2" @click="createShurf" :loading="creating">
 
             Создать
@@ -336,7 +339,7 @@
 
 
 
-    <v-dialog v-model="detailsVisible" :fullscreen="isMobile" max-width="940" scrollable>
+    <v-dialog v-model="detailsVisible" :fullscreen="isMobile" max-width="940" scrollable eager>
 
       <v-card :rounded="isMobile ? 0 : 'lg'">
 
@@ -378,6 +381,10 @@
 
           <template v-else-if="selected">
 
+            <v-btn-toggle v-if="isNew" v-model="createMode" mandatory density="compact" color="brown" class="mb-3">
+              <v-btn value="plan">Плановый шурф</v-btn>
+              <v-btn value="unplanned">Внеплановый</v-btn>
+            </v-btn-toggle>
             <v-expansion-panels multiple variant="accordion" :model-value="[0, 1]">
 
               <v-expansion-panel v-for="(group, index) in detailGroups" :key="group.title" :value="index">
@@ -392,7 +399,7 @@
 
                       <div class="detail-label mb-1">{{ field.label }}</div>
 
-                      <template v-if="isEditing && field.key">
+                      <template v-if="isEditing && field.key && isWritable(field.key)">
 
                         <v-select
 
@@ -611,6 +618,9 @@
               </v-expansion-panel>
 
             </v-expansion-panels>
+            <JournalRecordPanels v-if="selected && !isEditing" class="mt-4" journal="shurfs" :record-id="selected.id"
+              :record-label="selected.address || `Шурф ${selected.id}`"
+              @changed="refreshSelected" @hide="hideForMap" @restore="restoreAfterMap" />
 
           </template>
 
@@ -682,6 +692,7 @@
 
     </v-dialog>
 
+    <JournalBatchApprovalDialog ref="batchApprovalRef" journal="shurfs" @approved="loadShurfs" />
   </Teleport>
 
 </template>
@@ -694,6 +705,7 @@ import { computed, reactive, ref, watch } from 'vue'
 
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useJournalRecordForm } from '~/composables/useJournalRecordForm'
 
 import {
 
@@ -963,7 +975,7 @@ const openDialog = async (nextScope: ShurfJournalScope = {}) => {
 
   try {
 
-    await Promise.all([loadLookups(), loadShurfs()])
+    await Promise.all([loadLookups(), loadShurfs(), recordForm.loadSchema()])
 
     if (nextScope.shurfId) await openDetails(nextScope.shurfId)
 
@@ -989,142 +1001,82 @@ const clearScope = () => {
 
 
 
-const createShurf = () => {
+const recordForm = useJournalRecordForm('shurfs')
+const batchApprovalRef = ref<{ open: () => Promise<void> } | null>(null)
+const isWritable = recordForm.isWritable
+const createMode = ref<'plan' | 'unplanned'>('plan')
 
+const createShurf = async () => {
+  await recordForm.loadSchema()
   isNew.value = true
-
   isEditing.value = true
-
-  editFields.value = {
-
-    name: 'Новый шурф'
-
-  }
-
+  createMode.value = 'plan'
+  editFields.value = { line_id: scope.lineId ?? null }
   selected.value = null
-
   detailsVisible.value = true
-
   detailsError.value = ''
-
 }
-
-
 
 const startEdit = () => {
-
   if (!selected.value) return
-
   isNew.value = false
-
   isEditing.value = true
-
   editFields.value = { ...selected.value }
-
 }
-
-
 
 const cancelEdit = () => {
-
   isEditing.value = false
-
-  if (isNew.value) {
-
-    detailsVisible.value = false
-
-  }
-
+  if (isNew.value) detailsVisible.value = false
 }
-
-
 
 const saveChanges = async () => {
-
   saving.value = true
-
+  detailsError.value = ''
   try {
-
-    if (isNew.value) {
-
-      const result = await fastApiService.createObject('shurfy', editFields.value)
-
-      if (result && result.id) {
-
-        isEditing.value = false
-
-        await loadShurfs()
-
-        await openDetails(result.id)
-
-      }
-
-    } else if (selected.value) {
-
-      const changes: Record<string, any> = {}
-
-      for (const [k, v] of Object.entries(editFields.value)) {
-
-        if (v !== selected.value[k as keyof ShurfDetails]) {
-
-          changes[k] = v
-
-        }
-
-      }
-
-      if (Object.keys(changes).length > 0) {
-
-        await fastApiService.updateObjectAttributes('shurfy', selected.value.id.toString(), changes)
-
-      }
-
-      isEditing.value = false
-
-      await loadShurfs()
-
-      await openDetails(selected.value.id)
-
-    }
-
+    const id = await recordForm.save({
+      isNew: isNew.value, id: selected.value?.id, original: selected.value as Record<string, unknown> | null,
+      edited: editFields.value, mode: createMode.value,
+    })
+    isEditing.value = false
+    isNew.value = false
+    await loadShurfs()
+    if (id) await openDetails(id)
   } catch (e: any) {
-
-    detailsError.value = 'Ошибка при сохранении: ' + (e?.message || '')
-
+    recordForm.showError(e?.message || 'Ошибка при сохранении')
   } finally {
-
     saving.value = false
-
   }
-
 }
 
-
-
 const deleteShurf = async (id: number) => {
-
-  if (!confirm(`Вы действительно хотите удалить шурф #${id}?`)) return
-
+  deleting.value = true
   try {
-
-    deleting.value = true
-
-    await fastApiService.deleteObject('shurfy', id)
-
-    detailsVisible.value = false
-
-    await loadShurfs()
-
-  } catch (e: any) {
-
-    detailsError.value = 'Ошибка при удалении шурфа: ' + (e?.message || '')
-
+    if (await recordForm.remove(id, selected.value?.address || `Шурф ${id}`)) {
+      detailsVisible.value = false
+      await loadShurfs()
+    }
   } finally {
-
     deleting.value = false
-
   }
+}
 
+const refreshSelected = async () => {
+  if (!selected.value) return
+  try { selected.value = await fastApiService.getShurf(selected.value.id) } catch { /* остаётся прежняя */ }
+  void loadShurfs()
+}
+
+let restoreState: { list: boolean; details: boolean } | null = null
+const hideForMap = () => {
+  restoreState = { list: visible.value, details: detailsVisible.value }
+  detailsVisible.value = false
+  visible.value = false
+}
+const restoreAfterMap = () => {
+  if (!restoreState) return
+  visible.value = restoreState.list
+  detailsVisible.value = restoreState.details
+  restoreState = null
 }
 
 const resetFilters = () => {
@@ -1227,7 +1179,7 @@ const detailGroups = computed(() => {
 
       ['Фактическое окончание', item?.actual_finish, 'actual_finish', 'date'],
 
-      ['Адрес', item?.address, 'address', 'text'], 
+      ['Адрес', item?.address], ['Номер дома', item?.house_number, 'house_number', 'text'],
 
       ['Трубопровод', item?.line_id, 'line_id', 'number'], 
 
@@ -1237,11 +1189,11 @@ const detailGroups = computed(() => {
 
       ['Ближайшая камера', item?.nearest_chamber_name],
 
-      ['Расстояние до камеры, м', item?.distance_to_nearest_chamber], 
+      ['Расстояние до камеры, м', item?.distance_to_nearest_chamber, 'distance_to_nearest_chamber', 'number'],
 
-      ['Длина осмотра, м', item?.inspection_length],
+      ['Длина осмотра, м', item?.inspection_length, 'inspection_length', 'number'],
 
-      ['Глубина заложения, м', item?.laying_depth]
+      ['Глубина заложения, м', item?.laying_depth, 'laying_depth', 'number']
 
     ]) },
 
@@ -1275,7 +1227,7 @@ const detailGroups = computed(() => {
 
       ['Коррозия подачи', item?.corrosion_flow_name], ['Коррозия обратки', item?.corrosion_return_name],
 
-      ['Место контрольной вырезки', item?.control_cut_location], ['Результаты вырезки', item?.cut_results],
+      ['Место контрольной вырезки', item?.control_cut_location, 'control_cut_location', 'text'], ['Результаты вырезки', item?.cut_results, 'cut_results', 'textarea'],
 
       ['Результаты осмотра', item?.inspection_results, 'inspection_results', 'textarea'], ['Назначенные мероприятия', item?.planned_measures, 'planned_measures', 'textarea'],
 
@@ -1287,13 +1239,13 @@ const detailGroups = computed(() => {
 
       ['Номер акта', item?.act_number, 'act_number', 'text'], ['Дата утверждения акта', item?.act_approved_on, 'act_approved_on', 'date'],
 
-      ['Состояние утверждения', item?.approval_name], ['Дата утверждения плана', item?.approved_on, 'approved_on', 'date'],
+      ['Состояние утверждения', item?.approval_name], ['Дата утверждения плана', item?.approved_on],
 
-      ['Назначение', item?.approval_purpose, 'approval_purpose', 'text'], ['ФИО утверждающего', item?.approver_name, 'approver_name', 'text'],
+      ['Назначение', item?.approval_purpose], ['ФИО утверждающего', item?.approver_name],
 
-      ['Должность утверждающего', item?.approver_position, 'approver_position', 'text'], ['Служба утверждающего', item?.approver_service, 'approver_service', 'text'],
+      ['Должность утверждающего', item?.approver_position], ['Служба утверждающего', item?.approver_service],
 
-      ['ФИО визирующего', item?.reviewer_name, 'reviewer_name', 'text'], ['Должность визирующего', item?.reviewer_position, 'reviewer_position', 'text'],
+      ['ФИО визирующего', item?.reviewer_name], ['Должность визирующего', item?.reviewer_position],
 
       ['Член комиссии 1', item?.commission_member_1, 'commission_member_1', 'text'], ['Член комиссии 2', item?.commission_member_2, 'commission_member_2', 'text']
 
