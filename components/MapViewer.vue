@@ -278,6 +278,7 @@
       <LazyNetworkQueriesDialog
         v-if="mountedDialogs.networkQueries"
         ref="networkQueriesRef"
+        @locate="handleLocateFault"
       />
 
       <!-- Desktop TGID «Анализ»: режим, допустимость, гидростатические зоны -->

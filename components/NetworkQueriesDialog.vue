@@ -9,7 +9,7 @@
       </v-card-title>
       <v-card-text>
         <p class="text-body-2 text-medium-emphasis mb-3">
-          Аналог desktop «Запросы» (Zap1–Zap7). По умолчанию — видимые фрагменты карты.
+          Аналог desktop «Запросы» (Zap1–Zap7_1). По умолчанию — видимые фрагменты карты.
         </p>
         <v-chip
           v-if="scopeLabel"
@@ -87,6 +87,14 @@
           >
             Открытые системы (Zap5)
           </v-btn>
+          <v-btn
+            color="primary"
+            variant="tonal"
+            :loading="loading === 'closed-consumers'"
+            @click="run('closed-consumers')"
+          >
+            Закрытые потребители (Zap6)
+          </v-btn>
         </div>
 
         <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-3">
@@ -155,6 +163,31 @@
               </tbody>
             </table>
           </div>
+          <div v-else-if="result.query === 'closed_consumers'">
+            <div class="mb-2">Найдено: <strong>{{ result.count }}</strong></div>
+            <div v-if="!result.count" class="text-body-2 text-medium-emphasis">Нет закрытых потребителей</div>
+            <div v-else class="nq-scroll">
+              <table class="nq-table">
+                <thead>
+                  <tr><th>Код</th><th>Узел</th><th>Потребитель</th><th>Фрагмент</th></tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="row in result.items || []"
+                    :key="`${row.node_id}-${row.kind}`"
+                    :class="{ 'nq-row-link': row.latitude != null && row.longitude != null }"
+                    :title="row.latitude != null ? 'Показать на карте' : ''"
+                    @click="locate(row)"
+                  >
+                    <td>{{ row.code ?? '—' }}</td>
+                    <td>{{ row.name ?? row.node_id }}</td>
+                    <td>{{ row.consumer ?? '—' }}</td>
+                    <td>{{ row.fragment_id }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </template>
       </v-card-text>
     </v-card>
@@ -167,6 +200,7 @@ import { useMobile } from '~/composables/useMobile'
 import { fastApiService } from '~/services/fastApiService'
 import { useFragmentStore } from '~/stores/fragmentStore'
 
+const emit = defineEmits<{ (e: 'locate', point: { lat: number; lng: number }): void }>()
 const { isMobile } = useMobile()
 const fragmentStore = useFragmentStore()
 const visible = ref(false)
@@ -209,7 +243,12 @@ const heatRows = computed(() => {
   return HEAT_ROWS.map((r) => ({ ...r, given: totals[`n_${r.key}`], received: totals[`q_${r.key}`] }))
 })
 
-type QueryKind = 'volume' | 'length' | 'diameter' | 'laying' | 'heat' | 'heat-closed' | 'heat-open'
+type QueryKind =
+  | 'volume' | 'length' | 'diameter' | 'laying' | 'heat' | 'heat-closed' | 'heat-open' | 'closed-consumers'
+
+const locate = (row: Record<string, any>) => {
+  if (row.latitude != null && row.longitude != null) emit('locate', { lat: row.latitude, lng: row.longitude })
+}
 
 const run = async (kind: QueryKind) => {
   loading.value = kind
@@ -223,6 +262,7 @@ const run = async (kind: QueryKind) => {
     else if (kind === 'laying') result.value = await fastApiService.getNetworkQueryLengthByDiameterLaying(ids)
     else if (kind === 'heat-closed') result.value = await fastApiService.getNetworkQueryHeatConsumption(ids, 'closed')
     else if (kind === 'heat-open') result.value = await fastApiService.getNetworkQueryHeatConsumption(ids, 'open')
+    else if (kind === 'closed-consumers') result.value = await fastApiService.getNetworkQueryClosedConsumers(ids)
     else result.value = await fastApiService.getNetworkQueryHeatConsumption(ids)
   } catch (e: any) {
     error.value = e?.message || String(e)
@@ -245,4 +285,6 @@ defineExpose({ openDialog })
 .nq-table th, .nq-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eceff1; }
 .nq-table th { background: #eceff1; color: #546e7a; }
 .nq-scroll { overflow-x: auto; }
+.nq-row-link { cursor: pointer; }
+.nq-row-link:hover td { background: rgba(var(--v-theme-primary), 0.06); }
 </style>

@@ -59,6 +59,7 @@
           <v-tabs v-model="tab" density="compact" color="primary">
             <v-tab value="chart">График</v-tab>
             <v-tab value="table">Таблица узлов</v-tab>
+            <v-tab value="time">Время прохождения</v-tab>
           </v-tabs>
           <v-divider />
 
@@ -104,6 +105,82 @@
                 </v-table>
               </div>
             </v-window-item>
+
+            <v-window-item value="time">
+              <div class="pa-3">
+                <div v-if="travelLoading" class="d-flex align-center py-6 justify-center">
+                  <v-progress-circular indeterminate color="primary" size="24" />
+                  <span class="ml-3">Расчёт времени прохождения…</span>
+                </div>
+                <v-alert v-else-if="travelError" type="error" variant="tonal" density="compact">
+                  {{ travelError }}
+                </v-alert>
+                <template v-else-if="travel">
+                  <div class="d-flex flex-wrap ga-4 mb-2">
+                    <div>
+                      <div class="text-caption text-medium-emphasis">Подающий теплопровод</div>
+                      <div class="text-subtitle-1" :class="{ 'text-error': travel.supply.no_flow }">
+                        {{ travel.supply.text }}
+                      </div>
+                    </div>
+                    <div>
+                      <div class="text-caption text-medium-emphasis">Обратный теплопровод</div>
+                      <div class="text-subtitle-1" :class="{ 'text-error': travel.return.no_flow }">
+                        {{ travel.return.text }}
+                      </div>
+                    </div>
+                  </div>
+                  <p class="text-caption text-medium-emphasis mb-2">
+                    Как в десктопе («Время прохождения»): время участков (ut_out a11) суммируется по маршруту
+                    со знаком ориентации линии; расход против принятого направления — «нет движения».
+                    <template v-if="travel.calculation_ids.length"> Расчёт: {{ travel.calculation_ids.join(', ') }}.</template>
+                  </p>
+                  <v-alert v-if="travel.note" type="warning" variant="tonal" density="compact" class="mb-2">
+                    {{ travel.note }}. Простая сумма времени участков:
+                    подача {{ fmt(travel.supply.sum_segments_min) }} мин, обратка {{ fmt(travel.return.sum_segments_min) }} мин.
+                  </v-alert>
+                  <div style="max-height: 440px; overflow-y: auto;">
+                    <v-table density="compact" class="piezo-table">
+                      <thead>
+                        <tr>
+                          <th rowspan="2">#</th>
+                          <th rowspan="2">Участок</th>
+                          <th rowspan="2" class="text-right">L, м</th>
+                          <th colspan="3" class="text-center">Подача</th>
+                          <th colspan="3" class="text-center">Обратка</th>
+                        </tr>
+                        <tr>
+                          <th class="text-right">G, т/ч</th>
+                          <th class="text-right">t, мин</th>
+                          <th class="text-right">Σt, мин</th>
+                          <th class="text-right">G, т/ч</th>
+                          <th class="text-right">t, мин</th>
+                          <th class="text-right">Σt, мин</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr
+                          v-for="row in travel.items"
+                          :key="row.index"
+                          class="piezo-row"
+                          @click="$emit('node-hover', row.node2_id)"
+                        >
+                          <td>{{ row.index }}</td>
+                          <td>{{ row.node1_label }} → {{ row.node2_label }}</td>
+                          <td class="text-right">{{ fmt(row.supply?.length_m ?? row.return?.length_m) }}</td>
+                          <td class="text-right">{{ fmt(row.supply?.q) }}</td>
+                          <td class="text-right">{{ fmt(row.supply?.time_min) }}</td>
+                          <td class="text-right">{{ cumText(row.supply) }}</td>
+                          <td class="text-right">{{ fmt(row.return?.q) }}</td>
+                          <td class="text-right">{{ fmt(row.return?.time_min) }}</td>
+                          <td class="text-right">{{ cumText(row.return) }}</td>
+                        </tr>
+                      </tbody>
+                    </v-table>
+                  </div>
+                </template>
+              </div>
+            </v-window-item>
           </v-window>
         </template>
       </v-card-text>
@@ -113,8 +190,8 @@
 
 <script setup lang="ts">
 import { useNotificationStore } from '~/stores/notificationStore';
-import { computed, ref } from 'vue';
-import { fastApiService } from '~/services/fastApiService';
+import { computed, ref, watch } from 'vue';
+import { fastApiService, type TravelTimeResponse, type TravelTimeSide } from '~/services/fastApiService';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart } from 'echarts/charts';
@@ -153,7 +230,49 @@ const emit = defineEmits<{
   'node-hover': [number];
 }>();
 
-const tab = ref<'chart' | 'table'>('chart');
+const tab = ref<'chart' | 'table' | 'time'>('chart');
+
+// Время прохождения потока (десктоп OnTimePr) — считается по требованию при открытии вкладки
+const travel = ref<TravelTimeResponse | null>(null);
+const travelLoading = ref(false);
+const travelError = ref<string | null>(null);
+
+const routeWaypoints = (): number[] => {
+  if (props.waypoints && props.waypoints.length >= 2) return props.waypoints;
+  const ids = (props.pathData || []).map((d: any) => d.node_id);
+  return ids.length >= 2 ? [ids[0], ids[ids.length - 1]] : [];
+};
+
+const loadTravelTime = async () => {
+  const nodes = routeWaypoints();
+  if (nodes.length < 2 || travelLoading.value) return;
+  travelLoading.value = true;
+  travelError.value = null;
+  try {
+    travel.value = await fastApiService.getTravelTime(nodes);
+  } catch (err: any) {
+    travelError.value = err?.message || 'Ошибка расчёта времени прохождения';
+  } finally {
+    travelLoading.value = false;
+  }
+};
+
+watch(
+  () => [props.waypoints, props.pathData],
+  () => {
+    travel.value = null;
+    travelError.value = null;
+    if (tab.value === 'time' && props.modelValue) loadTravelTime();
+  }
+);
+watch(tab, (t) => {
+  if (t === 'time' && !travel.value) loadTravelTime();
+});
+
+const cumText = (side: TravelTimeSide | null | undefined): string => {
+  if (!side) return '—';
+  return side.cumulative_min == null ? 'нет движения' : side.cumulative_min.toFixed(2);
+};
 
 const fmt = (v: number | null | undefined): string =>
   v == null || Number.isNaN(v) ? '—' : Number(v).toFixed(2);

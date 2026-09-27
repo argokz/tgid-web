@@ -289,6 +289,48 @@ export interface PiezometerRouteResponse {
   has_calculation: boolean;
 }
 
+export interface TravelTimeSide {
+  line_id: number;
+  /** +1 — линия ориентирована по маршруту, −1 — против */
+  napr: number;
+  q: number | null;
+  time_min: number | null;
+  length_m: number | null;
+  calculation_id: number | null;
+  /** Накопленное время после участка (как в десктопе); null — «нет движения» */
+  cumulative_min: number | null;
+}
+
+export interface TravelTimeSummary {
+  total_min: number | null;
+  text: string;
+  no_flow: boolean;
+  lines: number;
+  sum_segments_min: number;
+  mixed_orientation: boolean;
+}
+
+export interface TravelTimeResponse {
+  query: 'travel_time';
+  title: string;
+  calculation_ids: number[];
+  node_count: number;
+  waypoints: number[];
+  supply: TravelTimeSummary;
+  return: TravelTimeSummary;
+  count: number;
+  items: Array<{
+    index: number;
+    node1_id: number;
+    node1_label: string;
+    node2_id: number;
+    node2_label: string;
+    supply: TravelTimeSide | null;
+    return: TravelTimeSide | null;
+  }>;
+  note?: string | null;
+}
+
 export interface SplitTransferReport {
   /** Реально перенесено на новую половину: {таблица: количество} */
   moved: Record<string, number>;
@@ -770,6 +812,14 @@ export const fastApiService = {
     return request<PiezometerRouteResponse>('piezometer/route', {
       method: 'POST',
       body: { nodes },
+    });
+  },
+
+  /** Время прохождения потока по маршруту (десктоп OnTimePr) — те же waypoints, что у пьезометра */
+  async getTravelTime(nodes: number[], calculationId?: number): Promise<TravelTimeResponse> {
+    return request<TravelTimeResponse>('api/analysis/travel-time', {
+      method: 'POST',
+      body: { nodes, ...(calculationId ? { calculation_id: calculationId } : {}) },
     });
   },
 
@@ -1385,6 +1435,12 @@ export const fastApiService = {
         ...(fragmentIds?.length ? { fragments: fragmentIds.join(',') } : {}),
         ...(system ? { system } : {}),
       },
+    });
+  },
+  /** Zap6: закрытые (физически отключённые) потребители. */
+  async getNetworkQueryClosedConsumers(fragmentIds?: number[]): Promise<any> {
+    return request('api/network-queries/closed-consumers', {
+      query: fragmentIds?.length ? { fragments: fragmentIds.join(',') } : {},
     });
   },
   /** Zap7_1: длина по диаметрам и способам прокладки. */
