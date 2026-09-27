@@ -563,6 +563,72 @@ export interface CalculationListFilter {
   offset?: number;
 }
 
+export type UserRole = 'viewer' | 'calculator' | 'editor' | 'admin';
+
+export interface AdminUser {
+  id: number;
+  username: string;
+  role: UserRole;
+  is_active: boolean;
+  is_admin: boolean;
+}
+
+export interface AdminUsersResponse {
+  items: AdminUser[];
+  can_write: boolean;
+  note: string | null;
+}
+
+export interface AdminRole {
+  role: UserRole;
+  level: number;
+  description: string;
+}
+
+export interface AuditChange {
+  field: string;
+  old: any;
+  new: any;
+}
+
+export interface AuditLogItem {
+  log_id: number;
+  changed_at: string | null;
+  changed_by: string | null;
+  operation: string | null;
+  table_name: string | null;
+  record_id: number | null;
+  changes: AuditChange[];
+  comment?: string | null;
+  node_id?: number | null;
+  change_group_id?: string | null;
+  is_rolled_back?: boolean | null;
+  old_data?: Record<string, any> | null;
+  new_data?: Record<string, any> | null;
+}
+
+export interface AuditLogFilter {
+  table?: string | null;
+  record_id?: number | null;
+  changed_by?: string | null;
+  operation?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+  change_group_id?: string | null;
+  page?: number;
+  page_size?: number;
+}
+
+export interface AuditLogResponse extends PaginatedResponse<AuditLogItem> {
+  note?: string;
+}
+
+export interface AuditLookups {
+  tables: { name: string; count: number }[];
+  users: { name: string; count: number }[];
+  operations: { name: string; count: number }[];
+}
+
 export interface CalculationDeleteResponse {
   success: boolean;
   calculation_id: number;
@@ -1445,6 +1511,44 @@ export const fastApiService = {
       if (value !== null && value !== undefined && value !== '') query[key] = value as string | number;
     }
     return request<CalculationListResponse>('api/v1/calculations', { query });
+  },
+
+  /** Администрирование пользователей UsersDB (только admin) */
+  async getAdminRoles(): Promise<{ items: AdminRole[] }> {
+    return request('api/v1/admin/roles', mutationOptions('GET'));
+  },
+
+  async getAdminUsers(): Promise<AdminUsersResponse> {
+    return request<AdminUsersResponse>('api/v1/admin/users', mutationOptions('GET'));
+  },
+
+  async createAdminUser(body: { username: string; password: string; role: UserRole }): Promise<AdminUser> {
+    return request<AdminUser>('api/v1/admin/users', mutationOptions('POST', body));
+  },
+
+  async updateAdminUser(userId: number, body: { role?: UserRole; is_active?: boolean }): Promise<AdminUser> {
+    return request<AdminUser>(`api/v1/admin/users/${encodePath(userId)}`, mutationOptions('PATCH', body));
+  },
+
+  async setAdminUserPassword(userId: number, password: string): Promise<{ success: boolean; id: number }> {
+    return request(`api/v1/admin/users/${encodePath(userId)}/password`, mutationOptions('PUT', { password }));
+  },
+
+  /** История правок audit_log с фильтрами */
+  async getAuditLog(filter: AuditLogFilter = {}): Promise<AuditLogResponse> {
+    const query: Record<string, string | number> = {};
+    for (const [key, value] of Object.entries(filter)) {
+      if (value !== null && value !== undefined && value !== '') query[key] = value as string | number;
+    }
+    return request<AuditLogResponse>('api/v1/audit-log', { query });
+  },
+
+  async getAuditLogEntry(logId: number): Promise<AuditLogItem> {
+    return request<AuditLogItem>(`api/v1/audit-log/${encodePath(logId)}`);
+  },
+
+  async getAuditLookups(): Promise<AuditLookups> {
+    return request<AuditLookups>('api/v1/audit-log/lookups');
   },
 
   /** Удаляет расчёт и его *_out-строки (только при MUTATIONS_ENABLED) */

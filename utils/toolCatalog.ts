@@ -1,3 +1,5 @@
+import type { Role } from '~/utils/permissions'
+
 /**
  * Каталог инструментов, не относящихся к карте: журналы, реестры,
  * диагностика и отчёты. Живёт отдельно от компонентов, чтобы панель
@@ -33,9 +35,13 @@ export type ToolEvent =
   | 'open-elevators'
   | 'open-throttling-calculator'
   | 'open-hydraulic-thematic'
+  | 'open-users-admin'
+  | 'open-audit-history'
 
 export interface ToolDescriptor {
   label: string
+  /** Минимальная роль: пункт скрыт, если у пользователя роль ниже (utils/permissions.ts) */
+  requires?: Role
   icon: string
   color: string
   event: ToolEvent
@@ -105,6 +111,15 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
       { label: 'Технические условия', hint: 'Реестр ТУ и нагрузки', icon: 'mdi-file-certificate-outline', color: 'cyan-darken-3', event: 'open-technical-condition-journal' },
       { label: 'Объекты АЛСЕКО', hint: 'Договорные нагрузки и здания', icon: 'mdi-office-building-marker', color: 'indigo-darken-2', event: 'open-alseko-journal' },
       { label: 'Электрическая сеть', hint: 'Источники, ЛЭП, приёмники', icon: 'mdi-transmission-tower', color: 'amber-darken-4', event: 'open-electrical-network-journal' },
+    ],
+  },
+  {
+    title: 'Администрирование',
+    icon: 'mdi-shield-account',
+    color: 'blue-grey-darken-2',
+    items: [
+      { label: 'История правок', hint: 'Журнал изменений audit_log', icon: 'mdi-history', color: 'blue-grey-darken-2', event: 'open-audit-history', requires: 'viewer' },
+      { label: 'Пользователи', hint: 'Роли, блокировка, пароли', icon: 'mdi-account-cog', color: 'blue-grey-darken-3', event: 'open-users-admin', requires: 'admin' },
     ],
   },
 ]

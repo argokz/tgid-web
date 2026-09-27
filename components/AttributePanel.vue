@@ -782,6 +782,20 @@
 
 
             <v-btn
+              v-if="historyTarget && authStore.canViewHistory"
+              icon
+              variant="text"
+              size="small"
+              color="grey-darken-1"
+              aria-label="История правок объекта"
+              @click="$emit('open-audit-history', historyTarget)"
+            >
+              <v-icon size="18">mdi-history</v-icon>
+              <v-tooltip activator="parent" location="bottom">История правок объекта</v-tooltip>
+            </v-btn>
+
+
+            <v-btn
 
 
               v-if="isEditTopologyMode"
@@ -1440,6 +1454,7 @@ import { useAttributeTabs, type TabData } from '~/composables/useAttributeTabs'
 
 
 import { fastApiService } from '~/services/fastApiService'
+import { useAuthStore } from '~/stores/authStore'
 
 
 
@@ -1467,6 +1482,7 @@ const emit = defineEmits<{
 
 
   'delete-feature': [featureId: string | number]
+  'open-audit-history': [scope: { table: string; recordId: number }]
 
 
   'open-defect-journal': [scope: { lineId?: number; nodeId?: number; defectId?: number }]
@@ -1595,6 +1611,14 @@ const isLineObject = computed(() => {
   const table = String(p.gistable || '').toLowerCase()
   if (table) return table === 'linesobj'
   return 'externalsignlineid' in p || ('nodeid1' in p && 'nodeid2' in p)
+})
+/** «История»: записи audit_log этой таблицы и этого id (триггеры пишут table_name в lower case) */
+const authStore = useAuthStore()
+const historyTarget = computed<{ table: string; recordId: number } | null>(() => {
+  const recordId = Number(propsData.value.id)
+  if (!Number.isInteger(recordId) || recordId <= 0) return null
+  const table = String(propsData.value.gistable || '').toLowerCase() || (isLineObject.value ? 'linesobj' : '')
+  return table ? { table, recordId } : null
 })
 
 

@@ -80,6 +80,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useMobile } from '~/composables/useMobile';
+import { useAuthStore } from '~/stores/authStore';
+import { filterByRole } from '~/utils/permissions';
 import { TOOL_GROUPS, type ToolDescriptor } from '~/utils/toolCatalog';
 
 const open = defineModel<boolean>({ default: false });
@@ -87,11 +89,15 @@ const emit = defineEmits<{ 'open-tool': [event: ToolDescriptor['event']] }>();
 
 const { isMobile: mobile } = useMobile();
 const search = ref('');
+const authStore = useAuthStore();
+
+/** Пункты с requires скрыты, если роль ниже (например «Пользователи» — только admin) */
+const allowedGroups = computed(() => filterByRole(TOOL_GROUPS, authStore.permissions));
 
 const filteredGroups = computed(() => {
   const s = (search.value || '').trim().toLowerCase();
-  if (!s) return TOOL_GROUPS;
-  return TOOL_GROUPS
+  if (!s) return allowedGroups.value;
+  return allowedGroups.value
     .map((g) => ({
       ...g,
       items: g.items.filter(

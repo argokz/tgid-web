@@ -333,6 +333,16 @@
         ref="calculationDiagnosticsRef"
       />
 
+      <!-- Администрирование: пользователи и роли (только admin), история правок audit_log -->
+      <LazyUsersAdminDialog
+        v-if="mountedDialogs.usersAdmin"
+        ref="usersAdminRef"
+      />
+      <LazyAuditHistoryDialog
+        v-if="mountedDialogs.auditHistory"
+        ref="auditHistoryRef"
+      />
+
       <!-- Attribute properties panel dialog (лениво: монтируется при первом identify-клике) -->
       <LazyAttributePanel
         v-if="mountedDialogs.attributePanel"
@@ -358,6 +368,7 @@
         @open-network-bypasses="openLazyDialog('networkBypass', $event)"
         @open-network-diaphragms="openLazyDialog('networkDiaphragm', $event)"
         @open-outage-simulation="openLazyDialog('outageSimulation', $event)"
+        @open-audit-history="openLazyDialog('auditHistory', $event)"
       />
 
       <!-- Node search dialog -->
@@ -759,6 +770,8 @@ const regimeAnalysisRef = ref<{ openDialog: () => void } | null>(null);
 const outageSimulationRef = ref<{ openDialog: (scope?: { lineId?: number; nodeId?: number }) => void } | null>(null);
 const throttlingCalculatorRef = ref<{ openDialog: (scope?: any) => void } | null>(null);
 const hydraulicThematicRef = ref<{ openDialog: (scope?: any) => void } | null>(null);
+const usersAdminRef = ref<{ openDialog: () => void } | null>(null);
+const auditHistoryRef = ref<{ openDialog: (scope?: { table?: string; recordId?: number }) => void } | null>(null);
 
 /**
  * Ленивое монтирование диалогов: тяжёлые журналы не попадают в основной чанк карты,
@@ -794,7 +807,9 @@ type LazyDialogKey =
   | 'regimeAnalysis'
   | 'outageSimulation'
   | 'throttlingCalculator'
-  | 'hydraulicThematic';
+  | 'hydraulicThematic'
+  | 'usersAdmin'
+  | 'auditHistory';
 
 type LazyDialogInstance = { openDialog: (scope?: any) => void };
 
@@ -830,6 +845,8 @@ const lazyDialogRefs: Record<LazyDialogKey, Ref<LazyDialogInstance | null>> = {
   outageSimulation: outageSimulationRef,
   throttlingCalculator: throttlingCalculatorRef,
   hydraulicThematic: hydraulicThematicRef,
+  usersAdmin: usersAdminRef,
+  auditHistory: auditHistoryRef,
 };
 
 /** Событие панели инструментов → ключ ленивого диалога */
@@ -862,6 +879,8 @@ const TOOL_EVENT_TO_DIALOG: Record<ToolEvent, LazyDialogKey> = {
   'open-elevators': 'elevator',
   'open-network-queries': 'networkQueries',
   'open-regime-analysis': 'regimeAnalysis',
+  'open-users-admin': 'usersAdmin',
+  'open-audit-history': 'auditHistory',
 };
 
 const onOpenTool = (event: ToolEvent) => {
