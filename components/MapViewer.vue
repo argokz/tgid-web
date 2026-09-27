@@ -349,7 +349,7 @@
         ref="attributePanelRef"
         :is-edit-topology-mode="isEditTopologyMode"
         @delete-feature="onDeleteFeature"
-        @refresh-layers="layerStore.refreshVisibleDataLayers()"
+        @refresh-layers="onCardRefreshLayers"
         @open-defect-journal="openLazyDialog('defect', $event)"
         @open-shurf-journal="openLazyDialog('shurf', $event)"
         @open-inspection-journal="openLazyDialog('inspection', $event)"
@@ -482,6 +482,54 @@
           <span v-else-if="isMergeMode && mergeTargetNodeId" class="text-caption text-warning font-weight-medium">
             Узел {{ mergeTargetNodeId }} выбран. Кликните узел для слияния.
           </span>
+          <v-btn
+            size="small"
+            :color="isVertexMode ? 'warning' : 'default'"
+            :variant="isVertexMode ? 'flat' : 'outlined'"
+            @click="toggleVertexMode"
+          >
+            <v-icon start size="16">mdi-vector-polyline-edit</v-icon>
+            {{ isVertexMode ? 'Закрыть вершины' : 'Вершины' }}
+          </v-btn>
+          <template v-if="isVertexMode">
+            <span v-if="!vertexEditor.active.value" class="text-caption text-medium-emphasis">
+              Кликните участок
+            </span>
+            <template v-else>
+              <span class="text-caption">
+                Участок {{ vertexEditor.lineId.value }}: тяните вершину, «○» — добавить, правый клик — удалить
+              </span>
+              <v-btn
+                size="small"
+                color="primary"
+                variant="flat"
+                :disabled="!vertexEditor.dirty.value"
+                :loading="vertexEditor.saving.value"
+                @click="vertexEditor.save()"
+              >
+                <v-icon start size="16">mdi-content-save</v-icon>
+                Сохранить
+              </v-btn>
+              <v-btn size="small" variant="text" :disabled="!vertexEditor.dirty.value" @click="vertexEditor.reset()">
+                <v-icon start size="16">mdi-restore</v-icon>
+                Сбросить
+              </v-btn>
+            </template>
+          </template>
+          <v-divider vertical class="mx-1" />
+          <v-btn
+            size="small"
+            variant="outlined"
+            :disabled="!lastTopologyOperation || !lastTopologyOperation.undo_supported"
+            :loading="undoBusy"
+            @click="undoLastTopologyOperation"
+          >
+            <v-icon start size="16">mdi-undo</v-icon>
+            Отменить
+            <v-tooltip activator="parent" location="bottom">
+              {{ lastTopologyOperation ? `Отменить: ${topologyOperationLabel(lastTopologyOperation)}` : 'Нет операций для отмены' }}
+            </v-tooltip>
+          </v-btn>
         </div>
       </div>
 
@@ -539,8 +587,11 @@ import type { Ref } from 'vue';
 import { markPerf, measurePerf, timeAsync } from '~/utils/perf';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { ApiError, fastApiService } from '~/services/fastApiService';
-import type { MergeNodesReport } from '~/services/fastApiService';
+import type { MergeNodesReport, SplitReviewDecision, TopologyUndoEntry } from '~/services/fastApiService';
 import maplibregl from 'maplibre-gl';
+import { useLineVertexEditor } from '~/composables/useLineVertexEditor';
+import { pickNetworkSnap } from '~/utils/networkSnap';
+import { topologyOperationLabel } from '~/utils/topologyLabels';
 
 const props = defineProps<{
   initialLayers: LayerConfig[];
@@ -1699,6 +1750,81 @@ const fetchTopologyVersion = async (kind: 'nodes' | 'lines', id: number): Promis
   }
 };
 
+// === Отмена последней операции топологии (журнал на сервере, B5) ===
+const lastTopologyOperation = ref<TopologyUndoEntry | null>(null);
+const undoBusy = ref(false);
+
+const refreshUndoState = async () => {
+  if (!topologyEditingEnabled.value) {
+    lastTopologyOperation.value = null;
+    return;
+  }
+  try {
+    lastTopologyOperation.value = await fastApiService.getLastTopologyOperation();
+  } catch {
+    lastTopologyOperation.value = null;
+  }
+};
+
+/** После любой операции топологии: обновить слои и кнопку «Отменить» */
+const afterTopologyChange = () => {
+  layerStore.refreshVisibleDataLayers();
+  void refreshUndoState();
+};
+
+/** Карточка объекта сообщает об изменении (разворот, удаление) */
+const onCardRefreshLayers = () => afterTopologyChange();
+
+const undoLastTopologyOperation = async () => {
+  const entry = lastTopologyOperation.value;
+  if (!entry) return;
+  undoBusy.value = true;
+  try {
+    const res = await fastApiService.undoTopologyOperation(entry.operation_id);
+    const deleted = Object.values(res.deleted || {}).reduce((a, ids) => a + ids.length, 0);
+    const restored = Object.values(res.restored || {}).reduce((a, n) => a + Number(n || 0), 0);
+    useNotificationStore().showSuccess(
+      `Отменено: ${topologyOperationLabel(entry)} (восстановлено строк: ${restored}, удалено созданных: ${deleted})`
+    );
+    vertexEditor.stop();
+    afterTopologyChange();
+  } catch (err: any) {
+    if (err instanceof ApiError && err.isVersionConflict) {
+      useNotificationStore().showWarning(
+        'Отменить нельзя: объекты операции изменены после неё (другим пользователем или следующей операцией).'
+      );
+    } else {
+      reportTopologyError(err, 'Ошибка отмены');
+    }
+    void refreshUndoState();
+  } finally {
+    undoBusy.value = false;
+  }
+};
+
+// === Правка вершин участка (8.5) ===
+const isVertexMode = ref(false);
+const vertexEditor = useLineVertexEditor(() => mapStore.map, {
+  onSaved: (res) => {
+    useNotificationStore().showSuccess(`Геометрия участка ${res.line_id} сохранена, длина ${res.new_length} м`);
+    afterTopologyChange();
+  },
+  onError: (err, reload) => reportTopologyError(err, 'Ошибка сохранения геометрии', reload),
+});
+
+const toggleVertexMode = () => {
+  if (isVertexMode.value && vertexEditor.dirty.value && !confirm('Отказаться от несохранённых изменений вершин?')) return;
+  isVertexMode.value = !isVertexMode.value;
+  vertexEditor.stop();
+  if (isVertexMode.value) {
+    isMergeMode.value = false;
+    mergeTargetNodeId.value = null;
+    mergeSourceNodeId.value = null;
+    topologyStartNode.value = null;
+    useNotificationStore().showInfo('Правка вершин: кликните участок. Концы участка прибиты к узлам.');
+  }
+};
+
 /** 409 «изменён другим пользователем» — уведомление с кнопкой перезагрузки; прочее — ошибка */
 const reportTopologyError = (err: any, prefix: string, reload?: () => void | Promise<void>) => {
   const notify = useNotificationStore();
@@ -1713,6 +1839,10 @@ const reportTopologyError = (err: any, prefix: string, reload?: () => void | Pro
 };
 
 const toggleMergeMode = () => {
+  if (isVertexMode.value) {
+    isVertexMode.value = false;
+    vertexEditor.stop();
+  }
   isMergeMode.value = !isMergeMode.value;
   mergeTargetNodeId.value = null;
   mergeSourceNodeId.value = null;
@@ -1768,7 +1898,7 @@ const confirmMerge = async () => {
     useNotificationStore().showSuccess(
       `Узел ${source} слит в ${target}. Перепривязано участков: ${res.merged_lines ?? 0}, перенесено ссылок: ${moved}${removed}`
     );
-    layerStore.refreshVisibleDataLayers();
+    afterTopologyChange();
     mergeConfirmDialogOpen.value = false;
     isMergeMode.value = false;
     mergeTargetNodeId.value = null;
@@ -1808,16 +1938,20 @@ const openSplitPreview = async (lineId: number, lng: number, lat: number) => {
   }
 };
 
-const confirmSplit = async () => {
+const confirmSplit = async (reviewToNew: SplitReviewDecision = {}) => {
   const target = splitPreviewTarget.value;
   if (!target) return;
   splitPreviewConfirming.value = true;
   try {
-    const result = await fastApiService.splitLine(target.lineId, target.lng, target.lat, target.version);
+    // решение по оборудованию без узла/позиции — всегда явное ({} — всё на первой половине)
+    const result = await fastApiService.splitLine(target.lineId, target.lng, target.lat, target.version, reviewToNew);
+    const movedByOperator = Object.values(result.transferred?.review_moved || {})
+      .reduce((a: number, ids: any) => a + (ids?.length || 0), 0);
     useNotificationStore().showSuccess(
       `Участок ${target.lineId} разрезан: узел ${result.new_node_id}, участок ${result.new_line_id}`
+      + (movedByOperator ? `; на вторую половину перенесено оборудования: ${movedByOperator}` : '')
     );
-    layerStore.refreshVisibleDataLayers();
+    afterTopologyChange();
     splitPreviewOpen.value = false;
   } catch (err: any) {
     splitPreviewOpen.value = false;
@@ -1869,8 +2003,12 @@ const toggleEditTopologyMode = () => {
     useNotificationStore().showWarning('Сначала завершите рисование или измерение на панели рисования.');
     return;
   }
+  if (isEditTopologyMode.value && vertexEditor.dirty.value && !confirm('Отказаться от несохранённых изменений вершин?')) return;
   isEditTopologyMode.value = !isEditTopologyMode.value;
+  isVertexMode.value = false;
+  vertexEditor.stop();
   if (isEditTopologyMode.value) {
+    void refreshUndoState();
     topologyStartNode.value = null;
     isTraceMode.value = false;
     mapStore.setIdentifyMode(false);
@@ -1890,6 +2028,11 @@ const toggleEditTopologyMode = () => {
 
 const onMapMouseDownForTopology = (e: any) => {
   if (!isEditTopologyMode.value || activeDrawMode.value !== 'none') return;
+  // Режим вершин: перетаскивание вершин вместо узлов
+  if (isVertexMode.value) {
+    vertexEditor.onMouseDown(e);
+    return;
+  }
   // В режиме слияния узлы только выбираются кликом
   if (isMergeMode.value) return;
   const features = mapStore.map?.queryRenderedFeatures(e.point);
@@ -1922,18 +2065,37 @@ const onMapMouseDownForTopology = (e: any) => {
   }
 };
 
+/** Привязка в редакторе — только к объектам сети (utils/networkSnap), кроме самого узла */
+const NODE_SNAP_RADIUS_PX = 10;
+const snapToNetwork = (e: any, excludeNodeId: number | null): [number, number] => {
+  const map = mapStore.map;
+  if (!map) return [e.lngLat.lng, e.lngLat.lat];
+  const r = NODE_SNAP_RADIUS_PX;
+  const features = map.queryRenderedFeatures([[e.point.x - r, e.point.y - r], [e.point.x + r, e.point.y + r]]);
+  const snap = pickNetworkSnap(features, e.point, (c) => map.project(c), r, {
+    nodes: excludeNodeId != null ? [excludeNodeId] : [],
+  });
+  return snap ? snap.coord : [e.lngLat.lng, e.lngLat.lat];
+};
+
 const onMapMouseMoveForTopology = (e: any) => {
-  if (!isEditTopologyMode.value || !draggedNodeMarker || draggedNodeId === null) return;
+  if (!isEditTopologyMode.value) return;
+  if (isVertexMode.value) {
+    vertexEditor.onMouseMove(e);
+    return;
+  }
+  if (!draggedNodeMarker || draggedNodeId === null) return;
   if (!dragMoved && dragStartPoint) {
     const dx = e.point.x - dragStartPoint.x;
     const dy = e.point.y - dragStartPoint.y;
     if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
     dragMoved = true;
   }
-  draggedNodeMarker.setLngLat(e.lngLat);
+  draggedNodeMarker.setLngLat(snapToNetwork(e, draggedNodeId));
 };
 
 const onNodeDragEnd = async () => {
+  if (vertexEditor.onMouseUp()) return;
   if (!draggedNodeMarker || !draggedNodeId) return;
   if (!dragMoved) {
     // Сдвига не было: это клик — пусть его обработает onMapClickForTopology
@@ -1953,9 +2115,7 @@ const onNodeDragEnd = async () => {
     const expectedVersion = draggedNodeVersion ? await draggedNodeVersion : undefined;
     await fastApiService.moveNode(id, lngLat.lng, lngLat.lat, expectedVersion);
     useNotificationStore().showSuccess('Узел успешно перемещен');
-    // Refresh layers
-    const layerStore = useLayerStore();
-    layerStore.refreshVisibleDataLayers();
+    afterTopologyChange();
   } catch (err: any) {
     reportTopologyError(err, 'Ошибка перемещения узла');
   } finally {
@@ -1977,6 +2137,22 @@ const onMapClickForTopology = async (e: any) => {
   const features = mapStore.map?.queryRenderedFeatures(e.point);
   const nodeFeature = features?.find((feature: any) => getFeatureKind(feature) === 'node');
   const lineFeature = features?.find((feature: any) => getFeatureKind(feature) === 'line');
+
+  // Режим вершин: клик по участку выбирает его для правки (пока правка не закрыта)
+  if (isVertexMode.value) {
+    if (vertexEditor.active.value) return;
+    const lineId = lineFeature ? getFeatureId(lineFeature) : null;
+    if (!lineId) {
+      useNotificationStore().showInfo('Кликните по участку сети.');
+      return;
+    }
+    try {
+      await vertexEditor.load(lineId);
+    } catch (err: any) {
+      reportTopologyError(err, 'Не удалось загрузить геометрию участка');
+    }
+    return;
+  }
   
   if (nodeFeature && nodeFeature.properties) {
     const id = getFeatureId(nodeFeature);
@@ -2016,8 +2192,7 @@ const onMapClickForTopology = async (e: any) => {
         ]);
         await fastApiService.createLine(topologyStartNode.value, id, { nodeid1: startVersion, nodeid2: endVersion });
         useNotificationStore().showSuccess(`Участок между ${topologyStartNode.value} и ${id} создан`);
-        const layerStore = useLayerStore();
-        layerStore.refreshVisibleDataLayers();
+        afterTopologyChange();
       } catch (err: any) {
         reportTopologyError(err, 'Ошибка создания участка');
       } finally {
@@ -2041,12 +2216,21 @@ const onMapClickForTopology = async (e: any) => {
   }
 
   try {
-    const result = await fastApiService.createNode(e.lngLat.lng, e.lngLat.lat);
-    useNotificationStore().showSuccess(`Узел ${result.id} создан`);
-    layerStore.refreshVisibleDataLayers();
+    // Фрагмент, код и признак подачи/обратки сервер берёт у ближайшего узла сети —
+    // без них узел не попадёт в расчёт и не сольётся с соседями
+    const [lng, lat] = snapToNetwork(e, null);
+    const result = await fastApiService.createNode(lng, lat);
+    useNotificationStore().showSuccess(`Узел ${result.id} создан (фрагмент ${result.fileid ?? '—'})`);
+    afterTopologyChange();
   } catch (err: any) {
-    useNotificationStore().showError('Ошибка создания узла: ' + err.message);
+    reportTopologyError(err, 'Ошибка создания узла');
   }
+};
+
+/** Правый клик в режиме вершин — удалить промежуточную вершину */
+const onMapContextMenuForTopology = (e: any) => {
+  if (!isEditTopologyMode.value || !isVertexMode.value) return;
+  vertexEditor.onContextMenu(e);
 };
 
 /** Удаление из карточки: version — версия объекта, запомненная при открытии карточки */
@@ -2067,8 +2251,7 @@ const onDeleteFeature = async (featureId: string | number, version?: string) => 
       useNotificationStore().showSuccess('Участок удален');
     }
     attributePanelRef.value?.close();
-    const layerStore = useLayerStore();
-    layerStore.refreshVisibleDataLayers();
+    afterTopologyChange();
   } catch (err: any) {
     reportTopologyError(err, 'Ошибка удаления', () => attributePanelRef.value?.close());
   }
@@ -2131,6 +2314,7 @@ const initMap = async () => {
     mapStore.map?.on('mousemove', onMapMouseMoveForTopology);
     mapStore.map?.on('mouseup', onNodeDragEnd);
     mapStore.map?.on('click', onMapClickForTopology);
+    mapStore.map?.on('contextmenu', onMapContextMenuForTopology);
     mapBootstrapped.value = true;
     mapInitLoading.value = false;
     await applyLayersToMap(props.initialLayers);
@@ -2248,6 +2432,7 @@ onBeforeUnmount(() => {
   mapStore.map?.off('mousemove', onMapMouseMoveForTopology);
   mapStore.map?.off('mouseup', onNodeDragEnd);
   mapStore.map?.off('click', onMapClickForTopology);
+  mapStore.map?.off('contextmenu', onMapContextMenuForTopology);
   if (draggedNodeMarker) draggedNodeMarker.remove();
   clearRouteHighlight();
   if (defectLocateMarker) defectLocateMarker.remove();
