@@ -2190,8 +2190,13 @@ const onMapClickForTopology = async (e: any) => {
           topologyStartNodeVersion ?? Promise.resolve(undefined),
           fetchTopologyVersion('nodes', id),
         ]);
-        await fastApiService.createLine(topologyStartNode.value, id, { nodeid1: startVersion, nodeid2: endVersion });
-        useNotificationStore().showSuccess(`Участок между ${topologyStartNode.value} и ${id} создан`);
+        const created = await fastApiService.createLine(topologyStartNode.value, id, { nodeid1: startVersion, nodeid2: endVersion });
+        // Паспорт трубы (диаметр, конструктив) сервер берёт от смежного/ближайшего участка
+        const templateLine = created?.passport?.template_line_id;
+        const passportNote = templateLine
+          ? `; паспорт трубы скопирован с участка ${templateLine}`
+          : '; паспорт трубы по умолчанию — проверьте диаметр';
+        useNotificationStore().showSuccess(`Участок между ${topologyStartNode.value} и ${id} создан${passportNote}`);
         afterTopologyChange();
       } catch (err: any) {
         reportTopologyError(err, 'Ошибка создания участка');
