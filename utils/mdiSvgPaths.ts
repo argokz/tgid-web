@@ -196,6 +196,9 @@ import {
   mdiWaterCheck,
   mdiWaterPlus,
   mdiWaterPump,
+  mdiStamper,
+  mdiCursorDefaultClickOutline,
+  mdiFileDocumentMultipleOutline,
 } from '@mdi/js'
 
 
@@ -390,6 +393,9 @@ const byExportName: Record<string, string> = {
   mdiWaterCheck,
   mdiWaterPlus,
   mdiWaterPump,
+  mdiStamper,
+  mdiCursorDefaultClickOutline,
+  mdiFileDocumentMultipleOutline,
 }
 
 

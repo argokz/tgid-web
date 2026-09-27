@@ -378,6 +378,9 @@
         :map="mapStore.map"
       />
 
+      <!-- Контур журнала: показ на карте и выбор участков (этап 9) -->
+      <JournalContourPickBar />
+
       <!-- Панель трассировки маршрута пьезометра -->
       <v-card
         v-if="isTraceMode"
@@ -590,6 +593,7 @@ import { ApiError, fastApiService } from '~/services/fastApiService';
 import type { MergeNodesReport, SplitReviewDecision, TopologyUndoEntry } from '~/services/fastApiService';
 import maplibregl from 'maplibre-gl';
 import { useLineVertexEditor } from '~/composables/useLineVertexEditor';
+import { useJournalContourLayer } from '~/composables/useJournalContourLayer';
 import { pickNetworkSnap } from '~/utils/networkSnap';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
 
@@ -1802,6 +1806,13 @@ const undoLastTopologyOperation = async () => {
   }
 };
 
+// === Контуры журналов (этап 9): слой контура и выбор участков кликом ===
+const journalContourLayer = useJournalContourLayer(() => mapStore.map, {
+  isLineFeature: (feature: any) => getFeatureKind(feature) === 'line',
+  featureId: (feature: any) => getFeatureId(feature),
+  onPickHint: (text: string) => useNotificationStore().showInfo(text),
+});
+
 // === Правка вершин участка (8.5) ===
 const isVertexMode = ref(false);
 const vertexEditor = useLineVertexEditor(() => mapStore.map, {
@@ -2320,6 +2331,7 @@ const initMap = async () => {
     mapStore.map?.on('mouseup', onNodeDragEnd);
     mapStore.map?.on('click', onMapClickForTopology);
     mapStore.map?.on('contextmenu', onMapContextMenuForTopology);
+    if (mapStore.map) journalContourLayer.attach(mapStore.map);
     mapBootstrapped.value = true;
     mapInitLoading.value = false;
     await applyLayersToMap(props.initialLayers);
@@ -2438,6 +2450,7 @@ onBeforeUnmount(() => {
   mapStore.map?.off('mouseup', onNodeDragEnd);
   mapStore.map?.off('click', onMapClickForTopology);
   mapStore.map?.off('contextmenu', onMapContextMenuForTopology);
+  journalContourLayer.detach(mapStore.map);
   if (draggedNodeMarker) draggedNodeMarker.remove();
   clearRouteHighlight();
   if (defectLocateMarker) defectLocateMarker.remove();
