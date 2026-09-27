@@ -345,7 +345,7 @@
             {{ sourceDetails.ready_to_calculate ? 'Готов к расчёту' : 'Исходные данные неполные' }}
           </v-chip>
           <v-btn
-            v-if="mutationsEnabled && sourceDetails.fragment_id"
+            v-if="authStore.canRunWritingCalc && sourceDetails.fragment_id"
             class="ml-2"
             color="primary"
             variant="tonal"
@@ -428,8 +428,11 @@
 
 <script setup lang="ts">
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useAuthStore } from '~/stores/authStore'
 
 const mutationsEnabled = useMutationsEnabled()
+/** Запуск теплопотерь пишет в БД: роль calculator+ и MUTATIONS_ENABLED на сервере */
+const authStore = useAuthStore()
 import { defineComponent, h, type PropType } from 'vue'
 import { useDisplay } from 'vuetify'
 import { fastApiService, type HeatLossLookups, type HeatLossSeasonDetails, type HeatLossSeasonSummary, type HeatLossSourceDetails, type HeatLossSourceSummary } from '~/services/fastApiService'

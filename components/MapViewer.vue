@@ -528,6 +528,7 @@ import { usePopupStore } from '~/stores/popupStore';
 import { useLayerStore } from '~/stores/layerStore';
 import { useCesiumStore } from '~/stores/cesiumStore';
 import { useUiStore } from '~/stores/uiStore';
+import { useAuthStore } from '~/stores/authStore';
 import type { ToolEvent } from '~/utils/toolCatalog';
 import type { LayerConfig } from '~/types';
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
@@ -555,10 +556,9 @@ watch(() => uiStore.toolsPanelOpen, (isOpen: boolean) => {
   if (isOpen) toolsPanelMounted.value = true;
 });
 const CesiumViewer = defineAsyncComponent(() => import('./CesiumViewer.vue'));
-const runtimeConfig = useRuntimeConfig();
-const topologyEditingEnabled = computed(
-  () => runtimeConfig.public.topologyEditingEnabled === true
-);
+const authStore = useAuthStore();
+/** Редактор топологии: admin + MUTATIONS_ENABLED + TOPOLOGY_MUTATIONS_ENABLED на сервере */
+const topologyEditingEnabled = computed(() => authStore.canEditTopology);
 const PAGE_STATE_KEY = 'mapPageState';
 
 const mapInitLoading = ref(false);
@@ -1649,6 +1649,10 @@ const onMapClickForTrace = (e: any) => {
 
 // === Topology Edit Mode ===
 const isEditTopologyMode = ref(false);
+// Вышел из учётной записи / сервер выключил флаг — режим правки топологии закрывается
+watch(topologyEditingEnabled, (enabled: boolean) => {
+  if (!enabled) isEditTopologyMode.value = false;
+});
 const topologyStartNode = ref<number | null>(null);
 let draggedNodeMarker: maplibregl.Marker | null = null;
 let draggedNodeId: number | null = null;

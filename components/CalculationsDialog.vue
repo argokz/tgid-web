@@ -126,6 +126,7 @@
           </template>
           <template #[`item.actions`]="{ item }">
             <v-btn
+              v-if="authStore.canRunWritingCalc"
               icon="mdi-delete"
               variant="text"
               size="small"
@@ -137,10 +138,10 @@
           </template>
         </v-data-table-server>
         <p
-          v-if="!authStore.mutationsEnabledServer"
+          v-if="!authStore.canRunWritingCalc"
           class="text-caption text-medium-emphasis mt-1"
         >
-          Удаление расчётов выключено на сервере (MUTATIONS_ENABLED=false) или нужен вход.
+          Удаление расчётов: нужна роль calculator или выше и MUTATIONS_ENABLED=true на сервере.
         </p>
       </v-card-text>
     </v-card>
@@ -266,7 +267,7 @@ const modeLabel = (item: CalculationListItem) => {
 };
 
 const canDelete = (item: CalculationListItem) => {
-  if (!authStore.mutationsEnabledServer || !authStore.canCalculate) return false;
+  if (!authStore.canRunWritingCalc) return false;
   return authStore.canEdit || (item.user_gid ?? '') === authStore.username;
 };
 
@@ -333,7 +334,8 @@ watch(
 watch(isOpen, (open) => {
   if (!open) return;
   if (!fragmentStore.getFragments.length) void fragmentStore.loadFragments();
-  void authStore.refreshMe(); // актуальный флаг MUTATIONS_ENABLED и роль для кнопки удаления
+  // актуальный флаг MUTATIONS_ENABLED и роль для кнопки удаления
+  void (authStore.accessToken ? authStore.refreshMe() : authStore.loadConfig());
   void load();
 });
 </script>

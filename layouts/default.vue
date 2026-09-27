@@ -42,7 +42,9 @@
           {{ link.text }}
         </v-btn>
 
+        <!-- Запуск расчёта sety: роль calculator+ (сервер проверяет то же) -->
         <v-btn
+          v-if="authStore.canCalculate"
           prepend-icon="mdi-calculator-variant"
           :color="showCalculationModal ? 'primary' : undefined"
           :class="['nav-btn', 'ms-1', { 'active-link': showCalculationModal }]"
@@ -152,7 +154,7 @@
             <v-list-item
               v-if="authStore.isAuthenticated"
               :title="authStore.username"
-              :subtitle="authStore.role || 'пользователь'"
+              :subtitle="roleLabel"
               prepend-icon="mdi-account-check"
             />
             <v-list-item
@@ -196,6 +198,7 @@
 
     <!-- Модальное окно расчета -->
     <PlanningCalculationModal
+      v-if="authStore.canCalculate"
       v-model="showCalculationModal"
       @protocol-log="onCalculationLog"
       @show-protocol="showProtocol = $event"
@@ -210,7 +213,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useMobile } from '~/composables/useMobile';
 import { apiHealth, fastApiService, refreshApiHealth } from '~/services/fastApiService';
@@ -221,6 +224,7 @@ import { useUiStore } from '~/stores/uiStore';
 import PlanningCalculationModal from '~/components/PlanningCalculationModal.vue';
 import CalculationProtocol from '~/components/CalculationProtocol.vue';
 import LoginDialog from '~/components/LoginDialog.vue';
+import { ROLE_LABELS, type Role } from '~/utils/permissions';
 
 const { isMobile: mobile } = useMobile();
 const route = useRoute();
@@ -237,6 +241,13 @@ const protocolRef = ref<{ addLog: (log: any) => void } | null>(null);
 onMounted(() => {
   authStore.hydrate();
   void refreshApiHealth();
+});
+
+const roleLabel = computed(() => ROLE_LABELS[authStore.role as Role] || authStore.role || 'пользователь');
+
+// Роль понизили или вышли из учётной записи — окно расчёта закрывается
+watch(() => authStore.canCalculate, (allowed) => {
+  if (!allowed) showCalculationModal.value = false;
 });
 
 const links = [

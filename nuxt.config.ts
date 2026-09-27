@@ -70,13 +70,8 @@ export default defineNuxtConfig({
         process.env.NUXT_PUBLIC_CESIUM_ION_TOKEN ||
         env.NUXT_PUBLIC_CESIUM_ION_TOKEN ||
         '',
-      topologyEditingEnabled:
-        process.env.NUXT_PUBLIC_TOPOLOGY_EDITING_ENABLED === 'true' ||
-        env.NUXT_PUBLIC_TOPOLOGY_EDITING_ENABLED === 'true',
-      /** Journal/attribute write UI. Requires API MUTATIONS_ENABLED + auth. */
-      mutationsEnabled:
-        process.env.NUXT_PUBLIC_MUTATIONS_ENABLED === 'true' ||
-        env.NUXT_PUBLIC_MUTATIONS_ENABLED === 'true',
+      // Кнопки записи, расчётов и топологии показываются по роли и флагам сервера
+      // (/auth/config: mutations_enabled, topology_mutations_enabled) — см. utils/permissions.ts.
       networkTilesetUrl:
         process.env.NUXT_PUBLIC_NETWORK_TILESET_URL ||
         env.NUXT_PUBLIC_NETWORK_TILESET_URL ||
