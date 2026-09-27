@@ -334,10 +334,51 @@ export interface TravelTimeResponse {
 export interface SplitTransferReport {
   /** Реально перенесено на новую половину: {таблица: количество} */
   moved: Record<string, number>;
-  /** Оставлено на первой половине, требует ручной проверки оператора */
+  /** Оборудование без узла и позиции на участке — половину выбирает оператор */
   review: Record<string, number>;
+  /** То же поштучно (превью): опознавательные атрибуты объекта */
+  review_items?: Record<string, SplitReviewItem[]>;
+  /** Перенесено на новую половину по решению оператора */
+  review_moved?: Record<string, number[]>;
   /** Таблицы/колонки, отсутствующие в схеме — пропущены */
   skipped: string[];
+}
+
+export interface SplitReviewItem {
+  id: number;
+  attrs: Record<string, string | number | boolean | null>;
+}
+
+/** Решение оператора при разрезании: {таблица: [id]} — на новую (вторую) половину */
+export type SplitReviewDecision = Record<string, number[]>;
+
+/** Операция топологии, которую можно отменить (кнопка «Отменить») */
+export interface TopologyUndoEntry {
+  operation_id: number;
+  operation: string;
+  created_at: string | null;
+  summary: Record<string, any>;
+  objects: number;
+  undo_supported: boolean;
+}
+
+export interface TopologyUndoResult extends TopologyUndoEntry {
+  success: boolean;
+  restored: Record<string, number>;
+  deleted: Record<string, number[]>;
+}
+
+/** Полная геометрия участка для правки вершин (WGS84) */
+export interface LineGeometryResponse {
+  line_id: number;
+  nodeid1: number;
+  nodeid2: number;
+  coordinates: [number, number][];
+  node1: [number, number] | null;
+  node2: [number, number] | null;
+  length_m: number | null;
+  version: string;
+  endpoint_tolerance_m: number;
 }
 
 export interface SplitPreview {
@@ -417,6 +458,10 @@ export interface ReverseLineReport {
   };
   requires_confirmation: boolean;
   versions: TopologyVersionMap;
+  /** Парная труба (подача ↔ обратка), разворачивается вместе — как в десктопе */
+  pair?: (ReverseLineReport & { matched_by: 'coords' | 'geometry'; deviation_m: number | null }) | null;
+  pair_line_id?: number | null;
+  operation_id?: number | null;
 }
 
 /** Тело запроса без неопределённых полей (версия не передана — сервер её не проверяет) */
@@ -766,9 +811,10 @@ export class ApiError extends Error {
     return this.status === 409 && this.data?.code === 'version_conflict';
   }
 
-  /** Маршрута нет на сервере — обычно развёрнута устаревшая версия API */
+  /** Маршрута нет на сервере — обычно развёрнута устаревшая версия API.
+   *  404 с кодом в detail (например, nothing_to_undo) — ответ существующего маршрута. */
   get isRouteMissing(): boolean {
-    return this.status === 404 && !this.path.match(/\/\d+$/);
+    return this.status === 404 && !this.data?.code && !this.path.match(/\/\d+$/);
   }
 
   /** Сеть/сервер недоступны */
@@ -800,13 +846,21 @@ const BLOCKER_LABELS: Record<string, string> = {
   conflicting_references: 'у обоих узлов есть единичные объекты',
 };
 
-const OBJECT_KIND_LABELS: Record<string, string> = { node: 'узел', line: 'участок' };
+const OBJECT_KIND_LABELS: Record<string, string> = {
+  node: 'узел',
+  line: 'участок',
+  // конфликты отмены: строки таблиц, затронутые операцией
+  nodes: 'узел',
+  linesobj: 'участок',
+  heatpipesections: 'паспорт трубы',
+  operation: 'последняя операция',
+};
 
 /** 409 version_conflict: {conflicts: {"node:5": {removed, changed_at}}} → «узел 5 (изменён 27.09 15:51)» */
 export const formatVersionConflict = (detail: { message?: string; conflicts?: Record<string, any> }): string => {
   const parts = Object.entries(detail.conflicts || {}).map(([key, info]) => {
     const [kind, id] = key.split(':');
-    const label = `${OBJECT_KIND_LABELS[kind] || kind} ${id}`;
+    const label = id ? `${OBJECT_KIND_LABELS[kind] || kind} ${id}` : OBJECT_KIND_LABELS[kind] || kind;
     if (info?.removed) return `${label} удалён`;
     const at = info?.changed_at ? new Date(info.changed_at) : null;
     return at && !Number.isNaN(at.getTime())
@@ -1107,10 +1161,20 @@ export const fastApiService = {
     });
   },
 
-  async splitLine(lineId: number, lng: number, lat: number, expectedVersion?: string): Promise<any> {
+  /**
+   * Разрезание. reviewToNew — решение по оборудованию без узла/позиции (из превью):
+   * без него при наличии такого оборудования сервер отвечает 409 requires_resolution.
+   */
+  async splitLine(
+    lineId: number,
+    lng: number,
+    lat: number,
+    expectedVersion?: string,
+    reviewToNew?: SplitReviewDecision
+  ): Promise<any> {
     return request('api/topology/split-line', {
       method: 'POST',
-      body: compact({ line_id: lineId, lng, lat, expected_version: expectedVersion }),
+      body: compact({ line_id: lineId, lng, lat, expected_version: expectedVersion, review_to_new: reviewToNew }),
     });
   },
 
@@ -1129,8 +1193,38 @@ export const fastApiService = {
     });
   },
 
-  async createNode(lng: number, lat: number): Promise<any> {
-    return request('api/topology/node', { method: 'POST', body: { lng, lat } });
+  /**
+   * Новый узел. Фрагмент/код/признак сервер берёт у узла-образца (nearNodeId / nearLineId)
+   * или у ближайшего узла сети; fileid — явный фрагмент.
+   */
+  async createNode(
+    lng: number,
+    lat: number,
+    ref: { fileid?: number; nearNodeId?: number; nearLineId?: number } = {}
+  ): Promise<{ success: boolean; id: number; fileid: number | null; operation_id?: number | null }> {
+    return request('api/topology/node', {
+      method: 'POST',
+      body: compact({ lng, lat, fileid: ref.fileid, near_node_id: ref.nearNodeId, near_line_id: ref.nearLineId }),
+    });
+  },
+
+  /** Полная геометрия участка и его версия (тайлы обрезаны и упрощены — для правки не годятся) */
+  async getLineGeometry(lineId: number): Promise<LineGeometryResponse> {
+    return request<LineGeometryResponse>(`api/topology/line/${encodePath(lineId)}/geometry`);
+  },
+
+  /** Последняя операция топологии пользователя, которую можно отменить (null — нечего) */
+  async getLastTopologyOperation(): Promise<TopologyUndoEntry | null> {
+    const res = await request<{ operation: TopologyUndoEntry | null }>('api/topology/undo');
+    return res.operation;
+  },
+
+  /** Отмена последней операции. 409 version_conflict — объекты изменены после неё; 404 — нечего отменять */
+  async undoTopologyOperation(operationId?: number): Promise<TopologyUndoResult> {
+    return request<TopologyUndoResult>('api/topology/undo', {
+      method: 'POST',
+      body: compact({ operation_id: operationId }),
+    });
   },
 
   async deleteNode(id: number, expectedVersion?: string): Promise<any> {
@@ -1936,7 +2030,14 @@ export const fastApiService = {
    */
   async reverseLine(
     lineId: number,
-    options: { expectedVersion?: string; acceptDirectionChange?: boolean } = {}
+    options: {
+      expectedVersion?: string;
+      acceptDirectionChange?: boolean;
+      /** Пара из превью (разворачивается вместе); includePair=false — только этот участок */
+      pairLineId?: number | null;
+      pairVersion?: string;
+      includePair?: boolean;
+    } = {}
   ): Promise<ReverseLineReport> {
     return request('api/topology/reverse-line', {
       method: 'POST',
@@ -1944,6 +2045,9 @@ export const fastApiService = {
         line_id: lineId,
         expected_version: options.expectedVersion,
         accept_direction_change: options.acceptDirectionChange || undefined,
+        pair_line_id: options.pairLineId ?? undefined,
+        pair_version: options.pairVersion,
+        include_pair: options.includePair === false ? false : undefined,
       }),
     });
   },

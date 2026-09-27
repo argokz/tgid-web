@@ -39,6 +39,23 @@
             </tbody>
           </v-table>
 
+          <!-- Парная труба (подача ↔ обратка): как в десктопе, разворачивается вместе -->
+          <div v-if="report.pair" class="mb-3">
+            <v-alert type="info" variant="tonal" density="compact" class="mb-1">
+              Парная труба {{ report.pair.line_id }}
+              ({{ externalSignLineLabel(report.pair.before.externalsignlineid) }},
+              {{ report.pair.matched_by === 'coords' ? 'та же трасса' : `трасса в пределах ${report.pair.deviation_m ?? 0} м` }}):
+              узлы {{ report.pair.before.nodeid1 }} → {{ report.pair.before.nodeid2 }}
+              станут {{ report.pair.after.nodeid1 }} → {{ report.pair.after.nodeid2 }}.
+            </v-alert>
+            <v-checkbox
+              v-model="withPair"
+              density="compact"
+              hide-details
+              label="Развернуть вместе с парной трубой (подача и обратка)"
+            />
+          </div>
+
           <!-- Зависит от направления: требует подтверждения -->
           <div v-if="directionalList.length" class="mb-3">
             <v-alert type="warning" variant="tonal" density="compact" class="mb-2">
@@ -98,8 +115,8 @@
           color="primary"
           variant="flat"
           :loading="confirming"
-          :disabled="loading || !!error || !report || (report.requires_confirmation && !accepted)"
-          @click="emit('confirm', { acceptDirectionChange: accepted })"
+          :disabled="loading || !!error || !report || (needsConfirmation && !accepted)"
+          @click="emit('confirm', { acceptDirectionChange: accepted, includePair: withPair && !!report?.pair })"
         >
           Развернуть
         </v-btn>
@@ -121,14 +138,30 @@ const props = defineProps<{
   confirming: boolean;
   error: string | null;
 }>();
-const emit = defineEmits<{ confirm: [options: { acceptDirectionChange: boolean }]; cancel: [] }>();
+const emit = defineEmits<{
+  confirm: [options: { acceptDirectionChange: boolean; includePair: boolean }];
+  cancel: [];
+}>();
 
 const accepted = ref(false);
+const withPair = ref(true);
 watch(() => props.report, () => {
   accepted.value = false;
+  withPair.value = true;
 });
 
-const directionalList = computed(() => countList(props.report?.equipment.directional));
+/** Оборудование, меняющее направление: участок + парная труба, если она разворачивается */
+const directionalCounts = computed(() => {
+  const own = { ...(props.report?.equipment.directional || {}) };
+  if (withPair.value && props.report?.pair) {
+    for (const [table, n] of Object.entries(props.report.pair.equipment.directional || {})) {
+      own[table] = (own[table] || 0) + Number(n || 0);
+    }
+  }
+  return own;
+});
+const needsConfirmation = computed(() => Object.keys(directionalCounts.value).length > 0);
+const directionalList = computed(() => countList(directionalCounts.value));
 const neutralList = computed(() => countList(props.report?.equipment.neutral));
 const diaphragmLocations = computed(() =>
   Object.entries(props.report?.equipment.diaphragm_locations || {})

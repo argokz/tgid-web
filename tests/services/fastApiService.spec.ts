@@ -923,6 +923,44 @@ describe('fastApiService optimistic locking and topology previews', () => {
     expect(err.userMessage).toContain('pumps ×1')
   })
 
+  it('sends split review decision, node reference and reverse pair', async () => {
+    await fastApiService.splitLine(17, 76.91, 43.25, 'v17', { dampers: [22] })
+    await fastApiService.createNode(76.9, 43.2, { nearNodeId: 5 })
+    await fastApiService.reverseLine(100, { expectedVersion: 'a', pairLineId: 101, pairVersion: 'b' })
+    await fastApiService.reverseLine(100, { includePair: false })
+    const bodies = fetchMock.mock.calls.map((c) => c[1].body)
+    expect(bodies[0]).toEqual({ line_id: 17, lng: 76.91, lat: 43.25, expected_version: 'v17', review_to_new: { dampers: [22] } })
+    expect(bodies[1]).toEqual({ lng: 76.9, lat: 43.2, near_node_id: 5 })
+    expect(bodies[2]).toEqual({ line_id: 100, expected_version: 'a', pair_line_id: 101, pair_version: 'b' })
+    expect(bodies[3]).toEqual({ line_id: 100, include_pair: false })
+  })
+
+  it('reads line geometry and undoes the last topology operation', async () => {
+    fetchMock.mockResolvedValueOnce({ operation: { operation_id: 12, operation: 'MOVE', summary: {}, objects: 3 } })
+    const last = await fastApiService.getLastTopologyOperation()
+    expect(last?.operation_id).toBe(12)
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.example.test/api/topology/undo')
+    await fastApiService.undoTopologyOperation(12)
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'POST', body: { operation_id: 12 } })
+    await fastApiService.getLineGeometry(17)
+    expect(fetchMock.mock.calls[2][0]).toBe('https://api.example.test/api/topology/line/17/geometry')
+  })
+
+  it('treats 404 nothing_to_undo as an answer, not a missing route', async () => {
+    fetchMock.mockRejectedValue({ statusCode: 404, data: { detail: { code: 'nothing_to_undo', message: 'Нет операций' } } })
+    const err = await fastApiService.undoTopologyOperation().catch((e) => e)
+    expect(err.status).toBe(404)
+    expect(err.isRouteMissing).toBe(false)
+  })
+
+  it('names rows in undo conflicts', () => {
+    const text = formatVersionConflict({
+      message: 'Объекты изменены после операции',
+      conflicts: { 'nodes:5': { removed: false }, 'heatpipesections:9': { removed: true }, operation: {} },
+    })
+    expect(text).toBe('Объекты изменены после операции: узел 5 изменён; паспорт трубы 9 удалён; последняя операция изменён')
+  })
+
   it('formats conflict timestamps', () => {
     const text = formatVersionConflict({ conflicts: { 'line:3': { removed: false, changed_at: '2026-09-27T15:51:45' } } })
     expect(text.startsWith('Объект изменён другим пользователем: участок 3 изменён ')).toBe(true)

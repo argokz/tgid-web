@@ -2632,20 +2632,26 @@ const reverseLineDirection = async () => {
   }
 }
 
-const confirmReverse = async ({ acceptDirectionChange }: { acceptDirectionChange: boolean }) => {
+const confirmReverse = async ({ acceptDirectionChange, includePair }: { acceptDirectionChange: boolean; includePair: boolean }) => {
   const lineId = reversePreviewLineId.value
   if (!lineId) return
+  const pairId = includePair ? reversePreviewReport.value?.pair?.line_id ?? null : null
   reversingLine.value = true
   try {
     const res = await fastApiService.reverseLine(lineId, {
       // версия из превью; если превью не вернуло — версия карточки
       expectedVersion: reversePreviewReport.value?.versions?.[`line:${lineId}`] ?? cardVersion.value,
       acceptDirectionChange,
+      // парная труба из превью разворачивается вместе (как GidWidget::swap в десктопе)
+      includePair,
+      pairLineId: pairId,
+      pairVersion: pairId ? reversePreviewReport.value?.versions?.[`line:${pairId}`] : undefined,
     })
     propsData.value = { ...propsData.value, nodeid1: res.nodeid1, nodeid2: res.nodeid2 }
     cardVersion.value = res.versions?.[`line:${lineId}`]
     reversePreviewOpen.value = false
-    notificationMessage.value = `Направление участка ${lineId} изменено (узлы ${res.nodeid1} → ${res.nodeid2})`
+    const pairText = res.pair_line_id ? ` вместе с парной трубой ${res.pair_line_id}` : ''
+    notificationMessage.value = `Направление участка ${lineId}${pairText} изменено (узлы ${res.nodeid1} → ${res.nodeid2})`
     showNotification.value = true
     emit('refresh-layers')
   } catch (error: any) {
