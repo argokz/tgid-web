@@ -346,7 +346,82 @@ export interface SplitPreview {
   new_node_id: number;
   new_line_id: number;
   transferred: SplitTransferReport;
+  /** Версии объектов на момент превью: {"line:17": "…#xmin"} — передаются при подтверждении */
+  versions: TopologyVersionMap;
 }
+
+/** Версии объектов для оптимистичной блокировки: {"node:5": token, "line:17": token} */
+export type TopologyVersionMap = Record<string, string>;
+
+export interface TopologyObjectVersion {
+  version: string;
+  archivechangedate: string | null;
+  removed: boolean;
+}
+
+export interface TopologyVersionsResponse {
+  nodes: Record<string, TopologyObjectVersion>;
+  lines: Record<string, TopologyObjectVersion>;
+}
+
+/** Превью/результат слияния узлов (dry-run → подтверждение) */
+export interface MergeNodesReport {
+  dry_run?: boolean;
+  success?: boolean;
+  target_node_id: number;
+  source_node_id: number;
+  target_position: { x: number | null; y: number | null; lng: number | null; lat: number | null };
+  distance_m: number | null;
+  /** Участки источника, которые перепривяжутся к целевому узлу */
+  relinked_lines: number[];
+  /** Участки между сливаемыми узлами — будут сняты (safe-delete) */
+  removed_lines: number[];
+  /** Что переносится на целевой узел: {"realconsumers.nodeid": 1} */
+  transfer: Record<string, number>;
+  /** Результаты расчёта (*_out) — не переносятся */
+  results_skipped: Record<string, number>;
+  /** Что блокирует слияние; пусто — можно применять */
+  blockers: Record<string, any>;
+  warnings: { parallel_lines_with?: number[] };
+  transferred?: Record<string, number>;
+  merged_lines?: number;
+  versions: TopologyVersionMap;
+}
+
+export interface ReverseNodeBoundItem {
+  id: number;
+  nodeid: number | null;
+  position_before: 'start' | 'end' | 'other';
+  position_after: 'start' | 'end' | 'other';
+}
+
+/** Превью/результат разворота участка */
+export interface ReverseLineReport {
+  dry_run?: boolean;
+  success?: boolean;
+  line_id: number;
+  nodeid1: number;
+  nodeid2: number;
+  before: { nodeid1: number; nodeid2: number; externalsignlineid: number | null };
+  after: { nodeid1: number; nodeid2: number; externalsignlineid: number | null };
+  geometry: { reversed: boolean; points: number | null; length_m: number | null };
+  equipment: {
+    /** Направление действия меняется вместе с участком (насосы, клапаны, регуляторы) */
+    directional: Record<string, number>;
+    /** Привязаны к узлу: узел сохраняется, меняется положение начало ↔ конец */
+    node_bound: Record<string, ReverseNodeBoundItem[]>;
+    /** От направления не зависят */
+    neutral: Record<string, number>;
+    /** Места установки диафрагм (функциональные, не начало/конец) */
+    diaphragm_locations: Record<string, number>;
+  };
+  requires_confirmation: boolean;
+  versions: TopologyVersionMap;
+}
+
+/** Тело запроса без неопределённых полей (версия не передана — сервер её не проверяет) */
+const compact = <T extends Record<string, any>>(body: T): T =>
+  Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined && v !== null)) as T;
 
 export interface OutageSimulationSummary {
   isolated_lines_count: number;
@@ -673,14 +748,22 @@ export class ApiError extends Error {
   readonly detail: string;
   readonly path: string;
   readonly userMessage: string;
+  /** Структурированный detail ответа (например, {code, conflicts} у 409), если он был объектом */
+  readonly data: any;
 
-  constructor(params: { status: number; detail: string; path: string; userMessage: string }) {
+  constructor(params: { status: number; detail: string; path: string; userMessage: string; data?: any }) {
     super(params.userMessage);
     this.name = 'ApiError';
     this.status = params.status;
     this.detail = params.detail;
     this.path = params.path;
     this.userMessage = params.userMessage;
+    this.data = params.data ?? null;
+  }
+
+  /** 409: объект изменён/удалён другим пользователем после того, как его прочитали */
+  get isVersionConflict(): boolean {
+    return this.status === 409 && this.data?.code === 'version_conflict';
   }
 
   /** Маршрута нет на сервере — обычно развёрнута устаревшая версия API */
@@ -710,6 +793,27 @@ const BLOCKER_LABELS: Record<string, string> = {
   internal_scheme_lines: 'линии внутренней схемы узла',
   connecting_lines: 'соединяющие участки с оборудованием',
   equipment: 'оборудование, зависящее от направления',
+  requires_confirmation: 'требуется подтверждение в превью',
+  different_fragments: 'узлы из разных фрагментов',
+  different_internal_scheme: 'узлы из разных внутренних схем',
+  target_without_geometry: 'у целевого узла нет геометрии',
+  conflicting_references: 'у обоих узлов есть единичные объекты',
+};
+
+const OBJECT_KIND_LABELS: Record<string, string> = { node: 'узел', line: 'участок' };
+
+/** 409 version_conflict: {conflicts: {"node:5": {removed, changed_at}}} → «узел 5 (изменён 27.09 15:51)» */
+export const formatVersionConflict = (detail: { message?: string; conflicts?: Record<string, any> }): string => {
+  const parts = Object.entries(detail.conflicts || {}).map(([key, info]) => {
+    const [kind, id] = key.split(':');
+    const label = `${OBJECT_KIND_LABELS[kind] || kind} ${id}`;
+    if (info?.removed) return `${label} удалён`;
+    const at = info?.changed_at ? new Date(info.changed_at) : null;
+    return at && !Number.isNaN(at.getTime())
+      ? `${label} изменён ${at.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })}`
+      : `${label} изменён`;
+  });
+  return [detail.message || 'Объект изменён другим пользователем', parts.join('; ')].filter(Boolean).join(': ');
 };
 
 const formatBlockerValue = (value: any): string => {
@@ -735,6 +839,7 @@ const extractDetail = (error: any): string => {
   if (typeof data === 'string') return data;
   if (data?.detail) {
     if (typeof data.detail === 'string') return data.detail;
+    if (data.detail.code === 'version_conflict') return formatVersionConflict(data.detail);
     if (data.detail.blockers) return formatTopologyBlockers(data.detail);
     return JSON.stringify(data.detail);
   }
@@ -837,11 +942,13 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
       }
 
       const detail = extractDetail(error);
+      const rawDetail = (error?.data ?? error?.response?._data)?.detail;
       const apiError = new ApiError({
         status,
         detail,
         path,
         userMessage: userMessageFor(status, detail, path),
+        data: rawDetail && typeof rawDetail === 'object' ? rawDetail : null,
       });
 
       if (apiError.isUnavailable) {
@@ -969,18 +1076,41 @@ export const fastApiService = {
     });
   },
 
-  async createLine(nodeid1: number, nodeid2: number): Promise<any> {
-    return request('api/topology/line', { method: 'POST', body: { nodeid1, nodeid2 } });
+  /**
+   * Версии узлов/участков (оптимистичная блокировка): запоминаются при выборе объекта
+   * и передаются в операцию; если объект успели изменить — сервер ответит 409.
+   */
+  async getTopologyVersions(ids: { nodes?: number[]; lines?: number[] }): Promise<TopologyVersionsResponse> {
+    return request<TopologyVersionsResponse>('api/v1/topology/versions', {
+      query: compact({
+        nodes: ids.nodes?.length ? ids.nodes.join(',') : undefined,
+        lines: ids.lines?.length ? ids.lines.join(',') : undefined,
+      }),
+    });
   },
 
-  async deleteLine(lineId: number): Promise<any> {
-    return request(`api/topology/line/${encodePath(lineId)}`, { method: 'DELETE' });
+  async createLine(
+    nodeid1: number,
+    nodeid2: number,
+    versions?: { nodeid1?: string; nodeid2?: string }
+  ): Promise<any> {
+    return request('api/topology/line', {
+      method: 'POST',
+      body: compact({ nodeid1, nodeid2, nodeid1_version: versions?.nodeid1, nodeid2_version: versions?.nodeid2 }),
+    });
   },
 
-  async splitLine(lineId: number, lng: number, lat: number): Promise<any> {
+  async deleteLine(lineId: number, expectedVersion?: string): Promise<any> {
+    return request(`api/topology/line/${encodePath(lineId)}`, {
+      method: 'DELETE',
+      ...(expectedVersion ? { query: { expected_version: expectedVersion } } : {}),
+    });
+  },
+
+  async splitLine(lineId: number, lng: number, lat: number, expectedVersion?: string): Promise<any> {
     return request('api/topology/split-line', {
       method: 'POST',
-      body: { line_id: lineId, lng, lat },
+      body: compact({ line_id: lineId, lng, lat, expected_version: expectedVersion }),
     });
   },
 
@@ -992,10 +1122,10 @@ export const fastApiService = {
     });
   },
 
-  async moveNode(id: number, lng: number, lat: number): Promise<any> {
+  async moveNode(id: number, lng: number, lat: number, expectedVersion?: string): Promise<any> {
     return request(`api/topology/node/${encodePath(id)}/move`, {
       method: 'PUT',
-      body: { lng, lat },
+      body: compact({ lng, lat, expected_version: expectedVersion }),
     });
   },
 
@@ -1003,8 +1133,11 @@ export const fastApiService = {
     return request('api/topology/node', { method: 'POST', body: { lng, lat } });
   },
 
-  async deleteNode(id: number): Promise<any> {
-    return request(`api/topology/node/${encodePath(id)}`, { method: 'DELETE' });
+  async deleteNode(id: number, expectedVersion?: string): Promise<any> {
+    return request(`api/topology/node/${encodePath(id)}`, {
+      method: 'DELETE',
+      ...(expectedVersion ? { query: { expected_version: expectedVersion } } : {}),
+    });
   },
 
   async getDefects(filters: JournalFilters = {}): Promise<PaginatedResponse<DefectSummary>> {
@@ -1789,31 +1922,61 @@ export const fastApiService = {
     return { blob, filename: `Расчет_дросселирования_${Date.now()}.xlsx` };
   },
 
-  async reverseLine(lineId: number): Promise<{ success: boolean; line_id: number; nodeid1: number; nodeid2: number }> {
+  /** Превью разворота участка: узлы, геометрия, оборудование по классам, версия участка */
+  async previewReverseLine(lineId: number): Promise<ReverseLineReport> {
+    return request<ReverseLineReport>('api/topology/reverse-line', {
+      method: 'POST',
+      body: { line_id: lineId, dry_run: true },
+    });
+  },
+
+  /**
+   * Разворот участка. 409 blocked — нужен acceptDirectionChange (насосы/клапаны/регуляторы),
+   * 409 version_conflict — участок изменён после превью.
+   */
+  async reverseLine(
+    lineId: number,
+    options: { expectedVersion?: string; acceptDirectionChange?: boolean } = {}
+  ): Promise<ReverseLineReport> {
     return request('api/topology/reverse-line', {
       method: 'POST',
-      body: { line_id: lineId },
+      body: compact({
+        line_id: lineId,
+        expected_version: options.expectedVersion,
+        accept_direction_change: options.acceptDirectionChange || undefined,
+      }),
     });
   },
 
-  /** 409 — слияние заблокировано зависимостями (detail.blockers) */
-  async mergeNodes(params: { target_node_id: number; source_node_id: number }): Promise<{
-    success: boolean;
+  /** Превью слияния: что и куда будет перенесено, что блокирует (ничего не сохраняет) */
+  async previewMergeNodes(params: { target_node_id: number; source_node_id: number }): Promise<MergeNodesReport> {
+    return request<MergeNodesReport>('api/topology/merge-nodes', {
+      method: 'POST',
+      body: { ...params, dry_run: true },
+    });
+  },
+
+  /** 409 — слияние заблокировано (detail.blockers) или узлы изменены после превью (version_conflict) */
+  async mergeNodes(params: {
     target_node_id: number;
     source_node_id: number;
-    merged_lines: number;
-    removed_lines: number[];
-  }> {
+    target_version?: string;
+    source_version?: string;
+  }): Promise<MergeNodesReport> {
     return request('api/topology/merge-nodes', {
       method: 'POST',
-      body: params,
+      body: compact(params),
     });
   },
 
-  async updateLineGeometry(lineId: number, coordinates: number[][]): Promise<{ success: boolean; line_id: number; new_length: number }> {
+  async updateLineGeometry(
+    lineId: number,
+    coordinates: number[][],
+    expectedVersion?: string
+  ): Promise<{ success: boolean; line_id: number; new_length: number; versions: TopologyVersionMap }> {
     return request(`api/topology/line/${encodePath(lineId)}/geometry`, {
       method: 'PUT',
-      body: { coordinates },
+      body: compact({ coordinates, expected_version: expectedVersion }),
     });
   },
 

@@ -485,27 +485,19 @@
         </div>
       </div>
 
-      <!-- Диалог подтверждения слияния узлов -->
-      <v-dialog v-model="mergeConfirmDialogOpen" max-width="450">
-        <v-card>
-          <v-card-title class="d-flex align-center">
-            <v-icon color="warning" class="mr-2">mdi-call-merge</v-icon>
-            Слияние узлов
-          </v-card-title>
-          <v-card-text>
-            Вы уверены, что хотите объединить узел <strong>{{ mergeSourceNodeId }}</strong> в узел <strong>{{ mergeTargetNodeId }}</strong>?
-            <br><br>
-            Участки и потребители узла <strong>{{ mergeSourceNodeId }}</strong> перейдут на узел <strong>{{ mergeTargetNodeId }}</strong>,
-            участок между ними будет снят, узел <strong>{{ mergeSourceNodeId }}</strong> — удалён.
-            Если на узле есть другое оборудование или внутренняя схема, сервер откажет и покажет, что мешает.
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer />
-            <v-btn variant="text" @click="cancelMerge">Отмена</v-btn>
-            <v-btn color="primary" :loading="mergeLoading" @click="confirmMerge">Объединить</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+      <!-- Превью слияния узлов (dry-run: что и куда перенесётся, что блокирует) -->
+      <LazyMergePreviewDialog
+        v-if="mergeConfirmDialogOpen"
+        v-model="mergeConfirmDialogOpen"
+        :target-id="mergeTargetNodeId"
+        :source-id="mergeSourceNodeId"
+        :report="mergePreviewReport"
+        :loading="mergePreviewLoading"
+        :confirming="mergeLoading"
+        :error="mergePreviewError"
+        @confirm="confirmMerge"
+        @cancel="cancelMerge"
+      />
 
       <!-- Feature selection menu -->
       <FeatureMenu />
@@ -546,7 +538,8 @@ import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, r
 import type { Ref } from 'vue';
 import { markPerf, measurePerf, timeAsync } from '~/utils/perf';
 import { useNotificationStore } from '~/stores/notificationStore';
-import { fastApiService } from '~/services/fastApiService';
+import { ApiError, fastApiService } from '~/services/fastApiService';
+import type { MergeNodesReport } from '~/services/fastApiService';
 import maplibregl from 'maplibre-gl';
 
 const props = defineProps<{
@@ -1673,8 +1666,12 @@ watch(topologyEditingEnabled, (enabled: boolean) => {
   if (!enabled) isEditTopologyMode.value = false;
 });
 const topologyStartNode = ref<number | null>(null);
+// Версия начального узла нового участка — запрашивается при его выборе
+let topologyStartNodeVersion: Promise<string | undefined> | null = null;
 let draggedNodeMarker: maplibregl.Marker | null = null;
 let draggedNodeId: number | null = null;
+// Версия перетаскиваемого узла, запрошенная в момент захвата (mousedown)
+let draggedNodeVersion: Promise<string | undefined> | null = null;
 let suppressTopologyClickUntil = 0;
 // Клик по узлу — это mousedown+mouseup без сдвига: он не должен записывать moveNode
 const DRAG_THRESHOLD_PX = 4;
@@ -1686,6 +1683,34 @@ const mergeTargetNodeId = ref<number | null>(null);
 const mergeSourceNodeId = ref<number | null>(null);
 const mergeConfirmDialogOpen = ref(false);
 const mergeLoading = ref(false);
+const mergePreviewReport = ref<MergeNodesReport | null>(null);
+const mergePreviewLoading = ref(false);
+const mergePreviewError = ref<string | null>(null);
+
+// === Оптимистичная блокировка ===
+// Версия объекта берётся в момент выбора (или из dry-run превью) и уходит в операцию;
+// если объект успели изменить, сервер отвечает 409 version_conflict.
+const fetchTopologyVersion = async (kind: 'nodes' | 'lines', id: number): Promise<string | undefined> => {
+  try {
+    const res = await fastApiService.getTopologyVersions({ [kind]: [id] });
+    return res[kind]?.[String(id)]?.version;
+  } catch {
+    return undefined; // без версии сервер не проверяет — операция всё равно под FOR UPDATE
+  }
+};
+
+/** 409 «изменён другим пользователем» — уведомление с кнопкой перезагрузки; прочее — ошибка */
+const reportTopologyError = (err: any, prefix: string, reload?: () => void | Promise<void>) => {
+  const notify = useNotificationStore();
+  if (err instanceof ApiError && err.isVersionConflict) {
+    notify.showConflict(err.userMessage, async () => {
+      layerStore.refreshVisibleDataLayers();
+      await reload?.();
+    });
+    return;
+  }
+  notify.showError(`${prefix}: ${err?.userMessage || err?.message || ''}`);
+};
 
 const toggleMergeMode = () => {
   isMergeMode.value = !isMergeMode.value;
@@ -1701,25 +1726,57 @@ const cancelMerge = () => {
   mergeConfirmDialogOpen.value = false;
   mergeTargetNodeId.value = null;
   mergeSourceNodeId.value = null;
+  mergePreviewReport.value = null;
+};
+
+/** Dry-run слияния: отчёт «что и куда перенесётся» и версии обоих узлов для подтверждения */
+const openMergePreview = async () => {
+  const target = mergeTargetNodeId.value;
+  const source = mergeSourceNodeId.value;
+  if (!target || !source) return;
+  mergePreviewReport.value = null;
+  mergePreviewError.value = null;
+  mergePreviewLoading.value = true;
+  mergeConfirmDialogOpen.value = true;
+  try {
+    mergePreviewReport.value = await fastApiService.previewMergeNodes({
+      target_node_id: target,
+      source_node_id: source,
+    });
+  } catch (err: any) {
+    mergePreviewError.value = err?.userMessage || err?.message || 'Не удалось получить превью';
+  } finally {
+    mergePreviewLoading.value = false;
+  }
 };
 
 const confirmMerge = async () => {
-  if (!mergeTargetNodeId.value || !mergeSourceNodeId.value) return;
+  const target = mergeTargetNodeId.value;
+  const source = mergeSourceNodeId.value;
+  if (!target || !source) return;
+  const versions = mergePreviewReport.value?.versions || {};
   mergeLoading.value = true;
   try {
     const res = await fastApiService.mergeNodes({
-      target_node_id: mergeTargetNodeId.value,
-      source_node_id: mergeSourceNodeId.value,
+      target_node_id: target,
+      source_node_id: source,
+      target_version: versions[`node:${target}`],
+      source_version: versions[`node:${source}`],
     });
-    const removed = res.removed_lines?.length ? `, снят соединяющий участок: ${res.removed_lines.join(', ')}` : '';
-    useNotificationStore().showSuccess(`Узлы объединены. Перепривязано участков: ${res.merged_lines}${removed}`);
+    const moved = Object.values(res.transferred || {}).reduce((a, n) => a + Number(n || 0), 0);
+    const removed = res.removed_lines?.length ? `, снят участок: ${res.removed_lines.join(', ')}` : '';
+    useNotificationStore().showSuccess(
+      `Узел ${source} слит в ${target}. Перепривязано участков: ${res.merged_lines ?? 0}, перенесено ссылок: ${moved}${removed}`
+    );
     layerStore.refreshVisibleDataLayers();
     mergeConfirmDialogOpen.value = false;
     isMergeMode.value = false;
     mergeTargetNodeId.value = null;
     mergeSourceNodeId.value = null;
+    mergePreviewReport.value = null;
   } catch (err: any) {
-    useNotificationStore().showError('Ошибка слияния: ' + (err?.userMessage || err?.message || ''));
+    // Конфликт версий: узлы изменились после превью — «Перезагрузить» строит превью заново
+    reportTopologyError(err, 'Ошибка слияния', openMergePreview);
   } finally {
     mergeLoading.value = false;
   }
@@ -1731,7 +1788,7 @@ const splitPreviewLoading = ref(false);
 const splitPreviewConfirming = ref(false);
 const splitPreviewError = ref<string | null>(null);
 const splitPreviewReport = ref<import('~/services/fastApiService').SplitTransferReport | null>(null);
-const splitPreviewTarget = ref<{ lineId: number; lng: number; lat: number } | null>(null);
+const splitPreviewTarget = ref<{ lineId: number; lng: number; lat: number; version?: string } | null>(null);
 
 const openSplitPreview = async (lineId: number, lng: number, lat: number) => {
   splitPreviewTarget.value = { lineId, lng, lat };
@@ -1742,6 +1799,8 @@ const openSplitPreview = async (lineId: number, lng: number, lat: number) => {
   try {
     const preview = await fastApiService.previewSplitLine(lineId, lng, lat);
     splitPreviewReport.value = preview.transferred;
+    // версия участка на момент превью — подтверждение применится, только если он не изменился
+    splitPreviewTarget.value = { lineId, lng, lat, version: preview.versions?.[`line:${lineId}`] };
   } catch (err: any) {
     splitPreviewError.value = err?.userMessage || err?.message || 'Не удалось получить превью';
   } finally {
@@ -1754,14 +1813,15 @@ const confirmSplit = async () => {
   if (!target) return;
   splitPreviewConfirming.value = true;
   try {
-    const result = await fastApiService.splitLine(target.lineId, target.lng, target.lat);
+    const result = await fastApiService.splitLine(target.lineId, target.lng, target.lat, target.version);
     useNotificationStore().showSuccess(
       `Участок ${target.lineId} разрезан: узел ${result.new_node_id}, участок ${result.new_line_id}`
     );
     layerStore.refreshVisibleDataLayers();
     splitPreviewOpen.value = false;
   } catch (err: any) {
-    useNotificationStore().showError('Ошибка разрезания: ' + (err?.userMessage || err?.message || ''));
+    splitPreviewOpen.value = false;
+    reportTopologyError(err, 'Ошибка разрезания', () => openSplitPreview(target.lineId, target.lng, target.lat));
   } finally {
     splitPreviewConfirming.value = false;
     splitPreviewTarget.value = null;
@@ -1844,6 +1904,7 @@ const onMapMouseDownForTopology = (e: any) => {
     mapStore.map?.dragPan.disable();
     
     draggedNodeId = id;
+    draggedNodeVersion = fetchTopologyVersion('nodes', id);
     dragStartPoint = { x: e.point.x, y: e.point.y };
     dragMoved = false;
     const pointCoordinates = nodeFeature.geometry?.type === 'Point'
@@ -1889,18 +1950,20 @@ const onNodeDragEnd = async () => {
   
   try {
     useNotificationStore().showInfo('Сохранение новой позиции...');
-    await fastApiService.moveNode(id, lngLat.lng, lngLat.lat);
+    const expectedVersion = draggedNodeVersion ? await draggedNodeVersion : undefined;
+    await fastApiService.moveNode(id, lngLat.lng, lngLat.lat, expectedVersion);
     useNotificationStore().showSuccess('Узел успешно перемещен');
     // Refresh layers
     const layerStore = useLayerStore();
     layerStore.refreshVisibleDataLayers();
   } catch (err: any) {
-    useNotificationStore().showError('Ошибка перемещения узла: ' + err.message);
+    reportTopologyError(err, 'Ошибка перемещения узла');
   } finally {
     mapStore.map?.dragPan.enable();
     draggedNodeMarker.remove();
     draggedNodeMarker = null;
     draggedNodeId = null;
+    draggedNodeVersion = null;
     dragStartPoint = null;
     dragMoved = false;
     suppressTopologyClickUntil = Date.now() + 250;
@@ -1929,7 +1992,7 @@ const onMapClickForTopology = async (e: any) => {
           return;
         }
         mergeSourceNodeId.value = id;
-        mergeConfirmDialogOpen.value = true;
+        await openMergePreview();
       }
       return;
     }
@@ -1937,6 +2000,7 @@ const onMapClickForTopology = async (e: any) => {
     // Line creation logic
     if (!topologyStartNode.value) {
       topologyStartNode.value = id;
+      topologyStartNodeVersion = fetchTopologyVersion('nodes', id);
       useNotificationStore().showSuccess(`Узел ${id} выбран. Кликните по другому узлу для создания участка.`);
     } else {
       if (topologyStartNode.value === id) {
@@ -1946,12 +2010,16 @@ const onMapClickForTopology = async (e: any) => {
       }
       // Create line
       try {
-        await fastApiService.createLine(topologyStartNode.value, id);
+        const [startVersion, endVersion] = await Promise.all([
+          topologyStartNodeVersion ?? Promise.resolve(undefined),
+          fetchTopologyVersion('nodes', id),
+        ]);
+        await fastApiService.createLine(topologyStartNode.value, id, { nodeid1: startVersion, nodeid2: endVersion });
         useNotificationStore().showSuccess(`Участок между ${topologyStartNode.value} и ${id} создан`);
         const layerStore = useLayerStore();
         layerStore.refreshVisibleDataLayers();
       } catch (err: any) {
-        useNotificationStore().showError('Ошибка создания участка: ' + err.message);
+        reportTopologyError(err, 'Ошибка создания участка');
       } finally {
         topologyStartNode.value = null;
       }
@@ -1981,7 +2049,8 @@ const onMapClickForTopology = async (e: any) => {
   }
 };
 
-const onDeleteFeature = async (featureId: string | number) => {
+/** Удаление из карточки: version — версия объекта, запомненная при открытии карточки */
+const onDeleteFeature = async (featureId: string | number, version?: string) => {
   if (!confirm('Вы уверены, что хотите удалить объект?')) return;
   try {
     const selected = mapStore.potentialFeatures?.[0];
@@ -1991,17 +2060,17 @@ const onDeleteFeature = async (featureId: string | number) => {
     const isNode = selected.layerId?.includes('node') || selected.layerName?.includes('node');
     
     if (isNode) {
-      await fastApiService.deleteNode(Number(featureId));
+      await fastApiService.deleteNode(Number(featureId), version);
       useNotificationStore().showSuccess('Узел и прилегающие участки удалены');
     } else {
-      await fastApiService.deleteLine(Number(featureId));
+      await fastApiService.deleteLine(Number(featureId), version);
       useNotificationStore().showSuccess('Участок удален');
     }
     attributePanelRef.value?.close();
     const layerStore = useLayerStore();
     layerStore.refreshVisibleDataLayers();
   } catch (err: any) {
-    useNotificationStore().showError('Ошибка удаления: ' + err.message);
+    reportTopologyError(err, 'Ошибка удаления', () => attributePanelRef.value?.close());
   }
 };
 

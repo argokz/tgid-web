@@ -813,7 +813,7 @@
               color="error"
 
 
-              @click="$emit('delete-feature', propsData.id)"
+              @click="$emit('delete-feature', propsData.id, cardVersion)"
 
 
             >
@@ -1414,6 +1414,18 @@
 
 
 
+    <!-- Превью разворота участка (dry-run → подтверждение) -->
+    <LazyReversePreviewDialog
+      v-if="reversePreviewOpen"
+      v-model="reversePreviewOpen"
+      :line-id="reversePreviewLineId"
+      :report="reversePreviewReport"
+      :loading="reversePreviewLoading"
+      :confirming="reversingLine"
+      :error="reversePreviewError"
+      @confirm="confirmReverse"
+    />
+
     <v-snackbar v-model="showNotification" :timeout="2000" color="primary" location="bottom" rounded="pill">
 
 
@@ -1453,8 +1465,9 @@ import { useMobile } from '~/composables/useMobile'
 import { useAttributeTabs, type TabData } from '~/composables/useAttributeTabs'
 
 
-import { fastApiService } from '~/services/fastApiService'
+import { ApiError, fastApiService, type ReverseLineReport } from '~/services/fastApiService'
 import { useAuthStore } from '~/stores/authStore'
+import { useNotificationStore } from '~/stores/notificationStore'
 
 
 
@@ -1481,7 +1494,7 @@ const componentProps = withDefaults(defineProps<{
 const emit = defineEmits<{
 
 
-  'delete-feature': [featureId: string | number]
+  'delete-feature': [featureId: string | number, version?: string]
   'open-audit-history': [scope: { table: string; recordId: number }]
 
 
@@ -1606,6 +1619,31 @@ const isEditTopologyMode = computed(() => componentProps.isEditTopologyMode)
 
 
 // Слои GeoServer не несут gistable: участок узнаём по полям записи linesobj
+const isNodeObject = computed(() => {
+  const p = propsData.value
+  const table = String(p.gistable || '').toLowerCase()
+  if (table) return table === 'nodes'
+  return 'nodetypeid' in p && !('nodeid1' in p)
+})
+
+// Версия узла/участка на момент открытия карточки (оптимистичная блокировка):
+// удаление и разворот применятся, только если объект с тех пор не меняли.
+const cardVersion = ref<string | undefined>(undefined)
+const loadCardVersion = async () => {
+  cardVersion.value = undefined
+  const id = Number(propsData.value.id)
+  if (!isEditTopologyMode.value || !Number.isFinite(id)) return
+  const kind = isLineObject.value ? 'lines' : isNodeObject.value ? 'nodes' : null
+  if (!kind) return
+  try {
+    const res = await fastApiService.getTopologyVersions({ [kind]: [id] })
+    if (Number(propsData.value.id) === id) cardVersion.value = res[kind]?.[String(id)]?.version
+  } catch {
+    // без версии сервер не проверяет конфликт — операция всё равно идёт под FOR UPDATE
+  }
+}
+watch(() => [propsData.value.id, isEditTopologyMode.value], () => { void loadCardVersion() })
+
 const isLineObject = computed(() => {
   const p = propsData.value
   const table = String(p.gistable || '').toLowerCase()
@@ -2570,20 +2608,59 @@ const downloadPassport = async () => {
 const reversingLine = ref(false)
 
 
+const reversePreviewOpen = ref(false)
+const reversePreviewLoading = ref(false)
+const reversePreviewError = ref<string | null>(null)
+const reversePreviewReport = ref<ReverseLineReport | null>(null)
+const reversePreviewLineId = ref<number | null>(null)
+
+/** Превью разворота: узлы, геометрия, оборудование; версия — та, что видела карточка */
 const reverseLineDirection = async () => {
   const lineId = Number(propsData.value.id)
   if (!Number.isFinite(lineId)) return
-  if (!confirm(`Развернуть направление участка ${lineId}? Начальный и конечный узлы поменяются местами.`)) return
+  reversePreviewLineId.value = lineId
+  reversePreviewReport.value = null
+  reversePreviewError.value = null
+  reversePreviewLoading.value = true
+  reversePreviewOpen.value = true
+  try {
+    reversePreviewReport.value = await fastApiService.previewReverseLine(lineId)
+  } catch (error: any) {
+    reversePreviewError.value = error?.userMessage || error?.message || 'Не удалось получить превью'
+  } finally {
+    reversePreviewLoading.value = false
+  }
+}
+
+const confirmReverse = async ({ acceptDirectionChange }: { acceptDirectionChange: boolean }) => {
+  const lineId = reversePreviewLineId.value
+  if (!lineId) return
   reversingLine.value = true
   try {
-    const res = await fastApiService.reverseLine(lineId)
+    const res = await fastApiService.reverseLine(lineId, {
+      // версия из превью; если превью не вернуло — версия карточки
+      expectedVersion: reversePreviewReport.value?.versions?.[`line:${lineId}`] ?? cardVersion.value,
+      acceptDirectionChange,
+    })
     propsData.value = { ...propsData.value, nodeid1: res.nodeid1, nodeid2: res.nodeid2 }
+    cardVersion.value = res.versions?.[`line:${lineId}`]
+    reversePreviewOpen.value = false
     notificationMessage.value = `Направление участка ${lineId} изменено (узлы ${res.nodeid1} → ${res.nodeid2})`
     showNotification.value = true
     emit('refresh-layers')
   } catch (error: any) {
-    notificationMessage.value = error?.userMessage || error?.message || 'Не удалось развернуть участок'
-    showNotification.value = true
+    reversePreviewOpen.value = false
+    if (error instanceof ApiError && error.isVersionConflict) {
+      // Участок изменён другим пользователем: перезагрузить слои и версию, открыть превью заново
+      useNotificationStore().showConflict(error.userMessage, async () => {
+        emit('refresh-layers')
+        await loadCardVersion()
+        await reverseLineDirection()
+      })
+    } else {
+      notificationMessage.value = error?.userMessage || error?.message || 'Не удалось развернуть участок'
+      showNotification.value = true
+    }
   } finally {
     reversingLine.value = false
   }

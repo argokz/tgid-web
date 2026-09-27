@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fastApiService } from '../../services/fastApiService'
+import { ApiError, fastApiService, formatVersionConflict } from '../../services/fastApiService'
 
 describe('fastApiService topology contracts', () => {
   const fetchMock = vi.fn()
@@ -843,5 +843,88 @@ describe('fastApiService auth and topology errors', () => {
     })
     await expect(fastApiService.mergeNodes({ target_node_id: 1, source_node_id: 2 }))
       .rejects.toThrow('Узлы нельзя объединить: соединяющие участки с оборудованием — 324106: pressregulators ×1')
+  })
+})
+
+describe('fastApiService optimistic locking and topology previews', () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    fetchMock.mockResolvedValue({ success: true })
+    vi.stubGlobal('$fetch', fetchMock)
+    vi.stubGlobal('useRuntimeConfig', () => ({
+      public: { mapApiBaseUrl: 'https://api.example.test/' }
+    }))
+  })
+
+  it('requests object versions as comma-separated ids', async () => {
+    fetchMock.mockResolvedValueOnce({ nodes: { 5: { version: 'a#1', archivechangedate: null, removed: false } }, lines: {} })
+    const res = await fastApiService.getTopologyVersions({ nodes: [5, 6], lines: [] })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/api/v1/topology/versions',
+      expect.objectContaining({ query: { nodes: '5,6' } })
+    )
+    expect(res.nodes['5'].version).toBe('a#1')
+  })
+
+  it('passes expected versions to every topology write', async () => {
+    await fastApiService.moveNode(7, 76.9, 43.2, 'v7')
+    await fastApiService.createLine(1, 2, { nodeid1: 'v1', nodeid2: 'v2' })
+    await fastApiService.splitLine(17, 76.91, 43.25, 'v17')
+    await fastApiService.deleteLine(17, 'v17')
+    await fastApiService.deleteNode(7, 'v7')
+    await fastApiService.reverseLine(100, { expectedVersion: 'v100', acceptDirectionChange: true })
+    await fastApiService.mergeNodes({ target_node_id: 1, source_node_id: 2, target_version: 't', source_version: 's' })
+    await fastApiService.updateLineGeometry(100, [[76.9, 43.2], [76.91, 43.21]], 'g')
+
+    const bodies = fetchMock.mock.calls.map((c) => c[1].body)
+    expect(bodies[0]).toEqual({ lng: 76.9, lat: 43.2, expected_version: 'v7' })
+    expect(bodies[1]).toEqual({ nodeid1: 1, nodeid2: 2, nodeid1_version: 'v1', nodeid2_version: 'v2' })
+    expect(bodies[2]).toEqual({ line_id: 17, lng: 76.91, lat: 43.25, expected_version: 'v17' })
+    expect(fetchMock.mock.calls[3][1]).toMatchObject({ method: 'DELETE', query: { expected_version: 'v17' } })
+    expect(fetchMock.mock.calls[4][1]).toMatchObject({ method: 'DELETE', query: { expected_version: 'v7' } })
+    expect(bodies[5]).toEqual({ line_id: 100, expected_version: 'v100', accept_direction_change: true })
+    expect(bodies[6]).toEqual({ target_node_id: 1, source_node_id: 2, target_version: 't', source_version: 's' })
+    expect(bodies[7]).toEqual({ coordinates: [[76.9, 43.2], [76.91, 43.21]], expected_version: 'g' })
+  })
+
+  it('asks merge and reverse previews as dry-run', async () => {
+    await fastApiService.previewMergeNodes({ target_node_id: 1, source_node_id: 2 })
+    await fastApiService.previewReverseLine(100)
+    expect(fetchMock.mock.calls[0][1].body).toEqual({ target_node_id: 1, source_node_id: 2, dry_run: true })
+    expect(fetchMock.mock.calls[1][1].body).toEqual({ line_id: 100, dry_run: true })
+  })
+
+  it('marks 409 version conflicts and names the changed objects', async () => {
+    fetchMock.mockRejectedValue({
+      statusCode: 409,
+      data: {
+        detail: {
+          code: 'version_conflict',
+          message: 'Объект изменён другим пользователем',
+          conflicts: { 'node:5': { removed: true }, 'line:7': { removed: false, changed_at: null } },
+        },
+      },
+    })
+    const err = await fastApiService.moveNode(5, 76.9, 43.2, 'old').catch((e) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err.isVersionConflict).toBe(true)
+    expect(err.userMessage).toBe('Объект изменён другим пользователем: узел 5 удалён; участок 7 изменён')
+  })
+
+  it('does not treat dependency blockers as a version conflict', async () => {
+    fetchMock.mockRejectedValue({
+      statusCode: 409,
+      data: { detail: { code: 'blocked', message: 'Разворот', blockers: { equipment: { pumps: 1 } } } },
+    })
+    const err = await fastApiService.reverseLine(5).catch((e) => e)
+    expect(err.isVersionConflict).toBe(false)
+    expect(err.userMessage).toContain('pumps ×1')
+  })
+
+  it('formats conflict timestamps', () => {
+    const text = formatVersionConflict({ conflicts: { 'line:3': { removed: false, changed_at: '2026-09-27T15:51:45' } } })
+    expect(text.startsWith('Объект изменён другим пользователем: участок 3 изменён ')).toBe(true)
   })
 })

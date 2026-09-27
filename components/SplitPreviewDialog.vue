@@ -94,6 +94,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { SplitTransferReport } from '~/services/fastApiService';
+import { topologyTableLabel } from '~/utils/topologyLabels';
 
 const open = defineModel<boolean>({ default: false });
 const props = defineProps<{
@@ -105,20 +106,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ confirm: []; cancel: [] }>();
 
-const TABLE_LABELS: Record<string, string> = {
-  pressregulators: 'Регуляторы давления',
-  consumptregulators: 'Регуляторы расхода',
-  pressdropregulators: 'Регуляторы перепада',
-  dampers: 'Задвижки',
-  diaphragms: 'Диафрагмы',
-  elevators: 'Элеваторы',
-  systemradiators: 'Радиаторы',
-  pumps: 'Насосы',
-  heatexchangers: 'Теплообменники',
-  airheaters: 'Калориферы',
-};
-
-const tableLabel = (t: string) => TABLE_LABELS[t] || t;
+const tableLabel = topologyTableLabel;
 
 const toList = (rec: Record<string, number> | undefined) =>
   Object.entries(rec || {})
