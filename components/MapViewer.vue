@@ -288,6 +288,12 @@
         @locate="handleLocateFault"
       />
 
+      <!-- Desktop TGID «Excel»: отчёты по шаблонам gid6 excel2 и сводные ведомости -->
+      <LazyExcelReportsDialog
+        v-if="mountedDialogs.excelReports"
+        ref="excelReportsRef"
+      />
+
       <!-- Outage simulation dialog (локализация аварий и задвижек) -->
       <LazyOutageSimulationDialog
         v-if="mountedDialogs.outageSimulation"
@@ -825,6 +831,7 @@ const elevatorJournalRef = ref<{
 } | null>(null);
 const networkQueriesRef = ref<{ openDialog: () => void } | null>(null);
 const regimeAnalysisRef = ref<{ openDialog: () => void } | null>(null);
+const excelReportsRef = ref<{ openDialog: () => void } | null>(null);
 const outageSimulationRef = ref<{ openDialog: (scope?: { lineId?: number; nodeId?: number }) => void } | null>(null);
 const throttlingCalculatorRef = ref<{ openDialog: (scope?: any) => void } | null>(null);
 const hydraulicThematicRef = ref<{ openDialog: (scope?: any) => void } | null>(null);
@@ -865,6 +872,7 @@ type LazyDialogKey =
   | 'elevator'
   | 'networkQueries'
   | 'regimeAnalysis'
+  | 'excelReports'
   | 'outageSimulation'
   | 'throttlingCalculator'
   | 'hydraulicThematic'
@@ -904,6 +912,7 @@ const lazyDialogRefs: Record<LazyDialogKey, Ref<LazyDialogInstance | null>> = {
   elevator: elevatorJournalRef,
   networkQueries: networkQueriesRef,
   regimeAnalysis: regimeAnalysisRef,
+  excelReports: excelReportsRef,
   outageSimulation: outageSimulationRef,
   throttlingCalculator: throttlingCalculatorRef,
   hydraulicThematic: hydraulicThematicRef,
@@ -943,6 +952,7 @@ const TOOL_EVENT_TO_DIALOG: Record<ToolEvent, LazyDialogKey> = {
   'open-elevators': 'elevator',
   'open-network-queries': 'networkQueries',
   'open-regime-analysis': 'regimeAnalysis',
+  'open-excel-reports': 'excelReports',
   'open-users-admin': 'usersAdmin',
   'open-audit-history': 'auditHistory',
   'open-group-setters': 'groupSetters',

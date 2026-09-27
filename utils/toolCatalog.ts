@@ -27,6 +27,7 @@ export type ToolEvent =
   | 'open-consumer-load-diagnostics'
   | 'open-network-queries'
   | 'open-regime-analysis'
+  | 'open-excel-reports'
   | 'open-pump-equipment'
   | 'open-network-armatures'
   | 'open-network-regulators'
@@ -110,6 +111,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     color: 'success',
     items: [
       { label: 'Отчёты и паспорта', hint: 'Паспорта участков в Excel', icon: 'mdi-file-tree', color: 'success', event: 'open-passport-dialog' },
+      { label: 'Отчёты Excel', hint: 'Таблицы десктопа: участки, потребители, задвижки, результаты расчёта', icon: 'mdi-file-excel', color: 'green-darken-3', event: 'open-excel-reports' },
       { label: 'Технические условия', hint: 'Реестр ТУ и нагрузки', icon: 'mdi-file-certificate-outline', color: 'cyan-darken-3', event: 'open-technical-condition-journal' },
       { label: 'Объекты АЛСЕКО', hint: 'Договорные нагрузки и здания', icon: 'mdi-office-building-marker', color: 'indigo-darken-2', event: 'open-alseko-journal' },
       { label: 'Электрическая сеть', hint: 'Источники, ЛЭП, приёмники', icon: 'mdi-transmission-tower', color: 'amber-darken-4', event: 'open-electrical-network-journal' },

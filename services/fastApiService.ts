@@ -683,6 +683,29 @@ export interface CalculationListFilter {
   offset?: number;
 }
 
+/** Пункт каталога Excel-отчётов (GET api/reports/catalog) */
+export interface ReportCatalogItem {
+  id: string;
+  title: string;
+  group: string;
+  /** desktop — шаблон и SQL gid6 excel2; summary — сводная ведомость веба (api/reports/excel) */
+  kind: 'desktop' | 'summary';
+  desktop: string | null;
+  note: string | null;
+  uses_calculation: boolean;
+  params: {
+    fragment_id: 'required' | null;
+    calculation_id: 'optional' | null;
+    year?: 'optional' | null;
+  };
+  sheets: { title: string; sql: string | null }[];
+}
+
+export interface ReportsCatalog {
+  items: ReportCatalogItem[];
+  not_ported: { sql: string; reason: string }[];
+}
+
 export type UserRole = 'viewer' | 'calculator' | 'editor' | 'admin';
 
 export interface AdminUser {
@@ -824,6 +847,8 @@ export class ApiError extends Error {
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+/** Excel-отчёты по всему фрагменту: запросы ограничены на сервере 60 с, плюс сборка книги */
+const REPORT_TIMEOUT_MS = 120_000;
 const MAX_RETRIES = 2;
 
 /** Ретраим только то, что имеет шанс пройти со второй попытки */
@@ -1922,6 +1947,27 @@ export const fastApiService = {
     const year = query?.year;
     const suffix = year != null && year !== '' ? `_${year}` : '';
     return { blob, filename: `report_${docType}${suffix}.xlsx` };
+  },
+
+  /** Каталог Excel-отчётов: отчёты десктопа gid6 (excel2) и сводные ведомости веба */
+  async getReportsCatalog(): Promise<ReportsCatalog> {
+    return request<ReportsCatalog>('api/reports/catalog');
+  },
+
+  /** Excel-отчёт десктопа по шаблону gid6: фрагмент обязателен, расчёт — последний, если не задан */
+  async downloadCatalogReport(
+    report: Pick<ReportCatalogItem, 'id' | 'title'>,
+    params: { fragment_id: number; calculation_id?: number | null },
+  ): Promise<{ blob: Blob; filename: string }> {
+    const query: Record<string, number> = { fragment_id: params.fragment_id };
+    if (params.calculation_id) query.calculation_id = params.calculation_id;
+    const blob = await request<Blob>(`api/reports/catalog/${encodePath(report.id)}/excel`, {
+      responseType: 'blob',
+      query,
+      timeout: REPORT_TIMEOUT_MS,
+    });
+    const safeTitle = report.title.replace(/[\\/:*?"<>|]+/g, ' ').trim();
+    return { blob, filename: `${safeTitle} ф${params.fragment_id}.xlsx` };
   },
 
   async downloadCalculationExcel(calculationId: number): Promise<{ blob: Blob; filename: string }> {
