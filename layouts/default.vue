@@ -209,6 +209,27 @@
       ref="protocolRef"
       v-model:show="showProtocol"
     />
+
+    <!-- Глобальные уведомления (notificationStore); с действием — дольше и с кнопкой -->
+    <v-snackbar
+      v-model="notificationStore.show"
+      :color="notificationStore.type"
+      location="bottom"
+      multi-line
+      :timeout="notificationStore.action ? 15000 : 5000"
+    >
+      {{ notificationStore.message }}
+      <template #actions>
+        <v-btn
+          v-if="notificationStore.action"
+          variant="text"
+          @click="notificationStore.runAction()"
+        >
+          {{ notificationStore.action.label }}
+        </v-btn>
+        <v-btn icon="mdi-close" variant="text" size="small" aria-label="Закрыть" @click="notificationStore.hide()" />
+      </template>
+    </v-snackbar>
   </v-app>
 </template>
 
@@ -229,6 +250,7 @@ import { ROLE_LABELS, type Role } from '~/utils/permissions';
 const { isMobile: mobile } = useMobile();
 const route = useRoute();
 const authStore = useAuthStore();
+const notificationStore = useNotificationStore();
 const uiStore = useUiStore();
 const mainMenuOpen = ref(false);
 const showLogin = ref(false);
