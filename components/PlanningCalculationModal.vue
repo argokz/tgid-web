@@ -225,7 +225,7 @@
                   label="Запись летних сопротивлений в обобщенный потребитель"
                   density="compact"
                   hide-details
-                  :disabled="!summerMode"
+                  :disabled="!summerMode || !canWriteSource"
                 />
               </div>
             </div>
@@ -262,13 +262,14 @@
                   label="Расчет дроссельных органов и запись сопротивлений"
                   density="compact"
                   hide-details
+                  :disabled="!canWriteSource"
                 />
                 <v-checkbox
                   v-model="recordMixingCoefficients"
                   label="Запись коэффициентов смешения"
                   density="compact"
                   hide-details
-                  :disabled="!isTemperatureMode"
+                  :disabled="!isTemperatureMode || !canWriteSource"
                 />
               </template>
               <v-checkbox
@@ -295,6 +296,7 @@
                 label="Запись тепловых нагрузок и потерь в обобщенный потребитель"
                 density="compact"
                 hide-details
+                :disabled="!canWriteSource"
               />
               <v-checkbox
                 v-model="considerVariationCoefficients"
@@ -304,6 +306,23 @@
               />
             </div>
           </div>
+
+          <v-alert
+            v-if="savePoRequested"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            {{ SAVE_PO_WARNING }}
+          </v-alert>
+          <p
+            v-if="!canWriteSource"
+            class="text-caption text-medium-emphasis mt-2 mb-0"
+          >
+            Запись в исходные данные (сопротивления, коэффициенты смешения, нагрузки обобщённых
+            потребителей) выключена: нужна роль calculator или выше и MUTATIONS_ENABLED=true на сервере.
+          </p>
         </v-form>
       </v-card-text>
 
@@ -335,6 +354,47 @@
     </v-card>
 
     <CalculationsDialog v-model="calculationsOpen" />
+
+    <!-- -save_po: подтверждение перезаписи нагрузок обобщённых потребителей -->
+    <v-dialog
+      v-model="savePoConfirmOpen"
+      max-width="560"
+    >
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          <v-icon
+            color="warning"
+            class="mr-2"
+          >
+            mdi-alert
+          </v-icon>
+          Запись нагрузок в обобщённые потребители
+        </v-card-title>
+        <v-card-text>
+          <p class="mb-2">
+            {{ SAVE_PO_WARNING }}
+          </p>
+          <p class="mb-0">
+            Старые значения останутся только в истории правок (audit_log). Продолжить расчёт с записью?
+          </p>
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn
+            variant="text"
+            @click="answerSavePo(false)"
+          >
+            Отмена
+          </v-btn>
+          <v-btn
+            color="warning"
+            variant="flat"
+            @click="answerSavePo(true)"
+          >
+            Записать и рассчитать
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-dialog>
 </template>
 
@@ -342,6 +402,8 @@
 import { ref, computed, watch } from 'vue';
 import { useDisplay } from 'vuetify';
 import CalculationsDialog from '~/components/CalculationsDialog.vue';
+import { useAuthStore } from '~/stores/authStore';
+import { requestSavesPo } from '~/utils/permissions';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { useLayerStore } from '~/stores/layerStore';
 import { fastApiService, type SetyCalcMode, type SetyRunRequest } from '~/services/fastApiService';
@@ -454,6 +516,42 @@ const considerVariationCoefficients = ref(true);
 
 const isTemperatureMode = computed(() => consumptionType.value === 'temperature');
 
+/** Флаги записи в исходные таблицы: роль calculator+ и MUTATIONS_ENABLED (сервер вернёт 503) */
+const authStore = useAuthStore();
+const canWriteSource = computed(() => authStore.canRunWritingCalc);
+watch(canWriteSource, (allowed) => {
+  if (allowed) return;
+  calculateThrottleValves.value = false;
+  recordMixingCoefficients.value = false;
+  recordHeatLoadLoss.value = false;
+  saveSummerResistance.value = false;
+});
+
+const SAVE_PO_WARNING =
+  'Во фрагменте с обобщёнными потребителями sety перезапишет нагрузки магистрали нулями '
+  + '(так же работает десктоп, см. docs/acceptance-numeric.md). Включайте запись только для '
+  + 'фрагментов с реальными потребителями.';
+const savePoRequested = computed(() => requestSavesPo({
+  save_po: calcMode.value === 'plan' && recordHeatLoadLoss.value,
+  save_leto: calcMode.value !== 'plan' && summerMode.value && saveSummerResistance.value,
+}));
+const savePoConfirmOpen = ref(false);
+let savePoResolve: ((ok: boolean) => void) | null = null;
+const askSavePoConfirm = () => new Promise<boolean>((resolve) => {
+  savePoResolve = resolve;
+  savePoConfirmOpen.value = true;
+});
+const answerSavePo = (ok: boolean) => {
+  const resolve = savePoResolve;
+  savePoResolve = null;
+  savePoConfirmOpen.value = false;
+  resolve?.(ok);
+};
+// Закрыли окно подтверждения кликом мимо / Esc — это отказ
+watch(savePoConfirmOpen, (open) => {
+  if (!open && savePoResolve) answerSavePo(false);
+});
+
 watch(summerMode, (on) => {
   // Param2Dialog: летний режим — только детализированное сопротивление
   if (on) consumerResistance.value = 'detailed';
@@ -488,10 +586,10 @@ const buildRequest = (fragmentIds: number[], tn: number): SetyRunRequest => {
       tg,
       teplopoter: tg ? considerHeatLoss.value : true,
       uf_calc: tg && considerMixingCoefficients.value,
-      save_uf_new: tg && recordMixingCoefficients.value,
+      save_uf_new: canWriteSource.value && tg && recordMixingCoefficients.value,
       teplovyd: considerInternalHeat.value,
-      dross_yes: calculateThrottleValves.value,
-      save_po: recordHeatLoadLoss.value,
+      dross_yes: canWriteSource.value && calculateThrottleValves.value,
+      save_po: canWriteSource.value && recordHeatLoadLoss.value,
       veter: considerWind.value,
       trtp: heatLossTemperature.value,
     };
@@ -500,7 +598,7 @@ const buildRequest = (fragmentIds: number[], tn: number): SetyRunRequest => {
     ...base,
     consumer_resistance: summerMode.value ? 'detailed' : consumerResistance.value,
     leto: summerMode.value,
-    save_leto: summerMode.value && saveSummerResistance.value,
+    save_leto: canWriteSource.value && summerMode.value && saveSummerResistance.value,
   };
 };
 
@@ -555,8 +653,13 @@ const calculate = async () => {
     return;
   }
 
-  isOpen.value = false;
   const body = buildRequest(fragmentIds, tn);
+  if (requestSavesPo(body) && !(await askSavePoConfirm())) {
+    addProtocolLog('Расчёт не запущен: запись нагрузок в обобщённые потребители не подтверждена', 'info');
+    return;
+  }
+
+  isOpen.value = false;
   addProtocolLog('Отправка запроса на расчет...', 'info');
 
   calculating.value = true;
