@@ -4,9 +4,12 @@
       <template v-if="bridge.state.pick.active">
         <v-icon color="orange-darken-3">mdi-cursor-default-click-outline</v-icon>
         <div class="bar-text">
-          <div class="text-body-2 font-weight-medium text-truncate">Контур: {{ bridge.state.pick.label }}</div>
+          <div class="text-body-2 font-weight-medium text-truncate">
+            {{ bridge.state.pick.kind === 'node' ? 'Выбор' : 'Контур' }}: {{ bridge.state.pick.label }}
+          </div>
           <div class="text-caption text-medium-emphasis">
-            Клик по участку добавляет или убирает его · выбрано {{ bridge.state.pick.lineIds.length }}
+            Клик по {{ bridge.state.pick.kind === 'node' ? 'узлу' : 'участку' }} добавляет или убирает его
+            · выбрано {{ bridge.state.pick.lineIds.length }}
           </div>
         </div>
         <v-btn size="small" variant="text" :disabled="!bridge.state.pick.lineIds.length" @click="clearAll">Очистить</v-btn>

@@ -12,12 +12,15 @@ const OVERLAY_SOURCE = 'journal-contour';
 const OVERLAY_LAYER = 'journal-contour-line';
 const PICK_SOURCE = 'journal-contour-pick';
 const PICK_LAYER = 'journal-contour-pick-line';
-const OWN_LAYERS = new Set([OVERLAY_LAYER, PICK_LAYER]);
+const PICK_NODE_LAYER = 'journal-contour-pick-node';
+const OWN_LAYERS = new Set([OVERLAY_LAYER, PICK_LAYER, PICK_NODE_LAYER]);
 
 const EMPTY = { type: 'FeatureCollection' as const, features: [] as any[] };
 
 interface Options {
   isLineFeature: (feature: any) => boolean
+  /** Узел сети — для выбора узлов (групповые установщики по потребителям/узлам) */
+  isNodeFeature?: (feature: any) => boolean
   featureId: (feature: any) => number | null
   onPickHint?: (text: string) => void
 }
@@ -52,6 +55,21 @@ export function useJournalContourLayer(getMap: () => maplibregl.Map | null | und
           source: PICK_SOURCE,
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: { 'line-color': '#ff6f00', 'line-width': 5, 'line-opacity': 0.9 },
+        });
+      }
+      if (!map.getLayer(PICK_NODE_LAYER)) {
+        map.addLayer({
+          id: PICK_NODE_LAYER,
+          type: 'circle',
+          source: PICK_SOURCE,
+          filter: ['==', ['geometry-type'], 'Point'],
+          paint: {
+            'circle-color': '#ff6f00',
+            'circle-radius': 7,
+            'circle-opacity': 0.85,
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': 2,
+          },
         });
       }
       return true;
@@ -102,13 +120,15 @@ export function useJournalContourLayer(getMap: () => maplibregl.Map | null | und
     if (!map) return;
     const r = 6;
     const features = map.queryRenderedFeatures([[e.point.x - r, e.point.y - r], [e.point.x + r, e.point.y + r]]);
-    const line = features.find((f: any) => !OWN_LAYERS.has(f?.layer?.id) && options.isLineFeature(f));
-    const id = line ? options.featureId(line) : null;
+    const wantNode = bridge.state.pick.kind === 'node';
+    const matches = (f: any) => (wantNode ? Boolean(options.isNodeFeature?.(f)) : options.isLineFeature(f));
+    const hit = features.find((f: any) => !OWN_LAYERS.has(f?.layer?.id) && matches(f));
+    const id = hit ? options.featureId(hit) : null;
     if (!id) {
-      options.onPickHint?.('Кликните по участку тепловой сети.');
+      options.onPickHint?.(wantNode ? 'Кликните по узлу (потребителю) сети.' : 'Кликните по участку тепловой сети.');
       return;
     }
-    bridge.togglePicked(id, line);
+    bridge.togglePicked(id, hit);
   };
 
   const attach = (map: maplibregl.Map) => {
