@@ -37,6 +37,8 @@ export type ToolEvent =
   | 'open-hydraulic-thematic'
   | 'open-users-admin'
   | 'open-audit-history'
+  | 'open-group-setters'
+  | 'open-dictionaries'
 
 export interface ToolDescriptor {
   label: string
@@ -111,6 +113,15 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
       { label: 'Технические условия', hint: 'Реестр ТУ и нагрузки', icon: 'mdi-file-certificate-outline', color: 'cyan-darken-3', event: 'open-technical-condition-journal' },
       { label: 'Объекты АЛСЕКО', hint: 'Договорные нагрузки и здания', icon: 'mdi-office-building-marker', color: 'indigo-darken-2', event: 'open-alseko-journal' },
       { label: 'Электрическая сеть', hint: 'Источники, ЛЭП, приёмники', icon: 'mdi-transmission-tower', color: 'amber-darken-4', event: 'open-electrical-network-journal' },
+    ],
+  },
+  {
+    title: 'Исходные данные',
+    icon: 'mdi-book-open-page-variant-outline',
+    color: 'teal-darken-3',
+    items: [
+      { label: 'Групповые установщики', hint: 'Поле = значение для фрагмента, выделения или фильтра (aSet*)', icon: 'mdi-select-group', color: 'deep-orange-darken-2', event: 'open-group-setters', requires: 'editor' },
+      { label: 'Справочники', hint: 'Удельные расходы, Kv, температуры, ГВС, организации, районы', icon: 'mdi-book-open-page-variant-outline', color: 'teal-darken-3', event: 'open-dictionaries', requires: 'editor' },
     ],
   },
   {

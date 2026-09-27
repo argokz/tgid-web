@@ -80,7 +80,18 @@ describe('каталог инструментов по ролям', () => {
   it('инструменты без requires видны всем, пустые группы скрываются', () => {
     const groups = filterByRole(TOOL_GROUPS, computePermissions(base))
     expect(groups.find((g) => g.title === 'Администрирование')).toBeUndefined()
-    expect(groups.flatMap((g) => g.items).length).toBe(TOOL_GROUPS.flatMap((g) => g.items).length - 2)
+    expect(groups.find((g) => g.title === 'Исходные данные')).toBeUndefined()
+    const open = TOOL_GROUPS.flatMap((g) => g.items).filter((i) => !i.requires)
+    expect(groups.flatMap((g) => g.items).length).toBe(open.length)
+  })
+
+  it('групповые установщики и справочники — editor+', () => {
+    for (const role of ['', 'viewer', 'calculator']) {
+      expect(toolEvents(role)).not.toContain('open-group-setters')
+      expect(toolEvents(role)).not.toContain('open-dictionaries')
+    }
+    expect(toolEvents('editor')).toContain('open-group-setters')
+    expect(toolEvents('admin')).toContain('open-dictionaries')
   })
 })
 

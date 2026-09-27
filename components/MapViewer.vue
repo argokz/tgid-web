@@ -343,6 +343,16 @@
         ref="auditHistoryRef"
       />
 
+      <!-- Исходные данные (этап 9): групповые установщики aSet* и справочники -->
+      <LazyGroupSetterDialog
+        v-if="mountedDialogs.groupSetters"
+        ref="groupSettersRef"
+      />
+      <LazyDictionariesDialog
+        v-if="mountedDialogs.dictionaries"
+        ref="dictionariesRef"
+      />
+
       <!-- Attribute properties panel dialog (лениво: монтируется при первом identify-клике) -->
       <LazyAttributePanel
         v-if="mountedDialogs.attributePanel"
@@ -820,6 +830,8 @@ const throttlingCalculatorRef = ref<{ openDialog: (scope?: any) => void } | null
 const hydraulicThematicRef = ref<{ openDialog: (scope?: any) => void } | null>(null);
 const usersAdminRef = ref<{ openDialog: () => void } | null>(null);
 const auditHistoryRef = ref<{ openDialog: (scope?: { table?: string; recordId?: number }) => void } | null>(null);
+const groupSettersRef = ref<{ openDialog: () => void } | null>(null);
+const dictionariesRef = ref<{ openDialog: (scope?: { dictionary?: string }) => void } | null>(null);
 
 /**
  * Ленивое монтирование диалогов: тяжёлые журналы не попадают в основной чанк карты,
@@ -857,7 +869,9 @@ type LazyDialogKey =
   | 'throttlingCalculator'
   | 'hydraulicThematic'
   | 'usersAdmin'
-  | 'auditHistory';
+  | 'auditHistory'
+  | 'groupSetters'
+  | 'dictionaries';
 
 type LazyDialogInstance = { openDialog: (scope?: any) => void };
 
@@ -895,6 +909,8 @@ const lazyDialogRefs: Record<LazyDialogKey, Ref<LazyDialogInstance | null>> = {
   hydraulicThematic: hydraulicThematicRef,
   usersAdmin: usersAdminRef,
   auditHistory: auditHistoryRef,
+  groupSetters: groupSettersRef,
+  dictionaries: dictionariesRef,
 };
 
 /** Событие панели инструментов → ключ ленивого диалога */
@@ -929,6 +945,8 @@ const TOOL_EVENT_TO_DIALOG: Record<ToolEvent, LazyDialogKey> = {
   'open-regime-analysis': 'regimeAnalysis',
   'open-users-admin': 'usersAdmin',
   'open-audit-history': 'auditHistory',
+  'open-group-setters': 'groupSetters',
+  'open-dictionaries': 'dictionaries',
 };
 
 const onOpenTool = (event: ToolEvent) => {
@@ -1809,6 +1827,7 @@ const undoLastTopologyOperation = async () => {
 // === Контуры журналов (этап 9): слой контура и выбор участков кликом ===
 const journalContourLayer = useJournalContourLayer(() => mapStore.map, {
   isLineFeature: (feature: any) => getFeatureKind(feature) === 'line',
+  isNodeFeature: (feature: any) => getFeatureKind(feature) === 'node',
   featureId: (feature: any) => getFeatureId(feature),
   onPickHint: (text: string) => useNotificationStore().showInfo(text),
 });

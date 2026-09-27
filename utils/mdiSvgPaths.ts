@@ -199,6 +199,11 @@ import {
   mdiStamper,
   mdiCursorDefaultClickOutline,
   mdiFileDocumentMultipleOutline,
+  mdiBookOpenPageVariantOutline,
+  mdiSelectGroup,
+  mdiCropFree,
+  mdiLayersOutline,
+  mdiFilterOutline,
 } from '@mdi/js'
 
 
@@ -396,6 +401,11 @@ const byExportName: Record<string, string> = {
   mdiStamper,
   mdiCursorDefaultClickOutline,
   mdiFileDocumentMultipleOutline,
+  mdiBookOpenPageVariantOutline,
+  mdiSelectGroup,
+  mdiCropFree,
+  mdiLayersOutline,
+  mdiFilterOutline,
 }
 
 
