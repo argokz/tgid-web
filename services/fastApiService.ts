@@ -489,6 +489,86 @@ export interface CalculationSummaryItem {
   fileid: number | null;
 }
 
+/** plan — плановый (десктоп «Плановый…», sety с -dross); emergency — аварийный/фактический (без -dross) */
+export type SetyCalcMode = 'plan' | 'emergency';
+
+/** Тело POST api/v1/calculations/run; несколько fragment_ids — «по списку» (по очереди) */
+export interface SetyRunRequest {
+  mode: SetyCalcMode;
+  fragment_ids: number[];
+  name?: string;
+  tn: number;
+  sopr?: number;
+  ro_p?: number;
+  ro_o?: number;
+  ro_temp?: boolean;
+  char_sety?: boolean;
+  mag_fragment?: boolean;
+  use_kv?: boolean;
+  veter?: boolean;
+  avtomat?: boolean;
+  // только плановый
+  tg?: boolean;
+  teplopoter?: boolean;
+  uf_calc?: boolean;
+  save_uf_new?: boolean;
+  teplovyd?: boolean;
+  dross_yes?: boolean;
+  save_po?: boolean;
+  utechki?: boolean;
+  trtp?: number;
+  iter?: number;
+  // только аварийный
+  consumer_resistance?: 'detailed' | 'equivalent';
+  leto?: boolean;
+  save_leto?: boolean;
+}
+
+export interface SetyRunResponse {
+  message: string;
+  task_id: string;
+  request_id: string;
+  mode: SetyCalcMode;
+  fragment_ids: number[];
+  params: string;
+}
+
+export interface CalculationListItem {
+  id: number;
+  fileid: number | null;
+  fragment_name: string | null;
+  calculated_at: string | null;
+  tn: number | null;
+  name: string | null;
+  user_gid: string | null;
+  calc_plan: number | null;
+  is_latest: boolean;
+  has_results: boolean;
+  mode: SetyCalcMode | null;
+  params: Record<string, number | string> | null;
+}
+
+export interface CalculationListResponse {
+  total: number;
+  items: CalculationListItem[];
+}
+
+export interface CalculationListFilter {
+  file_id?: number | null;
+  mode?: SetyCalcMode | null;
+  author?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CalculationDeleteResponse {
+  success: boolean;
+  calculation_id: number;
+  deleted_rows: Record<string, number>;
+}
+
 export interface CalculationGeoJsonResponse {
   type: 'FeatureCollection';
   summary?: {
@@ -1352,6 +1432,27 @@ export const fastApiService = {
 
   async getLatestCalculations(limit = 20): Promise<CalculationSummaryItem[]> {
     return request<CalculationSummaryItem[]>('api/calculations/latest', { query: { limit } });
+  },
+
+  /** Расчёт в режиме десктопа: плановый / аварийный, один фрагмент или по списку */
+  async runSetyMode(body: SetyRunRequest): Promise<SetyRunResponse> {
+    return request<SetyRunResponse>('api/v1/calculations/run', mutationOptions('POST', body));
+  },
+
+  async listCalculations(filter: CalculationListFilter = {}): Promise<CalculationListResponse> {
+    const query: Record<string, string | number> = {};
+    for (const [key, value] of Object.entries(filter)) {
+      if (value !== null && value !== undefined && value !== '') query[key] = value as string | number;
+    }
+    return request<CalculationListResponse>('api/v1/calculations', { query });
+  },
+
+  /** Удаляет расчёт и его *_out-строки (только при MUTATIONS_ENABLED) */
+  async deleteCalculation(calculationId: number): Promise<CalculationDeleteResponse> {
+    return request<CalculationDeleteResponse>(
+      `api/v1/calculations/${encodePath(calculationId)}`,
+      mutationOptions('DELETE'),
+    );
   },
 
   async getCalculationResultsGeoJSON(calculationId: number): Promise<CalculationGeoJsonResponse> {

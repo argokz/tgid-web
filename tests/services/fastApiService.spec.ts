@@ -808,6 +808,28 @@ describe('fastApiService auth and topology errors', () => {
     }
   })
 
+  it('runs sety modes and deletes calculations with the bearer token', async () => {
+    await fastApiService.runSetyMode({ mode: 'emergency', fragment_ids: [74, 75], tn: -25, consumer_resistance: 'detailed' })
+    await fastApiService.deleteCalculation(12)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/v1/calculations/run', expect.objectContaining({
+      method: 'POST',
+      body: { mode: 'emergency', fragment_ids: [74, 75], tn: -25, consumer_resistance: 'detailed' },
+    }))
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/v1/calculations/12', expect.objectContaining({ method: 'DELETE' }))
+    for (const call of fetchMock.mock.calls) {
+      expect(call[1].headers).toMatchObject({ Authorization: 'Bearer jwt-123' })
+    }
+  })
+
+  it('lists calculations without empty filters', async () => {
+    fetchMock.mockResolvedValueOnce({ total: 0, items: [] })
+    await fastApiService.listCalculations({ file_id: 74, mode: null, author: '', limit: 25, offset: 0 })
+    expect(fetchMock).toHaveBeenCalledWith('https://api.example.test/api/v1/calculations', expect.objectContaining({
+      query: { file_id: 74, limit: 25, offset: 0 },
+    }))
+  })
+
   it('omits the header when there is no token', async () => {
     delete store.itwin_access_token
     await fastApiService.createNode(76.9, 43.2)

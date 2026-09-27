@@ -197,7 +197,8 @@
     <!-- Модальное окно расчета -->
     <PlanningCalculationModal
       v-model="showCalculationModal"
-      @log="onCalculationLog"
+      @protocol-log="onCalculationLog"
+      @show-protocol="showProtocol = $event"
     />
 
     <!-- Окно протокола -->

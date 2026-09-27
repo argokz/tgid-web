@@ -1,7 +1,7 @@
 <template>
   <v-dialog
     v-model="isOpen"
-    :max-width="mobile ? undefined : 800"
+    :max-width="mobile ? undefined : 820"
     :fullscreen="mobile"
     scrollable
     persistent
@@ -13,112 +13,168 @@
     >
       <v-card-title class="primary-text d-flex align-center flex-wrap py-2 gap-1">
         <v-icon class="mr-2">
-          mdiCog
+          mdi-cog
         </v-icon>
-        Установки расчета планового режима
+        {{ dialogTitle }}
         <v-spacer />
+        <v-btn
+          variant="text"
+          size="small"
+          prepend-icon="mdi-format-list-text"
+          @click="calculationsOpen = true"
+        >
+          Расчёты
+        </v-btn>
         <v-btn
           icon
           density="compact"
           @click="close"
         >
-          <v-icon>mdiClose</v-icon>
+          <v-icon>mdi-close</v-icon>
         </v-btn>
       </v-card-title>
-      
-      <v-card-text class="pt-4 pb-0">
+
+      <v-card-text class="pt-2 pb-0">
         <v-form ref="form">
+          <!-- Режим запуска (десктоп: Плановый / Фактический(аварийный) / … по списку) -->
+          <v-btn-toggle
+            v-model="runKind"
+            mandatory
+            color="primary"
+            density="compact"
+            variant="outlined"
+            divided
+            class="mb-3 flex-wrap"
+          >
+            <v-btn value="normal">
+              Обычный
+            </v-btn>
+            <v-btn value="list">
+              По списку
+            </v-btn>
+            <v-btn value="emergency">
+              Аварийный
+            </v-btn>
+          </v-btn-toggle>
+
+          <v-select
+            v-if="runKind === 'list'"
+            v-model="listMode"
+            :items="listModeOptions"
+            item-title="label"
+            item-value="value"
+            label="Тип расчёта для фрагментов списка"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+            hide-details
+          />
+
+          <p
+            v-if="calcMode === 'emergency'"
+            class="text-caption text-medium-emphasis mb-3"
+          >
+            Аварийный (фактический) режим: sety запускается без -dross — потребители считаются
+            гидравлическими трактами (дроссели, элеваторы, приборы), состояние сети — текущее
+            состояние объектов в БД (закрытые задвижки и т.п.).
+          </p>
+
           <!-- Наименование расчета -->
           <p class="text-subtitle-2 mb-1">
             Наименование расчета
           </p>
           <v-text-field
             v-model="calculationName"
-            placeholder="Расчет планового режима"
             variant="outlined"
             density="compact"
             class="mb-3"
             hide-details
+            maxlength="200"
           />
-          
-          <!-- Расчетные расходы потребителей -->
+
           <p class="text-subtitle-2 mb-1">
-            Расчетные расходы потребителей
+            {{ runKind === 'list' ? 'Фрагменты для расчета (по очереди)' : 'Фрагмент для расчета' }}
           </p>
-          <v-radio-group
-            v-model="consumptionType"
-            :inline="!mobile"
-            class="my-0"
+          <v-autocomplete
+            v-if="runKind === 'list'"
+            v-model="selectedFragmentIds"
+            :items="fragmentItems"
+            item-title="name"
+            item-value="id"
+            multiple
+            chips
+            closable-chips
+            variant="outlined"
             density="compact"
-            hide-details
-          >
-            <v-radio
-              value="specific"
-              label="По удельным расходам"
-            />
-            <v-radio
-              value="temperature"
-              label="По температурному графику"
-            />
-          </v-radio-group>
-          
-          <p class="text-subtitle-2 mb-1 mt-2">
-            Активный фрагмент для расчета
-          </p>
-          <v-btn 
-            variant="outlined" 
-            class="mb-1" 
-            :color="fragmentError ? 'error' : undefined"
-            :class="{ 'error-border': fragmentError }"
-            @click="fragmentSelectModal = true"
-          >
-            {{ selectedFragmentName }}
-          </v-btn>
-          <p
-            v-if="fragmentError"
-            class="text-caption text-error mb-2"
-          >
-            Необходимо выбрать фрагмент для расчета
-          </p>
-          
-          <FragmentSelectModal
-            v-model="fragmentSelectModal"
-            :model-value-id="selectedFragmentId"
-            @update:model-value-id="(val: number | null) => selectedFragmentId = val"
+            placeholder="Выберите фрагменты"
+            :error="fragmentError"
+            :error-messages="fragmentError ? 'Выберите хотя бы два фрагмента' : undefined"
+            class="mb-2"
           />
-          
-          <div class="d-flex flex-wrap mt-2 calc-form-row">
-            <div class="w-50 pr-2 calc-form-col">
-              <v-checkbox 
-                v-model="considerHeatLoss" 
-                label="С учетом тепловых потерь в сети"
-                density="compact"
-                hide-details
-                :disabled="!isTemperatureMode"
+          <v-autocomplete
+            v-else
+            v-model="selectedFragmentId"
+            :items="fragmentItems"
+            item-title="name"
+            item-value="id"
+            variant="outlined"
+            density="compact"
+            placeholder="Выберите фрагмент"
+            :error="fragmentError"
+            :error-messages="fragmentError ? 'Необходимо выбрать фрагмент для расчета' : undefined"
+            class="mb-2"
+          />
+
+          <!-- Плановый режим (Param1Dialog) -->
+          <template v-if="calcMode === 'plan'">
+            <p class="text-subtitle-2 mb-1">
+              Расчетные расходы потребителей
+            </p>
+            <v-radio-group
+              v-model="consumptionType"
+              :inline="!mobile"
+              class="my-0"
+              density="compact"
+              hide-details
+            >
+              <v-radio
+                value="specific"
+                label="По удельным расходам"
               />
-              
-              <v-checkbox 
-                v-model="considerMixingCoefficients" 
-                label="С учетом рассчитанных коэффициентов смешения"
-                density="compact"
-                hide-details
-                :disabled="!isTemperatureMode"
+              <v-radio
+                value="temperature"
+                label="По температурному графику"
               />
-              
-              <v-checkbox 
-                v-model="considerInternalHeat" 
-                label="С учетом внутренних тепловыделений"
-                density="compact"
-                hide-details
-              />
-            </div>
-          
-            <div class="w-50 pl-2 calc-form-col">
-              <!-- Температура расчета тепловых потерь -->
-              <p class="text-subtitle-2 mb-1 mt-1">
-                Температура расчета тепловых потерь
-              </p>
-              <div class="d-flex">
+            </v-radio-group>
+
+            <div class="d-flex flex-wrap mt-2 calc-form-row">
+              <div class="w-50 pr-2 calc-form-col">
+                <v-checkbox
+                  v-model="considerHeatLoss"
+                  label="С учетом тепловых потерь в сети"
+                  density="compact"
+                  hide-details
+                  :disabled="!isTemperatureMode"
+                />
+                <v-checkbox
+                  v-model="considerMixingCoefficients"
+                  label="С учетом рассчитанных коэффициентов смешения"
+                  density="compact"
+                  hide-details
+                  :disabled="!isTemperatureMode"
+                />
+                <v-checkbox
+                  v-model="considerInternalHeat"
+                  label="С учетом внутренних тепловыделений"
+                  density="compact"
+                  hide-details
+                />
+              </div>
+
+              <div class="w-50 pl-2 calc-form-col">
+                <p class="text-subtitle-2 mb-1 mt-1">
+                  Температура расчета тепловых потерь
+                </p>
                 <v-select
                   v-model="heatLossTemperature"
                   :items="heatLossTemperatureOptions"
@@ -126,14 +182,60 @@
                   item-value="value"
                   variant="outlined"
                   density="compact"
-                  class="mr-2"
                   hide-details
                 />
               </div>
-              
-              <!-- Температура наружного воздуха -->
-              <p class="text-subtitle-2 mb-1 mt-2">
-                Температура наружного воздуха
+            </div>
+          </template>
+
+          <!-- Аварийный / фактический режим (Param2Dialog) -->
+          <template v-else>
+            <p class="text-subtitle-2 mb-1">
+              Гидравлическое сопротивление потребителей
+            </p>
+            <v-radio-group
+              v-model="consumerResistance"
+              :inline="!mobile"
+              class="my-0"
+              density="compact"
+              hide-details
+            >
+              <v-radio
+                value="detailed"
+                label="Детализированное"
+              />
+              <v-radio
+                value="equivalent"
+                label="Эквивалентное"
+                :disabled="summerMode"
+              />
+            </v-radio-group>
+            <div class="d-flex flex-wrap calc-form-row">
+              <div class="w-50 pr-2 calc-form-col">
+                <v-checkbox
+                  v-model="summerMode"
+                  label="Летний режим"
+                  density="compact"
+                  hide-details
+                />
+              </div>
+              <div class="w-50 pl-2 calc-form-col">
+                <v-checkbox
+                  v-model="saveSummerResistance"
+                  label="Запись летних сопротивлений в обобщенный потребитель"
+                  density="compact"
+                  hide-details
+                  :disabled="!summerMode"
+                />
+              </div>
+            </div>
+          </template>
+
+          <!-- Общие -->
+          <div class="d-flex flex-wrap mt-2 calc-form-row">
+            <div class="w-50 pr-2 calc-form-col">
+              <p class="text-subtitle-2 mb-1 mt-1">
+                Температура наружного воздуха, °C
               </p>
               <div class="d-flex align-center flex-wrap ga-2">
                 <v-text-field
@@ -143,73 +245,59 @@
                   type="number"
                   class="flex-grow-1"
                   style="min-width: 120px;"
+                  :error="tnError"
                   hide-details
                 />
-                <v-checkbox 
-                  v-model="considerWind" 
+                <v-checkbox
+                  v-if="calcMode === 'plan'"
+                  v-model="considerWind"
                   label="Учитывать ветер"
                   density="compact"
                   hide-details
                 />
               </div>
-            </div>
-          </div>
-          
-          <!-- Дополнительные опции -->
-          <div class="d-flex flex-wrap mt-2 calc-form-row">
-            <div class="w-50 pr-2 calc-form-col">
-              <v-checkbox 
-                v-model="calculateThrottleValves" 
-                label="Расчет дроссельных органов и запись сопротивлений"
-                density="compact"
-                hide-details
-              />
-              
-              <!-- <v-checkbox 
-                v-model="calculateAutomatedConsumers" 
-                label="Расчет автоматизированных потребителей"
-                density="compact"
-                hide-details
-                :disabled="!isTemperatureMode"
-              ></v-checkbox> -->
-              
-              <v-checkbox 
-                v-model="recordMixingCoefficients" 
-                label="Запись коэффициентов смешения"
-                density="compact"
-                hide-details
-                :disabled="!isTemperatureMode"
-              />
-              
-              <v-checkbox 
-                v-model="networkQuantitativeCharacteristics" 
+              <template v-if="calcMode === 'plan'">
+                <v-checkbox
+                  v-model="calculateThrottleValves"
+                  label="Расчет дроссельных органов и запись сопротивлений"
+                  density="compact"
+                  hide-details
+                />
+                <v-checkbox
+                  v-model="recordMixingCoefficients"
+                  label="Запись коэффициентов смешения"
+                  density="compact"
+                  hide-details
+                  :disabled="!isTemperatureMode"
+                />
+              </template>
+              <v-checkbox
+                v-model="networkQuantitativeCharacteristics"
                 label="Количественные характеристики сети"
                 density="compact"
                 hide-details
               />
             </div>
-            
+
             <div class="w-50 pl-2 calc-form-col">
-              <!-- Расчетный перепад напора -->
               <p class="text-subtitle-2 mb-1">
                 Расчетный перепад напора:
               </p>
-              <v-checkbox 
-                v-model="mainFragment" 
+              <v-checkbox
+                v-model="mainFragment"
                 label="Магистральный фрагмент"
                 density="compact"
                 hide-details
               />
-              
-              <v-checkbox 
-                v-model="recordHeatLoadLoss" 
+              <v-checkbox
+                v-if="calcMode === 'plan'"
+                v-model="recordHeatLoadLoss"
                 label="Запись тепловых нагрузок и потерь в обобщенный потребитель"
                 density="compact"
                 hide-details
               />
-              
-              <v-checkbox 
-                v-model="considerVariationCoefficients" 
+              <v-checkbox
+                v-model="considerVariationCoefficients"
                 label="С учетом коэффициентов вариации"
                 density="compact"
                 hide-details
@@ -218,10 +306,13 @@
           </div>
         </v-form>
       </v-card-text>
-      
-      <v-card-actions class="pa-3 d-flex flex-wrap gap-2" :class="mobile ? 'flex-column-reverse' : 'justify-end'">
-        <v-btn 
-          variant="outlined" 
+
+      <v-card-actions
+        class="pa-3 d-flex flex-wrap gap-2"
+        :class="mobile ? 'flex-column-reverse' : 'justify-end'"
+      >
+        <v-btn
+          variant="outlined"
           min-width="100"
           density="comfortable"
           :block="mobile"
@@ -229,9 +320,9 @@
         >
           Отмена
         </v-btn>
-        <v-btn 
-          color="primary" 
-          variant="elevated" 
+        <v-btn
+          color="primary"
+          variant="elevated"
           min-width="100"
           density="comfortable"
           :block="mobile"
@@ -242,16 +333,20 @@
         </v-btn>
       </v-card-actions>
     </v-card>
+
+    <CalculationsDialog v-model="calculationsOpen" />
   </v-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { useDisplay } from 'vuetify';
-import FragmentSelectModal from '~/components/FragmentSelectModal.vue';
+import CalculationsDialog from '~/components/CalculationsDialog.vue';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { useLayerStore } from '~/stores/layerStore';
-import { fastApiService } from '~/services/fastApiService';
+import { fastApiService, type SetyCalcMode, type SetyRunRequest } from '~/services/fastApiService';
+
+type RunKind = 'normal' | 'list' | 'emergency';
 
 const heatLossTemperatureOptions = [
   { label: 'расчетная tн отопл', value: 0 },
@@ -259,28 +354,37 @@ const heatLossTemperatureOptions = [
   { label: 'Текущая tн', value: 2 }
 ];
 
+const listModeOptions = [
+  { label: 'Плановый', value: 'plan' },
+  { label: 'Аварийный (фактический)', value: 'emergency' },
+];
+
 const fragmentStore = useFragmentStore();
 const fragments = computed(() => fragmentStore.getFragments);
+const fragmentItems = computed(() =>
+  fragments.value.map(f => ({ id: Number(f.id), name: f.name ?? `Фрагмент ${f.id}` })));
 
 const { mobile } = useDisplay();
 
-const selectedFragmentId = ref<number | null>(null);
-const fragmentSelectModal = ref(false);
-const fragmentError = ref(false);
-const calculating = ref(false);
-
-const selectedFragmentName = computed(() => {
-  if (selectedFragmentId.value === null) return 'Выбрать фрагмент';
-  const frag = fragments.value.find(f => f.id === selectedFragmentId.value);
-  return frag?.name ?? 'Выбрать фрагмент';
+const runKind = ref<RunKind>('normal');
+const listMode = ref<SetyCalcMode>('plan');
+const calcMode = computed<SetyCalcMode>(() => {
+  if (runKind.value === 'emergency') return 'emergency';
+  if (runKind.value === 'list') return listMode.value;
+  return 'plan';
 });
 
-// Определяем пропсы
+const selectedFragmentId = ref<number | null>(null);
+const selectedFragmentIds = ref<number[]>([]);
+const fragmentError = ref(false);
+const tnError = ref(false);
+const calculating = ref(false);
+const calculationsOpen = ref(false);
+
 const props = defineProps<{
   modelValue: boolean
 }>();
 
-// Определяем события
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   'calculate': []
@@ -288,156 +392,187 @@ const emit = defineEmits<{
   'show-protocol': [value: boolean]
 }>();
 
-// Компьютед свойство для режима диалога
 const isOpen = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value)
 });
 
-function getCurrentCalculationName() {
-  const now = new Date();
-  return `Расчет планового режима ${now.toLocaleString('ru-RU', {
+const dialogTitle = computed(() => (calcMode.value === 'plan'
+  ? 'Установки расчета планового режима'
+  : 'Установки расчета аварийного (фактического) режима'));
+
+function defaultCalculationName() {
+  const stamp = new Date().toLocaleString('ru-RU', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit'
-  }).replace(',', '')}`;
+  }).replace(',', '');
+  return calcMode.value === 'plan'
+    ? `Расчет планового режима ${stamp}`
+    : `Расчет аварийного режима ${stamp}`;
 }
 
-const calculationName = ref(getCurrentCalculationName());
+const calculationName = ref(defaultCalculationName());
 
 watch(isOpen, (val) => {
-  if (val) {
-    calculationName.value = getCurrentCalculationName();
+  if (!val) return;
+  calculationName.value = defaultCalculationName();
+  if (!fragments.value.length) void fragmentStore.loadFragments();
+  if (selectedFragmentId.value === null && fragmentStore.selectedFragmentId !== null) {
+    selectedFragmentId.value = fragmentStore.selectedFragmentId;
   }
 });
 
-// Состояние формы
-const consumptionType = ref('specific'); // или 'temperature'
+watch(calcMode, () => {
+  // имя по умолчанию следует за режимом, пока пользователь его не менял
+  if (/^Расчет (планового|аварийного) режима /.test(calculationName.value)) {
+    calculationName.value = defaultCalculationName();
+  }
+});
+
+// Состояние формы — плановый
+const consumptionType = ref('specific');
 const considerHeatLoss = ref(true);
 const considerMixingCoefficients = ref(false);
 const considerInternalHeat = ref(true);
-const heatLossStandard = ref('нормы');
 const heatLossTemperature = ref(0);
-const outdoorTemperature = ref('-32');
 const considerWind = ref(false);
 const calculateThrottleValves = ref(false);
-const calculateAutomatedConsumers = ref(false);
 const recordMixingCoefficients = ref(false);
+const recordHeatLoadLoss = ref(false);
+// аварийный (десктоп по умолчанию — эквивалентное сопротивление)
+const consumerResistance = ref<'detailed' | 'equivalent'>('equivalent');
+const summerMode = ref(false);
+const saveSummerResistance = ref(false);
+// общие
+const outdoorTemperature = ref('-32');
 const networkQuantitativeCharacteristics = ref(false);
 const mainFragment = ref(false);
-const recordHeatLoadLoss = ref(false);
 const considerVariationCoefficients = ref(true);
 
 const isTemperatureMode = computed(() => consumptionType.value === 'temperature');
 
-// Методы
+watch(summerMode, (on) => {
+  // Param2Dialog: летний режим — только детализированное сопротивление
+  if (on) consumerResistance.value = 'detailed';
+  else saveSummerResistance.value = false;
+});
+
 const form = ref();
 
-// Закрыть модальное окно
 const close = () => {
   isOpen.value = false;
 };
 
 const addProtocolLog = (message: string, type: string = 'info', html = false) => {
-  const now = new Date();
-  const timestamp = now.toLocaleTimeString('ru-RU');
+  const timestamp = new Date().toLocaleTimeString('ru-RU');
   emit('protocol-log', { timestamp, message, type, html });
 };
 
-const buildApiString = () => {
-  const params = [];
-  params.push(`-name "${calculationName.value}"`);
-  params.push(`-time "${new Date().toISOString().slice(0, 19).replace('T', ' ')}"`);
-  if (selectedFragmentId.value !== null) params.push(`-fileID ${selectedFragmentId.value}`);
-
-  if (isTemperatureMode.value) {
-    params.push('-tg');
-    if (!considerHeatLoss.value) params.push('-no_teplopoter');
-    if (considerMixingCoefficients.value) params.push('-uf_calc');
-    if (recordMixingCoefficients.value) params.push('-save_uf_new');
+const buildRequest = (fragmentIds: number[], tn: number): SetyRunRequest => {
+  const base: SetyRunRequest = {
+    mode: calcMode.value,
+    fragment_ids: fragmentIds,
+    name: calculationName.value.trim() || undefined,
+    tn,
+    char_sety: networkQuantitativeCharacteristics.value,
+    mag_fragment: mainFragment.value,
+    use_kv: considerVariationCoefficients.value,
+  };
+  if (calcMode.value === 'plan') {
+    const tg = isTemperatureMode.value;
+    return {
+      ...base,
+      tg,
+      teplopoter: tg ? considerHeatLoss.value : true,
+      uf_calc: tg && considerMixingCoefficients.value,
+      save_uf_new: tg && recordMixingCoefficients.value,
+      teplovyd: considerInternalHeat.value,
+      dross_yes: calculateThrottleValves.value,
+      save_po: recordHeatLoadLoss.value,
+      veter: considerWind.value,
+      trtp: heatLossTemperature.value,
+    };
   }
-
-  params.push(`-trtp ${heatLossTemperature.value}`);
-  if (outdoorTemperature.value) params.push(`-Tn ${outdoorTemperature.value}`);
-  if (considerWind.value) params.push('-veter');
-  if (!considerInternalHeat.value) params.push('-no_teplovyd');
-  if (calculateThrottleValves.value) params.push('-dross_yes');
-  if (networkQuantitativeCharacteristics.value) params.push('-char_sety');
-  if (mainFragment.value) params.push('-mag_fragment');
-  if (recordHeatLoadLoss.value) params.push('-save_po');
-  if (!considerVariationCoefficients.value) params.push('-no_kv');
-  params.push(`-user_gid 1`);
-
-  return params.join(' ');
+  return {
+    ...base,
+    consumer_resistance: summerMode.value ? 'detailed' : consumerResistance.value,
+    leto: summerMode.value,
+    save_leto: summerMode.value && saveSummerResistance.value,
+  };
 };
 
-// Выполнить расчет
+const pollTask = async (taskId: string) => {
+  let lastStatus = '';
+  let lastProgress = '';
+  for (;;) {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    const statusResponse = await fastApiService.getTaskStatus(taskId);
+
+    if (statusResponse.status !== lastStatus) {
+      lastStatus = statusResponse.status;
+      addProtocolLog(`Статус: ${lastStatus}`, 'info');
+    }
+    const progress = statusResponse.meta?.message;
+    if (progress && progress !== lastProgress) {
+      lastProgress = progress;
+      addProtocolLog(progress, 'info');
+    }
+
+    if (statusResponse.status === 'SUCCESS') {
+      const finalResult = statusResponse.result || {};
+      const ok = finalResult.status === 'success';
+      addProtocolLog(finalResult.message || 'Расчет окончен', ok ? 'success' : 'error');
+      if (finalResult.output) addProtocolLog(finalResult.output, ok ? 'success' : 'info', true);
+      if (finalResult.error) addProtocolLog(finalResult.error, 'error', true);
+      const layerStore = useLayerStore();
+      layerStore.visibleGeoServerLayers.forEach(id => layerStore.refreshLayerSource(id));
+      return;
+    }
+    if (statusResponse.status === 'FAILURE') {
+      addProtocolLog('Ошибка при выполнении расчета на сервере', 'error');
+      if (statusResponse.error) addProtocolLog(statusResponse.error, 'error', true);
+      return;
+    }
+  }
+};
+
 const calculate = async () => {
   emit('show-protocol', true);
-  
-  if (selectedFragmentId.value === null) {
-    fragmentError.value = true;
-    addProtocolLog('Ошибка: необходимо выбрать фрагмент для расчета', 'error');
+
+  const fragmentIds = runKind.value === 'list'
+    ? [...selectedFragmentIds.value]
+    : (selectedFragmentId.value !== null ? [selectedFragmentId.value] : []);
+  fragmentError.value = runKind.value === 'list' ? fragmentIds.length < 2 : fragmentIds.length === 0;
+  const tn = Number(outdoorTemperature.value);
+  tnError.value = outdoorTemperature.value === '' || !Number.isFinite(tn) || tn < -60 || tn > 50;
+  if (fragmentError.value || tnError.value) {
+    addProtocolLog(fragmentError.value
+      ? 'Ошибка: необходимо выбрать фрагмент(ы) для расчета'
+      : 'Ошибка: температура наружного воздуха должна быть от -60 до 50 °C', 'error');
     return;
   }
-  fragmentError.value = false;
 
-  // Закрываем диалог при начале расчета
   isOpen.value = false;
-
-  const apiString = buildApiString();
+  const body = buildRequest(fragmentIds, tn);
   addProtocolLog('Отправка запроса на расчет...', 'info');
-  addProtocolLog(`Параметры: ${apiString}`, 'info');
 
   calculating.value = true;
   try {
-    const result = await fastApiService.postRunSetyCmd(apiString);
+    const result = await fastApiService.runSetyMode(body);
     if (!result.task_id) {
       addProtocolLog(result.message || 'Ошибка: сервер не вернул ID задачи', 'error');
-      calculating.value = false;
       return;
     }
-    
+    addProtocolLog(`Параметры: ${result.params}`, 'info');
     addProtocolLog(result.message || 'Задача добавлена в очередь', 'success');
     addProtocolLog(`Task ID: ${result.task_id}`, 'info');
-    
-    // Polling logic
-    let isDone = false;
-    let lastStatus = '';
-    
-    while (!isDone) {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Poll every 2 seconds
-      const statusResponse = await fastApiService.getTaskStatus(result.task_id);
-      
-      if (statusResponse.status !== lastStatus) {
-        lastStatus = statusResponse.status;
-        addProtocolLog(`Статус: ${lastStatus}`, 'info');
-      }
-      
-      if (statusResponse.status === 'SUCCESS') {
-        const finalResult = statusResponse.result;
-        addProtocolLog(finalResult.message || 'Расчет окончен', 'success');
-        if (finalResult.output) {
-          addProtocolLog(finalResult.output, 'success', true);
-        }
-        isDone = true;
-        
-        // Refresh map layers to show new colors
-        const layerStore = useLayerStore();
-        layerStore.visibleGeoServerLayers.forEach(id => layerStore.refreshLayerSource(id));
-      } else if (statusResponse.status === 'FAILURE') {
-        addProtocolLog('Ошибка при выполнении расчета на сервере', 'error');
-        if (statusResponse.error) {
-          addProtocolLog(statusResponse.error, 'error', true);
-        }
-        isDone = true;
-      }
-    }
-  } catch (error) {
+    await pollTask(result.task_id);
+  } catch (error: any) {
     addProtocolLog('Ошибка при связи с сервером', 'error');
-    addProtocolLog(`Детали ошибки: ${error}`, 'error');
+    addProtocolLog(`Детали ошибки: ${error?.userMessage || error?.message || error}`, 'error');
   } finally {
     calculating.value = false;
   }
@@ -455,7 +590,4 @@ const calculate = async () => {
   padding-left: 0 !important;
   padding-right: 0 !important;
 }
-.error-border {
-  border: 2px solid rgb(var(--v-theme-error));
-}
-</style> 
+</style>
