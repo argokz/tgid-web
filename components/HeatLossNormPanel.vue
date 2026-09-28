@@ -1,6 +1,10 @@
 <template>
   <div class="norm-panel">
     <div class="norm-filters pa-3">
+      <v-btn-toggle v-model="losesType" mandatory density="compact" color="deep-orange-darken-3" variant="outlined">
+        <v-btn value="norm" size="small">Нормативные</v-btn>
+        <v-btn value="fact" size="small">Фактические</v-btn>
+      </v-btn-toggle>
       <v-select
         v-model="seasonId"
         :items="seasonItems"
@@ -75,7 +79,7 @@
               </td>
               <td class="text-right">
                 <v-btn
-                  v-if="authStore.canEditData"
+                  v-if="authStore.canEditData && losesType === 'norm'"
                   size="x-small"
                   variant="text"
                   color="deep-orange-darken-3"
@@ -143,12 +147,12 @@
             </tr>
           </tbody>
         </table>
-        <div v-if="!runs.length" class="hint">Расчётов нормативных теплопотерь нет</div>
+        <div v-if="!runs.length" class="hint">Расчётов теплопотерь нет</div>
       </section>
 
       <section v-if="run">
         <h4 class="section-title">{{ run.name }}</h4>
-        <v-tabs v-model="view" density="compact" color="deep-orange-darken-3" class="mb-2">
+        <v-tabs v-model="view" density="compact" color="deep-orange-darken-3" class="mb-2" show-arrows>
           <v-tab value="totals">Итоги</v-tab>
           <v-tab value="avg_month_loses">МесПотери</v-tab>
           <v-tab value="avg_year_loses">ГодПотери</v-tab>
@@ -156,6 +160,7 @@
           <v-tab value="summer_norms">НормыЛето</v-tab>
           <v-tab value="material_characteristics">МатХар</v-tab>
           <v-tab value="month_temperatures">МесТемп</v-tab>
+          <v-tab v-for="t in WATER_TABS" :key="t.key" :value="t.key">{{ t.label }}</v-tab>
           <v-tab value="sections">Участки</v-tab>
         </v-tabs>
 
@@ -276,7 +281,9 @@
 import { useAuthStore } from '~/stores/authStore'
 import {
   fastApiService,
+  type HeatLossLosesType,
   type HeatLossNormRun,
+  type HeatLossNormSeason,
   type HeatLossNormRunSummary,
   type HeatLossNormScope,
   type HeatLossNormSection,
@@ -291,6 +298,8 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
+const losesType = ref<HeatLossLosesType>('norm')
+const factSeasons = ref<HeatLossNormSeason[]>([])
 const seasonId = ref<number | null>(null)
 const fragmentId = ref<number | null>(null)
 const scope = ref<HeatLossNormScope | null>(null)
@@ -307,7 +316,8 @@ const sectionTotal = ref(0)
 const sectionSource = ref<number | null>(null)
 const SECTION_PAGE_SIZE = 50
 
-const seasonItems = computed(() => props.seasons.map((s) => ({
+const activeSeasons = computed(() => (losesType.value === 'fact' ? factSeasons.value : props.seasons))
+const seasonItems = computed(() => activeSeasons.value.map((s) => ({
   value: s.id,
   title: `${fmtDate(s.d1)} — ${fmtDate(s.d2)}${s.city ? ` · ${s.city}` : ''} (№${s.id})`,
 })))
@@ -357,6 +367,68 @@ const SHEETS: Record<string, Col[]> = {
   ],
 }
 SHEETS.summer_norms = SHEETS.winter_norms
+
+// листы по воде и прочие листы десктопа (exportController): ключ листа API, вкладка, колонки
+const cols = (pairs: [string, string, number?][]): Col[] => pairs.map(([key, label, digits]) => ({ key, label, digits }))
+const month: [string, string] = ['monthname', 'Месяц']
+const volumes: [string, string, number][] = [
+  ['v1', 'V магистр.', 2], ['v2', 'V распред.', 2], ['vpodv', 'V подвалы', 2], ['vobm', 'V обвязка магистр.', 2],
+  ['vobr', 'V обвязка прочая', 2], ['vall', 'V всего', 2],
+]
+const sarz: Col[] = cols([
+  month, ['netwaterexp', 'Слив, м³/ч', 3], ['workcount', 'Суток', 0], ['regcount', 'Регуляторов', 0],
+  ['avggsarzg', 'G регуляторов, м³', 2], ['regcountnode', 'В узлах', 0], ['avggsarznodeg', 'G в узлах, м³', 2],
+  ['avggsarzgall', 'G всего, м³', 2], ['tgp', 't1', 1], ['tn', 'tн', 1], ['qsarz', 'Q, Гкал', 2],
+])
+const coeffs: Col[] = cols([
+  ['name', 'Источник'],
+  ...(['1', '3'] as const).flatMap((n) => ['ms', 'rs', 'basement', 'harness'].flatMap((b) =>
+    ['flow', 'ret', 'underground'].map((k): [string, string, number] => [`coeff${b}${k}norms${n}`, `${b} ${k} N${n}`, 2]))),
+])
+const WATER_TABS: { key: string; label: string; columns: Col[] }[] = [
+  { key: 'overalls', label: 'ИТОГО', columns: cols([
+    month, ['isolq', 'Изоляция, Гкал', 2], ['qtb', 'Баки, Гкал', 2], ['normq', 'Норм. утечка, Гкал', 2],
+    ['reglq', 'Регламентные, Гкал', 2], ['normg', 'Норм. утечка, м³', 2], ['reglg', 'Регламентные, м³', 2],
+    ['gall', 'Вода всего, м³', 2], ['allq', 'Тепло всего, Гкал', 2]]) },
+  { key: 'net_water_loses', label: 'ТехнПСВ', columns: cols([
+    month, ['fillingg', 'Заполнение, м³', 2], ['avggpressingg', 'Опрессовка', 2], ['avggflushingg', 'Промывка', 2],
+    ['avggsarzg', 'САРЗ', 2], ['normg', 'Норм. утечка', 2], ['gall', 'Всего', 2]]) },
+  { key: 'net_water_year_loses', label: 'ТехнТП', columns: cols([
+    month, ['fillingq', 'Заполнение, Гкал', 2], ['avggpressingq', 'Опрессовка', 2], ['avggflushingq', 'Промывка', 2],
+    ['avggsarzq', 'САРЗ', 2], ['normq', 'Норм. утечка', 2], ['qall', 'Всего', 2]]) },
+  { key: 'loads', label: 'Нагрузка', columns: cols([
+    ['heatsourcename', 'Источник'], ['got_pr', 'Отопление, Гкал/ч', 3], ['gvent_pr', 'Вентиляция', 3],
+    ['ggvs_pr', 'ГВС ср.', 3]]) },
+  { key: 'capacities', label: 'Емкость', columns: cols([
+    ['name', 'Источник'], ['v1', 'Магистр.', 2], ['v1leto', 'лето', 2], ['v2', 'Распред.', 2], ['v2leto', 'лето', 2],
+    ['vpodv', 'Подвалы', 2], ['vob', 'Обвязка', 2], ['vot', 'Отопление', 2], ['vvent', 'Вентиляция', 2],
+    ['vgvs', 'ГВС', 2], ['vall', 'Всего', 2], ['vallleto', 'Всего лето', 2], ['podp', 'Подпитка, м³/ч', 2],
+    ['podpleto', 'лето', 2]]) },
+  { key: 'heat_tests', label: 'К(исп)', columns: coeffs },
+  { key: 'repair_heat_tests', label: 'К(исп) Ремонт', columns: coeffs },
+  { key: 'tank_batteries', label: 'БакАк', columns: cols([
+    ['mesto', 'Место'], ['designcapacity', 'Объём, м³', 0], ['quantity', 'Кол-во', 0], ['height', 'H, мм', 0],
+    ['diameter', 'D, мм', 0]]) },
+  { key: 'tank_batteries_loses', label: 'БакАкТП', columns: cols([
+    month, ['tn', 'tн', 1], ['tgo', 't2', 1], ['monthloses', 'Потери, Гкал/ч', 2], ['workcount', 'Суток', 0]]) },
+  { key: 'fillings', label: 'Заполнение', columns: cols([
+    month, ['magistralshare', 'Магистр., %', 1], ['distsiteshare', 'Распред., %', 1],
+    ['heatingsystemshare', 'Системы, %', 1], ['gmag', 'G магистр., м³', 2], ['grs', 'G распред.', 2],
+    ['gtep', 'G систем', 2], ['nettemperature', 't воды', 1], ['tx', 't подпитки', 1], ['qms', 'Q магистр., Гкал', 2],
+    ['qrs', 'Q распред.', 2], ['qtep', 'Q систем', 2]]) },
+  { key: 'pressings', label: 'Опрессовка', columns: cols([
+    month, ['opr', 'Опрессовка'], ['tset', 't воды', 1], ['tn', 'tн', 1], ['percent1', 'Объём, %', 0], ...volumes,
+    ['avgqpressing', 'Q, Гкал', 2]]) },
+  { key: 'flushings_hs', label: 'ПромывкаСО', columns: cols([
+    month, ['flushinghs_temp1', 't воды', 1], ['tn', 'tн', 1], ['flushinghs', 'Кратность', 2], ['vot1', 'V жилых', 2],
+    ['vot2', 'V общественных', 2], ['vall', 'V всего', 2], ['q', 'Q, Гкал', 2]]) },
+  { key: 'flushings', label: 'ПромывкаТС', columns: cols([
+    month, ['kolv', 'Трубопроводов', 0], ['flushing_temp1', 't воды', 1], ['tn', 'tн', 1],
+    ['flushing', 'Кратность', 2], ...volumes, ['q', 'Q, Гкал', 2]]) },
+  { key: 'sarz_flows', label: 'САРЗ_Под', columns: sarz },
+  { key: 'sarz_rets', label: 'САРЗ_Обр', columns: sarz },
+]
+for (const t of WATER_TABS) SHEETS[t.key] = t.columns
 const sheetColumns = computed(() => SHEETS[view.value] || [])
 const sheetRows = computed(() => (run.value?.sheets?.[view.value] || []) as Record<string, any>[])
 
@@ -377,7 +449,7 @@ async function loadScope() {
   if (!seasonId.value) return
   scopeLoading.value = true
   try {
-    scope.value = await fastApiService.getHeatLossNormScope(seasonId.value, fragmentId.value)
+    scope.value = await fastApiService.getHeatLossNormScope(seasonId.value, fragmentId.value, losesType.value)
   } catch (err: any) {
     notify().showError(err?.message || 'Не удалось получить источники')
   } finally {
@@ -431,13 +503,24 @@ async function loadSections(page = 1) {
 
 watch(view, (value) => { if (value === 'sections' && !sections.value.length) loadSections(1) })
 watch(fragmentId, () => { scope.value = null; loadRuns() })
+watch(losesType, async (value) => {
+  scope.value = null
+  if (value === 'fact' && !factSeasons.value.length) {
+    try {
+      factSeasons.value = (await fastApiService.getHeatLossNormSeasons('fact')).items
+    } catch (err: any) {
+      notify().showError(err?.message || 'Не удалось получить сезоны фактических потерь')
+    }
+  }
+  seasonId.value = activeSeasons.value[0]?.id ?? null
+})
 
 async function runCalculation() {
   if (!seasonId.value) return
   running.value = true
   try {
     const { task_id: taskId } = await fastApiService.runHeatLossNorm({
-      season_id: seasonId.value, fragment_id: fragmentId.value,
+      season_id: seasonId.value, fragment_id: fragmentId.value, loses_type: losesType.value,
     })
     for (let i = 0; i < 300; i++) {
       await new Promise((resolve) => setTimeout(resolve, 2000))
@@ -505,7 +588,7 @@ defineExpose({ init })
 
 <style scoped>
 .norm-panel { display: flex; flex-direction: column; min-height: 0; height: 100%; }
-.norm-filters { display: grid; grid-template-columns: minmax(260px, 1.4fr) minmax(220px, 1fr) auto auto; gap: 12px; align-items: center; background: #fff3e0; }
+.norm-filters { display: grid; grid-template-columns: auto minmax(260px, 1.4fr) minmax(220px, 1fr) auto auto; gap: 12px; align-items: center; background: #fff3e0; }
 .norm-body { overflow: auto; padding: 12px; flex: 1; min-height: 0; }
 .section-title { color: #bf360c; margin-bottom: 6px; }
 .norm-table { width: 100%; border-collapse: collapse; font-size: .82rem; }

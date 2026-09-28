@@ -627,9 +627,21 @@ export interface HeatLossNormScopeSource {
   has_temp_graph: boolean;
 }
 
+export type HeatLossLosesType = 'norm' | 'fact';
+
+export interface HeatLossNormSeason {
+  id: number;
+  name: string | null;
+  city: string | null;
+  d1: string | null;
+  d2: string | null;
+  a: number | null;
+}
+
 export interface HeatLossNormScope {
   season: { id: number; city: string | null; d1: string | null; d2: string | null; a: number | null };
   fragment_id: number | null;
+  loses_type?: HeatLossLosesType;
   sources: HeatLossNormScopeSource[];
 }
 
@@ -644,6 +656,7 @@ export interface HeatLossNormRunSummary {
   params: {
     season_id?: number;
     season?: string;
+    loses_type?: HeatLossLosesType;
     fragment_id?: number | null;
     heat_source_ids?: number[];
     ready_source_ids?: number[];
@@ -1569,10 +1582,19 @@ export const fastApiService = {
     );
   },
 
-  async getHeatLossNormScope(seasonId: number, fragmentId?: number | null): Promise<HeatLossNormScope> {
+  async getHeatLossNormScope(
+    seasonId: number,
+    fragmentId?: number | null,
+    losesType: HeatLossLosesType = 'norm'
+  ): Promise<HeatLossNormScope> {
     return request('api/v1/heat-losses/norm/scope', {
-      query: { season_id: seasonId, ...(fragmentId ? { fragment_id: fragmentId } : {}) },
+      query: { season_id: seasonId, loses_type: losesType, ...(fragmentId ? { fragment_id: fragmentId } : {}) },
     });
+  },
+  async getHeatLossNormSeasons(
+    losesType: HeatLossLosesType = 'norm'
+  ): Promise<{ loses_type: HeatLossLosesType; items: HeatLossNormSeason[] }> {
+    return request('api/v1/heat-losses/norm/seasons', { query: { loses_type: losesType } });
   },
   async prepareHeatLossWorkConditions(
     sourceId: number,
@@ -1585,6 +1607,7 @@ export const fastApiService = {
   },
   async runHeatLossNorm(body: {
     season_id: number;
+    loses_type?: HeatLossLosesType;
     fragment_id?: number | null;
     heat_source_ids?: number[] | null;
   }): Promise<{ success: boolean; task_id: string }> {
