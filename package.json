@@ -23,6 +23,7 @@
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "playwright test",
     "perf:budget": "node ./scripts/perf-budget.mjs",
     "check": "npm run lint && npm run typecheck && npm run test",
     "ci": "npm run check && npm run build"
@@ -54,6 +55,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@playwright/test": "1.63.0",
     "@types/mapbox-gl": "^3.4.1",
     "@vue/test-utils": "^2.4.6",
     "eslint": "^9.22.0",

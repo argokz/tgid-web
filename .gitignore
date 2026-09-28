@@ -16,3 +16,7 @@ public/cesium/
 # Локальные сборки Nuxt с другим base/портом
 127.0.0.1/
 3007/
+
+# Playwright e2e (npm run e2e)
+test-results/
+playwright-report/
