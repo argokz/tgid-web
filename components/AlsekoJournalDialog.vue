@@ -209,7 +209,7 @@
           v-else-if="mode === 'loads'"
           class="alseko-table"
         >
-          <thead><tr><th>ID</th><th>Адрес</th><th>Объект</th><th>Договор / реестр</th><th>Район</th><th>Источник</th><th>Отопление</th><th>ГВС</th><th>Вентиляция</th><th>Пар</th><th>Здания</th></tr></thead>
+          <thead><tr><th>ID</th><th>Адрес</th><th>Объект</th><th>Договор / реестр</th><th>Район</th><th>Источник</th><th>Отопление, ккал/ч</th><th>ГВС, ккал/ч</th><th>Вентиляция, ккал/ч</th><th>Пар, ккал/ч</th><th>Здания</th></tr></thead>
           <tbody>
             <tr
               v-for="item in loadItems"
@@ -231,14 +231,14 @@
           v-else
           class="alseko-table building-table"
         >
-          <thead><tr><th>ID</th><th>Адрес</th><th>Отопление</th><th>ГВС</th><th>Вентиляция</th><th>Пар</th><th>Схема отопления</th><th>Схема ГВС</th><th>Карта</th></tr></thead>
+          <thead><tr><th>ID</th><th>Адрес</th><th>Отопление, Гкал/ч</th><th>ГВС, Гкал/ч</th><th>Вентиляция, Гкал/ч</th><th>Пар, Гкал/ч</th><th>Схема отопления</th><th>Схема ГВС</th><th>Карта</th></tr></thead>
           <tbody>
             <tr
               v-for="item in buildingItems"
               :key="item.id"
               @click="openBuilding(item.id)"
             >
-              <td>{{ item.id }}</td><td>{{ displayAddress(item) }}</td><td>{{ loadValue(item.heating_load) }}</td><td>{{ loadValue(item.hot_water_load) }}</td><td>{{ loadValue(item.ventilation_load) }}</td><td>{{ loadValue(item.steam_load) }}</td><td>{{ item.heating_scheme_id ?? '—' }}</td><td>{{ item.hot_water_scheme_id ?? '—' }}</td>
+              <td>{{ item.id }}</td><td>{{ displayAddress(item) }}</td><td>{{ gcalValue(item.heating_load) }}</td><td>{{ gcalValue(item.hot_water_load) }}</td><td>{{ gcalValue(item.ventilation_load) }}</td><td>{{ gcalValue(item.steam_load) }}</td><td>{{ item.heating_scheme_id ?? '—' }}</td><td>{{ item.hot_water_scheme_id ?? '—' }}</td>
               <td><v-icon :color="hasCoordinates(item) ? 'indigo' : 'grey'">mdi-map-marker</v-icon></td>
             </tr>
           </tbody>
@@ -334,7 +334,7 @@
             :items="buildingMainDetails"
           />
           <DetailGrid
-            title="Нагрузки, ккал/ч"
+            title="Нагрузки, Гкал/ч"
             :items="buildingBreakdown"
           />
           <RelationTable
@@ -389,9 +389,11 @@ const loadMainDetails = computed<Array<[string, unknown]>>(() => selectedLoad.va
 const loadBreakdown = computed<Array<[string, unknown]>>(() => selectedLoad.value ? [['Отопление', loadValue(selectedLoad.value.heating_load)], ['ГВС', loadValue(selectedLoad.value.hot_water_load)], ['Вентиляция', loadValue(selectedLoad.value.ventilation_load)], ['Пар', loadValue(selectedLoad.value.steam_load)], ['Всего', loadValue(selectedLoad.value.total_load)]] : [])
 const loadNetworkDetails = computed<Array<[string, unknown]>>(() => selectedLoad.value ? [['Административный район', selectedLoad.value.administrative_district], ['Район эксплуатации', selectedLoad.value.operation_district], ['Участок', selectedLoad.value.operation_site], ['Источник', selectedLoad.value.heat_source], ['Температурный график', selectedLoad.value.temperature_graph]] : [])
 const buildingMainDetails = computed<Array<[string, unknown]>>(() => selectedBuilding.value ? [['Адрес', displayAddress(selectedBuilding.value)], ['Потребитель', selectedBuilding.value.consumer], ['Этажность', selectedBuilding.value.floor], ['Год постройки', selectedBuilding.value.construction_year], ['Схема отопления', selectedBuilding.value.heating_scheme_id], ['Схема ГВС', selectedBuilding.value.hot_water_scheme_id]] : [])
-const buildingBreakdown = computed<Array<[string, unknown]>>(() => selectedBuilding.value ? [['Отопление', loadValue(selectedBuilding.value.heating_load)], ['ГВС', loadValue(selectedBuilding.value.hot_water_load)], ['Вентиляция', loadValue(selectedBuilding.value.ventilation_load)], ['Пар', loadValue(selectedBuilding.value.steam_load)], ['Всего', loadValue(selectedBuilding.value.total_load)]] : [])
+const buildingBreakdown = computed<Array<[string, unknown]>>(() => selectedBuilding.value ? [['Отопление', gcalValue(selectedBuilding.value.heating_load)], ['ГВС', gcalValue(selectedBuilding.value.hot_water_load)], ['Вентиляция', gcalValue(selectedBuilding.value.ventilation_load)], ['Пар', gcalValue(selectedBuilding.value.steam_load)], ['Всего', gcalValue(selectedBuilding.value.total_load)]] : [])
 
 function formatValue(value: unknown) { return value === null || value === undefined || value === '' ? '—' : String(value) }
+// nagruzki (договоры АЛСЕКО) — ккал/ч, zdaniya_2 (здания) — Гкал/ч (сверка делит nagruzki на 1e6)
+function gcalValue(value: unknown) { return value === null || value === undefined || value === '' ? '—' : Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 4 }) }
 function loadValue(value: unknown) { return value === null || value === undefined || value === '' ? '—' : Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) }
 function displayAddress(item: object) { const row = item as Record<string, unknown>; return [row.microdistrict, row.street, row.house].filter(Boolean).join(', ') || String(row.source_address || '—') }
 function hasCoordinates(item: object) { const row = item as Record<string, unknown>; return Number.isFinite(Number(row.longitude)) && Number.isFinite(Number(row.latitude)) }
