@@ -639,6 +639,7 @@ import type { MergeNodesReport, PiezometerRouteResponse, SplitReviewDecision, To
 import maplibregl from 'maplibre-gl';
 import { useLineVertexEditor } from '~/composables/useLineVertexEditor';
 import { useJournalContourLayer } from '~/composables/useJournalContourLayer';
+import { useOverlayLayer } from '~/composables/useOverlayLayer';
 import { useLocateMarkers } from '~/composables/useLocateMarkers';
 import type { LocatePoint } from '~/composables/useLocateMarkers';
 import { pickNetworkSnap } from '~/utils/networkSnap';
@@ -1063,6 +1064,16 @@ const locate = locateMarkers.handlers({
 });
 
 // === Outage Simulation Map Visualization ===
+const outageIsolatedOverlay = useOverlayLayer(() => mapStore.map, 'outage-isolated-pipes', {
+  layerIds: ['outage-isolated-pipes-glow', 'outage-isolated-pipes-line'],
+});
+const outageDownstreamOverlay = useOverlayLayer(() => mapStore.map, 'outage-downstream-pipes', {
+  layerIds: ['outage-downstream-pipes-line'],
+});
+const outageValvesOverlay = useOverlayLayer(() => mapStore.map, 'outage-valves-to-close', {
+  layerIds: ['outage-valves-to-close-points'],
+});
+
 const onShowOutageOnMap = (res: any) => {
   const map = mapStore.map;
   if (!map) return;
@@ -1070,59 +1081,52 @@ const onShowOutageOnMap = (res: any) => {
 
   // Highlight isolated pipes
   if (res.geojson?.isolated_pipes?.features?.length) {
-    map.addSource('outage-isolated-pipes', {
-      type: 'geojson',
-      data: res.geojson.isolated_pipes,
-    });
-    map.addLayer({
-      id: 'outage-isolated-pipes-glow',
-      type: 'line',
-      source: 'outage-isolated-pipes',
-      paint: {
-        'line-color': '#ff1744',
-        'line-width': 8,
-        'line-opacity': 0.45,
+    outageIsolatedOverlay.show(res.geojson.isolated_pipes, [
+      {
+        id: 'outage-isolated-pipes-glow',
+        type: 'line',
+        paint: {
+          'line-color': '#ff1744',
+          'line-width': 8,
+          'line-opacity': 0.45,
+        },
       },
-    });
-    map.addLayer({
-      id: 'outage-isolated-pipes-line',
-      type: 'line',
-      source: 'outage-isolated-pipes',
-      paint: {
-        'line-color': '#d50000',
-        'line-width': 4,
+      {
+        id: 'outage-isolated-pipes-line',
+        type: 'line',
+        paint: {
+          'line-color': '#d50000',
+          'line-width': 4,
+        },
       },
-    });
+    ]);
   }
 
   // Участки ниже закрытых задвижек без связи с источниками (оценка)
   if (res.geojson?.downstream_pipes?.features?.length) {
-    map.addSource('outage-downstream-pipes', { type: 'geojson', data: res.geojson.downstream_pipes });
-    map.addLayer({
-      id: 'outage-downstream-pipes-line',
-      type: 'line',
-      source: 'outage-downstream-pipes',
-      paint: { 'line-color': '#ff6d00', 'line-width': 4, 'line-dasharray': [2, 1.5] },
-    });
+    outageDownstreamOverlay.show(res.geojson.downstream_pipes, [
+      {
+        id: 'outage-downstream-pipes-line',
+        type: 'line',
+        paint: { 'line-color': '#ff6d00', 'line-width': 4, 'line-dasharray': [2, 1.5] },
+      },
+    ]);
   }
 
   // Highlight isolating valves
   if (res.geojson?.valves_to_close?.features?.length) {
-    map.addSource('outage-valves-to-close', {
-      type: 'geojson',
-      data: res.geojson.valves_to_close,
-    });
-    map.addLayer({
-      id: 'outage-valves-to-close-points',
-      type: 'circle',
-      source: 'outage-valves-to-close',
-      paint: {
-        'circle-radius': 9,
-        'circle-color': '#ffd600',
-        'circle-stroke-width': 3,
-        'circle-stroke-color': '#d50000',
+    outageValvesOverlay.show(res.geojson.valves_to_close, [
+      {
+        id: 'outage-valves-to-close-points',
+        type: 'circle',
+        paint: {
+          'circle-radius': 9,
+          'circle-color': '#ffd600',
+          'circle-stroke-width': 3,
+          'circle-stroke-color': '#d50000',
+        },
       },
-    });
+    ]);
   }
 
   // Center map on isolated zone
@@ -1138,15 +1142,9 @@ const onShowOutageOnMap = (res: any) => {
 };
 
 const onClearOutageHighlight = () => {
-  const map = mapStore.map;
-  if (!map) return;
-  if (map.getLayer('outage-isolated-pipes-glow')) map.removeLayer('outage-isolated-pipes-glow');
-  if (map.getLayer('outage-isolated-pipes-line')) map.removeLayer('outage-isolated-pipes-line');
-  if (map.getSource('outage-isolated-pipes')) map.removeSource('outage-isolated-pipes');
-  if (map.getLayer('outage-downstream-pipes-line')) map.removeLayer('outage-downstream-pipes-line');
-  if (map.getSource('outage-downstream-pipes')) map.removeSource('outage-downstream-pipes');
-  if (map.getLayer('outage-valves-to-close-points')) map.removeLayer('outage-valves-to-close-points');
-  if (map.getSource('outage-valves-to-close')) map.removeSource('outage-valves-to-close');
+  outageIsolatedOverlay.clear();
+  outageDownstreamOverlay.clear();
+  outageValvesOverlay.clear();
 };
 
 const onFocusCoords = (lng: number, lat: number) => {
@@ -1179,22 +1177,23 @@ const ensureFlowArrowIcon = (m: any) => {
   m.addImage(FLOW_ARROW_ICON, ctx.getImageData(0, 0, size, size), { pixelRatio: 2 });
 };
 
-const onClearHydraulicThematic = () => {
-  const map = mapStore.map;
-  if (!map) return;
-  const layers = [
-    'hydraulic-nodes-labels-layer',
-    'hydraulic-nodes-layer',
-    'hydraulic-flow-arrows-layer',
-    'hydraulic-pipes-layer',
-  ];
-  for (const id of layers) {
-    if (map.getLayer(id)) map.removeLayer(id);
-  }
-  if (map.getSource('hydraulic-calc-source')) {
-    map.removeSource('hydraulic-calc-source');
-  }
-};
+const hydraulicOverlay = useOverlayLayer(() => mapStore.map, 'hydraulic-calc-source', {
+  layerIds: ['hydraulic-pipes-layer', 'hydraulic-flow-arrows-layer', 'hydraulic-nodes-layer', 'hydraulic-nodes-labels-layer'],
+});
+
+const onClearHydraulicThematic = () => hydraulicOverlay.clear();
+
+const hydraulicPipeColor = (colorPipes: boolean) => (colorPipes
+  ? [
+      'case',
+      ['==', ['get', 'is_over_resistance'], true], '#d32f2f',
+      ['==', ['get', 'velocity_status'], 'high'], '#f57c00',
+      ['==', ['get', 'velocity_status'], 'low'], '#7b1fa2',
+      '#2e7d32',
+    ]
+  : '#1976d2');
+
+const visibility = (visible: boolean) => (visible ? 'visible' : 'none');
 
 const onApplyHydraulicThematic = (payload: {
   geojson: any;
@@ -1208,106 +1207,87 @@ const onApplyHydraulicThematic = (payload: {
 
   onClearHydraulicThematic();
 
-  map.addSource('hydraulic-calc-source', {
-    type: 'geojson',
-    data: payload.geojson,
-  });
-
-  const pipeColor = payload.colorPipes
-    ? [
-        'case',
-        ['==', ['get', 'is_over_resistance'], true], '#d32f2f',
-        ['==', ['get', 'velocity_status'], 'high'], '#f57c00',
-        ['==', ['get', 'velocity_status'], 'low'], '#7b1fa2',
-        '#2e7d32',
-      ]
-    : '#1976d2';
-
-  // 1. Участки с раскраской
-  map.addLayer({
-    id: 'hydraulic-pipes-layer',
-    type: 'line',
-    source: 'hydraulic-calc-source',
-    filter: ['==', ['get', 'kind'], 'line'],
-    paint: {
-      'line-color': pipeColor as any,
-      'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 15, 5, 18, 8],
-    },
-  });
-
-  // 2. Стрелки направления потоков вдоль участков. Иконка, а не символ шрифта:
-  //    в глифах Open Sans (MapTiler) нет «▶», и текстовые стрелки не рисовались
+  // Стрелки направления потоков — иконка, а не символ шрифта:
+  // в глифах Open Sans (MapTiler) нет «▶», и текстовые стрелки не рисовались
   ensureFlowArrowIcon(map);
-  map.addLayer({
-    id: 'hydraulic-flow-arrows-layer',
-    type: 'symbol',
-    source: 'hydraulic-calc-source',
-    filter: ['==', ['get', 'kind'], 'line'],
-    layout: {
-      'symbol-placement': 'line',
-      'symbol-spacing': 80,
-      'icon-image': FLOW_ARROW_ICON,
-      'icon-rotation-alignment': 'map',
-      'icon-rotate': ['case', ['<', ['get', 'flow_dir'], 0], 180, 0] as any,
-      'icon-allow-overlap': true,
-      'icon-ignore-placement': true,
-      'visibility': payload.showArrows ? 'visible' : 'none',
+  hydraulicOverlay.show(payload.geojson, [
+    // 1. Участки с раскраской
+    {
+      id: 'hydraulic-pipes-layer',
+      type: 'line',
+      filter: ['==', ['get', 'kind'], 'line'],
+      paint: {
+        'line-color': hydraulicPipeColor(payload.colorPipes),
+        'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 15, 5, 18, 8],
+      },
     },
-  });
-
-  // 3. Узлы с раскраской по ΔH
-  map.addLayer({
-    id: 'hydraulic-nodes-layer',
-    type: 'circle',
-    source: 'hydraulic-calc-source',
-    filter: ['==', ['get', 'kind'], 'node'],
-    layout: {
-      visibility: payload.colorNodes ? 'visible' : 'none',
+    // 2. Стрелки направления потоков вдоль участков
+    {
+      id: 'hydraulic-flow-arrows-layer',
+      type: 'symbol',
+      filter: ['==', ['get', 'kind'], 'line'],
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': 80,
+        'icon-image': FLOW_ARROW_ICON,
+        'icon-rotation-alignment': 'map',
+        'icon-rotate': ['case', ['<', ['get', 'flow_dir'], 0], 180, 0],
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
+        'visibility': visibility(payload.showArrows),
+      },
     },
-    paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 4, 15, 7, 18, 10],
-      // ΔH есть только у узлов, где считались обе трубы; остальные — серые
-      'circle-color': [
-        'case',
-        HAS_DELTA_H,
-        [
-          'interpolate',
-          ['linear'],
-          ['get', 'delta_h'],
-          0, '#304ffe',
-          15, '#00b0ff',
-          30, '#00e676',
-          50, '#ffeb3b',
-          70, '#ff1744',
+    // 3. Узлы с раскраской по ΔH
+    {
+      id: 'hydraulic-nodes-layer',
+      type: 'circle',
+      filter: ['==', ['get', 'kind'], 'node'],
+      layout: {
+        visibility: visibility(payload.colorNodes),
+      },
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 4, 15, 7, 18, 10],
+        // ΔH есть только у узлов, где считались обе трубы; остальные — серые
+        'circle-color': [
+          'case',
+          HAS_DELTA_H,
+          [
+            'interpolate',
+            ['linear'],
+            ['get', 'delta_h'],
+            0, '#304ffe',
+            15, '#00b0ff',
+            30, '#00e676',
+            50, '#ffeb3b',
+            70, '#ff1744',
+          ],
+          '#9e9e9e',
         ],
-        '#9e9e9e',
-      ] as any,
-      'circle-stroke-color': '#ffffff',
-      'circle-stroke-width': 1.5,
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': 1.5,
+      },
     },
-  });
-
-  // 4. Подписи напора узлов
-  map.addLayer({
-    id: 'hydraulic-nodes-labels-layer',
-    type: 'symbol',
-    source: 'hydraulic-calc-source',
-    filter: ['all', ['==', ['get', 'kind'], 'node'], HAS_DELTA_H] as any,
-    minzoom: 14,
-    layout: {
-      'text-field': ['concat', 'ΔH=', ['to-string', ['get', 'delta_h']], ' м'] as any,
-      'text-font': ['Open Sans Regular'],
-      'text-size': 11,
-      'text-offset': [0, 1.4],
-      'text-anchor': 'top',
-      'visibility': payload.showNodeLabels ? 'visible' : 'none',
+    // 4. Подписи напора узлов
+    {
+      id: 'hydraulic-nodes-labels-layer',
+      type: 'symbol',
+      filter: ['all', ['==', ['get', 'kind'], 'node'], HAS_DELTA_H],
+      minzoom: 14,
+      layout: {
+        'text-field': ['concat', 'ΔH=', ['to-string', ['get', 'delta_h']], ' м'],
+        'text-font': ['Open Sans Regular'],
+        'text-size': 11,
+        'text-offset': [0, 1.4],
+        'text-anchor': 'top',
+        'visibility': visibility(payload.showNodeLabels),
+      },
+      paint: {
+        'text-color': '#1a237e',
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 2,
+      },
     },
-    paint: {
-      'text-color': '#1a237e',
-      'text-halo-color': '#ffffff',
-      'text-halo-width': 2,
-    },
-  });
+  ]);
 };
 
 const onUpdateHydraulicThematicSettings = (payload: {
@@ -1316,30 +1296,11 @@ const onUpdateHydraulicThematicSettings = (payload: {
   colorNodes: boolean;
   showNodeLabels: boolean;
 }) => {
-  const map = mapStore.map;
-  if (!map || !map.getSource('hydraulic-calc-source')) return;
-
-  if (map.getLayer('hydraulic-flow-arrows-layer')) {
-    map.setLayoutProperty('hydraulic-flow-arrows-layer', 'visibility', payload.showArrows ? 'visible' : 'none');
-  }
-  if (map.getLayer('hydraulic-nodes-layer')) {
-    map.setLayoutProperty('hydraulic-nodes-layer', 'visibility', payload.colorNodes ? 'visible' : 'none');
-  }
-  if (map.getLayer('hydraulic-nodes-labels-layer')) {
-    map.setLayoutProperty('hydraulic-nodes-labels-layer', 'visibility', payload.showNodeLabels ? 'visible' : 'none');
-  }
-  if (map.getLayer('hydraulic-pipes-layer')) {
-    const pipeColor = payload.colorPipes
-      ? [
-          'case',
-          ['==', ['get', 'is_over_resistance'], true], '#d32f2f',
-          ['==', ['get', 'velocity_status'], 'high'], '#f57c00',
-          ['==', ['get', 'velocity_status'], 'low'], '#7b1fa2',
-          '#2e7d32',
-        ]
-      : '#1976d2';
-    map.setPaintProperty('hydraulic-pipes-layer', 'line-color', pipeColor as any);
-  }
+  if (!hydraulicOverlay.isShown()) return;
+  hydraulicOverlay.setLayout('hydraulic-flow-arrows-layer', 'visibility', visibility(payload.showArrows));
+  hydraulicOverlay.setLayout('hydraulic-nodes-layer', 'visibility', visibility(payload.colorNodes));
+  hydraulicOverlay.setLayout('hydraulic-nodes-labels-layer', 'visibility', visibility(payload.showNodeLabels));
+  hydraulicOverlay.setPaint('hydraulic-pipes-layer', 'line-color', hydraulicPipeColor(payload.colorPipes));
 };
 
 // === Trace Mode for Piezometric Graph ===
@@ -1362,9 +1323,9 @@ const piezometerTotalLength = ref(0);
 const piezometerRoute = ref<PiezometerRouteResponse | null>(null);
 const piezometerCalc2 = ref<number | null>(null);
 const piezometerDirectionsOpen = ref(false);
-const routeSourceId = 'piezo-route-source';
-const routeLineLayer = 'piezo-route-line';
-const routeNodeLayer = 'piezo-route-nodes';
+const routeOverlay = useOverlayLayer(() => mapStore.map, 'piezo-route-source', {
+  layerIds: ['piezo-route-line', 'piezo-route-nodes'],
+});
 const traceNodeMarkers: maplibregl.Marker[] = [];
 
 const toggleTraceMode = () => {
@@ -1381,13 +1342,9 @@ const toggleTraceMode = () => {
 };
 
 const clearRouteHighlight = () => {
-  const map = mapStore.map;
   traceNodeMarkers.forEach((m) => m.remove());
   traceNodeMarkers.length = 0;
-  if (!map) return;
-  if (map.getLayer(routeNodeLayer)) map.removeLayer(routeNodeLayer);
-  if (map.getLayer(routeLineLayer)) map.removeLayer(routeLineLayer);
-  if (map.getSource(routeSourceId)) map.removeSource(routeSourceId);
+  routeOverlay.clear();
 };
 
 /** Подсветка построенного маршрута линией + маркерами по узлам */
@@ -1407,20 +1364,18 @@ const highlightRoute = (path: Array<{ node_id: number; lng: number | null; lat: 
   if (coords.length < 2) return;
 
   try {
-    addRouteLayers(map, path, coords);
+    addRouteLayers(path, coords);
   } catch (e) {
     console.warn('[piezometer] не удалось подсветить маршрут:', e);
   }
 };
 
 const addRouteLayers = (
-  map: maplibregl.Map,
   path: Array<{ lng: number | null; lat: number | null }>,
   coords: number[][]
 ) => {
-  map.addSource(routeSourceId, {
-    type: 'geojson',
-    data: {
+  routeOverlay.show(
+    {
       type: 'FeatureCollection',
       features: [
         { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } },
@@ -1433,26 +1388,26 @@ const addRouteLayers = (
           })),
       ],
     },
-  });
-  map.addLayer({
-    id: routeLineLayer,
-    type: 'line',
-    source: routeSourceId,
-    filter: ['==', ['geometry-type'], 'LineString'],
-    paint: { 'line-color': '#ff6f00', 'line-width': 4, 'line-opacity': 0.85 },
-  });
-  map.addLayer({
-    id: routeNodeLayer,
-    type: 'circle',
-    source: routeSourceId,
-    filter: ['==', ['get', 'node'], true],
-    paint: {
-      'circle-radius': 4,
-      'circle-color': '#ff6f00',
-      'circle-stroke-width': 2,
-      'circle-stroke-color': '#fff',
-    },
-  });
+    [
+      {
+        id: 'piezo-route-line',
+        type: 'line',
+        filter: ['==', ['geometry-type'], 'LineString'],
+        paint: { 'line-color': '#ff6f00', 'line-width': 4, 'line-opacity': 0.85 },
+      },
+      {
+        id: 'piezo-route-nodes',
+        type: 'circle',
+        filter: ['==', ['get', 'node'], true],
+        paint: {
+          'circle-radius': 4,
+          'circle-color': '#ff6f00',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#fff',
+        },
+      },
+    ]
+  );
 
   // Центрируем карту на маршруте
   const lngs = coords.map((c) => c[0]);
