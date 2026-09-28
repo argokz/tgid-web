@@ -100,7 +100,8 @@
      `DEV_LOGIN_ENABLED=false`, `JWT_SECRET` ≥ 32 байт, `JWT_EXPIRE_MINUTES`, `AUTH_LIVE_USER_CHECK`.
    - Флаги записи: на первой выкатке `MUTATIONS_ENABLED=false`, `TOPOLOGY_MUTATIONS_ENABLED=false`;
      включать только после приёмки на копии.
-   - Redis/Celery: `REDIS_ADDR`, `REDIS_PASSWORD`; очереди `HEAT_LOSSES_QUEUE`, `FILE_JOBS_QUEUE`
+   - Redis/Celery: `REDIS_ADDR`, `REDIS_PASSWORD`, `REDIS_DB` (прод и копия на одном Redis — разные номера,
+     иначе воркер копии заберёт задачи прода и наоборот); очереди `HEAT_LOSSES_QUEUE`, `FILE_JOBS_QUEUE`
      (пусто — основная), `FILE_JOBS_TTL` (с, по умолчанию 3600).
    - **CORS**: `CORS_ALLOWED_ORIGINS` — список через запятую; по умолчанию
      `https://itwin.kz,http://localhost:3000,http://localhost:3007`; для прода оставить только прод-домены.
