@@ -1,4 +1,137 @@
-# Статус реализации плана миграции (2026-09-28)
+# Сводный статус переноса (2026-09-28)
+
+Документ заменяет версии от 25.09 («все фазы 100 %») и 26.09 — обе были недостоверны.
+План этапов 0–11: `C:\Users\Danko\.claude\plans\whimsical-humming-castle.md`.
+Тот же текст лежит в корне монорепо `H:\projects\tgid-app\MIGRATION_ROADMAP.md` (корень не в git).
+Ниже — журналы отдельных итераций; где они расходятся со сводкой, верна сводка.
+
+### Где что
+
+- `itwin-api/` → github.com/argokz/tgid-server: FastAPI + asyncpg + Celery/Redis, движок sety.
+- `web-itwin/` → github.com/argokz/tgid-web: Nuxt 3 + Vuetify + MapLibre + Cesium.
+- Эталоны (только чтение): `gid8/` (Qt), `gid6/` (SQL, формы, excel2), `potr5/`.
+- Проверки ведутся на копии `almatygid_copy` / `usersdb_copy` (дамп `H:\tgid-backups\2026-09-25`),
+  паспорта — на `astanagid_2026_03_17` (только чтение). **Прод (itwin.kz/map-api) не обновлён**:
+  там старая версия API.
+
+### Этапы 0–11: что сделано
+
+Хеши: A — tgid-server, W — tgid-web.
+
+| Этап | Статус | Коммиты / документы |
+|---|---|---|
+| 0. Секреты | код — готово; смена паролей БД/GeoServer, приватность репо, чистка истории — за админом, не подтверждено | A 7b233f1, 9937c1e; W 67ed5ae |
+| 1. Бэкап и копия | готово: дамп прода, `almatygid_copy` с маркером `_this_is_copy`, `.env.copy` | — |
+| 2. Стабилизация 24–25.09 | готово: колонки `ut_out`, калькулятор шайб/элеваторов, ТГ ОТОП, merge/reverse/geometry с проверками, JWT на всех `/api` | A 6ed77cd, 697bc47, 1f680d3, 70f2a59, 6558f3b, 4838dd9, dddc7c0; W 3197493, eaa8e34 |
+| 3. Гигиена репо | готово: мусор удалён, `files/kls`/`tab` в репо, CI на все тесты | A 7a32672, c613234; W 386564b |
+| 4. Выкатка read-only на прод | **не сделано** (нужен доступ к серверу) — см. чек-лист ниже | `docs/deploy-map-api.md` |
+| 5. Численная приёмка sety | веб = исходники десктопа (0 расхождений); с расчётом десктопа №1 совпадение при `-no_kv` у 936 из 955 потребителей, остаток — испорченные на копии входные данные | A 9645d5b, e276d97, ba9f161, d6b3604; `itwin-api/docs/acceptance-numeric.md` |
+| 6. Паспорта и анализ | паспорт f1–f15 на PostgreSQL (строится на Астане, в Алматы пуст по данным); запросы «Анализ», Zap4/5/6/7_1, время доезда; режимы sety (список, аварийный), список/удаление расчётов | A d11ed4d, 4b661dd, 91402a5, 40171ff, fafe001, 2042ead, e3572a3; W 1ac8258, 2699b2b, 63995e5; `itwin-api/docs/passport.md` |
+| 7. Безопасность и роли | готово: роли viewer/editor/calculator/admin, allow-list SQL-имён, админка пользователей, история правок (`audit_log`) | A 41238d8, 1d1ee1d, efecce7, 5d66389; W b9d0012, 3eb1b7a, 2696f59 |
+| 8. Редактор топологии (Stage B) | готово на копии: оптимистичные блокировки, полный merge, reverse dry-run, журнал отмены, golden B7 | A 9e67c42, 6c71178, dba42a7; W 584c95c, 670aef6, 4d7c64e, 36aa725; `web-itwin/docs/stage-b-acceptance.md` |
+| 9. Паритет P1 | журналы с записью (контуры, утверждение планов, документы), групповые установщики `aSet*` и справочники, Excel-отчёты gid6 excel2, теплопотери poteriNewPg (норм./факт.), ТГ ПОВ/СКК, диафрагмы, правка оборудования, участки ПТС | A 72710c1, 93dbe97, fb7f21d, b599950, a3b3233, 6abe1fc, b507b2a, c430586, 66e71c5, 78f7898, 8cd4828; W b3f1e2d, 99e1fa6, 0ff95d6, 3d88b0e, 3faad82, 49b6fdd, 6337c6a, ad5427c; `web-itwin/docs/journals-parity.md`, `group-setters-parity.md`, `reports-parity.md` |
+| 10. Паритет P2 | печать A4/A3, экспорт GeoJSON (+атрибуты, бывш. «Zulu»), импорт SHP/Excel/координат, фрагменты .tgid (экспорт/импорт/слияние), двойной/статический пьезометр, 3D-тайлсет и VISICOM из env, сверка/привязка АЛСЕКО и электросети | A 04a38de, 23a5ee2, f3a313f, 8ca7967, 42d5eb2, d391439, 5680967; W bb516e9, 58a8ea0, 4f89973, a9df1b3, ba80960, f0a886f, 49895cb, 66649d3 |
+| 11. Техдолг | MapViewer разрезан (useLocateMarkers, useOverlayLayer, useTopologyEditor, каталог инструментов); мойибейк и «только пробелы»; lint 0 ошибок; компонентные тесты; e2e-smoke Playwright; `declarative_base` из `sqlalchemy.orm`; тяжёлые выгрузки через Celery (file-jobs); единицы нагрузок | W 89b15c1, 8982f3e, 38519c6, d2267e2, 863d074, 889f30c, 9cd8d5d, 1e4cd98, 85071ac, 6051545; A a3f68b5, 7f3075c, de19478; W 515f4df, 5056359, 2be248e; `itwin-api/docs/consumer-loads.md` |
+
+Фоновые выгрузки (этап 11): `POST /api/v1/file-jobs {kind, params}` → `GET /api/v1/file-jobs/{id}` →
+`GET …/download`; виды: `passport`, `report_excel`, `catalog_report`, `alseko_reconciliation`,
+`electrical_reconciliation`. Файл хранится в Redis `FILE_JOBS_TTL` (1 ч), очередь — `FILE_JOBS_QUEUE`.
+Веб (`fastApiService.runFileJob`) показывает прогресс и, если API старый, нет Redis или воркер 30 с не
+берёт задачу, переходит на прежний синхронный эндпоинт. Синхронные эндпоинты сохранены.
+
+### Как проверено
+
+- **API**: pytest 715 (полный прогон ~10 мин, включая golden теплопотерь), `app.openapi()` — 255 путей.
+- **Web**: `npm run typecheck` 0 ошибок, vitest 204, lint 0 ошибок (≈2300 форматных предупреждений),
+  e2e-smoke Playwright 5/5 (`npm run e2e`, локальный стенд dev 3040 + API 8040 на копии; не в CI).
+- **Численная приёмка sety** (`docs/acceptance-numeric.md`, `scripts/golden/compare_calc.py`): веб ↔
+  исходники десктопа — 0; отображение карта/Excel/пьезометр = `ut_out`/`us_out`, расхождений 0;
+  формулы калькулятора, ТГ, теплопотерь — golden-тесты против Python-кода десктопа.
+- **Топология** — golden B7 split/merge/delete/move/reverse на копии (`stage-b-acceptance.md`).
+- **Паспорт** — все 15 форм на `astanagid_2026_03_17` (участок МС 19: 124 КБ, ~15 с; через Celery то же).
+- **Фоновые выгрузки** — временный воркер на отдельной очереди: паспорт (Астана) 14 с, отчёт out_ut
+  фр. 74 8,6 с (1,5 МБ), сверка АЛСЕКО 12,7 с (1,5 МБ), ТУ-баланс и электросеть < 1 с, ошибки
+  («Узел не найден», «Нет отчёта») доходят до UI.
+- **Не подписано экспертом**: результаты расчёта (нужен окончательный прогон «ноль в ноль», см. ниже),
+  содержимое паспортов (нужны образцы десктопа), отчёты excel2 на реальных данных.
+
+### Известные проблемы данных
+
+- **Паспорта Алматы пусты**: трубы не привязаны к участкам ПТС (0 из 98 019 `heatpipesections`);
+  в Астане привязано 77 230 из 191 068. Привязка — инструмент «Участки ПТС» (`passport.md`).
+- **Копия, фрагмент 74**: проверка `-save_po` 27.09 обнулила нагрузки 24 обобщённых потребителей
+  (так работает движок десктопа); SQL восстановления — в `acceptance-numeric.md`. Расчёт десктопа №1
+  считался без Kv, флаг `-no_kv` в `calc_params` не пишется.
+- **Теплопотери**: результатов десктопного модуля в БД нет (сверять не с чем); на копии нет баков,
+  обвязки, сливов САРЗ и данных `*Fact`.
+- **Гидростатические зоны Алматы** — мусор: отметки узлов 0/1 м.
+- **Нагрузки** (`consumer-loads.md`): единицы Гкал/ч, ошибки единиц нет; фрагменты — копии одной сети
+  (91/93/95/97 совпадают), суммы по всей базе завышены; выбросы 711 Гкал/ч (~10 фрагментов) и
+  456 565 Гкал/ч (удалённый узел) — проверить эксперту. `nagruzki` АЛСЕКО — ккал/ч. Исправлено:
+  модель отключения и диагностика нагрузок считали технологию как ГВС и не учитывали ГВС.
+- **Excel-отчёты** (`reports-parity.md`): на фр. 74 данные в 19 из 26 книг; пусты `dr_out`,
+  `bypass`, `bp_out`, `nst_out`, регулирующая арматура.
+- **Справочники** (`group-setters-parity.md`): пусты `responsibles`, `gvsloadgraphs`, `districts`,
+  `administrativedistricts`, `heatpoint`.
+- **Журналы** (`journals-parity.md`): журнал ремонтов gid6 пуст — эталоном не служит; факторы риска
+  требуют привязки труб к участкам.
+- **Узлы без `externalcodeid`**, созданные веб-редактором до 27.09, не видны на карте и в расчёте —
+  `sql/fixes/20260927_nodes_without_externalcode.sql`.
+- **Электросеть** в Алматы пуста (данные есть в Астане).
+
+### Чек-лист выкатки на прод
+
+Порядок: свежий бэкап → миграции → API → воркер → веб → проверка. Точка отката — бэкап и прежний контейнер.
+
+1. **Бэкап**: `pg_dump -Fc` сетевой БД (`almatygid`) и `usersdb` перед любыми миграциями.
+2. **Миграции**
+   - UsersDB (alembic, `itwin-api/itwin-api/migrations`): `alembic upgrade head` — ревизии
+     `60f9094f81af` (таблицы), `fd215dfad484` (`is_admin`), **`b7c1e2d3f4a5` (`users.role`)**.
+   - Сетевая БД (psql, вручную, идемпотентно):
+     `sql/migrations/20260927_topology_undo_log.sql` (журнал отмены топологии; без неё отмена недоступна),
+     `sql/migrations/20260928_heat_losses_report_out.sql` (листы теплопотерь; без неё запуск → 503).
+   - Исправление данных (по решению, сначала посмотреть выборку первого SELECT):
+     `sql/fixes/20260927_nodes_without_externalcode.sql`.
+   - На 28.09 других миграций в `sql/migrations` и alembic нет.
+3. **Env API** (`itwin-api/itwin-api/.env` на сервере)
+   - БД: `DB_HOST/PORT/NAME/USER/PASSWORD` (новый пароль из этапа 0), `USERS_DB_*`, `SPRAV_DB_*`;
+     пул `DB_POOL_MIN_SIZE/MAX_SIZE`, `DB_COMMAND_TIMEOUT`.
+   - Авторизация: `AUTH_DISABLED=false`, `STRICT_AUTH=true`, `AUTH_REQUIRED_GET=true`,
+     `DEV_LOGIN_ENABLED=false`, `JWT_SECRET` ≥ 32 байт, `JWT_EXPIRE_MINUTES`, `AUTH_LIVE_USER_CHECK`.
+   - Флаги записи: на первой выкатке `MUTATIONS_ENABLED=false`, `TOPOLOGY_MUTATIONS_ENABLED=false`;
+     включать только после приёмки на копии.
+   - Redis/Celery: `REDIS_ADDR`, `REDIS_PASSWORD`; очереди `HEAT_LOSSES_QUEUE`, `FILE_JOBS_QUEUE`
+     (пусто — основная), `FILE_JOBS_TTL` (с, по умолчанию 3600).
+   - **CORS**: `CORS_ALLOWED_ORIGINS` — список через запятую; по умолчанию
+     `https://itwin.kz,http://localhost:3000,http://localhost:3007`; для прода оставить только прод-домены.
+   - `FILES_DIR` (Word/файлы), `PYTHONUTF8` (кодировка вывода sety).
+4. **Воркер Celery**: перезапустить на новом коде (иначе нет задач `build_file_job`, `run_heat_losses_norm`);
+   если заданы отдельные очереди — воркер с `-Q celery,<очереди>`. Redis обязателен для расчётов,
+   теплопотерь и фоновых выгрузок (без него веб переходит на синхронные эндпоинты).
+5. **Env web** (сборка Nuxt): `NUXT_PUBLIC_MAP_API_BASE_URL`, `NUXT_PUBLIC_GEOSERVER_URL`,
+   `NUXT_PUBLIC_MAPTILER_KEY`, `NUXT_PUBLIC_VISICOM_TILES_URL` / `_KEY` / `_SCHEME` / `_ATTRIBUTION` /
+   `_MAX_ZOOM` (без ключа подложки VISICOM нет), `NUXT_PUBLIC_NETWORK_TILESET_URL` (3D-тайлсет, `deploy-3d.md`),
+   `NUXT_PUBLIC_CESIUM_ION_TOKEN`, флаги `NUXT_PUBLIC_MUTATIONS_ENABLED`, `NUXT_PUBLIC_TOPOLOGY_EDITING_ENABLED`
+   (UI всё равно сверяется с `/auth/config` сервера).
+6. **GeoServer** (`web-itwin/docs/geoserver-topology-layers.md`): SQL view `heatpipesections` и слои
+   топологии должны видеть новые узлы/участки (JOIN `externalcodes`), проверить кеш тайлов после правок.
+   Пароль admin — сменить (этап 0).
+7. **nginx**: upstream `/map-api` → новый контейнер (`docs/deploy-map-api.md`, `docs/nginx-server.conf`).
+8. **Проверка после выкатки**: `GET /health` (routes = 259 уникальных путей на 28.09, database ok, redis ok), баннер «устаревший API»
+   в вебе исчез, вход по JWT, карта/карточка/пьезометр/отчёт/паспорт (Астана или участок с трубами),
+   расчёт на тестовом фрагменте — только при включённом `MUTATIONS_ENABLED`.
+
+### Что осталось
+
+- Выкатка (этап 4) и включение записи на проде после приёмки.
+- Подпись эксперта: прогон «ноль в ноль» после восстановления 24 потребителей фр. 74, паспорта против
+  образцов десктопа, выбросы нагрузок.
+- Привязка труб Алматы к участкам ПТС (данные), наполнение пустых справочников.
+- CI: e2e не запускается в CI (нужен стенд с БД).
+
+---
+
+# Журнал итерации 2026-09-28
 
 ## Этап 10 (часть 1): печать, экспорт GeoJSON, импорт SHP/Excel/координат (2026-09-28)
 
