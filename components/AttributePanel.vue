@@ -478,7 +478,7 @@
               <v-icon size="18">mdi-heat-wave</v-icon>
 
 
-              <v-tooltip activator="parent" location="bottom">Исходные данные тепловых потерь‚РµСЂСЊ</v-tooltip>
+              <v-tooltip activator="parent" location="bottom">Исходные данные тепловых потерь</v-tooltip>
 
 
             </v-btn>
