@@ -171,7 +171,12 @@
                   </v-btn>
                 </div>
                 <p
-                  v-if="lastDownload"
+                  v-if="downloading && progressText"
+                  class="text-caption text-medium-emphasis mb-0"
+                  data-testid="file-job-progress"
+                >{{ progressText }}</p>
+                <p
+                  v-else-if="lastDownload"
                   class="text-caption text-medium-emphasis mb-0"
                 >{{ lastDownload }}</p>
               </div>
@@ -204,8 +209,10 @@
 import { computed, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import {
+  describeFileJobProgress,
   fastApiService,
   type CalculationListItem,
+  type FileJobProgress,
   type ReportCatalogItem,
 } from '~/services/fastApiService'
 import { useFragmentStore } from '~/stores/fragmentStore'
@@ -229,6 +236,10 @@ const loadingCalculations = ref(false)
 const year = ref<number | null>(null)
 const downloading = ref(false)
 const lastDownload = ref('')
+const progressText = ref('')
+const onProgress = (p: FileJobProgress) => {
+  progressText.value = describeFileJobProgress(p)
+}
 
 const groups = computed(() => groupReports(items.value, search.value || ''))
 const needsFragment = computed(() => reportNeedsFragment(selected.value))
@@ -276,17 +287,18 @@ const download = async () => {
   const item = selected.value
   if (!item) return
   downloading.value = true
+  progressText.value = ''
   error.value = ''
   try {
     let result: { blob: Blob; filename: string }
     if (item.kind === 'summary') {
-      result = await fastApiService.downloadExcelReport(item.id, year.value ? { year: year.value } : undefined)
+      result = await fastApiService.downloadExcelReport(item.id, year.value ? { year: year.value } : undefined, { onProgress })
     } else {
       if (!fragmentId.value) return
       result = await fastApiService.downloadCatalogReport(item, {
         fragment_id: fragmentId.value,
         calculation_id: calculationId.value,
-      })
+      }, { onProgress })
     }
     saveBlob(result.blob, result.filename)
     lastDownload.value = `Скачан ${result.filename}`

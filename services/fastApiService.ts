@@ -1335,8 +1335,149 @@ const mutationWithFallback = async <T>(
   }
 };
 
+/** Виды фоновых файлов API (database/file_jobs.py) */
+export type FileJobKind =
+  | 'passport'
+  | 'report_excel'
+  | 'catalog_report'
+  | 'alseko_reconciliation'
+  | 'electrical_reconciliation';
+
+/** Статус фоновой выгрузки (GET api/v1/file-jobs/{task_id}) */
+export interface FileJobStatus {
+  task_id: string;
+  state: 'PENDING' | 'PROGRESS' | 'SUCCESS' | 'FAILURE' | string;
+  ready: boolean;
+  success: boolean | null;
+  message: string | null;
+  kind?: string | null;
+  filename?: string;
+  size?: number;
+  elapsed_s?: number | null;
+  status_code?: number | null;
+}
+
+export interface FileJobProgress {
+  phase: 'queued' | 'running' | 'downloading' | 'fallback';
+  elapsedMs: number;
+  message: string;
+}
+
+export interface FileJobOptions {
+  onProgress?: (progress: FileJobProgress) => void;
+  signal?: AbortSignal;
+  /** Сколько ждать, пока воркер возьмёт задачу, прежде чем перейти на синхронный эндпоинт */
+  pendingFallbackMs?: number;
+  timeoutMs?: number;
+  pollMs?: number;
+}
+
+/** Текст прогресса фоновой выгрузки для UI: «Формирование файла… 7 с» */
+export const describeFileJobProgress = (p: FileJobProgress | null | undefined): string =>
+  p ? `${p.message} ${Math.round(p.elapsedMs / 1000)} с` : '';
+
+const FILE_JOB_PENDING_FALLBACK_MS = 30_000;
+const FILE_JOB_TIMEOUT_MS = 10 * 60_000;
+
+const filenameFromDisposition = (header: string | null | undefined): string | null => {
+  if (!header) return null;
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      /* ниже — ASCII-имя */
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(header);
+  return plain ? plain[1].trim() : null;
+};
+
+/**
+ * Единый путь тяжёлых выгрузок: задача Celery → опрос статуса → скачивание файла из Redis.
+ * Если фоновые файлы недоступны (старый API, нет Redis, воркер не берёт задачу) — вызывается
+ * `fallback` (синхронный эндпоинт того же файла).
+ */
+const runFileJob = async (
+  kind: FileJobKind,
+  params: Record<string, unknown>,
+  fallback: (() => Promise<{ blob: Blob; filename: string }>) | null,
+  options: FileJobOptions = {},
+): Promise<{ blob: Blob; filename: string }> => {
+  const started = Date.now();
+  const report = (phase: FileJobProgress['phase'], message: string) =>
+    options.onProgress?.({ phase, message, elapsedMs: Date.now() - started });
+  const pendingLimit = options.pendingFallbackMs ?? FILE_JOB_PENDING_FALLBACK_MS;
+  const timeout = options.timeoutMs ?? FILE_JOB_TIMEOUT_MS;
+  const pollMs = options.pollMs ?? 1000;
+  const runFallback = async (reason: string) => {
+    if (!fallback) throw new Error(reason);
+    report('fallback', 'Формирование файла на сервере (синхронно)…');
+    return fallback();
+  };
+
+  let taskId: string;
+  try {
+    const job = await request<{ task_id: string }>('api/v1/file-jobs', mutationOptions('POST', { kind, params }));
+    taskId = job.task_id;
+  } catch (e: any) {
+    // 4xx по параметрам — ошибка пользователя; 404/5xx/сеть — фоновые файлы недоступны
+    if (e instanceof ApiError && e.status && e.status >= 400 && e.status < 500 && e.status !== 404) throw e;
+    return runFallback(e?.message || 'Фоновые выгрузки недоступны');
+  }
+  report('queued', 'Задача в очереди…');
+
+  for (;;) {
+    if (options.signal?.aborted) throw new Error('Отменено');
+    await sleep(pollMs);
+    const status = await request<FileJobStatus>(`api/v1/file-jobs/${encodePath(taskId)}`);
+    const elapsed = Date.now() - started;
+    if (status.state === 'PENDING') {
+      if (elapsed > pendingLimit) {
+        if (fallback) return runFallback('Воркер не взял задачу');
+        throw new Error('Воркер не взял задачу формирования файла');
+      }
+      report('queued', 'Задача в очереди…');
+      continue;
+    }
+    if (!status.ready) {
+      report('running', status.message || 'Формирование файла…');
+      if (elapsed > timeout) throw new Error('Формирование файла не уложилось в отведённое время');
+      continue;
+    }
+    if (!status.success) throw new Error(status.message || 'Не удалось сформировать файл');
+    report('downloading', 'Скачивание…');
+    const url = buildApiUrl(`api/v1/file-jobs/${encodePath(taskId)}/download`);
+    let disposition: string | null = null;
+    const blob = await $fetch<Blob>(url, {
+      responseType: 'blob',
+      timeout: REPORT_TIMEOUT_MS,
+      headers: authHeaders(),
+      onResponse({ response }: any) {
+        disposition = response?.headers?.get?.('content-disposition') ?? null;
+      },
+    });
+    return { blob, filename: filenameFromDisposition(disposition) || status.filename || `${kind}.xlsx` };
+  }
+};
+
 export const fastApiService = {
   request,
+
+  /** Фоновая выгрузка файла: задача → статус → скачивание (см. runFileJob) */
+  runFileJob(
+    kind: FileJobKind,
+    params: Record<string, unknown>,
+    options: FileJobOptions = {},
+  ): Promise<{ blob: Blob; filename: string }> {
+    return runFileJob(kind, params, null, options);
+  },
+  async startFileJob(kind: FileJobKind, params: Record<string, unknown>): Promise<{ task_id: string }> {
+    return request('api/v1/file-jobs', mutationOptions('POST', { kind, params }));
+  },
+  async getFileJobStatus(taskId: string): Promise<FileJobStatus> {
+    return request(`api/v1/file-jobs/${encodePath(taskId)}`);
+  },
 
   async getObjectData(
     typeObject: string,
@@ -1706,12 +1847,17 @@ export const fastApiService = {
   async getAlsekoReconciliationIssues(kind: string, limit = 50, offset = 0): Promise<AlsekoReconciliationIssues> {
     return request('api/alseko/reconciliation/issues', { query: { kind, limit, offset } });
   },
-  async downloadAlsekoReconciliationReport(kinds?: string[]): Promise<Blob> {
-    return request<Blob>('api/alseko/reconciliation/report.xlsx', {
-      ...mutationOptions('GET'),
-      query: kinds?.length ? { kinds: kinds.join(',') } : undefined,
-      responseType: 'blob',
+  async downloadAlsekoReconciliationReport(kinds?: string[], options: FileJobOptions = {}): Promise<Blob> {
+    const sync = async () => ({
+      blob: await request<Blob>('api/alseko/reconciliation/report.xlsx', {
+        ...mutationOptions('GET'),
+        query: kinds?.length ? { kinds: kinds.join(',') } : undefined,
+        responseType: 'blob',
+        timeout: REPORT_TIMEOUT_MS,
+      }),
+      filename: 'alseko_reconciliation.xlsx',
     });
+    return (await runFileJob('alseko_reconciliation', { kinds: kinds?.length ? kinds : null }, sync, options)).blob;
   },
   async getAlsekoAddresses(params: { q?: string; building_id?: number; limit?: number }): Promise<AlsekoAddressCandidates> {
     return request('api/alseko/addresses', { query: params });
@@ -1749,12 +1895,17 @@ export const fastApiService = {
   async getElectricalReconciliation(params: { tolerance?: number; kind?: string; object_type?: string; limit?: number; offset?: number } = {}): Promise<ElectricalReconciliation> {
     return request('api/electrical-network/reconciliation', { query: params });
   },
-  async downloadElectricalReconciliationReport(tolerance?: number): Promise<Blob> {
-    return request<Blob>('api/electrical-network/reconciliation/report.xlsx', {
-      ...mutationOptions('GET'),
-      query: tolerance ? { tolerance } : undefined,
-      responseType: 'blob',
+  async downloadElectricalReconciliationReport(tolerance?: number, options: FileJobOptions = {}): Promise<Blob> {
+    const sync = async () => ({
+      blob: await request<Blob>('api/electrical-network/reconciliation/report.xlsx', {
+        ...mutationOptions('GET'),
+        query: tolerance ? { tolerance } : undefined,
+        responseType: 'blob',
+        timeout: REPORT_TIMEOUT_MS,
+      }),
+      filename: 'electrical_reconciliation.xlsx',
     });
+    return (await runFileJob('electrical_reconciliation', tolerance ? { tolerance } : {}, sync, options)).blob;
   },
   /** Привязка по правилам десктопа (editor+, запись — MUTATIONS_ENABLED); dry_run — план «было → станет» */
   async bindElectricalNetwork(body: {
@@ -2402,14 +2553,20 @@ export const fastApiService = {
   async downloadExcelReport(
     docType: string,
     query?: Record<string, string | number | boolean | undefined | null>,
+    options: FileJobOptions = {},
   ): Promise<{ blob: Blob; filename: string }> {
-    const blob = await request<Blob>(`api/reports/excel/${encodePath(docType)}`, {
-      responseType: 'blob',
-      query,
-    });
     const year = query?.year;
     const suffix = year != null && year !== '' ? `_${year}` : '';
-    return { blob, filename: `report_${docType}${suffix}.xlsx` };
+    const sync = async () => ({
+      blob: await request<Blob>(`api/reports/excel/${encodePath(docType)}`, {
+        responseType: 'blob',
+        query,
+        timeout: REPORT_TIMEOUT_MS,
+      }),
+      filename: `report_${docType}${suffix}.xlsx`,
+    });
+    const params = { doc_type: docType, year: year != null && year !== '' ? Number(year) : null };
+    return runFileJob('report_excel', params, sync, options);
   },
 
   /** Каталог Excel-отчётов: отчёты десктопа gid6 (excel2) и сводные ведомости веба */
@@ -2421,14 +2578,24 @@ export const fastApiService = {
   async downloadCatalogReport(
     report: Pick<ReportCatalogItem, 'id' | 'title'>,
     params: { fragment_id: number; calculation_id?: number | null },
+    options: FileJobOptions = {},
   ): Promise<{ blob: Blob; filename: string }> {
     const query: Record<string, number> = { fragment_id: params.fragment_id };
     if (params.calculation_id) query.calculation_id = params.calculation_id;
-    const blob = await request<Blob>(`api/reports/catalog/${encodePath(report.id)}/excel`, {
-      responseType: 'blob',
-      query,
-      timeout: REPORT_TIMEOUT_MS,
+    const sync = async () => ({
+      blob: await request<Blob>(`api/reports/catalog/${encodePath(report.id)}/excel`, {
+        responseType: 'blob',
+        query,
+        timeout: REPORT_TIMEOUT_MS,
+      }),
+      filename: '',
     });
+    const { blob } = await runFileJob(
+      'catalog_report',
+      { report_id: report.id, fragment_id: params.fragment_id, calculation_id: params.calculation_id || null },
+      sync,
+      options,
+    );
     const safeTitle = report.title.replace(/[\\/:*?"<>|]+/g, ' ').trim();
     return { blob, filename: `${safeTitle} ф${params.fragment_id}.xlsx` };
   },
@@ -2466,24 +2633,27 @@ export const fastApiService = {
 
   async downloadPassport(
     msRs: PassportSite['ms_rs'],
-    id: number
+    id: number,
+    options: FileJobOptions = {},
   ): Promise<{ blob: Blob; filename: string }> {
-    const blob = await request<Blob>(`api/db/object/uchastok_${msRs}/${encodePath(id)}`, {
-      method: 'POST',
-      responseType: 'blob',
-    });
-    return { blob, filename: `Passport_${msRs}_${id}.xlsx` };
+    return fastApiService.downloadObjectPassport(`uchastok_${msRs}`, id, options);
   },
 
   async downloadObjectPassport(
     table: string,
-    id: number
+    id: number,
+    options: FileJobOptions = {},
   ): Promise<{ blob: Blob; filename: string }> {
-    const blob = await request<Blob>(`api/db/object/${encodePath(table)}/${encodePath(id)}`, {
-      method: 'POST',
-      responseType: 'blob',
+    const sync = async () => ({
+      blob: await request<Blob>(`api/db/object/${encodePath(table)}/${encodePath(id)}`, {
+        method: 'POST',
+        responseType: 'blob',
+        timeout: REPORT_TIMEOUT_MS,
+      }),
+      filename: `Passport_${table}_${id}.xlsx`,
     });
-    return { blob, filename: `Passport_${table}_${id}.xlsx` };
+    // имя с сервера — по участку (Passport_ms_12.xlsx), даже если паспорт открыт по трубе/узлу
+    return runFileJob('passport', { table, obj_id: id }, sync, options);
   },
 
   formatAttributeValue(value: any): string {

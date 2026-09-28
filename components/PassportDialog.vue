@@ -83,6 +83,7 @@
                     :title="uch.name"
                     prepend-icon="mdi-pipe"
                     :disabled="downloadingSiteId === uch.id"
+                    :subtitle="downloadingSiteId === uch.id ? progressText : undefined"
                     @click="downloadPassport(uch.ms_rs, uch.site_id)"
                   >
                     <template #append>
@@ -116,6 +117,7 @@
 import { ref } from 'vue'
 import { useNotificationStore } from '~/stores/notificationStore'
 import {
+  describeFileJobProgress,
   fastApiService,
   type PassportHierarchyGroup,
   type PassportSite
@@ -126,6 +128,7 @@ const loading = ref(false)
 const hierarchy = ref<PassportHierarchyGroup[]>([])
 const open = ref<string[]>([])
 const downloadingSiteId = ref<string | null>(null)
+const progressText = ref('')
 const diagnostics = ref<{
   ready_for_passport: boolean
   blockers: string[]
@@ -160,7 +163,12 @@ const downloadPassport = async (msRs: PassportSite['ms_rs'], id: number) => {
   const siteKey = `${msRs}_${id}`
   downloadingSiteId.value = siteKey
   try {
-    const { blob, filename } = await fastApiService.downloadPassport(msRs, id)
+    progressText.value = ''
+    const { blob, filename } = await fastApiService.downloadPassport(msRs, id, {
+      onProgress: (p) => {
+        progressText.value = describeFileJobProgress(p)
+      },
+    })
     const objectUrl = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = objectUrl
