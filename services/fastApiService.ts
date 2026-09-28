@@ -481,6 +481,13 @@ export interface OutageSimulationSummary {
   total_load_gcal_h: number;
   total_pipe_length_m: number;
   total_pipe_volume_m3: number;
+  /** Полная модель (оценка): узлы/участки/потребители, потерявшие связь с источниками */
+  downstream_nodes_count?: number;
+  downstream_lines_count?: number;
+  downstream_consumers_count?: number;
+  downstream_load_gcal_h?: number;
+  total_with_downstream_load_gcal_h?: number;
+  sources_count?: number;
 }
 
 export interface ValveToClose {
@@ -517,10 +524,17 @@ export interface OutageSimulationResponse {
   /** Камеры/ТРП с задвижками во внутренней схеме, на которых остановлена зона */
   boundary_nodes: number[];
   affected_consumers: AffectedConsumer[];
+  /** Потребители ниже закрытых задвижек (вне зоны, без связи с источниками) — оценка */
+  downstream_consumers?: AffectedConsumer[];
+  model?: string;
+  estimate?: boolean;
+  estimate_note?: string;
   geojson: {
     isolated_pipes: any;
     valves_to_close: any;
     affected_consumers: any;
+    downstream_pipes?: any;
+    downstream_consumers?: any;
   };
 }
 

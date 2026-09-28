@@ -93,9 +93,13 @@
           density="compact"
           class="mb-3"
         >
-          Оценка по модели сети: зона ограничена задвижками на участках и задвижками во внутренних
+          <b>Оценка</b> по модели сети: зона ограничена задвижками на участках и задвижками во внутренних
           схемах камер/ТРП ({{ result.summary.boundary_nodes_count ?? 0 }} узлов на границе).
-          Потребители ниже по течению за закрытыми задвижками не учитываются.
+          Ниже закрытых задвижек без связи с источниками ({{ result.summary.sources_count ?? 0 }}):
+          узлов {{ result.summary.downstream_nodes_count ?? 0 }}, потребителей
+          {{ result.summary.downstream_consumers_count ?? 0 }}
+          ({{ result.summary.downstream_load_gcal_h ?? 0 }} Гкал/ч) — кольца учитываются, напор и расход по
+          обходу не проверяются.
           <template v-if="result.valves_already_closed?.length">
             Уже закрыты и не требуют действий: {{ result.valves_already_closed.length }} задв.
           </template>
@@ -120,9 +124,11 @@
                 <div class="text-caption text-medium-emphasis">Отключено зданий</div>
                 <div class="text-h4 font-weight-bold d-flex align-center justify-center ga-2 mt-1">
                   <v-icon size="28">mdi-home-alert-outline</v-icon>
-                  {{ result.summary.consumers_count }}
+                  {{ result.summary.consumers_count + (result.summary.downstream_consumers_count ?? 0) }}
                 </div>
-                <div class="text-caption mt-1">потребителей без тепла</div>
+                <div class="text-caption mt-1">
+                  в зоне {{ result.summary.consumers_count }} · ниже задвижек {{ result.summary.downstream_consumers_count ?? 0 }}
+                </div>
               </v-card>
             </v-col>
 
@@ -131,7 +137,7 @@
                 <div class="text-caption text-medium-emphasis">Недоотпуск тепла</div>
                 <div class="text-h4 font-weight-bold d-flex align-center justify-center ga-2 mt-1">
                   <v-icon size="28">mdi-fire-alert</v-icon>
-                  {{ result.summary.total_load_gcal_h }}
+                  {{ result.summary.total_with_downstream_load_gcal_h ?? result.summary.total_load_gcal_h }}
                 </div>
                 <div class="text-caption mt-1">Гкал/ч (Qот + Qгвс + Qвент)</div>
               </v-card>
@@ -163,7 +169,7 @@
             </v-tab>
             <v-tab value="consumers">
               <v-badge
-                :content="result.affected_consumers.length"
+                :content="allConsumers.length"
                 color="warning"
                 inline
                 class="me-1"
@@ -250,11 +256,14 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="c in result.affected_consumers" :key="`${c.consumer_type}-${c.id}`">
+                  <tr v-for="c in allConsumers" :key="`${c.downstream ? 'd' : 'z'}-${c.consumer_type}-${c.id}`">
                     <td>{{ c.id }}</td>
                     <td>
                       <v-chip size="x-small" variant="tonal" color="info">
                         {{ c.consumer_type === 'real' ? 'Реальный' : 'Обобщенный' }}
+                      </v-chip>
+                      <v-chip v-if="c.downstream" size="x-small" variant="tonal" color="orange-darken-3" class="ml-1">
+                        ниже задвижек
                       </v-chip>
                     </td>
                     <td class="font-weight-medium">{{ c.name }}</td>
@@ -273,7 +282,7 @@
                       />
                     </td>
                   </tr>
-                  <tr v-if="!result.affected_consumers.length">
+                  <tr v-if="!allConsumers.length">
                     <td colspan="8" class="text-center text-medium-emphasis py-4">
                       В изолированной зоне нет подключенных потребителей
                     </td>
@@ -337,7 +346,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
 import {
   fastApiService,
@@ -364,6 +373,11 @@ const loading = ref(false);
 const errorMessage = ref('');
 const result = ref<OutageSimulationResponse | null>(null);
 const activeTab = ref('valves');
+/** Потребители зоны и ниже закрытых задвижек (оценка) одним списком */
+const allConsumers = computed(() => [
+  ...(result.value?.affected_consumers || []).map((c) => ({ ...c, downstream: false })),
+  ...(result.value?.downstream_consumers || []).map((c) => ({ ...c, downstream: true })),
+]);
 
 watch(
   () => props.initialLineId,
@@ -438,9 +452,9 @@ const exportCsv = () => {
     ]);
   }
 
-  for (const c of result.value.affected_consumers) {
+  for (const c of allConsumers.value) {
     rows.push([
-      `Потребитель (${c.consumer_type})`,
+      `Потребитель (${c.consumer_type}${c.downstream ? ', ниже задвижек' : ''})`,
       String(c.id),
       `"${c.name.replace(/"/g, '""')}"`,
       `Qсум=${c.total_load} Гкал/ч`,

@@ -1340,6 +1340,17 @@ const onShowOutageOnMap = (res: any) => {
     });
   }
 
+  // Участки ниже закрытых задвижек без связи с источниками (оценка)
+  if (res.geojson?.downstream_pipes?.features?.length) {
+    map.addSource('outage-downstream-pipes', { type: 'geojson', data: res.geojson.downstream_pipes });
+    map.addLayer({
+      id: 'outage-downstream-pipes-line',
+      type: 'line',
+      source: 'outage-downstream-pipes',
+      paint: { 'line-color': '#ff6d00', 'line-width': 4, 'line-dasharray': [2, 1.5] },
+    });
+  }
+
   // Highlight isolating valves
   if (res.geojson?.valves_to_close?.features?.length) {
     map.addSource('outage-valves-to-close', {
@@ -1377,6 +1388,8 @@ const onClearOutageHighlight = () => {
   if (map.getLayer('outage-isolated-pipes-glow')) map.removeLayer('outage-isolated-pipes-glow');
   if (map.getLayer('outage-isolated-pipes-line')) map.removeLayer('outage-isolated-pipes-line');
   if (map.getSource('outage-isolated-pipes')) map.removeSource('outage-isolated-pipes');
+  if (map.getLayer('outage-downstream-pipes-line')) map.removeLayer('outage-downstream-pipes-line');
+  if (map.getSource('outage-downstream-pipes')) map.removeSource('outage-downstream-pipes');
   if (map.getLayer('outage-valves-to-close-points')) map.removeLayer('outage-valves-to-close-points');
   if (map.getSource('outage-valves-to-close')) map.removeSource('outage-valves-to-close');
 };
