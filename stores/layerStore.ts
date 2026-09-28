@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { mapService } from '~/services/mapService';
+import { mapService, isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 import type { LayerConfig, ExtendedLayerConfig, WmsLayerConfig } from '~/types';
 import type { FilterSpecification } from 'maplibre-gl';
 import { useMapStore } from './mapStore';
@@ -85,8 +85,10 @@ export const useLayerStore = defineStore('layer', {
       if (!map) return;
       // Ранний вызов до загрузки стиля не должен ронять initializeLayers —
       // откладываем синхронизацию до события load
-      if (typeof (map as any).isStyleLoaded === 'function' && !(map as any).isStyleLoaded()) {
-        (map as any).once('load', () => this.syncContextLayersToMap());
+      // (isStyleLoaded() тут не годится: он ложен и после load, пока грузятся тайлы,
+      // а load повторно не придёт — контекстные слои не появились бы вовсе)
+      if (!isStyleMutable(map as any)) {
+        void waitForStyleMutable(map as any).then(() => this.syncContextLayersToMap(), () => {});
         return;
       }
       try {

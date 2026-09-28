@@ -25,6 +25,41 @@ function sanitizeMapLibreFilter(f: any): any {
   return f.map((k: any) => sanitizeMapLibreFilter(k));
 }
 
+/**
+ * Стиль можно менять (addSource/addLayer), когда он разобран: `style._loaded`.
+ * `map.isStyleLoaded()` для этого не годится — он дополнительно требует, чтобы
+ * все источники догрузили тайлы и все картинки были готовы. Пока GeoServer
+ * отдаёт тайлы уже добавленных слоёв, условие ложно, а событие `styledata`
+ * при догрузке тайлов не приходит (приходит `sourcedata`), поэтому ожидание
+ * через `styledata` + `once('idle')` зависало до таймаута (слой узлов uzel).
+ */
+export function isStyleMutable(map: Map): boolean {
+  const style = (map as unknown as { style?: { _loaded?: boolean } }).style;
+  if (style && typeof style._loaded === 'boolean') return style._loaded;
+  return Boolean(map.isStyleLoaded());
+}
+
+export function waitForStyleMutable(map: Map, timeoutMs = 15000): Promise<void> {
+  if (isStyleMutable(map)) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const events = ['style.load', 'styledata', 'load', 'idle'] as const;
+    const cleanup = () => {
+      clearTimeout(timer);
+      for (const ev of events) map.off(ev, check);
+    };
+    const check = () => {
+      if (!isStyleMutable(map)) return;
+      cleanup();
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Map style did not finish loading in time'));
+    }, timeoutMs);
+    for (const ev of events) map.on(ev, check);
+  });
+}
+
 export const mapService = {
   async loadStyleImage(map: Map, imageId: string, imageUrl: string) {
     if (!imageId || !imageUrl || map.hasImage(imageId)) return;
@@ -100,38 +135,10 @@ export const mapService = {
     }
 
     try {
-      // Дожидаемся полной загрузки стиля карты, иначе maplibre бросает
-      // "Style is not done loading" при addSource/addLayer
-      if (!map.isStyleLoaded()) {
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            map.off('styledata', onStyleData);
-            map.off('idle', onIdle);
-            reject(new Error('Map style did not finish loading in time'));
-          }, 15000);
-
-          const onStyleData = () => {
-            if (map.isStyleLoaded()) {
-              clearTimeout(timeout);
-              map.off('styledata', onStyleData);
-              map.off('idle', onIdle);
-              resolve();
-            }
-          };
-
-          const onIdle = () => {
-            if (map.isStyleLoaded()) {
-              clearTimeout(timeout);
-              map.off('styledata', onStyleData);
-              map.off('idle', onIdle);
-              resolve();
-            }
-          };
-
-          map.on('styledata', onStyleData);
-          map.once('idle', onIdle);
-        });
-      }
+      // addSource/addLayer требуют только разобранного стиля (style._loaded),
+      // а не загрузки всех тайлов: isStyleLoaded() ложен, пока грузится любой
+      // источник, и слой ждал «тишины» на карте до таймаута.
+      await waitForStyleMutable(map);
 
       // Добавляем источник данных
       map.addSource(layer.sourceId, {

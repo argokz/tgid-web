@@ -417,6 +417,7 @@ import { useLocateMarkers } from '~/composables/useLocateMarkers';
 import type { LocatePoint } from '~/composables/useLocateMarkers';
 import { getFeatureId, getFeatureKind } from '~/utils/networkFeature';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
+import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 
 const props = defineProps<{
   initialLayers: LayerConfig[];
@@ -942,8 +943,8 @@ const highlightRoute = (path: Array<{ node_id: number; lng: number | null; lat: 
   const map = mapStore.map;
   if (!map) return;
   // Стиль мог быть не готов (HMR / смена подложки) — addSource тогда бросает
-  if (typeof map.isStyleLoaded === 'function' && !map.isStyleLoaded()) {
-    map.once('idle', () => highlightRoute(path));
+  if (!isStyleMutable(map)) {
+    void waitForStyleMutable(map).then(() => highlightRoute(path), () => {});
     return;
   }
   clearRouteHighlight();

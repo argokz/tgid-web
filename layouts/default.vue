@@ -250,7 +250,12 @@ import CalculationProtocol from '~/components/CalculationProtocol.vue';
 import LoginDialog from '~/components/LoginDialog.vue';
 import { ROLE_LABELS, type Role } from '~/utils/permissions';
 
-const { isMobile: mobile } = useMobile();
+const { isMobile } = useMobile();
+// SSR не знает ширину окна и рендерит десктопную шапку; до монтирования клиент
+// обязан отрисовать то же самое, иначе гидратация расходится (кнопка меню,
+// классы брендинга, кнопки навигации). Мобильная раскладка — только после mount.
+const isHydrated = ref(false);
+const mobile = computed(() => isHydrated.value && isMobile.value);
 const route = useRoute();
 const authStore = useAuthStore();
 const notificationStore = useNotificationStore();
@@ -265,6 +270,7 @@ const exportingGeoJson = ref(false);
 const protocolRef = ref<{ addLog: (log: any) => void } | null>(null);
 
 onMounted(() => {
+  isHydrated.value = true;
   authStore.hydrate();
   void refreshApiHealth();
 });

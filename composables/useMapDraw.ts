@@ -8,6 +8,7 @@
  */
 import { computed, ref, shallowRef } from 'vue';
 import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
+import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 
 export type DrawMode = 'none' | 'point' | 'line' | 'polygon' | 'measure-distance' | 'measure-area';
 
@@ -179,8 +180,8 @@ export function useMapDraw() {
     // isStyleLoaded() иногда возвращает true, пока стиль ещё диффится (HMR,
     // смена подложки) — addSource в этот момент бросает. Ловим и повторяем
     // на следующем idle, чтобы не терять инициализацию слоёв рисования.
-    if (typeof map.isStyleLoaded === 'function' && !map.isStyleLoaded()) {
-      map.once('idle', () => { if (mapRef.value === map) ensureLayers(map); });
+    if (!isStyleMutable(map)) {
+      void waitForStyleMutable(map).then(() => { if (mapRef.value === map) ensureLayers(map); }, () => {});
       return;
     }
 
@@ -340,10 +341,10 @@ export function useMapDraw() {
     mapRef.value = map;
     // Панель могли открыть до готовности стиля — addSource тогда бросает
     // «Style is not done loading»; ждём событие load.
-    if (typeof map.isStyleLoaded === 'function' && !map.isStyleLoaded()) {
-      map.once('load', () => {
+    if (!isStyleMutable(map)) {
+      void waitForStyleMutable(map).then(() => {
         if (mapRef.value === map) ensureLayers(map);
-      });
+      }, () => {});
     } else {
       ensureLayers(map);
     }
