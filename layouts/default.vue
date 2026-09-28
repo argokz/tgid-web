@@ -54,7 +54,7 @@
 
         <!-- Запуск расчёта sety: роль calculator+ (сервер проверяет то же) -->
         <v-btn
-          v-if="authStore.canCalculate"
+          v-if="isHydrated && authStore.canCalculate"
           prepend-icon="mdi-calculator-variant"
           :color="showCalculationModal ? 'primary' : undefined"
           :class="['nav-btn', 'ms-1', { 'active-link': showCalculationModal }]"
@@ -268,7 +268,7 @@
 
     <!-- Модальное окно расчета -->
     <PlanningCalculationModal
-      v-if="authStore.canCalculate"
+      v-if="isHydrated && authStore.canCalculate"
       v-model="showCalculationModal"
       @protocol-log="onCalculationLog"
       @show-protocol="showProtocol = $event"
@@ -326,7 +326,8 @@ import { ROLE_LABELS, type Role } from '~/utils/permissions';
 const { isMobile } = useMobile();
 // SSR не знает ширину окна и рендерит десктопную шапку; до монтирования клиент
 // обязан отрисовать то же самое, иначе гидратация расходится (кнопка меню,
-// классы брендинга, кнопки навигации). Мобильная раскладка — только после mount.
+// классы брендинга, кнопки навигации). Мобильная раскладка и кнопки по роли
+// (роль/флаги сервера приходят из localStorage и /auth/config) — только после mount.
 const isHydrated = ref(false);
 const mobile = computed(() => isHydrated.value && isMobile.value);
 const route = useRoute();
