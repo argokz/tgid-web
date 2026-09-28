@@ -18,6 +18,10 @@
             <v-icon start size="18">mdi-elevator</v-icon>
             Сопло и элеватор
           </v-tab>
+          <v-tab value="engine">
+            <v-icon start size="18">mdi-pipe-valve</v-icon>
+            По напорам узла (движок)
+          </v-tab>
           <v-tab value="excel">
             <v-icon start size="18">mdi-file-excel</v-icon>
             Официальный бланк (Excel)
@@ -326,6 +330,76 @@
             </v-row>
           </v-window-item>
 
+          <!-- Диафрагмы по напорам узла: движок sety (drvary1) -->
+          <v-window-item value="engine">
+            <p class="text-body-2 text-medium-emphasis mb-3">
+              Как в гидравлическом расчёте sety (dross/drvary1): диаметр шайбы 10·√(G/√H), не меньше
+              минимального; если меньше — ставятся шайбы минимального диаметра (не больше трёх), остаток
+              напора не гасится.
+            </p>
+            <v-row dense>
+              <v-col cols="12" md="6">
+                <v-card variant="outlined" class="pa-4 rounded-lg h-100">
+                  <div class="text-subtitle-1 font-weight-bold mb-3">Элеватор и диафрагма перед соплом</div>
+                  <v-row dense>
+                    <v-col cols="6"><v-text-field v-model.number="engineElevator.available_head" label="Располагаемый напор Нп − Но, м" type="number" density="compact" variant="outlined" /></v-col>
+                    <v-col cols="6"><v-text-field v-model.number="engineElevator.heating_flow" label="Расход на отопление, т/ч" type="number" density="compact" variant="outlined" /></v-col>
+                    <v-col cols="6"><v-text-field v-model.number="engineElevator.mixing_ratio" label="Коэффициент смешения u" type="number" density="compact" variant="outlined" /></v-col>
+                    <v-col cols="6"><v-text-field v-model.number="engineElevator.system_loss" label="Потери в системе hс, м" type="number" density="compact" variant="outlined" /></v-col>
+                    <v-col cols="6"><v-text-field v-model.number="engineElevator.min_nozzle_diameter" label="Мин. диаметр сопла, мм" type="number" density="compact" variant="outlined" /></v-col>
+                    <v-col cols="6"><v-select v-model="engineElevator.regime" :items="[1, 6]" label="Режим расчёта" density="compact" variant="outlined" hint="6: при напоре > 40 м половину гасит диафрагма" persistent-hint /></v-col>
+                    <v-col cols="6"><v-text-field v-model.number="engineElevator.street_share" label="Доля уличного фасада" type="number" density="compact" variant="outlined" /></v-col>
+                    <v-col cols="6"><v-text-field v-model.number="engineElevator.circulation_head" label="Напор подпорно-цирк. диафрагмы, м" type="number" density="compact" variant="outlined" /></v-col>
+                  </v-row>
+                  <v-btn color="teal-darken-3" :loading="loadingEngineElevator" block class="mt-2" @click="calcEngineElevator">
+                    Рассчитать
+                  </v-btn>
+                  <div v-if="engineElevatorResult" class="mt-3 text-body-2">
+                    <div>Сопло: <b>{{ fmtMm(engineElevatorResult.nozzle_diameter_mm) }}</b>, напор на сопле {{ fmtM(engineElevatorResult.nozzle_head_m) }}, элеватор №{{ engineElevatorResult.elevator_number ?? '—' }}</div>
+                    <div v-if="engineElevatorResult.pre_nozzle">
+                      Диафрагма перед соплом: <b>{{ fmtMm(engineElevatorResult.pre_nozzle.diameter_mm) }}</b> × {{ engineElevatorResult.pre_nozzle.count }},
+                      гасит {{ fmtM(engineElevatorResult.pre_nozzle.head_dissipated_m) }}
+                      <span v-if="engineElevatorResult.pre_nozzle.head_residual_m > 0">(остаток {{ fmtM(engineElevatorResult.pre_nozzle.head_residual_m) }})</span>
+                    </div>
+                    <div v-else>Диафрагма перед соплом не требуется</div>
+                    <div v-if="engineElevatorResult.yard_facade">
+                      Дворовый фасад: {{ fmtMm(engineElevatorResult.yard_facade.diameter_mm) }} × {{ engineElevatorResult.yard_facade.count }}
+                    </div>
+                    <v-alert v-for="w in engineElevatorResult.warnings" :key="w" type="warning" density="compact" variant="tonal" class="mt-2">{{ w }}</v-alert>
+                  </div>
+                </v-card>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-card variant="outlined" class="pa-4 rounded-lg h-100">
+                  <div class="text-subtitle-1 font-weight-bold mb-3">Циркуляционная линия ГВС</div>
+                  <v-row dense>
+                    <v-col cols="6"><v-text-field v-model.number="engineCirc.circulation_flow" label="Расход циркуляции, т/ч" type="number" density="compact" variant="outlined" /></v-col>
+                    <v-col cols="6"><v-text-field v-model.number="engineCirc.return_head" label="Напор в обратном узла, м" type="number" density="compact" variant="outlined" /></v-col>
+                    <v-col cols="6"><v-text-field v-model.number="engineCirc.required_head" label="Напор у водоразборных приборов a12, м" type="number" density="compact" variant="outlined" /></v-col>
+                    <v-col cols="6"><v-text-field v-model.number="engineCirc.circulation_loss" label="Потери в циркуляции a11, м" type="number" density="compact" variant="outlined" /></v-col>
+                    <v-col cols="12">
+                      <v-btn-toggle v-model="engineCirc.draw_from" mandatory density="compact" color="teal-darken-3">
+                        <v-btn value="supply">Водоразбор из подающего</v-btn>
+                        <v-btn value="return">из обратного</v-btn>
+                      </v-btn-toggle>
+                    </v-col>
+                  </v-row>
+                  <v-btn color="teal-darken-3" :loading="loadingEngineCirc" block class="mt-3" @click="calcEngineCirc">
+                    Рассчитать
+                  </v-btn>
+                  <div v-if="engineCircResult" class="mt-3 text-body-2">
+                    <div>Гасимый напор a12 − a11 − Hобр: {{ fmtM(engineCircResult.available_head_m) }}</div>
+                    <div v-if="engineCircResult.diameter_mm != null">
+                      Диафрагма: <b>{{ fmtMm(engineCircResult.diameter_mm) }}</b> × {{ engineCircResult.count }},
+                      гасит {{ fmtM(engineCircResult.head_dissipated_m) }}
+                    </div>
+                    <v-alert v-for="w in engineCircResult.warnings" :key="w" type="warning" density="compact" variant="tonal" class="mt-2">{{ w }}</v-alert>
+                  </div>
+                </v-card>
+              </v-col>
+            </v-row>
+          </v-window-item>
+
           <!-- 3. Официальный бланк Excel -->
           <v-window-item value="excel">
             <v-card variant="outlined" class="pa-4 rounded-lg">
@@ -463,7 +537,11 @@ import { useMobile } from '~/composables/useMobile';
 import { useNotificationStore } from '~/stores/notificationStore';
 import {
   fastApiService,
+  type ElevatorEngineParams,
+  type ElevatorEngineResult,
   type ElevatorNozzleResult,
+  type GvsCirculationParams,
+  type GvsCirculationResult,
   type OrificePlateParams,
   type OrificePlateResult,
   type OrificeScheme,
@@ -567,6 +645,54 @@ const calcOrifice = async () => {
     reportError('Расчёт шайбы', err);
   } finally {
     loadingOrifice.value = false;
+  }
+};
+
+const engineElevator = reactive<ElevatorEngineParams>({
+  available_head: 45,
+  heating_flow: 6,
+  mixing_ratio: 1.4,
+  system_loss: 1.5,
+  min_nozzle_diameter: 3,
+  regime: 1,
+  street_share: 1,
+  circulation_head: 0,
+});
+const engineCirc = reactive<GvsCirculationParams>({
+  circulation_flow: 0.8,
+  required_head: 60,
+  circulation_loss: 3,
+  return_head: 35,
+  draw_from: 'supply',
+});
+const engineElevatorResult = ref<ElevatorEngineResult | null>(null);
+const engineCircResult = ref<GvsCirculationResult | null>(null);
+const loadingEngineElevator = ref(false);
+const loadingEngineCirc = ref(false);
+const fmtMm = (v: number | null | undefined) => (v == null ? '—' : `${Number(v).toFixed(1)} мм`);
+const fmtM = (v: number | null | undefined) => (v == null ? '—' : `${Number(v).toFixed(2)} м`);
+
+const calcEngineElevator = async () => {
+  loadingEngineElevator.value = true;
+  try {
+    engineElevatorResult.value = await fastApiService.calculateElevatorEngine({ ...engineElevator });
+  } catch (err: any) {
+    engineElevatorResult.value = null;
+    reportError('Элеватор (движок)', err);
+  } finally {
+    loadingEngineElevator.value = false;
+  }
+};
+
+const calcEngineCirc = async () => {
+  loadingEngineCirc.value = true;
+  try {
+    engineCircResult.value = await fastApiService.calculateGvsCirculationDiaphragm({ ...engineCirc });
+  } catch (err: any) {
+    engineCircResult.value = null;
+    reportError('Циркуляционная диафрагма ГВС', err);
+  } finally {
+    loadingEngineCirc.value = false;
   }
 };
 

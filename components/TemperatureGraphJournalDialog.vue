@@ -319,6 +319,16 @@
               <v-card-title class="text-subtitle-1 d-flex justify-space-between align-center">
                 <span>Исходные параметры desktop</span>
                 <div>
+                  <v-select
+                    v-if="mutationsEnabled && details"
+                    v-model="graphMode"
+                    :items="graphModes"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                    class="d-inline-flex mr-1 graph-mode-select"
+                    aria-label="Вид графика"
+                  />
                   <v-btn
                     v-if="mutationsEnabled && details"
                     color="deep-orange"
@@ -328,7 +338,7 @@
                     :loading="recalculating"
                     @click="recalculateGraph"
                   >
-                    Расчёт OTOP
+                    Рассчитать график
                   </v-btn>
                   <v-btn
                     v-if="mutationsEnabled && details"
@@ -449,6 +459,7 @@ import {
   fastApiService,
   type TemperatureGraphFilters,
   type TemperatureGraphLookups,
+  type TemperatureGraphMode,
   type TemperatureGraphSourceDetails,
   type TemperatureGraphSourceSummary,
   type TemperatureGraphStatus
@@ -548,14 +559,25 @@ const saveInputs = async () => {
 }
 
 const recalculating = ref(false)
+/** Вид графика как у desktop CTempGraph: graphTypeID 1 — О, 3 — П, 2 — СВ, 4 — СН */
+const graphModes: { title: string; value: TemperatureGraphMode }[] = [
+  { title: 'Отопительный (О)', value: 'otop' },
+  { title: 'Повышенный (П)', value: 'pov' },
+  { title: 'Скорр. повышенный (СВ)', value: 'skk_pov' },
+  { title: 'Скорр. пониженный (СН)', value: 'skk_pon' },
+]
+const graphMode = ref<TemperatureGraphMode>('otop')
+watch(() => details.value?.id, () => {
+  const type = Number((details.value as any)?.graph_type_id)
+  graphMode.value = type === 3 ? 'pov' : type === 2 ? 'skk_pov' : type === 4 ? 'skk_pon' : 'otop'
+})
 const recalculateGraph = async () => {
   if (!details.value) return
   recalculating.value = true
   try {
-    const result = await fastApiService.recalculateTemperatureGraph(details.value.id)
-    useNotificationStore().showSuccess(
-      `TG OTOP: ${result.points} точек${result.mode ? ` (${result.mode})` : ''}`,
-    )
+    const result = await fastApiService.recalculateTemperatureGraph(details.value.id, graphMode.value)
+    const title = graphModes.find(item => item.value === result.mode)?.title || result.mode
+    useNotificationStore().showSuccess(`Температурный график ${title}: ${result.points} точек`)
     await openDetails(details.value.id)
   } catch (err: any) {
     useNotificationStore().showError(err?.message || 'Не удалось пересчитать TG')
@@ -652,7 +674,7 @@ defineExpose({ openDialog })
 </script>
 
 <style scoped>
-.metric-row,.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.filters>*{min-width:170px;flex:1}.filters .v-btn{flex:0 0 auto}.table-wrap,.points-wrap{overflow:auto}.table-wrap{min-height:300px}.journal-table{width:100%;border-collapse:collapse;font-size:13px}.journal-table th,.journal-table td{padding:9px 10px;border-bottom:1px solid #e0e0e0;text-align:left;white-space:nowrap}.journal-table th{position:sticky;top:0;background:#f4eef7;z-index:1}.journal-table tbody tr{cursor:pointer}.journal-table tbody tr:hover{background:#f7f2f9}.muted{font-size:11px;color:#757575}.empty{text-align:center;color:#757575;padding:32px}.detail-alerts{display:grid;gap:8px}.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.input-grid{max-height:440px;overflow:auto}.chart-wrap{height:540px}.chart{height:100%;width:100%}.points-wrap{max-height:430px;border:1px solid #e0e0e0;border-radius:6px}.points-table tbody tr{cursor:default}
+.metric-row,.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.filters>*{min-width:170px;flex:1}.filters .v-btn{flex:0 0 auto}.table-wrap,.points-wrap{overflow:auto}.table-wrap{min-height:300px}.journal-table{width:100%;border-collapse:collapse;font-size:13px}.journal-table th,.journal-table td{padding:9px 10px;border-bottom:1px solid #e0e0e0;text-align:left;white-space:nowrap}.journal-table th{position:sticky;top:0;background:#f4eef7;z-index:1}.journal-table tbody tr{cursor:pointer}.journal-table tbody tr:hover{background:#f7f2f9}.muted{font-size:11px;color:#757575}.empty{text-align:center;color:#757575;padding:32px}.detail-alerts{display:grid;gap:8px}.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.input-grid{max-height:440px;overflow:auto}.chart-wrap{height:540px}.graph-mode-select{width:230px;vertical-align:middle}.chart{height:100%;width:100%}.points-wrap{max-height:430px;border:1px solid #e0e0e0;border-radius:6px}.points-table tbody tr{cursor:default}
 :deep(.detail-value){display:flex;flex-direction:column;min-width:0}:deep(.detail-label){font-size:11px;color:#757575}:deep(.detail-value strong){overflow-wrap:anywhere}
 @media(max-width:960px){.filters{display:grid;grid-template-columns:1fr}.filters>*{width:100%}.detail-grid{grid-template-columns:1fr}.chart-wrap{height:430px}}
 </style>

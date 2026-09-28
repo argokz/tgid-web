@@ -558,6 +558,139 @@ export interface OrificePlateResult {
   warning: string | null;
 }
 
+/** Диафрагма циркуляционной линии открытой ГВС по движку sety (drvary1 b39–b41) */
+export interface GvsCirculationParams {
+  circulation_flow: number; // т/ч
+  required_head: number; // a12, м
+  circulation_loss: number; // a11, м
+  return_head: number; // напор в обратном трубопроводе узла, м
+  draw_from?: 'supply' | 'return';
+  min_diameter?: number; // a15, мм
+}
+
+export interface EngineDiaphragm {
+  diameter_mm: number;
+  count: number;
+  head_one_m: number;
+  head_dissipated_m: number;
+  head_residual_m: number;
+  min_diameter_limited: boolean;
+  flow_t_h: number;
+  reason?: string;
+}
+
+export interface GvsCirculationResult extends Partial<Omit<EngineDiaphragm, 'diameter_mm'>> {
+  available_head_m: number;
+  draw_from: 'supply' | 'return';
+  diameter_mm: number | null;
+  warnings: string[];
+}
+
+/** Элеватор и диафрагма перед соплом по движку sety (drvary1, элеваторный ввод) */
+export interface ElevatorEngineParams {
+  available_head: number;
+  heating_flow: number;
+  mixing_ratio: number;
+  system_loss: number;
+  min_nozzle_diameter?: number;
+  min_diameter?: number;
+  regime?: number;
+  circulation_head?: number;
+  gvs_heater_loss?: number;
+  gvs_sequential_flow?: number;
+  graph_otop?: boolean;
+  street_share?: number;
+}
+
+export interface ElevatorEngineResult {
+  required_head_m: number;
+  flow_t_h: number;
+  nozzle_diameter_mm: number | null;
+  nozzle_head_m: number | null;
+  mixing_chamber_diameter_mm?: number;
+  elevator_number: number | null;
+  pre_nozzle: EngineDiaphragm | null;
+  yard_facade: EngineDiaphragm | null;
+  gvs_heater: EngineDiaphragm | null;
+  warnings: string[];
+}
+
+/** Нормативные теплопотери (перенос desktop poteriNewPg) */
+export interface HeatLossNormScopeSource {
+  id: number;
+  name: string | null;
+  sourcename: string | null;
+  sections: number;
+  pipe_length: number | null;
+  has_months: boolean;
+  has_parameters: boolean;
+  has_temp_graph: boolean;
+}
+
+export interface HeatLossNormScope {
+  season: { id: number; city: string | null; d1: string | null; d2: string | null; a: number | null };
+  fragment_id: number | null;
+  sources: HeatLossNormScopeSource[];
+}
+
+export type HeatLossPeriodTotals = Record<'potnp' | 'potno' | 'potpodz' | 'potall' | 'v1' | 'vall', number>;
+export type HeatLossTotals = Record<'heating' | 'summer' | 'year', HeatLossPeriodTotals>;
+
+export interface HeatLossNormRunSummary {
+  id: number;
+  name: string;
+  user_gid: string | null;
+  calculated_at: string | null;
+  params: {
+    season_id?: number;
+    season?: string;
+    fragment_id?: number | null;
+    heat_source_ids?: number[];
+    ready_source_ids?: number[];
+    section_rows?: number;
+    totals?: HeatLossTotals;
+  };
+}
+
+export interface HeatLossNormRun extends HeatLossNormRunSummary {
+  sources: { id: number; name: string | null; sourcename: string | null; has_months: boolean; sections: number }[];
+  totals: HeatLossTotals;
+  source_totals: Record<string, HeatLossTotals>;
+  section_counts: { rows?: number; lines?: number; length?: number };
+  sheets?: Record<string, Record<string, any>[]>;
+}
+
+export interface HeatLossNormSection {
+  id: number;
+  lineid: number;
+  truba: number;
+  name_typ: string | null;
+  diametr: number | null;
+  diametr_usl: number | null;
+  dlina: number | null;
+  year: number | null;
+  kolwork: number | null;
+  kti: number | null;
+  beta: number | null;
+  q: number | null;
+  kod_ist: string | null;
+  loss_gcal_h: number | null;
+  loss_gcal_year: number | null;
+  longitude: number | null;
+  latitude: number | null;
+  [key: string]: any;
+}
+
+export type TemperatureGraphMode = 'auto' | 'otop' | 'pov' | 'skk_pov' | 'skk_pon';
+
+export interface TemperatureGraphPreview {
+  mode: Exclude<TemperatureGraphMode, 'auto'>;
+  name: string | null;
+  points: Record<string, number>[];
+  errors: number[];
+  message: string | null;
+}
+
 export interface ElevatorNozzleParams {
   q_heating_gcal?: number; // Гкал/ч
   flow_g?: number; // т/ч
@@ -1436,6 +1569,56 @@ export const fastApiService = {
     );
   },
 
+  async getHeatLossNormScope(seasonId: number, fragmentId?: number | null): Promise<HeatLossNormScope> {
+    return request('api/v1/heat-losses/norm/scope', {
+      query: { season_id: seasonId, ...(fragmentId ? { fragment_id: fragmentId } : {}) },
+    });
+  },
+  async prepareHeatLossWorkConditions(
+    sourceId: number,
+    body: { season_id: number; tx?: Record<number, number>; t_percent?: number; dry_run?: boolean }
+  ): Promise<{ months: Record<string, any>[]; creates_source_parameters: boolean; dry_run: boolean }> {
+    return request(
+      `api/v1/heat-losses/sources/${encodePath(sourceId)}/work-conditions`,
+      mutationOptions('POST', body)
+    );
+  },
+  async runHeatLossNorm(body: {
+    season_id: number;
+    fragment_id?: number | null;
+    heat_source_ids?: number[] | null;
+  }): Promise<{ success: boolean; task_id: string }> {
+    return request('api/v1/heat-losses/norm/run', mutationOptions('POST', body));
+  },
+  async getHeatLossNormResults(
+    filters: { fragment_id?: number | null; limit?: number; offset?: number } = {}
+  ): Promise<{ total: number; items: HeatLossNormRunSummary[] }> {
+    const query: Record<string, number> = {};
+    if (filters.fragment_id) query.fragment_id = filters.fragment_id;
+    if (filters.limit) query.limit = filters.limit;
+    if (filters.offset) query.offset = filters.offset;
+    return request('api/v1/heat-losses/norm/results', { query });
+  },
+  async getHeatLossNormResult(id: number, includeSheets = true): Promise<HeatLossNormRun> {
+    return request(`api/v1/heat-losses/norm/results/${encodePath(id)}`, {
+      query: { include_sheets: includeSheets },
+    });
+  },
+  async getHeatLossNormSections(
+    id: number,
+    filters: { heat_source_id?: number | null; line_id?: number | null; page?: number; page_size?: number } = {}
+  ): Promise<{ total: number; page: number; page_size: number; items: HeatLossNormSection[] }> {
+    const query: Record<string, number> = {};
+    for (const [key, value] of Object.entries(filters)) if (value) query[key] = Number(value);
+    return request(`api/v1/heat-losses/norm/results/${encodePath(id)}/sections`, { query });
+  },
+  async downloadHeatLossNormExcel(id: number): Promise<{ blob: Blob; filename: string }> {
+    const blob = await request<Blob>(`api/v1/heat-losses/norm/results/${encodePath(id)}/excel`, {
+      responseType: 'blob',
+    });
+    return { blob, filename: `heat_losses_${id}.xlsx` };
+  },
+
   async getConsumerLoadDiagnostics(
     filters: JournalFilters = {}
   ): Promise<PaginatedResponse<ConsumerLoadSummary>> {
@@ -1463,12 +1646,19 @@ export const fastApiService = {
     return request(`api/temperature-graphs/sources/${encodePath(id)}`);
   },
   async recalculateTemperatureGraph(
-    sourceId: number
+    sourceId: number,
+    mode: TemperatureGraphMode = 'otop'
   ): Promise<{ success: boolean; points: number; mode?: string }> {
     return request(
-      `api/temperature-graphs/sources/${encodePath(sourceId)}/recalculate`,
+      `api/temperature-graphs/sources/${encodePath(sourceId)}/recalculate?mode=${encodeURIComponent(mode)}`,
       mutationOptions('POST', {})
     );
+  },
+  async previewTemperatureGraph(
+    sourceId: number,
+    mode: TemperatureGraphMode = 'auto'
+  ): Promise<TemperatureGraphPreview> {
+    return request(`api/temperature-graphs/sources/${encodePath(sourceId)}/preview`, { query: { mode } });
   },
   async applyStationaryTemperatureGraph(
     sourceId: number,
@@ -2051,6 +2241,14 @@ export const fastApiService = {
       method: 'POST',
       body: params,
     });
+  },
+
+  async calculateGvsCirculationDiaphragm(params: GvsCirculationParams): Promise<GvsCirculationResult> {
+    return request<GvsCirculationResult>('api/calc/gvs-circulation-diaphragm', { method: 'POST', body: params });
+  },
+
+  async calculateElevatorEngine(params: ElevatorEngineParams): Promise<ElevatorEngineResult> {
+    return request<ElevatorEngineResult>('api/calc/elevator-engine', { method: 'POST', body: params });
   },
 
   async downloadThrottlingSheet(params: ThrottlingSheetParams): Promise<{ blob: Blob; filename: string }> {

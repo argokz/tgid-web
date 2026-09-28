@@ -71,6 +71,9 @@
         <v-tab value="sources">
           Источники и готовность
         </v-tab>
+        <v-tab value="norm">
+          Нормативный расчёт
+        </v-tab>
       </v-tabs>
 
       <v-window
@@ -248,6 +251,18 @@
             @update:model-value="loadSources"
           />
         </v-window-item>
+
+        <v-window-item
+          value="norm"
+          class="journal-pane"
+        >
+          <HeatLossNormPanel
+            ref="normPanelRef"
+            :seasons="allSeasons"
+            :fragments="lookups.fragments"
+            @locate="locateSection"
+          />
+        </v-window-item>
       </v-window>
     </v-card>
   </v-dialog>
@@ -352,9 +367,10 @@
             size="small"
             prepend-icon="mdi-play"
             :loading="runningHeatLoss"
+            title="Гидравлико-тепловой расчёт sety фрагмента с -tg (не модуль «Теплопотери»)"
             @click="runHeatLossForSource"
           >
-            Запуск теплопотерь
+            Расчёт sety -tg
           </v-btn>
           <v-chip
             variant="outlined"
@@ -478,7 +494,9 @@ const downloadSeasonsExcel = async () => {
     exportingSeasons.value = false
   }
 }
-const activeTab = ref<'seasons' | 'sources'>('seasons')
+const activeTab = ref<'seasons' | 'sources' | 'norm'>('seasons')
+const normPanelRef = ref<{ init: () => Promise<void> } | null>(null)
+const allSeasons = ref<HeatLossSeasonSummary[]>([])
 const lookups = ref<HeatLossLookups>({ fragments: [], cities: [], source_counts: {}, season_counts: {}, result_availability: { calculation_count: 0, heat_loss_row_count: 0 } })
 const seasons = ref<HeatLossSeasonSummary[]>([])
 const sources = ref<HeatLossSourceSummary[]>([])
@@ -600,7 +618,19 @@ async function loadSeasons() { loading.value = true; try { const response = awai
 async function loadSources() { loading.value = true; try { const response = await fastApiService.getHeatLossSources({ ...sourceFilters, page: sourcePage.value, page_size: 50 }); sources.value = response.items; sourcePages.value = response.pages } finally { loading.value = false } }
 async function reloadSeasons() { seasonPage.value = 1; await loadSeasons() }
 async function reloadSources() { sourcePage.value = 1; await loadSources() }
-async function loadActiveTab() { if (activeTab.value === 'seasons') await loadSeasons(); else await loadSources() }
+async function loadActiveTab() {
+  if (activeTab.value === 'seasons') await loadSeasons()
+  else if (activeTab.value === 'sources') await loadSources()
+  else {
+    if (!allSeasons.value.length) allSeasons.value = (await fastApiService.getHeatLossSeasons({ page: 1, page_size: 200 })).items
+    await nextTick()
+    await normPanelRef.value?.init()
+  }
+}
+function locateSection(payload: { longitude: number; latitude: number; id: number; nodeId: number; label: string }) {
+  emit('locate-heat-source', payload)
+  visible.value = false
+}
 async function openSeason(id: number) { seasonDetails.value = null; sourceDetails.value = null; detailsVisible.value = true; detailLoading.value = true; isEditingSeason.value = false; try { seasonDetails.value = await fastApiService.getHeatLossSeason(id) } finally { detailLoading.value = false } }
 async function openSource(id: number) { seasonDetails.value = null; sourceDetails.value = null; detailsVisible.value = true; detailLoading.value = true; try { sourceDetails.value = await fastApiService.getHeatLossSource(id) } finally { detailLoading.value = false } }
 function locateSource() { const item = sourceDetails.value; if (!item || !hasCoordinates(item)) return; emit('locate-heat-source', { longitude: Number(item.longitude), latitude: Number(item.latitude), id: item.id, nodeId: item.node_id, label: item.name }); visible.value = false; detailsVisible.value = false }
