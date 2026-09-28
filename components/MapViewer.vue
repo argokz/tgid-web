@@ -136,243 +136,15 @@
         @open-elevators="openLazyDialog('elevator')"
       />
 
-      <!-- Диалоги журналов монтируются лениво: чанк подгружается при первом открытии через openLazyDialog -->
-      <!-- Passports Tree Dialog -->
-      <LazyPassportDialog v-if="mountedDialogs.passport" ref="passportDialogRef" />
-
-      <!-- Desktop TGID defect journal -->
-      <LazyDefectJournalDialog
-        v-if="mountedDialogs.defect"
-        ref="defectJournalRef"
-        @locate-defect="locate.defect"
-      />
-
-      <!-- Desktop TGID shurf journal -->
-      <LazyShurfJournalDialog
-        v-if="mountedDialogs.shurf"
-        ref="shurfJournalRef"
-        @locate-shurf="locate.shurf"
-        @open-defect="openLazyDialog('defect', { defectId: $event })"
-      />
-
-      <!-- Desktop TGID inspection journal -->
-      <LazyInspectionJournalDialog
-        v-if="mountedDialogs.inspection"
-        ref="inspectionJournalRef"
-        @locate-inspection="locate.inspection"
-        @open-defect="openLazyDialog('defect', { defectId: $event })"
-      />
-
-      <!-- Desktop TGID repair journal -->
-      <LazyRepairJournalDialog
-        v-if="mountedDialogs.repair"
-        ref="repairJournalRef"
-        @locate-repair="locate.repair"
-        @open-defect="openLazyDialog('defect', { defectId: $event })"
-      />
-
-      <!-- Desktop TGID pressure test journal -->
-      <LazyPressureTestJournalDialog
-        v-if="mountedDialogs.pressureTest"
-        ref="pressureTestJournalRef"
-        @locate-pressure-test="locate.pressureTest"
-        @open-defect="openLazyDialog('defect', { defectId: $event })"
-      />
-
-      <LazyOcheredOpressovokDialog
-        v-if="mountedDialogs.ocheredOpressovok"
-        ref="ocheredOpressovokRef"
-      />
-
-      <!-- Desktop TGID technical conditions registry -->
-      <LazyTechnicalConditionJournalDialog
-        v-if="mountedDialogs.technicalCondition"
-        ref="technicalConditionJournalRef"
-        @locate-technical-condition="locate.technicalCondition"
-      />
-
-      <!-- Desktop TGID corrosion indicator journal -->
-      <LazyCorrosionIndicatorJournalDialog
-        v-if="mountedDialogs.corrosionIndicator"
-        ref="corrosionIndicatorJournalRef"
-        @locate-corrosion-indicator="locate.corrosionIndicator"
-      />
-
-      <!-- Desktop TGID ALSEKO contractual load registry -->
-      <LazyAlsekoJournalDialog
-        v-if="mountedDialogs.alseko"
-        ref="alsekoJournalRef"
-        @locate-alseko="locate.alseko"
-      />
-
-      <!-- Desktop TGID electrical network inventory -->
-      <LazyElectricalNetworkJournalDialog
-        v-if="mountedDialogs.electricalNetwork"
-        ref="electricalNetworkJournalRef"
-        @locate-electrical-object="locate.electricalNetwork"
-      />
-
-      <!-- Desktop TGID heat-loss seasons and source readiness -->
-      <LazyHeatLossJournalDialog
-        v-if="mountedDialogs.heatLoss"
-        ref="heatLossJournalRef"
-        @locate-heat-source="locate.heatSource"
-      />
-
-      <!-- Desktop TGID temperature graphs and source operating conditions -->
-      <LazyTemperatureGraphJournalDialog
-        v-if="mountedDialogs.temperatureGraph"
-        ref="temperatureGraphJournalRef"
-        @locate-source="locate.heatSource"
-      />
-
-      <!-- Desktop TGID consumer load diagnostics -->
-      <LazyConsumerLoadDiagnosticsDialog
-        v-if="mountedDialogs.consumerLoad"
-        ref="consumerLoadDiagnosticsRef"
-        @locate-consumer="locate.consumer"
-      />
-
-      <!-- Desktop TGID pump inventory, catalog and characteristic curves -->
-      <LazyPumpEquipmentJournalDialog
-        v-if="mountedDialogs.pumpEquipment"
-        ref="pumpEquipmentJournalRef"
-        @locate-pump="locate.pump"
-      />
-
-      <!-- Desktop TGID network dampers and regulating armatures -->
-      <LazyNetworkArmatureJournalDialog
-        v-if="mountedDialogs.networkArmature"
-        ref="networkArmatureJournalRef"
-        @locate-armature="locate.armature"
-      />
-
-      <!-- Desktop TGID pressure, flow and differential-pressure regulators -->
-      <LazyNetworkRegulatorJournalDialog
-        v-if="mountedDialogs.networkRegulator"
-        ref="networkRegulatorJournalRef"
-        @locate-regulator="locate.regulator"
-      />
-
-      <!-- Desktop TGID bypasses on external heat pipelines -->
-      <LazyNetworkBypassJournalDialog
-        v-if="mountedDialogs.networkBypass"
-        ref="networkBypassJournalRef"
-        @locate-bypass="locate.bypass"
-      />
-
-      <!-- Desktop TGID diaphragms on external heat pipelines -->
-      <LazyNetworkDiaphragmJournalDialog
-        v-if="mountedDialogs.networkDiaphragm"
-        ref="networkDiaphragmJournalRef"
-        @locate-diaphragm="locate.diaphragm"
-      />
-
-      <!-- Desktop TGID elevator inventory -->
-      <LazyElevatorJournalDialog
-        v-if="mountedDialogs.elevator"
-        ref="elevatorJournalRef"
-        @locate-elevator="locate.elevator"
-      />
-
-      <LazyNetworkQueriesDialog
-        v-if="mountedDialogs.networkQueries"
-        ref="networkQueriesRef"
-        @locate="locate.fault"
-      />
-
-      <!-- Desktop TGID «Анализ»: режим, допустимость, гидростатические зоны -->
-      <LazyRegimeAnalysisDialog
-        v-if="mountedDialogs.regimeAnalysis"
-        ref="regimeAnalysisRef"
-        @locate="locate.fault"
-      />
-
-      <!-- Desktop TGID «Excel»: отчёты по шаблонам gid6 excel2 и сводные ведомости -->
-      <LazyExcelReportsDialog
-        v-if="mountedDialogs.excelReports"
-        ref="excelReportsRef"
-      />
-
-      <!-- Outage simulation dialog (локализация аварий и задвижек) -->
-      <LazyOutageSimulationDialog
-        v-if="mountedDialogs.outageSimulation"
-        ref="outageSimulationRef"
-        @show-on-map="onShowOutageOnMap"
-        @clear-highlight="onClearOutageHighlight"
-        @focus-coords="onFocusCoords"
-      />
-
-      <!-- Throttling calculator dialog (шайбы и элеваторы) -->
-      <LazyThrottlingCalculatorDialog
-        v-if="mountedDialogs.throttlingCalculator"
-        ref="throttlingCalculatorRef"
-      />
-
-      <!-- Hydraulic Thematic dialog (гидравлический режим и стрелки потоков) -->
-      <LazyHydraulicThematicDialog
-        v-if="mountedDialogs.hydraulicThematic"
-        ref="hydraulicThematicRef"
-        @apply-thematic="onApplyHydraulicThematic"
-        @update-thematic-settings="onUpdateHydraulicThematicSettings"
-        @clear-thematic="onClearHydraulicThematic"
-      />
-
-      <!-- Topology diagnostics modal -->
-      <LazyTopologyDiagnosticsModal
-        v-if="mountedDialogs.topologyDiagnostics"
-        ref="topologyDiagnosticsRef"
-        @locate-fault="locate.fault"
-      />
-
-      <!-- Fault diagnostics modal -->
-      <LazyFaultDiagnosticsModal
-        v-if="mountedDialogs.faultDiagnostics"
-        ref="faultDiagnosticsRef"
-        @open-defect="openLazyDialog('defect', { defectId: $event })"
-        @open-corrosion="openLazyDialog('corrosionIndicator', { indicatorId: $event })"
-      />
-
-      <!-- Calculation diagnostics modal -->
-      <LazyCalculationDiagnosticsModal
-        v-if="mountedDialogs.calculationDiagnostics"
-        ref="calculationDiagnosticsRef"
-      />
-
-      <!-- Администрирование: пользователи и роли (только admin), история правок audit_log -->
-      <LazyUsersAdminDialog
-        v-if="mountedDialogs.usersAdmin"
-        ref="usersAdminRef"
-      />
-      <LazyAuditHistoryDialog
-        v-if="mountedDialogs.auditHistory"
-        ref="auditHistoryRef"
-      />
-
-      <!-- Исходные данные (этап 9): групповые установщики aSet* и справочники -->
-      <LazyPtsSitesDialog
-        v-if="mountedDialogs.ptsSites"
-        ref="ptsSitesRef"
-      />
-      <LazyGroupSetterDialog
-        v-if="mountedDialogs.groupSetters"
-        ref="groupSettersRef"
-      />
-      <LazyDictionariesDialog
-        v-if="mountedDialogs.dictionaries"
-        ref="dictionariesRef"
-      />
-
-      <!-- Этап 10: печать карты в макет (PNG/PDF) -->
-      <LazyPrintLayoutDialog
-        v-if="mountedDialogs.printLayout"
-        ref="printLayoutRef"
-      />
-      <!-- Этап 10: импорт SHP / Excel / координат узлов -->
-      <LazyNetworkImportDialog
-        v-if="mountedDialogs.networkImport"
-        ref="networkImportRef"
-      />
+      <!-- Диалоги инструментов монтируются лениво (таблица toolDialogs): чанк подгружается при первом открытии через openLazyDialog -->
+      <template v-for="dialog in toolDialogs" :key="dialog.key">
+        <component
+          :is="dialog.component"
+          v-if="mountedDialogs[dialog.key]"
+          :ref="dialogRef(dialog.key)"
+          v-on="dialog.on ?? {}"
+        />
+      </template>
 
       <!-- Attribute properties panel dialog (лениво: монтируется при первом identify-клике) -->
       <LazyAttributePanel
@@ -405,7 +177,7 @@
       <!-- Node search dialog -->
       <LazyNodeSearch
         v-if="mountedDialogs.nodeSearch"
-        ref="nodeSearchRef"
+        :ref="dialogRef('nodeSearch')"
         :map="mapStore.map"
       />
 
@@ -628,10 +400,11 @@ import { useLayerStore } from '~/stores/layerStore';
 import { useCesiumStore } from '~/stores/cesiumStore';
 import { useUiStore } from '~/stores/uiStore';
 import { useAuthStore } from '~/stores/authStore';
-import type { ToolEvent } from '~/utils/toolCatalog';
+import { TOOL_EVENT_TO_DIALOG } from '~/utils/toolCatalog';
+import type { ToolDialogKey, ToolEvent } from '~/utils/toolCatalog';
 import type { LayerConfig } from '~/types';
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import type { Ref } from 'vue';
+import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowReactive, watch } from 'vue';
+import type { Component } from 'vue';
 import { markPerf, measurePerf, timeAsync } from '~/utils/perf';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { fastApiService } from '~/services/fastApiService';
@@ -798,209 +571,26 @@ const waitForMapContainer = async (attempts = 20, delayMs = 50): Promise<boolean
 };
 
 const attributePanelRef = ref<{ show: (props: Record<string, any>) => void; close: () => void } | null>(null);
-const nodeSearchRef = ref<{ openDialog: () => void; removeMarker: () => void } | null>(null);
-const topologyDiagnosticsRef = ref<{ openDialog: () => void } | null>(null);
-const faultDiagnosticsRef = ref<{ openDialog: () => void } | null>(null);
-const calculationDiagnosticsRef = ref<{ openDialog: () => void } | null>(null);
-const passportDialogRef = ref<{ openDialog: () => void } | null>(null);
-const defectJournalRef = ref<{
-  openDialog: (scope?: { lineId?: number; nodeId?: number; defectId?: number }) => void
-} | null>(null);
-const shurfJournalRef = ref<{
-  openDialog: (scope?: { lineId?: number; nodeId?: number; shurfId?: number }) => void
-} | null>(null);
-const inspectionJournalRef = ref<{
-  openDialog: (scope?: { lineId?: number; nodeId?: number; inspectionId?: number }) => void
-} | null>(null);
-const repairJournalRef = ref<{
-  openDialog: (scope?: { lineId?: number; nodeId?: number; repairId?: number }) => void
-} | null>(null);
-const pressureTestJournalRef = ref<{
-  openDialog: (scope?: { lineId?: number; nodeId?: number; testId?: number }) => void
-} | null>(null);
-const ocheredOpressovokRef = ref<{
-  openDialog: () => void
-} | null>(null);
-const technicalConditionJournalRef = ref<{
-  openDialog: (scope?: { buildingId?: number; pipeId?: number; conditionId?: number }) => void
-} | null>(null);
-const corrosionIndicatorJournalRef = ref<{
-  openDialog: (scope?: { lineId?: number; nodeId?: number; indicatorId?: number }) => void
-} | null>(null);
-const alsekoJournalRef = ref<{
-  openDialog: (scope?: { loadId?: number; buildingId?: number }) => void
-} | null>(null);
-const electricalNetworkJournalRef = ref<{
-  openDialog: (scope?: { objectType?: 'source' | 'line' | 'receiver' | 'channel' | 'coupling' | 'support' | 'sleeve'; objectId?: number; parentLineId?: number }) => void
-} | null>(null);
-const heatLossJournalRef = ref<{
-  openDialog: (scope?: { sourceId?: number; seasonId?: number }) => void
-} | null>(null);
-const temperatureGraphJournalRef = ref<{
-  openDialog: (scope?: { sourceId?: number; nodeId?: number; graphStatus?: 'ready' | 'missing' | 'duplicates' | 'incomplete' }) => void
-} | null>(null);
-const consumerLoadDiagnosticsRef = ref<{
-  openDialog: (scope?: { consumerType?: 'generalized' | 'real'; consumerId?: number; nodeId?: number; diagnostic?: 'zero_load' | 'closed' | 'disconnected' | 'not_calculated' }) => void
-} | null>(null);
-const pumpEquipmentJournalRef = ref<{
-  openDialog: (scope?: { pumpId?: number; standardPumpId?: number; lineId?: number }) => void
-} | null>(null);
-const networkArmatureJournalRef = ref<{
-  openDialog: (scope?: { equipmentType?: 'damper' | 'regulating'; armatureId?: number; standardId?: number; lineId?: number }) => void
-} | null>(null);
-const networkRegulatorJournalRef = ref<{
-  openDialog: (scope?: { regulatorType?: 'pressure' | 'flow' | 'differential'; regulatorId?: number; catalogType?: 'pressure' | 'flow' | 'differential'; catalogId?: number; lineId?: number }) => void
-} | null>(null);
-const networkBypassJournalRef = ref<{
-  openDialog: (scope?: { bypassId?: number; standardTubeId?: number; lineId?: number }) => void
-} | null>(null);
-const networkDiaphragmJournalRef = ref<{
-  openDialog: (scope?: { diaphragmId?: number; lineId?: number }) => void
-} | null>(null);
-const elevatorJournalRef = ref<{
-  openDialog: (scope?: { elevatorId?: number; lineId?: number; nodeId?: number }) => void
-} | null>(null);
-const networkQueriesRef = ref<{ openDialog: () => void } | null>(null);
-const regimeAnalysisRef = ref<{ openDialog: () => void } | null>(null);
-const excelReportsRef = ref<{ openDialog: () => void } | null>(null);
-const outageSimulationRef = ref<{ openDialog: (scope?: { lineId?: number; nodeId?: number }) => void } | null>(null);
-const throttlingCalculatorRef = ref<{ openDialog: (scope?: any) => void } | null>(null);
-const hydraulicThematicRef = ref<{ openDialog: (scope?: any) => void } | null>(null);
-const usersAdminRef = ref<{ openDialog: () => void } | null>(null);
-const auditHistoryRef = ref<{ openDialog: (scope?: { table?: string; recordId?: number }) => void } | null>(null);
-const groupSettersRef = ref<{ openDialog: () => void } | null>(null);
-const ptsSitesRef = ref<{ openDialog: () => void } | null>(null);
-const dictionariesRef = ref<{ openDialog: (scope?: { dictionary?: string }) => void } | null>(null);
-const printLayoutRef = ref<{ openDialog: () => void } | null>(null);
-const networkImportRef = ref<{ openDialog: () => void } | null>(null);
 
 /**
  * Ленивое монтирование диалогов: тяжёлые журналы не попадают в основной чанк карты,
  * их код загружается при первом открытии. openLazyDialog поднимает флаг монтирования
  * и, если компонент ещё не загружен, дожидается появления ref перед вызовом openDialog.
+ * Ключи диалогов инструментов объявлены в utils/toolCatalog.ts,
+ * компоненты и обработчики их событий — в таблице toolDialogs ниже.
  */
-type LazyDialogKey =
-  | 'nodeSearch'
-  | 'topologyDiagnostics'
-  | 'faultDiagnostics'
-  | 'calculationDiagnostics'
-  | 'passport'
-  | 'defect'
-  | 'shurf'
-  | 'inspection'
-  | 'repair'
-  | 'pressureTest'
-  | 'ocheredOpressovok'
-  | 'technicalCondition'
-  | 'corrosionIndicator'
-  | 'alseko'
-  | 'electricalNetwork'
-  | 'heatLoss'
-  | 'temperatureGraph'
-  | 'consumerLoad'
-  | 'pumpEquipment'
-  | 'networkArmature'
-  | 'networkRegulator'
-  | 'networkBypass'
-  | 'networkDiaphragm'
-  | 'elevator'
-  | 'networkQueries'
-  | 'regimeAnalysis'
-  | 'excelReports'
-  | 'outageSimulation'
-  | 'throttlingCalculator'
-  | 'hydraulicThematic'
-  | 'usersAdmin'
-  | 'auditHistory'
-  | 'groupSetters'
-  | 'ptsSites'
-  | 'dictionaries'
-  | 'printLayout'
-  | 'networkImport';
+type LazyDialogKey = ToolDialogKey | 'nodeSearch';
 
 type LazyDialogInstance = { openDialog: (scope?: any) => void };
 
 const mountedDialogs = reactive<Partial<Record<LazyDialogKey | 'attributePanel', boolean>>>({});
-
-const lazyDialogRefs: Record<LazyDialogKey, Ref<LazyDialogInstance | null>> = {
-  nodeSearch: nodeSearchRef,
-  topologyDiagnostics: topologyDiagnosticsRef,
-  faultDiagnostics: faultDiagnosticsRef,
-  calculationDiagnostics: calculationDiagnosticsRef,
-  passport: passportDialogRef,
-  defect: defectJournalRef,
-  shurf: shurfJournalRef,
-  inspection: inspectionJournalRef,
-  repair: repairJournalRef,
-  pressureTest: pressureTestJournalRef,
-  ocheredOpressovok: ocheredOpressovokRef,
-  technicalCondition: technicalConditionJournalRef,
-  corrosionIndicator: corrosionIndicatorJournalRef,
-  alseko: alsekoJournalRef,
-  electricalNetwork: electricalNetworkJournalRef,
-  heatLoss: heatLossJournalRef,
-  temperatureGraph: temperatureGraphJournalRef,
-  consumerLoad: consumerLoadDiagnosticsRef,
-  pumpEquipment: pumpEquipmentJournalRef,
-  networkArmature: networkArmatureJournalRef,
-  networkRegulator: networkRegulatorJournalRef,
-  networkBypass: networkBypassJournalRef,
-  networkDiaphragm: networkDiaphragmJournalRef,
-  elevator: elevatorJournalRef,
-  networkQueries: networkQueriesRef,
-  regimeAnalysis: regimeAnalysisRef,
-  excelReports: excelReportsRef,
-  outageSimulation: outageSimulationRef,
-  throttlingCalculator: throttlingCalculatorRef,
-  hydraulicThematic: hydraulicThematicRef,
-  usersAdmin: usersAdminRef,
-  auditHistory: auditHistoryRef,
-  groupSetters: groupSettersRef,
-  ptsSites: ptsSitesRef,
-  dictionaries: dictionariesRef,
-  printLayout: printLayoutRef,
-  networkImport: networkImportRef,
-};
-
-/** Событие панели инструментов → ключ ленивого диалога */
-const TOOL_EVENT_TO_DIALOG: Record<ToolEvent, LazyDialogKey> = {
-  'open-topology-diagnostics': 'topologyDiagnostics',
-  'open-fault-diagnostics': 'faultDiagnostics',
-  'open-calculation-diagnostics': 'calculationDiagnostics',
-  'open-passport-dialog': 'passport',
-  'open-defect-journal': 'defect',
-  'open-shurf-journal': 'shurf',
-  'open-inspection-journal': 'inspection',
-  'open-repair-journal': 'repair',
-  'open-pressure-test-journal': 'pressureTest',
-  'open-ochered-opressovok': 'ocheredOpressovok',
-  'open-technical-condition-journal': 'technicalCondition',
-  'open-corrosion-indicator-journal': 'corrosionIndicator',
-  'open-outage-simulation': 'outageSimulation',
-  'open-throttling-calculator': 'throttlingCalculator',
-  'open-hydraulic-thematic': 'hydraulicThematic',
-  'open-alseko-journal': 'alseko',
-  'open-electrical-network-journal': 'electricalNetwork',
-  'open-heat-loss-journal': 'heatLoss',
-  'open-temperature-graph-journal': 'temperatureGraph',
-  'open-consumer-load-diagnostics': 'consumerLoad',
-  'open-pump-equipment': 'pumpEquipment',
-  'open-network-armatures': 'networkArmature',
-  'open-network-regulators': 'networkRegulator',
-  'open-network-bypasses': 'networkBypass',
-  'open-network-diaphragms': 'networkDiaphragm',
-  'open-elevators': 'elevator',
-  'open-network-queries': 'networkQueries',
-  'open-regime-analysis': 'regimeAnalysis',
-  'open-excel-reports': 'excelReports',
-  'open-users-admin': 'usersAdmin',
-  'open-audit-history': 'auditHistory',
-  'open-group-setters': 'groupSetters',
-  'open-pts-sites': 'ptsSites',
-  'open-dictionaries': 'dictionaries',
-  'open-print-layout': 'printLayout',
-  'open-network-import': 'networkImport',
-};
+const dialogInstances = shallowReactive<Partial<Record<LazyDialogKey, LazyDialogInstance | null>>>({});
+const dialogRefSetters: Partial<Record<LazyDialogKey, (el: any) => void>> = {};
+/** Стабильный function-ref на ключ: экземпляр диалога попадает в dialogInstances */
+const dialogRef = (key: LazyDialogKey) =>
+  (dialogRefSetters[key] ??= (el: any) => {
+    dialogInstances[key] = (el as LazyDialogInstance | null) ?? null;
+  });
 
 const onOpenTool = (event: ToolEvent) => {
   const key = TOOL_EVENT_TO_DIALOG[event];
@@ -1009,12 +599,12 @@ const onOpenTool = (event: ToolEvent) => {
 
 const openLazyDialog = (key: LazyDialogKey, scope?: unknown) => {
   mountedDialogs[key] = true;
-  const target = lazyDialogRefs[key];
-  if (target.value) {
-    target.value.openDialog(scope);
+  const current = dialogInstances[key];
+  if (current) {
+    current.openDialog(scope);
     return;
   }
-  const stop = watch(target, (instance: LazyDialogInstance | null) => {
+  const stop = watch(() => dialogInstances[key], (instance: LazyDialogInstance | null | undefined) => {
     if (!instance) return;
     stop();
     instance.openDialog(scope);
@@ -1543,6 +1133,78 @@ const journalContourLayer = useJournalContourLayer(() => mapStore.map, {
   onPickHint: (text: string) => useNotificationStore().showInfo(text),
 });
 
+
+// === Диалоги инструментов: компонент и обработчики событий (порядок монтирования как в шаблоне) ===
+interface ToolDialogEntry {
+  key: ToolDialogKey;
+  component: Component;
+  on?: Record<string, (...args: any[]) => void>;
+}
+const lazyDialog = (loader: () => Promise<any>) => markRaw(defineAsyncComponent(loader));
+const openDefect = (defectId: unknown) => openLazyDialog('defect', { defectId });
+
+const toolDialogs: ToolDialogEntry[] = [
+  { key: 'passport', component: lazyDialog(() => import('./PassportDialog.vue')) },
+  { key: 'defect', component: lazyDialog(() => import('./DefectJournalDialog.vue')), on: { locateDefect: locate.defect } },
+  { key: 'shurf', component: lazyDialog(() => import('./ShurfJournalDialog.vue')), on: { locateShurf: locate.shurf, openDefect } },
+  { key: 'inspection', component: lazyDialog(() => import('./InspectionJournalDialog.vue')), on: { locateInspection: locate.inspection, openDefect } },
+  { key: 'repair', component: lazyDialog(() => import('./RepairJournalDialog.vue')), on: { locateRepair: locate.repair, openDefect } },
+  { key: 'pressureTest', component: lazyDialog(() => import('./PressureTestJournalDialog.vue')), on: { locatePressureTest: locate.pressureTest, openDefect } },
+  { key: 'ocheredOpressovok', component: lazyDialog(() => import('./OcheredOpressovokDialog.vue')) },
+  { key: 'technicalCondition', component: lazyDialog(() => import('./TechnicalConditionJournalDialog.vue')), on: { locateTechnicalCondition: locate.technicalCondition } },
+  { key: 'corrosionIndicator', component: lazyDialog(() => import('./CorrosionIndicatorJournalDialog.vue')), on: { locateCorrosionIndicator: locate.corrosionIndicator } },
+  { key: 'alseko', component: lazyDialog(() => import('./AlsekoJournalDialog.vue')), on: { locateAlseko: locate.alseko } },
+  { key: 'electricalNetwork', component: lazyDialog(() => import('./ElectricalNetworkJournalDialog.vue')), on: { locateElectricalObject: locate.electricalNetwork } },
+  { key: 'heatLoss', component: lazyDialog(() => import('./HeatLossJournalDialog.vue')), on: { locateHeatSource: locate.heatSource } },
+  { key: 'temperatureGraph', component: lazyDialog(() => import('./TemperatureGraphJournalDialog.vue')), on: { locateSource: locate.heatSource } },
+  { key: 'consumerLoad', component: lazyDialog(() => import('./ConsumerLoadDiagnosticsDialog.vue')), on: { locateConsumer: locate.consumer } },
+  { key: 'pumpEquipment', component: lazyDialog(() => import('./PumpEquipmentJournalDialog.vue')), on: { locatePump: locate.pump } },
+  { key: 'networkArmature', component: lazyDialog(() => import('./NetworkArmatureJournalDialog.vue')), on: { locateArmature: locate.armature } },
+  { key: 'networkRegulator', component: lazyDialog(() => import('./NetworkRegulatorJournalDialog.vue')), on: { locateRegulator: locate.regulator } },
+  { key: 'networkBypass', component: lazyDialog(() => import('./NetworkBypassJournalDialog.vue')), on: { locateBypass: locate.bypass } },
+  { key: 'networkDiaphragm', component: lazyDialog(() => import('./NetworkDiaphragmJournalDialog.vue')), on: { locateDiaphragm: locate.diaphragm } },
+  { key: 'elevator', component: lazyDialog(() => import('./ElevatorJournalDialog.vue')), on: { locateElevator: locate.elevator } },
+  { key: 'networkQueries', component: lazyDialog(() => import('./NetworkQueriesDialog.vue')), on: { locate: locate.fault } },
+  // Desktop TGID «Анализ»: режим, допустимость, гидростатические зоны
+  { key: 'regimeAnalysis', component: lazyDialog(() => import('./RegimeAnalysisDialog.vue')), on: { locate: locate.fault } },
+  // Desktop TGID «Excel»: отчёты по шаблонам gid6 excel2 и сводные ведомости
+  { key: 'excelReports', component: lazyDialog(() => import('./ExcelReportsDialog.vue')) },
+  // Локализация аварий и задвижек
+  {
+    key: 'outageSimulation',
+    component: lazyDialog(() => import('./OutageSimulationDialog.vue')),
+    on: { showOnMap: onShowOutageOnMap, clearHighlight: onClearOutageHighlight, focusCoords: onFocusCoords },
+  },
+  // Калькулятор дросселирования (шайбы и элеваторы)
+  { key: 'throttlingCalculator', component: lazyDialog(() => import('./ThrottlingCalculatorDialog.vue')) },
+  // Гидравлический режим и стрелки потоков
+  {
+    key: 'hydraulicThematic',
+    component: lazyDialog(() => import('./HydraulicThematicDialog.vue')),
+    on: {
+      applyThematic: onApplyHydraulicThematic,
+      updateThematicSettings: onUpdateHydraulicThematicSettings,
+      clearThematic: onClearHydraulicThematic,
+    },
+  },
+  { key: 'topologyDiagnostics', component: lazyDialog(() => import('./TopologyDiagnosticsModal.vue')), on: { locateFault: locate.fault } },
+  {
+    key: 'faultDiagnostics',
+    component: lazyDialog(() => import('./FaultDiagnosticsModal.vue')),
+    on: { openDefect, openCorrosion: (indicatorId: unknown) => openLazyDialog('corrosionIndicator', { indicatorId }) },
+  },
+  { key: 'calculationDiagnostics', component: lazyDialog(() => import('./CalculationDiagnosticsModal.vue')) },
+  // Администрирование: пользователи и роли (только admin), история правок audit_log
+  { key: 'usersAdmin', component: lazyDialog(() => import('./UsersAdminDialog.vue')) },
+  { key: 'auditHistory', component: lazyDialog(() => import('./AuditHistoryDialog.vue')) },
+  // Исходные данные (этап 9): участки ПТС, групповые установщики aSet* и справочники
+  { key: 'ptsSites', component: lazyDialog(() => import('./PtsSitesDialog.vue')) },
+  { key: 'groupSetters', component: lazyDialog(() => import('./GroupSetterDialog.vue')) },
+  { key: 'dictionaries', component: lazyDialog(() => import('./DictionariesDialog.vue')) },
+  // Этап 10: печать карты в макет (PNG/PDF), импорт SHP / Excel / координат узлов
+  { key: 'printLayout', component: lazyDialog(() => import('./PrintLayoutDialog.vue')) },
+  { key: 'networkImport', component: lazyDialog(() => import('./NetworkImportDialog.vue')) },
+];
 
 /** Стабильная сигнатура каталога слоёв (порядок в ответе API не должен вызывать повторный init) */
 const getLayerSignature = (layers: LayerConfig[]) =>
