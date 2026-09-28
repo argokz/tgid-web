@@ -787,6 +787,23 @@ describe('fastApiService topology contracts', () => {
       expect.objectContaining({ body: { waypoints: [1, 2], calculation_id_2: 7, include_static: false } }))
   })
 
+  it('exports, imports and merges fragments in .tgid format', async () => {
+    fetchMock.mockResolvedValue({ fileid: 5, tables: {} })
+    await fastApiService.exportFragmentTgid(42)
+    const file = new File(['x'], 'f.tgid')
+    await fastApiService.importFragmentTgid(file, { dryRun: true, name: 'N' })
+    await fastApiService.mergeFragments({ fragment_ids: [1, 2], dry_run: true })
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/api/v1/fragments/42/export',
+      expect.objectContaining({ method: 'GET', responseType: 'blob' }))
+    const form = fetchMock.mock.calls[1][1].body as FormData
+    expect(fetchMock.mock.calls[1][0]).toBe('https://api.example.test/api/v1/fragments/import')
+    expect(form.get('dry_run')).toBe('true')
+    expect(form.get('name')).toBe('N')
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/api/v1/fragments/merge',
+      expect.objectContaining({ method: 'POST', body: { fragment_ids: [1, 2], dry_run: true } }))
+  })
+
   it('lists, saves and deletes saved piezometer directions', async () => {
     fetchMock.mockResolvedValue({ items: [], count: 0 })
     await fastApiService.listPiezometerDirections([74])

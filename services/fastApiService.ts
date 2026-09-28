@@ -314,6 +314,24 @@ export interface PiezometerRouteResponse {
   static_head?: PiezometerStaticHead | null;
 }
 
+/** Отчёт импорта/слияния фрагментов (dry-run или применение) */
+export interface FragmentTransferReport {
+  dry_run?: boolean;
+  fileid: number | null;
+  name?: string;
+  tables: Record<string, number>;
+  created_nodes: number;
+  created_lines: number;
+  unresolved_refs?: Record<string, number>;
+  skipped_tables?: string[];
+  dropped_columns?: Record<string, string[]>;
+  geometry?: { nodes_with_shape: number; lines_with_shape: number };
+  duplicate_external_codes?: { name: string; ids: number[] }[];
+  unified_external_codes?: number;
+  coincident_node_positions?: number;
+  operation_id?: number | null;
+}
+
 /** Сохранённое направление (таблицы десктопа directions / deployeddirections) */
 export interface PiezometerDirection {
   id: number;
@@ -1287,6 +1305,33 @@ export const fastApiService = {
 
   async getFragments(): Promise<{ data: Fragment[] }> {
     return fetchWithRetry<{ data: Fragment[] }>(buildApiUrl('fragments'));
+  },
+
+  /** Экспорт фрагмента в .tgid десктопа (zip с tgid.txt) */
+  async exportFragmentTgid(fileId: number): Promise<Blob> {
+    return request<Blob>(`api/v1/fragments/${encodePath(fileId)}/export`, {
+      ...mutationOptions('GET'),
+      responseType: 'blob',
+    });
+  },
+
+  /** Импорт .tgid новым фрагментом: dry_run — превью в откатываемой транзакции */
+  async importFragmentTgid(file: File, opts: { name?: string; dryRun: boolean }): Promise<FragmentTransferReport> {
+    const form = new FormData();
+    form.append('file', file);
+    if (opts.name) form.append('name', opts.name);
+    form.append('dry_run', String(opts.dryRun));
+    return request<FragmentTransferReport>('api/v1/fragments/import', mutationOptions('POST', form));
+  },
+
+  /** Слияние фрагментов (десктоп unite_tgid): копии сводятся в новый фрагмент */
+  async mergeFragments(body: {
+    fragment_ids: number[];
+    name?: string;
+    unify_external_codes?: boolean;
+    dry_run: boolean;
+  }): Promise<FragmentTransferReport> {
+    return request<FragmentTransferReport>('api/v1/fragments/merge', mutationOptions('POST', body));
   },
 
   async postRunSetyCmd(params: string): Promise<any> {

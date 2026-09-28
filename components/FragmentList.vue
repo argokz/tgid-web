@@ -4,7 +4,17 @@
       <v-card-title class="text-subtitle-2 py-2 d-flex align-center">
         <v-icon start color="primary">mdi-puzzle</v-icon>
         Фрагменты (районы сети)
+        <v-spacer />
+        <v-btn
+          icon="mdi-source-merge"
+          size="x-small"
+          variant="text"
+          aria-label="Экспорт, импорт и слияние фрагментов"
+          title="Экспорт, импорт и слияние фрагментов (.tgid)"
+          @click="transferOpen = true"
+        />
       </v-card-title>
+      <LazyFragmentTransferDialog v-if="transferOpen" v-model="transferOpen" />
       <v-card-text class="pa-0">
         <template v-if="loading">
           <v-skeleton-loader type="list-item-two-line" class="pa-2" />
@@ -51,6 +61,7 @@ import { useFragmentStore } from '~/stores/fragmentStore';
 const fragmentStore = useFragmentStore();
 const loading = ref(false);
 const loadError = ref<string | null>(null);
+const transferOpen = ref(false);
 
 const fragments = computed(() => fragmentStore.fragments);
 
