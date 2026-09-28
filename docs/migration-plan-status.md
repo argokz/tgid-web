@@ -158,3 +158,19 @@ NUXT_PUBLIC_MUTATIONS_ENABLED=true
 Меню пользователя → «Войти» открывает LoginDialog; JWT в `itwin_access_token`.
 На стенде: `AUTH_DISABLED=false`, `AUTH_REQUIRED_GET=true`, `STRICT_AUTH=true`.
 Деплой map-api: [docs/deploy-map-api.md](../../docs/deploy-map-api.md).
+
+## Этап 10: 3D, VISICOM, АЛСЕКО, электросеть
+
+- 3D Tiles сети — `NUXT_PUBLIC_NETWORK_TILESET_URL`, деградация и выкладка: [deploy-3d.md](deploy-3d.md). Готового тайлсета нет.
+- VISICOM — `NUXT_PUBLIC_VISICOM_TILES_URL`/`_KEY`/`_SCHEME` (`utils/visicom.ts`); без ключа подложки нет.
+- АЛСЕКО — вкладка «Сверка и привязка» журнала: API `/api/alseko/reconciliation*`, `/addresses`,
+  `POST /api/alseko/buildings/{id}/address`, `POST /api/alseko/consumers/{node_id}/buildings`
+  (editor+, MUTATIONS_ENABLED, dry-run, audit_log). Перенос нагрузок в карточку потребителя — вручную.
+- Электросеть — в вебе только чтение. Сценарии десктопа (gid6 `GeoFile.cpp` createObj/createObjElPoint):
+  при создании ЛЭП её концы ищутся среди источников/приёмников и пишутся `naimenovanie_istochnika`/
+  `naimenovanie_priemnika`; точечные объекты (муфта, опора, гильза, канал, концевые источник/приёмник)
+  ставятся на ЛЭП (привязка к концу или проекция) и получают `naimenovanie_lep` = id ЛЭП.
+  Отчёт «ЛЭП» (OnElectroRemont) в gid6 выключен (`#if 0`). В Алматы таблицы пусты, данные есть в Астане
+  (35 источников, 40 ЛЭП, 26 приёмников, 45 каналов, 35 муфт, 40 опор, 93 гильзы).
+  Не сделано: сверка геометрической привязки (концы ЛЭП ↔ источник/приёмник, точки ↔ ЛЭП) и привязка
+  с dry-run/audit + Excel — следующий шаг, проверять на копии Астаны.
