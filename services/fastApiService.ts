@@ -285,6 +285,20 @@ export interface PiezometerPathNode {
   t_obr: number | null;
   lng: number | null;
   lat: number | null;
+  /** Двойной пьезометр: напоры второго расчёта */
+  h_pod_2?: number | null;
+  h_obr_2?: number | null;
+}
+
+/** Статика (gid8 Pjezo m_stat): max(отметка + высота здания) + 5 м по фрагментам маршрута */
+export interface PiezometerStaticHead {
+  value: number;
+  reserve_m: number;
+  node_id: number;
+  label: string;
+  z: number;
+  building_height: number;
+  fragment_ids: number[];
 }
 
 export interface PiezometerRouteResponse {
@@ -293,6 +307,29 @@ export interface PiezometerRouteResponse {
   node_count: number;
   total_length: number;
   has_calculation: boolean;
+  calculation_id?: number | null;
+  calculation_id_2?: number | null;
+  has_calculation_2?: boolean;
+  fragment_ids?: number[];
+  static_head?: PiezometerStaticHead | null;
+}
+
+/** Сохранённое направление (таблицы десктопа directions / deployeddirections) */
+export interface PiezometerDirection {
+  id: number;
+  name: string;
+  fileid: number;
+  fragment_name?: string | null;
+  node_count: number;
+  missing_nodes: number;
+}
+
+export interface PiezometerDirectionDetail {
+  id: number;
+  name: string;
+  fileid: number;
+  nodes: number[];
+  missing_nodes: number[];
 }
 
 export interface TravelTimeSide {
@@ -1306,11 +1343,28 @@ export const fastApiService = {
   },
 
   /** Маршрут пьезометра через последовательность узлов (waypoints) */
-  async buildPiezometerRoute(nodes: number[]): Promise<PiezometerRouteResponse> {
+  async buildPiezometerRoute(nodes: number[], calculationId2?: number | null): Promise<PiezometerRouteResponse> {
     return request<PiezometerRouteResponse>('piezometer/route', {
       method: 'POST',
-      body: { nodes },
+      body: calculationId2 ? { nodes, calculation_id_2: calculationId2 } : { nodes },
     });
+  },
+
+  /** Сохранённые направления пьезометра (десктоп «Список направлений») */
+  async listPiezometerDirections(fileIds?: number[]): Promise<{ items: PiezometerDirection[]; count: number }> {
+    return request('piezometer/directions', fileIds?.length ? { query: { fileid: fileIds } } : {});
+  },
+
+  async getPiezometerDirection(id: number): Promise<PiezometerDirectionDetail> {
+    return request(`piezometer/directions/${encodePath(id)}`);
+  },
+
+  async savePiezometerDirection(body: { name: string; nodes: number[]; fileid?: number | null; replace?: boolean }): Promise<PiezometerDirectionDetail & { replaced: number[] }> {
+    return request('piezometer/directions', mutationOptions('POST', body));
+  },
+
+  async deletePiezometerDirection(id: number): Promise<{ deleted: number }> {
+    return request(`piezometer/directions/${encodePath(id)}`, mutationOptions('DELETE'));
   },
 
   /** Время прохождения потока по маршруту (десктоп OnTimePr) — те же waypoints, что у пьезометра */
@@ -2407,10 +2461,16 @@ export const fastApiService = {
     });
   },
 
-  async downloadPiezometerExcel(waypoints: number[]): Promise<{ blob: Blob; filename: string }> {
+  async downloadPiezometerExcel(
+    waypoints: number[],
+    opts: { calculationId2?: number | null; includeStatic?: boolean } = {}
+  ): Promise<{ blob: Blob; filename: string }> {
+    const body: Record<string, any> = { waypoints };
+    if (opts.calculationId2) body.calculation_id_2 = opts.calculationId2;
+    if (opts.includeStatic === false) body.include_static = false;
     const blob = await request<Blob>('api/piezometer/excel', {
       method: 'POST',
-      body: { waypoints },
+      body,
       responseType: 'blob',
     });
     return { blob, filename: `Piezometer_Profile_${Date.now()}.xlsx` };

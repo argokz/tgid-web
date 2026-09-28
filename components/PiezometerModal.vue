@@ -8,6 +8,42 @@
           Длина маршрута: {{ formatLength(totalLength) }} · узлов: {{ pathData.length }}
         </span>
         <v-btn
+          v-if="!loading && !error && pathData.length && staticHead"
+          icon
+          size="small"
+          :variant="showStatic ? 'tonal' : 'text'"
+          aria-label="Статика"
+          @click="showStatic = !showStatic"
+        >
+          <v-icon>mdi-arrow-collapse-horizontal</v-icon>
+          <v-tooltip activator="parent" location="bottom">
+            Статика: {{ fmt(staticHead.value) }} м (max отметка + высота здания + {{ staticHead.reserve_m }} м)
+          </v-tooltip>
+        </v-btn>
+        <v-menu v-if="!loading && !error && pathData.length" :close-on-content-click="true" @update:model-value="onDoubleMenu">
+          <template #activator="{ props: menuProps }">
+            <v-btn v-bind="menuProps" icon size="small" :variant="calculationId2 ? 'tonal' : 'text'" aria-label="Двойной пьезометр">
+              <v-icon>mdi-chart-multiple</v-icon>
+              <v-tooltip activator="parent" location="bottom">Двойной пьезометр: второй расчёт на том же графике</v-tooltip>
+            </v-btn>
+          </template>
+          <v-list density="compact" max-height="360">
+            <v-list-subheader>Второй расчёт (последние 10 по фрагменту)</v-list-subheader>
+            <v-list-item v-if="calcListLoading" title="Загрузка…" />
+            <v-list-item v-else-if="!calcList.length" title="Нет других расчётов" disabled />
+            <v-list-item
+              v-for="c in calcList"
+              :key="c.id"
+              :active="c.id === calculationId2"
+              :disabled="c.id === calculationId"
+              :title="`№${c.id} ${c.name || ''}`"
+              :subtitle="[c.calculated_at, c.user_gid].filter(Boolean).join(' · ')"
+              @click="emit('double', c.id)"
+            />
+            <v-list-item v-if="calculationId2" title="Выключить двойной пьезометр" prepend-icon="mdi-close" @click="emit('double', null)" />
+          </v-list>
+        </v-menu>
+        <v-btn
           v-if="!loading && !error && pathData.length"
           icon
           size="small"
@@ -81,6 +117,10 @@
                       <th class="text-right">Z, м</th>
                       <th class="text-right">H под., м</th>
                       <th class="text-right">H обр., м</th>
+                      <template v-if="isDouble">
+                        <th class="text-right">H под., м (№{{ calculationId2 }})</th>
+                        <th class="text-right">H обр., м (№{{ calculationId2 }})</th>
+                      </template>
                       <th class="text-right">t под., °C</th>
                       <th class="text-right">t обр., °C</th>
                     </tr>
@@ -98,6 +138,10 @@
                       <td class="text-right">{{ fmt(node.z) }}</td>
                       <td class="text-right">{{ fmt(node.h_pod) }}</td>
                       <td class="text-right">{{ fmt(node.h_obr) }}</td>
+                      <template v-if="isDouble">
+                        <td class="text-right">{{ fmt(node.h_pod_2) }}</td>
+                        <td class="text-right">{{ fmt(node.h_obr_2) }}</td>
+                      </template>
                       <td class="text-right">{{ fmt(node.t_pod) }}</td>
                       <td class="text-right">{{ fmt(node.t_obr) }}</td>
                     </tr>
@@ -191,7 +235,13 @@
 <script setup lang="ts">
 import { useNotificationStore } from '~/stores/notificationStore';
 import { computed, ref, watch } from 'vue';
-import { fastApiService, type TravelTimeResponse, type TravelTimeSide } from '~/services/fastApiService';
+import {
+  fastApiService,
+  type CalculationListItem,
+  type PiezometerStaticHead,
+  type TravelTimeResponse,
+  type TravelTimeSide,
+} from '~/services/fastApiService';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart } from 'echarts/charts';
@@ -223,14 +273,44 @@ const props = defineProps<{
   totalLength?: number;
   /** Точки, выбранные пользователем: сервер строит по ним тот же маршрут */
   waypoints?: number[];
+  /** Расчёт основного графика и второй расчёт двойного пьезометра */
+  calculationId?: number | null;
+  calculationId2?: number | null;
+  fragmentIds?: number[];
+  /** Линия статики (gid8 Pjezo m_stat) */
+  staticHead?: PiezometerStaticHead | null;
 }>();
 
 const emit = defineEmits<{
   'update:modelValue': [boolean];
   'node-hover': [number];
+  /** Двойной пьезометр: id второго расчёта или null — выключить (родитель перестраивает маршрут) */
+  double: [number | null];
 }>();
 
 const tab = ref<'chart' | 'table' | 'time'>('chart');
+
+// Статика в десктопе включена по умолчанию (m_stat = true)
+const showStatic = ref(true);
+const isDouble = computed(() => !!props.calculationId2);
+
+// Двойной пьезометр: как CPjezo::onDouble — последние 10 расчётов фрагмента
+const calcList = ref<CalculationListItem[]>([]);
+const calcListLoading = ref(false);
+const onDoubleMenu = async (open: boolean) => {
+  if (!open || calcListLoading.value) return;
+  const fileId = props.fragmentIds?.[0];
+  calcListLoading.value = true;
+  try {
+    const res = await fastApiService.listCalculations({ file_id: fileId ?? null, limit: 10 });
+    calcList.value = res.items || [];
+  } catch (err: any) {
+    calcList.value = [];
+    useNotificationStore().showError(`Список расчётов: ${err?.message || 'ошибка сервера'}`);
+  } finally {
+    calcListLoading.value = false;
+  }
+};
 
 // Время прохождения потока (десктоп OnTimePr) — считается по требованию при открытии вкладки
 const travel = ref<TravelTimeResponse | null>(null);
@@ -331,6 +411,46 @@ const chartOptions = computed(() => {
     },
   ];
 
+  if (isDouble.value) {
+    // Второй расчёт — те же цвета пунктиром (десктоп рисует подачу/обратку второго расчёта поверх)
+    const n2 = props.calculationId2;
+    legendData.splice(2, 0, `H под (№${n2})`, `H обр (№${n2})`);
+    series.push(
+      {
+        name: `H под (№${n2})`,
+        type: 'line',
+        data: props.pathData.map((d) => d.h_pod_2 ?? null),
+        connectNulls: true,
+        itemStyle: { color: '#E53935' },
+        lineStyle: { width: 2, type: 'dashed' },
+        symbol: 'triangle',
+        symbolSize: 5,
+      },
+      {
+        name: `H обр (№${n2})`,
+        type: 'line',
+        data: props.pathData.map((d) => d.h_obr_2 ?? null),
+        connectNulls: true,
+        itemStyle: { color: '#1E88E5' },
+        lineStyle: { width: 2, type: 'dashed' },
+        symbol: 'triangle',
+        symbolSize: 5,
+      }
+    );
+  }
+
+  if (showStatic.value && props.staticHead) {
+    legendData.push('Статика');
+    series.push({
+      name: 'Статика',
+      type: 'line',
+      data: props.pathData.map(() => props.staticHead!.value),
+      itemStyle: { color: '#1A237E' },
+      lineStyle: { width: 2 },
+      symbol: 'none',
+    });
+  }
+
   if (hasTemperatures.value) {
     series.push(
       {
@@ -402,10 +522,18 @@ const onChartClick = (params: any) => {
 
 const exportCsv = () => {
   const header = ['#', 'node_id', 'label', 'L_m', 'Z_m', 'H_pod_m', 'H_obr_m', 't_pod_C', 't_obr_C'];
-  const rows = props.pathData.map((d, i) => [
-    i + 1, d.node_id, `"${(d.label || '').replace(/"/g, '""')}"`,
-    d.distance ?? '', d.z ?? '', d.h_pod ?? '', d.h_obr ?? '', d.t_pod ?? '', d.t_obr ?? '',
-  ]);
+  if (isDouble.value) header.push(`H_pod_m_calc${props.calculationId2}`, `H_obr_m_calc${props.calculationId2}`);
+  const withStatic = showStatic.value && props.staticHead;
+  if (withStatic) header.push('H_static_m');
+  const rows = props.pathData.map((d, i) => {
+    const row: any[] = [
+      i + 1, d.node_id, `"${(d.label || '').replace(/"/g, '""')}"`,
+      d.distance ?? '', d.z ?? '', d.h_pod ?? '', d.h_obr ?? '', d.t_pod ?? '', d.t_obr ?? '',
+    ];
+    if (isDouble.value) row.push(d.h_pod_2 ?? '', d.h_obr_2 ?? '');
+    if (withStatic) row.push(props.staticHead!.value);
+    return row;
+  });
   const csv = '﻿' + [header, ...rows].map((r) => r.join(';')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -428,7 +556,10 @@ const exportExcel = async () => {
     const waypoints = props.waypoints && props.waypoints.length >= 2
       ? props.waypoints
       : props.pathData.map((d: any) => d.node_id);
-    const { blob, filename } = await fastApiService.downloadPiezometerExcel(waypoints);
+    const { blob, filename } = await fastApiService.downloadPiezometerExcel(waypoints, {
+      calculationId2: props.calculationId2,
+      includeStatic: showStatic.value,
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

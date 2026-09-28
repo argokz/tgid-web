@@ -461,6 +461,9 @@
             <v-btn size="small" variant="text" :disabled="!traceNodes.length" @click="undoTraceNode">
               Отменить точку
             </v-btn>
+            <v-btn size="small" variant="text" prepend-icon="mdi-bookmark-multiple" @click="piezometerDirectionsOpen = true">
+              Направления
+            </v-btn>
             <v-spacer />
             <v-btn size="small" variant="text" color="error" :disabled="!traceNodes.length" @click="clearTrace">
               Очистить
@@ -479,7 +482,18 @@
         :has-calculation="piezometerHasCalc"
         :total-length="piezometerTotalLength"
         :waypoints="traceNodes"
+        :calculation-id="piezometerRoute?.calculation_id ?? null"
+        :calculation-id2="piezometerCalc2"
+        :fragment-ids="piezometerRoute?.fragment_ids ?? []"
+        :static-head="piezometerRoute?.static_head ?? null"
         @node-hover="onPiezometerNodeHover"
+        @double="onPiezometerDouble"
+      />
+      <LazyPiezometerDirectionsDialog
+        v-if="piezometerDirectionsOpen"
+        v-model="piezometerDirectionsOpen"
+        :waypoints="traceNodes"
+        @load="onPiezometerDirectionLoad"
       />
 
       <!-- Превью разрезания участка (dry-run → подтверждение) -->
@@ -621,7 +635,7 @@ import type { Ref } from 'vue';
 import { markPerf, measurePerf, timeAsync } from '~/utils/perf';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { ApiError, fastApiService } from '~/services/fastApiService';
-import type { MergeNodesReport, SplitReviewDecision, TopologyUndoEntry } from '~/services/fastApiService';
+import type { MergeNodesReport, PiezometerRouteResponse, SplitReviewDecision, TopologyUndoEntry } from '~/services/fastApiService';
 import maplibregl from 'maplibre-gl';
 import { useLineVertexEditor } from '~/composables/useLineVertexEditor';
 import { useJournalContourLayer } from '~/composables/useJournalContourLayer';
@@ -1622,6 +1636,10 @@ const piezometerLoading = ref(false);
 const piezometerError = ref<string | null>(null);
 const piezometerHasCalc = ref(false);
 const piezometerTotalLength = ref(0);
+/** Полный ответ маршрута (статика, фрагменты, расчёт) и второй расчёт двойного пьезометра */
+const piezometerRoute = ref<PiezometerRouteResponse | null>(null);
+const piezometerCalc2 = ref<number | null>(null);
+const piezometerDirectionsOpen = ref(false);
 const routeSourceId = 'piezo-route-source';
 const routeLineLayer = 'piezo-route-line';
 const routeNodeLayer = 'piezo-route-nodes';
@@ -1729,6 +1747,7 @@ const undoTraceNode = () => {
 
 const clearTrace = () => {
   traceNodes.value = [];
+  piezometerCalc2.value = null;
   clearRouteHighlight();
 };
 
@@ -1738,7 +1757,8 @@ const buildPiezometerRoute = async () => {
   piezometerLoading.value = true;
   piezometerError.value = null;
   try {
-    const res = await fastApiService.buildPiezometerRoute([...traceNodes.value]);
+    const res = await fastApiService.buildPiezometerRoute([...traceNodes.value], piezometerCalc2.value);
+    piezometerRoute.value = res;
     piezometerPathData.value = res.path;
     piezometerHasCalc.value = res.has_calculation;
     piezometerTotalLength.value = res.total_length;
@@ -1748,6 +1768,19 @@ const buildPiezometerRoute = async () => {
   } finally {
     piezometerLoading.value = false;
   }
+};
+
+const onPiezometerDouble = (calculationId: number | null) => {
+  piezometerCalc2.value = calculationId;
+  buildPiezometerRoute();
+};
+
+/** Загрузка сохранённого направления: опорные узлы → маршрут пьезометра */
+const onPiezometerDirectionLoad = (nodes: number[]) => {
+  clearTrace();
+  if (!isTraceMode.value) toggleTraceMode();
+  traceNodes.value = [...nodes];
+  buildPiezometerRoute();
 };
 
 const onPiezometerNodeHover = (nodeId: number) => {

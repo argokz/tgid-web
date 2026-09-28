@@ -775,6 +775,31 @@ describe('fastApiService topology contracts', () => {
     expect(res.blob).toBe(fakeBlob)
     expect(res.filename).toContain('Piezometer_Profile_')
   })
+
+  it('passes the second calculation and static flag to piezometer route and Excel', async () => {
+    fetchMock.mockResolvedValue({})
+    await fastApiService.buildPiezometerRoute([1, 2], 7)
+    await fastApiService.downloadPiezometerExcel([1, 2], { calculationId2: 7, includeStatic: false })
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/piezometer/route',
+      expect.objectContaining({ method: 'POST', body: { nodes: [1, 2], calculation_id_2: 7 } }))
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/api/piezometer/excel',
+      expect.objectContaining({ body: { waypoints: [1, 2], calculation_id_2: 7, include_static: false } }))
+  })
+
+  it('lists, saves and deletes saved piezometer directions', async () => {
+    fetchMock.mockResolvedValue({ items: [], count: 0 })
+    await fastApiService.listPiezometerDirections([74])
+    await fastApiService.savePiezometerDirection({ name: 'M9', nodes: [1, 2, 3] })
+    await fastApiService.deletePiezometerDirection(5)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.example.test/piezometer/directions',
+      expect.objectContaining({ query: { fileid: [74] } }))
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.example.test/piezometer/directions',
+      expect.objectContaining({ method: 'POST', body: { name: 'M9', nodes: [1, 2, 3] } }))
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://api.example.test/piezometer/directions/5',
+      expect.objectContaining({ method: 'DELETE' }))
+  })
 })
 
 
