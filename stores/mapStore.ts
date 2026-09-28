@@ -27,6 +27,12 @@ import {
   getMapTilerTilesUrl
 } from '~/utils/maptiler';
 import {
+  VISICOM_BASE_LAYER_ID,
+  buildVisicomSource,
+  getVisicomConfig,
+  isVisicomEnabled,
+} from '~/utils/visicom';
+import {
   getAllContextMapLayerIds,
   getPlanetLayersInsertBeforeId,
   isContextMapLayerId,
@@ -76,7 +82,8 @@ export const useMapStore = defineStore('map', {
       { id: 'hybrid-v4', label: 'Спутниковая карта (MapTiler Hybrid v4)' },
       { id: 'google', label: 'Google Maps' },
       { id: 'dg', label: '2GIS' },
-    ],
+      // VISICOM добавляется в initializeMap, только если заданы URL и ключ (utils/visicom.ts)
+    ] as { id: string; label: string }[],
     selectedBaseLayer: 'stadia',
 
     osmSource: {
@@ -159,7 +166,19 @@ export const useMapStore = defineStore('map', {
   }),
 
   actions: {
+    /** Подложки, зависящие от конфига: VISICOM показывается только с ключом. */
+    syncConfigurableBaseLayers() {
+      const enabled = isVisicomEnabled(getVisicomConfig());
+      const has = this.baseLayers.some((layer) => layer.id === VISICOM_BASE_LAYER_ID);
+      if (enabled && !has) {
+        this.baseLayers.push({ id: VISICOM_BASE_LAYER_ID, label: 'VISICOM' });
+      } else if (!enabled && has) {
+        this.baseLayers = this.baseLayers.filter((layer) => layer.id !== VISICOM_BASE_LAYER_ID);
+      }
+    },
+
     loadSelectedBaseLayer() {
+      this.syncConfigurableBaseLayers();
       const savedLayer = localStorage.getItem('selectedBaseLayer') || localStorage.getItem('baseLayer');
       if (!savedLayer) return;
       const hasLayer = this.baseLayers.some((layer: { id: string }) => layer.id === savedLayer);
@@ -276,6 +295,9 @@ export const useMapStore = defineStore('map', {
           source = getMapTilerKey() ? this.mapTilerHybridSource : this.osmSource;
           break;
         case 'google': source = this.googleSource; break;
+        case VISICOM_BASE_LAYER_ID:
+          source = buildVisicomSource(getVisicomConfig()) || this.osmSource;
+          break;
         case 'dg':
         case '2gis': source = this.dgSource; break;
         case 'stadia':

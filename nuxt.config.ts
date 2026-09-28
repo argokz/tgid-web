@@ -76,6 +76,14 @@ export default defineNuxtConfig({
         process.env.NUXT_PUBLIC_NETWORK_TILESET_URL ||
         env.NUXT_PUBLIC_NETWORK_TILESET_URL ||
         '',
+      // Подложка VISICOM: шаблон URL и ключ только из окружения; без ключа подложка скрыта
+      // (utils/visicom.ts). Переопределяются и в рантайме через NUXT_PUBLIC_VISICOM_*.
+      visicomTilesUrl: process.env.NUXT_PUBLIC_VISICOM_TILES_URL || env.NUXT_PUBLIC_VISICOM_TILES_URL || '',
+      visicomKey: process.env.NUXT_PUBLIC_VISICOM_KEY || env.NUXT_PUBLIC_VISICOM_KEY || '',
+      visicomScheme: process.env.NUXT_PUBLIC_VISICOM_SCHEME || env.NUXT_PUBLIC_VISICOM_SCHEME || 'tms',
+      visicomAttribution:
+        process.env.NUXT_PUBLIC_VISICOM_ATTRIBUTION || env.NUXT_PUBLIC_VISICOM_ATTRIBUTION || '',
+      visicomMaxZoom: process.env.NUXT_PUBLIC_VISICOM_MAX_ZOOM || env.NUXT_PUBLIC_VISICOM_MAX_ZOOM || '',
       geoserver: {
         url:
           process.env.NUXT_PUBLIC_GEOSERVER_URL ||

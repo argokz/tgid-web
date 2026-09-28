@@ -2,6 +2,7 @@
  * Composable для управления базовыми слоями карты
  */
 import { ref, computed } from 'vue'
+import { VISICOM_BASE_LAYER_ID, buildVisicomTiles, isVisicomEnabled, readVisicomConfig } from '~/utils/visicom'
 
 export interface BaseLayer {
   id: string
@@ -14,7 +15,9 @@ export interface BaseLayer {
 
 export const useBaseLayers = () => {
   const config = useRuntimeConfig()
-  const mapTilerKey = (config.public as any)?.maptilerKey || 'FAz78OuNlTWu7uIH8zuM'
+  // Ключ только из окружения (NUXT_PUBLIC_MAPTILER_KEY); без ключа mapStore откатывается на OSM
+  const mapTilerKey = (config.public as any)?.maptilerKey || ''
+  const visicom = readVisicomConfig(config.public as Record<string, unknown>)
 
   const layers: BaseLayer[] = [
     {
@@ -74,6 +77,17 @@ export const useBaseLayers = () => {
       maxZoom: 20
     }
   ]
+
+  if (isVisicomEnabled(visicom)) {
+    layers.push({
+      id: VISICOM_BASE_LAYER_ID,
+      name: 'VISICOM',
+      url: buildVisicomTiles(visicom)[0] || '',
+      attribution: visicom.attribution,
+      icon: 'mdi-map-search-outline',
+      maxZoom: visicom.maxzoom
+    })
+  }
 
   const currentLayer = ref<string>('stadia')
 

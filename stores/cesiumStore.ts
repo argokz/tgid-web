@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { markRaw } from 'vue'
 import type { ImageryLayer, TerrainProvider, Viewer } from 'cesium'
+import { describeTilesetError, type TilesetStatus } from '~/utils/cesiumTileset'
 
 type CesiumModule = typeof import('cesium')
 
@@ -20,9 +21,13 @@ export const useCesiumStore = defineStore('cesium', {
     viewMode: '2D' as '2D' | '3D',
     /** Shared selection between MapLibre and Cesium (P4). */
     syncedSelection: null as SyncedSelection,
-    /** Placeholder for future 3D Tileset of the network. */
+    /** 3D Tiles сети: адрес из runtimeConfig (NUXT_PUBLIC_NETWORK_TILESET_URL), см. docs/deploy-3d.md. */
     networkTilesetUrl: '' as string,
-    networkTilesetLoaded: false
+    networkTilesetLoaded: false,
+    networkTilesetStatus: 'disabled' as TilesetStatus,
+    networkTilesetError: '' as string,
+    /** Тайлы, которые не загрузились после успешного tileset.json (частичная деградация). */
+    networkTileFailures: 0
   }),
 
   actions: {
@@ -81,6 +86,8 @@ export const useCesiumStore = defineStore('cesium', {
       }
       if (this.networkTilesetUrl) {
         await this.loadNetworkTileset(this.networkTilesetUrl)
+      } else {
+        this.networkTilesetStatus = 'disabled'
       }
     },
 
@@ -110,20 +117,34 @@ export const useCesiumStore = defineStore('cesium', {
     },
 
     /**
-     * P4: load city-scale 3D Tiles for the heat network when a tileset URL is configured.
+     * 3D Tiles сети. Ошибка (нет файла, CORS, не JSON) не ломает 3D-режим: карта остаётся
+     * с подложкой/рельефом, статус и причина показываются в CesiumViewer.
      */
     async loadNetworkTileset(url: string) {
       const Cesium = this.cesium as CesiumModule | null
       if (!this.viewer || !Cesium || !url) return
+      this.networkTilesetUrl = url
+      this.networkTilesetStatus = 'loading'
+      this.networkTilesetError = ''
+      this.networkTileFailures = 0
       try {
         const tileset = await Cesium.Cesium3DTileset.fromUrl(url)
+        if (!this.viewer) return
+        tileset.tileFailed.addEventListener((event: { url?: string, message?: string }) => {
+          this.networkTileFailures += 1
+          if (this.networkTileFailures <= 3) {
+            console.warn('3D Tiles сети: тайл не загрузился', event?.url, event?.message)
+          }
+        })
         this.viewer.scene.primitives.add(tileset)
-        this.networkTilesetUrl = url
         this.networkTilesetLoaded = true
+        this.networkTilesetStatus = 'ready'
         this.viewer.scene.requestRender()
       } catch (error) {
         this.networkTilesetLoaded = false
-        console.warn('Не удалось загрузить 3D Tiles сети:', error)
+        this.networkTilesetStatus = 'error'
+        this.networkTilesetError = describeTilesetError(error)
+        console.warn('Не удалось загрузить 3D Tiles сети:', url, error)
       }
     },
 
