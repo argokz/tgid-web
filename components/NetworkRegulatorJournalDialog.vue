@@ -284,6 +284,7 @@
 import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { beginEquipmentEdit, saveEquipmentEdit } from '~/services/equipmentEditService'
 import {
   fastApiService,
   type NetworkRegulatorDetails,
@@ -392,6 +393,7 @@ const buildFields = () => {
 
 const startEdit = () => {
   isEditing.value = true
+  beginEquipmentEdit(itemDetails.value ? getTableForType(itemDetails.value.regulator_type) : '', itemDetails.value?.id)
   editFields.value = {}
   const fields = buildFields()
   for (const field of [...fields.assignment, ...fields.valve]) {
@@ -417,7 +419,7 @@ const saveChanges = async () => {
       else processedFields[key] = editFields.value[key]
     }
     
-    await fastApiService.updateObjectAttributes(table, itemDetails.value.id, processedFields)
+    await saveEquipmentEdit(table, itemDetails.value.id, processedFields)
     
     await openItemDetails(itemDetails.value.regulator_type, itemDetails.value.id)
     isEditing.value = false

@@ -344,6 +344,7 @@ import { DataZoomComponent, GridComponent, LegendComponent, MarkAreaComponent, T
 import VChart from 'vue-echarts'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { beginEquipmentEdit, saveEquipmentEdit } from '~/services/equipmentEditService'
 import {
   fastApiService,
   type InstalledPumpDetails,
@@ -411,6 +412,7 @@ const buildFields = () => {
 
 const startEdit = () => {
   isEditing.value = true
+  beginEquipmentEdit('pumps', installedDetails.value?.id)
   editFields.value = {}
   for (const field of buildFields()) {
     if (field.key) editFields.value[field.key] = field.value ?? null
@@ -432,7 +434,7 @@ const saveChanges = async () => {
       else processedFields[key] = editFields.value[key]
     }
     
-    await fastApiService.updateObjectAttributes('pumps', installedDetails.value.id, processedFields)
+    await saveEquipmentEdit('pumps', installedDetails.value.id, processedFields)
     
     await openInstalledDetails(installedDetails.value.id)
     isEditing.value = false

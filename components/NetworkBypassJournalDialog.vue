@@ -208,6 +208,7 @@
 import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { beginEquipmentEdit, saveEquipmentEdit } from '~/services/equipmentEditService'
 import {
   fastApiService,
   type NetworkBypassDetails,
@@ -281,6 +282,7 @@ const buildFields = () => {
 
 const startEdit = () => {
   isEditing.value = true
+  beginEquipmentEdit('bypass', itemDetails.value?.id)
   editFields.value = {}
   const fields = buildFields()
   for (const field of [...fields.assignment, ...fields.pipeline]) {
@@ -303,7 +305,7 @@ const saveChanges = async () => {
       else processedFields[key] = editFields.value[key]
     }
     
-    await fastApiService.updateObjectAttributes('bypass', itemDetails.value.id, processedFields)
+    await saveEquipmentEdit('bypass', itemDetails.value.id, processedFields)
     
     await openItemDetails(itemDetails.value.id)
     isEditing.value = false

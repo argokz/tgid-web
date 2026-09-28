@@ -360,6 +360,7 @@
 import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { beginEquipmentEdit, saveEquipmentEdit } from '~/services/equipmentEditService'
 import {
   fastApiService,
   type NetworkArmatureDetails,
@@ -421,13 +422,14 @@ const buildFields = () => {
     { label: 'Управление затвором', key: 'gatecontrol', type: 'number', value: itemDetails.value?.gate_control },
     ...(isDamper ? [] : [
       { label: 'Заданный перепад', key: 'regpdmean', type: 'number', value: itemDetails.value?.set_pressure_drop },
-      { label: 'Заданный расход', key: 'g', type: 'number', value: itemDetails.value?.set_flow }
+      { label: 'Заданный расход', key: 'q', type: 'number', value: itemDetails.value?.set_flow }
     ])
   ]
 }
 
 const startEdit = () => {
   isEditing.value = true
+  beginEquipmentEdit(itemDetails.value?.equipment_type === 'damper' ? 'dampers' : 'regularmatures', itemDetails.value?.id)
   editFields.value = {}
   for (const field of buildFields()) {
     if (field.key) editFields.value[field.key] = field.value ?? null
@@ -452,7 +454,7 @@ const saveChanges = async () => {
       else processedFields[key] = editFields.value[key]
     }
     
-    await fastApiService.updateObjectAttributes(table, itemDetails.value.id, processedFields)
+    await saveEquipmentEdit(table, itemDetails.value.id, processedFields)
     
     // Refresh
     await openItemDetails(itemDetails.value.equipment_type, itemDetails.value.id)
