@@ -1,19 +1,51 @@
 <template>
-  <v-dialog v-model="visible" :fullscreen="mobile" :max-width="mobile ? undefined : 1200" scrollable>
+  <v-dialog
+    v-model="visible"
+    :fullscreen="mobile"
+    :max-width="mobile ? undefined : 1200"
+    scrollable
+  >
     <v-card :rounded="mobile ? '0' : 'lg'">
       <v-card-title class="d-flex align-center ga-2 py-2">
         <v-icon>mdi-book-open-page-variant-outline</v-icon>
         Справочники
         <v-spacer />
-        <v-btn icon="mdi-refresh" variant="text" density="compact" :loading="loading" aria-label="Обновить" @click="loadRows" />
-        <v-btn icon="mdi-close" variant="text" density="compact" aria-label="Закрыть" @click="visible = false" />
+        <v-btn
+          icon="mdi-refresh"
+          variant="text"
+          density="compact"
+          :loading="loading"
+          aria-label="Обновить"
+          @click="loadRows"
+        />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          density="compact"
+          aria-label="Закрыть"
+          @click="visible = false"
+        />
       </v-card-title>
 
       <v-card-text class="pt-0">
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-2" closable @click:close="error = ''">
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mb-2"
+          closable
+          @click:close="error = ''"
+        >
           {{ error }}
-          <ul v-if="errorUsage?.by?.length" class="mt-1 ms-4">
-            <li v-for="u in errorUsage.by" :key="`${u.table}.${u.column}`">{{ u.label }} ({{ u.table }}.{{ u.column }}): {{ u.count }}</li>
+          <ul
+            v-if="errorUsage?.by?.length"
+            class="mt-1 ms-4"
+          >
+            <li
+              v-for="u in errorUsage.by"
+              :key="`${u.table}.${u.column}`"
+            >{{ u.label }} ({{ u.table }}.{{ u.column }}): {{ u.count }}</li>
           </ul>
         </v-alert>
 
@@ -65,11 +97,20 @@
         </div>
 
         <template v-if="info">
-          <v-alert v-if="info.affects_calc" type="warning" variant="tonal" density="compact" class="mb-2">
+          <v-alert
+            v-if="info.affects_calc"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-2"
+          >
             Справочник используется в гидравлическом расчёте — после правки пересчитайте режим.
             <span v-if="info.note"><br>{{ info.note }}</span>
           </v-alert>
-          <div v-else-if="info.note" class="text-caption text-medium-emphasis mb-2">{{ info.note }}</div>
+          <div
+            v-else-if="info.note"
+            class="text-caption text-medium-emphasis mb-2"
+          >{{ info.note }}</div>
           <div class="text-caption text-medium-emphasis mb-2">
             Таблица {{ info.table }} · ссылки: {{ info.usages.join(', ') || '—' }}
           </div>
@@ -89,7 +130,14 @@
           >
             <template #[`item.__actions`]="{ item }">
               <div class="d-flex ga-1">
-                <v-btn icon="mdi-pencil" size="small" variant="text" density="compact" aria-label="Изменить" @click="openEditor(item)" />
+                <v-btn
+                  icon="mdi-pencil"
+                  size="small"
+                  variant="text"
+                  density="compact"
+                  aria-label="Изменить"
+                  @click="openEditor(item)"
+                />
                 <v-btn
                   icon="mdi-delete"
                   size="small"
@@ -107,17 +155,30 @@
       </v-card-text>
     </v-card>
 
-    <v-dialog v-model="editorOpen" max-width="720" scrollable>
+    <v-dialog
+      v-model="editorOpen"
+      max-width="720"
+      scrollable
+    >
       <v-card>
         <v-card-title class="py-2">
           {{ editing ? `${info?.label}: запись ${editing.id}` : `${info?.label}: новая запись` }}
         </v-card-title>
         <v-card-text>
-          <v-alert v-if="usage && usage.total" type="info" variant="tonal" density="compact" class="mb-3">
+          <v-alert
+            v-if="usage && usage.total"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
             Используется: {{ usage.by.map((u) => `${u.label} — ${u.count}`).join('; ') }}
           </v-alert>
           <div class="editor-grid">
-            <template v-for="f in info?.fields || []" :key="f.column">
+            <template
+              v-for="f in info?.fields || []"
+              :key="f.column"
+            >
               <v-select
                 v-if="f.lookup"
                 v-model="form[f.column]"
@@ -156,8 +217,18 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="editorOpen = false">Отмена</v-btn>
-          <v-btn color="primary" variant="flat" prepend-icon="mdi-content-save" :loading="saving" :disabled="!canEditData" @click="save">
+          <v-btn
+            variant="text"
+            @click="editorOpen = false"
+          >Отмена</v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            prepend-icon="mdi-content-save"
+            :loading="saving"
+            :disabled="!canEditData"
+            @click="save"
+          >
             Сохранить
           </v-btn>
         </v-card-actions>

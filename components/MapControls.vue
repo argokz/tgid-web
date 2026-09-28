@@ -4,7 +4,10 @@
 
     <!-- Address Search -->
 
-    <div class="search-wrapper" :class="{ 'expanded': searchExpanded }">
+    <div
+      class="search-wrapper"
+      :class="{ 'expanded': searchExpanded }"
+    >
 
       <v-btn
 
@@ -23,7 +26,6 @@
         aria-label="Открыть поиск адреса на карте"
 
         @click="expandSearch"
-
       >
 
         <v-icon color="primary">mdi-magnify</v-icon>
@@ -31,7 +33,12 @@
       </v-btn>
 
 
-      <v-card v-if="searchExpanded" class="search-panel-expanded" elevation="8" rounded="lg">
+      <v-card
+        v-if="searchExpanded"
+        class="search-panel-expanded"
+        elevation="8"
+        rounded="lg"
+      >
 
         <div class="pa-2 search-input-wrapper">
 
@@ -58,7 +65,6 @@
             @keyup.enter="performSearch"
 
             @keyup.esc="collapseSearch"
-
           >
 
             <template #prepend-inner>
@@ -80,7 +86,6 @@
                 aria-label="Закрыть поиск адреса"
 
                 @click="collapseSearch"
-
               >
 
                 <v-icon size="small">mdi-close</v-icon>
@@ -94,11 +99,18 @@
         </div>
 
 
-        <div v-if="searchResults.length > 0 || searching" class="search-results-wrapper">
+        <div
+          v-if="searchResults.length > 0 || searching"
+          class="search-results-wrapper"
+        >
 
           <v-divider />
 
-          <v-list v-if="searchResults.length > 0" class="search-results" density="compact">
+          <v-list
+            v-if="searchResults.length > 0"
+            class="search-results"
+            density="compact"
+          >
 
             <v-list-item
 
@@ -109,14 +121,19 @@
               @click="selectResult(result)"
 
               class="search-result-item"
-
             >
 
               <template #prepend>
 
-                <v-avatar size="36" color="blue-lighten-5">
+                <v-avatar
+                  size="36"
+                  color="blue-lighten-5"
+                >
 
-                  <v-icon color="primary" size="small">mdi-map-marker</v-icon>
+                  <v-icon
+                    color="primary"
+                    size="small"
+                  >mdi-map-marker</v-icon>
 
                 </v-avatar>
 
@@ -138,7 +155,10 @@
 
           </v-list>
 
-          <div v-if="searching" class="pa-4 text-center">
+          <div
+            v-if="searching"
+            class="pa-4 text-center"
+          >
 
             <v-progress-circular
 
@@ -149,7 +169,6 @@
               color="primary"
 
               aria-label="Поиск адреса"
-
             />
 
             <div class="text-caption text-grey mt-2">Поиск...</div>
@@ -168,7 +187,10 @@
     <div class="control-buttons">
 
       <!-- Поиск узлов -->
-      <v-tooltip text="Поиск узлов" location="left">
+      <v-tooltip
+        text="Поиск узлов"
+        location="left"
+      >
         <template #activator="{ props: tp }">
           <v-btn
             v-bind="tp"
@@ -186,7 +208,10 @@
       </v-tooltip>
 
       <!-- Инструменты приложения (журналы, реестры, отчёты) — отдельная панель -->
-      <v-tooltip text="Инструменты: журналы, реестры, отчёты" location="left">
+      <v-tooltip
+        text="Инструменты: журналы, реестры, отчёты"
+        location="left"
+      >
         <template #activator="{ props: tp }">
           <v-btn
             v-bind="tp"
@@ -204,7 +229,10 @@
       </v-tooltip>
 
       <!-- Рисование и измерения — отдельная панель на карте -->
-      <v-tooltip text="Рисование и измерения" location="left">
+      <v-tooltip
+        text="Рисование и измерения"
+        location="left"
+      >
         <template #activator="{ props: tp }">
           <v-btn
             v-bind="tp"
@@ -250,7 +278,6 @@
         :text="isTraceMode ? 'Отключить режим трассировки' : 'Пьезометрический график'"
 
         location="left"
-
       >
 
         <template #activator="{ props: tp }">
@@ -274,7 +301,6 @@
             aria-label="Пьезометрический график"
 
             @click="$emit('toggle-trace-mode')"
-
           >
 
             <v-icon :color="isTraceMode ? 'white' : 'blue'">mdi-chart-line</v-icon>
@@ -293,7 +319,6 @@
         :text="identifyMode ? 'Отключить режим информации' : 'Информация об объекте'"
 
         location="left"
-
       >
 
         <template #activator="{ props: tp }">
@@ -317,7 +342,6 @@
             :aria-label="identifyMode ? 'Отключить режим информации' : 'Информация об объекте'"
 
             @click="toggleIdentifyMode"
-
           >
 
             <v-icon>mdi-information</v-icon>
@@ -331,7 +355,10 @@
 
       <!-- Home -->
 
-      <v-tooltip text="Начальный вид" location="left">
+      <v-tooltip
+        text="Начальный вид"
+        location="left"
+      >
 
         <template #activator="{ props: tp }">
 
@@ -352,7 +379,6 @@
             aria-label="Начальный вид"
 
             @click="goHome"
-
           >
 
             <v-icon color="grey-darken-2">mdi-home</v-icon>
@@ -366,7 +392,10 @@
 
       <!-- 2D/3D Toggle -->
 
-      <v-tooltip :text="cesiumStore.viewMode === '2D' ? 'Переключить в 3D (Cesium)' : 'Переключить в 2D (MapLibre)'" location="left">
+      <v-tooltip
+        :text="cesiumStore.viewMode === '2D' ? 'Переключить в 3D (Cesium)' : 'Переключить в 2D (MapLibre)'"
+        location="left"
+      >
 
         <template #activator="{ props: tp }">
 
@@ -389,7 +418,6 @@
             aria-label="Переключить 2D/3D"
 
             @click="toggle2D3D"
-
           >
 
             {{ cesiumStore.viewMode }}
@@ -403,7 +431,10 @@
 
       <!-- Geolocation -->
 
-      <v-tooltip text="Моё местоположение" location="left">
+      <v-tooltip
+        text="Моё местоположение"
+        location="left"
+      >
 
         <template #activator="{ props: tp }">
 
@@ -426,7 +457,6 @@
             :loading="locating"
 
             @click="getMyLocation"
-
           >
 
             <v-icon color="primary">mdi-crosshairs-gps</v-icon>
@@ -440,7 +470,10 @@
 
       <!-- Zoom In -->
 
-      <v-tooltip text="Приблизить" location="left">
+      <v-tooltip
+        text="Приблизить"
+        location="left"
+      >
 
         <template #activator="{ props: tp }">
 
@@ -461,7 +494,6 @@
             aria-label="Приблизить"
 
             @click="zoomIn"
-
           >
 
             <v-icon color="grey-darken-2">mdi-plus</v-icon>
@@ -475,7 +507,10 @@
 
       <!-- Zoom Out -->
 
-      <v-tooltip text="Отдалить" location="left">
+      <v-tooltip
+        text="Отдалить"
+        location="left"
+      >
 
         <template #activator="{ props: tp }">
 
@@ -496,7 +531,6 @@
             aria-label="Отдалить"
 
             @click="zoomOut"
-
           >
 
             <v-icon color="grey-darken-2">mdi-minus</v-icon>
@@ -510,11 +544,17 @@
 
       <!-- Base layer switcher -->
 
-      <v-menu offset-y location="left">
+      <v-menu
+        offset-y
+        location="left"
+      >
 
         <template #activator="{ props: menuProps }">
 
-          <v-tooltip text="Базовый слой" location="left">
+          <v-tooltip
+            text="Базовый слой"
+            location="left"
+          >
 
             <template #activator="{ props: tp }">
 
@@ -533,7 +573,6 @@
                 class="control-btn"
 
                 aria-label="Базовый слой"
-
               >
 
                 <v-icon color="deep-orange">{{ currentLayerIcon }}</v-icon>
@@ -547,7 +586,10 @@
         </template>
 
 
-        <v-list density="compact" class="layer-menu">
+        <v-list
+          density="compact"
+          class="layer-menu"
+        >
 
           <v-list-subheader>Базовые слои карты</v-list-subheader>
 
@@ -560,7 +602,6 @@
             @click="selectBaseLayer(layer.id)"
 
             :class="{ 'active-layer': currentLayer === layer.id }"
-
           >
 
             <template #prepend>
@@ -573,7 +614,10 @@
 
             <template #append>
 
-              <v-icon v-if="currentLayer === layer.id" color="primary">mdi-check</v-icon>
+              <v-icon
+                v-if="currentLayer === layer.id"
+                color="primary"
+              >mdi-check</v-icon>
 
             </template>
 

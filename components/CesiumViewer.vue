@@ -34,8 +34,14 @@ onMounted(async () => {
 
 <template>
   <div class="cesium-container">
-    <div ref="cesiumContainer" class="cesium-canvas" />
-    <div v-if="loading" class="cesium-status">Подготавливаем 3D-карту…</div>
+    <div
+      ref="cesiumContainer"
+      class="cesium-canvas"
+    />
+    <div
+      v-if="loading"
+      class="cesium-status"
+    >Подготавливаем 3D-карту…</div>
     <v-alert
       v-else-if="errorMessage"
       class="cesium-error"

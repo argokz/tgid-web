@@ -1,18 +1,33 @@
 <template>
-  <v-dialog v-model="visible" :fullscreen="isMobile" max-width="1100" scrollable>
+  <v-dialog
+    v-model="visible"
+    :fullscreen="isMobile"
+    max-width="1100"
+    scrollable
+  >
     <v-card rounded="lg">
       <v-card-title class="d-flex align-center ga-2">
         <v-icon>mdi-file-excel</v-icon>
         Отчёты Excel
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          @click="visible = false"
+        />
       </v-card-title>
       <v-card-text>
         <p class="text-body-2 text-medium-emphasis mb-3">
           Таблицы десктопа (меню «Excel»): шаблон и шапка как в gid6, данные по фрагменту и расчёту.
         </p>
 
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-3">
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+        >
           {{ error }}
         </v-alert>
 
@@ -28,9 +43,21 @@
               clearable
               class="mb-2"
             />
-            <v-progress-linear v-if="loadingCatalog" indeterminate color="primary" class="mb-2" />
-            <v-list density="compact" nav class="er-scroll">
-              <template v-for="group in groups" :key="group.title">
+            <v-progress-linear
+              v-if="loadingCatalog"
+              indeterminate
+              color="primary"
+              class="mb-2"
+            />
+            <v-list
+              density="compact"
+              nav
+              class="er-scroll"
+            >
+              <template
+                v-for="group in groups"
+                :key="group.title"
+              >
                 <v-list-subheader>{{ group.title }}</v-list-subheader>
                 <v-list-item
                   v-for="item in group.items"
@@ -42,13 +69,21 @@
                 >
                   <v-list-item-title>{{ item.title }}</v-list-item-title>
                   <template #append>
-                    <v-icon v-if="item.uses_calculation" size="16" color="indigo" title="Нужны результаты расчёта">
+                    <v-icon
+                      v-if="item.uses_calculation"
+                      size="16"
+                      color="indigo"
+                      title="Нужны результаты расчёта"
+                    >
                       mdi-calculator
                     </v-icon>
                   </template>
                 </v-list-item>
               </template>
-              <div v-if="!loadingCatalog && !groups.length" class="text-body-2 text-medium-emphasis pa-2">
+              <div
+                v-if="!loadingCatalog && !groups.length"
+                class="text-body-2 text-medium-emphasis pa-2"
+              >
                 Ничего не найдено.
               </div>
             </v-list>
@@ -57,15 +92,29 @@
           <div class="er-detail">
             <template v-if="selected">
               <div class="text-subtitle-1 mb-1">{{ selected.title }}</div>
-              <div v-if="selected.desktop" class="text-caption text-medium-emphasis mb-2">
+              <div
+                v-if="selected.desktop"
+                class="text-caption text-medium-emphasis mb-2"
+              >
                 gid6: {{ selected.desktop }}
               </div>
-              <v-alert v-if="selected.note" type="info" variant="tonal" density="compact" class="mb-2">
+              <v-alert
+                v-if="selected.note"
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="mb-2"
+              >
                 {{ selected.note }}
               </v-alert>
 
               <div class="d-flex flex-wrap ga-1 mb-3">
-                <v-chip v-for="sheet in selected.sheets" :key="sheet.title" size="small" variant="tonal">
+                <v-chip
+                  v-for="sheet in selected.sheets"
+                  :key="sheet.title"
+                  size="small"
+                  variant="tonal"
+                >
                   {{ sheet.title }}
                 </v-chip>
               </div>
@@ -104,8 +153,10 @@
                   variant="outlined"
                   hide-details
                 />
-                <p v-if="selected.uses_calculation && fragmentId && !loadingCalculations && !calculations.length"
-                   class="text-caption text-warning mb-0">
+                <p
+                  v-if="selected.uses_calculation && fragmentId && !loadingCalculations && !calculations.length"
+                  class="text-caption text-warning mb-0"
+                >
                   У фрагмента нет расчёта: листы результатов будут только с шапкой.
                 </p>
                 <div>
@@ -119,15 +170,27 @@
                     Скачать Excel
                   </v-btn>
                 </div>
-                <p v-if="lastDownload" class="text-caption text-medium-emphasis mb-0">{{ lastDownload }}</p>
+                <p
+                  v-if="lastDownload"
+                  class="text-caption text-medium-emphasis mb-0"
+                >{{ lastDownload }}</p>
               </div>
             </template>
-            <div v-else class="text-body-2 text-medium-emphasis">Выберите отчёт в списке.</div>
+            <div
+              v-else
+              class="text-body-2 text-medium-emphasis"
+            >Выберите отчёт в списке.</div>
 
-            <details v-if="notPorted.length" class="mt-4 text-caption text-medium-emphasis">
+            <details
+              v-if="notPorted.length"
+              class="mt-4 text-caption text-medium-emphasis"
+            >
               <summary>Не перенесены из десктопа ({{ notPorted.length }})</summary>
               <ul class="mt-1">
-                <li v-for="n in notPorted" :key="n.sql">{{ n.sql }} — {{ n.reason }}</li>
+                <li
+                  v-for="n in notPorted"
+                  :key="n.sql"
+                >{{ n.sql }} — {{ n.reason }}</li>
               </ul>
             </details>
           </div>

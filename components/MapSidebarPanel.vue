@@ -2,9 +2,18 @@
   <div class="sidebar-inner">
     <!-- Шапка -->
     <div class="sidebar-header">
-      <div class="d-flex align-center" style="gap: 12px;">
-        <v-avatar size="34" color="primary">
-          <v-icon color="white" size="18">{{ sidebarIcon }}</v-icon>
+      <div
+        class="d-flex align-center"
+        style="gap: 12px;"
+      >
+        <v-avatar
+          size="34"
+          color="primary"
+        >
+          <v-icon
+            color="white"
+            size="18"
+          >{{ sidebarIcon }}</v-icon>
         </v-avatar>
         <div>
           <div class="text-subtitle-2 font-weight-semibold">{{ sidebarTitle }}</div>
@@ -31,11 +40,23 @@
       density="compact"
       class="sidebar-tabs"
     >
-      <v-tab value="layers" density="compact">
-        <v-icon class="me-1" size="16">mdi-layers</v-icon>Слои
+      <v-tab
+        value="layers"
+        density="compact"
+      >
+        <v-icon
+          class="me-1"
+          size="16"
+        >mdi-layers</v-icon>Слои
       </v-tab>
-      <v-tab value="fragments" density="compact">
-        <v-icon class="me-1" size="16">mdi-map-marker-multiple</v-icon>Фрагменты
+      <v-tab
+        value="fragments"
+        density="compact"
+      >
+        <v-icon
+          class="me-1"
+          size="16"
+        >mdi-map-marker-multiple</v-icon>Фрагменты
         <v-chip
           v-if="pendingFragments.length > 0"
           size="x-small"
@@ -45,8 +66,14 @@
           {{ pendingFragments.length }}
         </v-chip>
       </v-tab>
-      <v-tab value="labels" density="compact">
-        <v-icon class="me-1" size="16">mdi-label-multiple</v-icon>Подписи
+      <v-tab
+        value="labels"
+        density="compact"
+      >
+        <v-icon
+          class="me-1"
+          size="16"
+        >mdi-label-multiple</v-icon>Подписи
         <v-chip
           v-if="pendingLabels.length > 0"
           size="x-small"
@@ -59,14 +86,21 @@
     </v-tabs>
     <v-divider />
 
-    <v-window v-model="activeTabLocal" class="sidebar-window">
+    <v-window
+      v-model="activeTabLocal"
+      class="sidebar-window"
+    >
 
       <!-- ── СЛОИ ── -->
       <v-window-item value="layers">
         <div class="tab-content">
           <div class="content-area">
             <div class="group-header px-3 py-2 mt-1">
-              <v-icon size="13" class="me-1" color="grey-darken-2">mdi-earth</v-icon>
+              <v-icon
+                size="13"
+                class="me-1"
+                color="grey-darken-2"
+              >mdi-earth</v-icon>
               <span class="text-caption font-weight-bold text-grey-darken-2 text-uppercase">
                 Слои контекста
               </span>
@@ -83,7 +117,10 @@
                 </v-icon>
               </v-btn>
             </div>
-            <div v-show="!contextSectionCollapsed" class="px-3 pb-1">
+            <div
+              v-show="!contextSectionCollapsed"
+              class="px-3 pb-1"
+            >
               <v-switch
                 :model-value="contextHoverInspectEnabled"
                 class="context-hover-switch"
@@ -104,7 +141,11 @@
             >
               Задайте NUXT_PUBLIC_MAPTILER_KEY в .env, чтобы включить подложки MapTiler.
             </div>
-            <v-list v-show="!contextSectionCollapsed" density="compact" class="py-0 mb-2 compact-list">
+            <v-list
+              v-show="!contextSectionCollapsed"
+              density="compact"
+              class="py-0 mb-2 compact-list"
+            >
               <v-list-item
                 v-for="row in contextLayerRows"
                 :key="row.key"
@@ -135,19 +176,35 @@
               scroll-strategy="reposition"
               @update:model-value="(v) => { if (!v) planetStyleTarget = null }"
             >
-              <v-card v-if="planetStyleTarget" density="compact" class="planet-style-card">
+              <v-card
+                v-if="planetStyleTarget"
+                density="compact"
+                class="planet-style-card"
+              >
                 <v-card-title class="text-subtitle-2 py-2 px-3 d-flex align-center">
                   <span class="text-truncate">{{ planetStyleTarget.label }}</span>
                   <v-spacer />
-                  <v-btn icon size="x-small" variant="text" aria-label="Закрыть" @click="planetStyleTarget = null">
+                  <v-btn
+                    icon
+                    size="x-small"
+                    variant="text"
+                    aria-label="Закрыть"
+                    @click="planetStyleTarget = null"
+                  >
                     <v-icon size="18">mdi-close</v-icon>
                   </v-btn>
                 </v-card-title>
                 <v-divider />
                 <v-card-text class="py-2 px-3">
-                  <div v-if="planetStyleCaps?.hasColor" class="mb-2">
+                  <div
+                    v-if="planetStyleCaps?.hasColor"
+                    class="mb-2"
+                  >
                     <div class="text-caption text-medium-emphasis mb-1">Цвет</div>
-                    <div class="d-flex align-center" style="gap: 8px;">
+                    <div
+                      class="d-flex align-center"
+                      style="gap: 8px;"
+                    >
                       <input
                         v-model="planetStyleForm.color"
                         type="color"
@@ -163,7 +220,10 @@
                       />
                     </div>
                   </div>
-                  <div v-if="planetStyleCaps?.hasOpacity" class="mb-1">
+                  <div
+                    v-if="planetStyleCaps?.hasOpacity"
+                    class="mb-1"
+                  >
                     <div class="d-flex justify-space-between text-caption text-medium-emphasis mb-0">
                       <span>Прозрачность</span>
                       <span>{{ planetStyleForm.opacity }}%</span>
@@ -178,7 +238,10 @@
                       color="primary"
                     />
                   </div>
-                  <div v-if="planetStyleCaps?.hasTextSize" class="mb-1">
+                  <div
+                    v-if="planetStyleCaps?.hasTextSize"
+                    class="mb-1"
+                  >
                     <div class="d-flex justify-space-between text-caption text-medium-emphasis mb-0">
                       <span>Размер подписи</span>
                       <span>{{ planetStyleForm.textSize }}px</span>
@@ -195,9 +258,21 @@
                   </div>
                 </v-card-text>
                 <v-divider />
-                <v-card-actions class="px-3 py-2 justify-end" style="gap: 6px;">
-                  <v-btn size="small" variant="text" @click="onPlanetStyleReset">Сброс</v-btn>
-                  <v-btn size="small" color="primary" variant="flat" @click="onPlanetStyleApply">OK</v-btn>
+                <v-card-actions
+                  class="px-3 py-2 justify-end"
+                  style="gap: 6px;"
+                >
+                  <v-btn
+                    size="small"
+                    variant="text"
+                    @click="onPlanetStyleReset"
+                  >Сброс</v-btn>
+                  <v-btn
+                    size="small"
+                    color="primary"
+                    variant="flat"
+                    @click="onPlanetStyleApply"
+                  >OK</v-btn>
                 </v-card-actions>
               </v-card>
             </v-dialog>
@@ -205,7 +280,11 @@
             <!-- ── Planet V4 слои ── -->
             <template v-if="mapStore.selectedBaseLayer === 'planet-v4'">
               <div class="group-header px-3 py-2 mt-1">
-                <v-icon size="13" class="me-1" color="grey-darken-2">mdi-earth</v-icon>
+                <v-icon
+                  size="13"
+                  class="me-1"
+                  color="grey-darken-2"
+                >mdi-earth</v-icon>
                 <span class="text-caption font-weight-bold text-grey-darken-2 text-uppercase">
                   Слои Planet V4
                 </span>
@@ -228,8 +307,15 @@
                   :key="pg.group"
                   class="mb-0"
                 >
-                  <div class="group-header px-3 py-1" style="background: transparent;">
-                    <v-icon size="12" class="me-1" color="grey-darken-1">{{ pg.icon }}</v-icon>
+                  <div
+                    class="group-header px-3 py-1"
+                    style="background: transparent;"
+                  >
+                    <v-icon
+                      size="12"
+                      class="me-1"
+                      color="grey-darken-1"
+                    >{{ pg.icon }}</v-icon>
                     <span class="text-caption font-weight-medium text-grey-darken-1">
                       {{ pg.label }}
                     </span>
@@ -278,7 +364,10 @@
                           @click.stop="mapStore.setPlanetLayerVisible(pl.sourceLayer, !mapStore.visiblePlanetLayers.includes(pl.sourceLayer))"
                         />
                       </template>
-                      <v-list-item-title class="text-body-2" style="font-size: 0.8rem !important;">
+                      <v-list-item-title
+                        class="text-body-2"
+                        style="font-size: 0.8rem !important;"
+                      >
                         {{ pl.label }}
                       </v-list-item-title>
                       <template #append>
@@ -321,7 +410,11 @@
                 v-if="group.name !== 'default'"
                 class="group-header px-3 py-1"
               >
-                <v-icon size="13" class="me-1" color="grey-darken-2">mdi-folder-outline</v-icon>
+                <v-icon
+                  size="13"
+                  class="me-1"
+                  color="grey-darken-2"
+                >mdi-folder-outline</v-icon>
                 <span class="text-caption font-weight-bold text-grey-darken-2 text-uppercase">
                   {{ formatGroupName(group.name) }}
                 </span>
@@ -352,7 +445,11 @@
                 >
                   <template #prepend>
                     <div class="d-flex align-center layer-prepend">
-                      <v-chip size="x-small" color="grey-lighten-3" class="me-1 order-chip working-order-chip">
+                      <v-chip
+                        size="x-small"
+                        color="grey-lighten-3"
+                        class="me-1 order-chip working-order-chip"
+                      >
                         {{ getLayerOrder(layer.layerId) }}
                       </v-chip>
                       <v-checkbox-btn
@@ -388,8 +485,16 @@
                       class="format-toggle"
                       @update:model-value="(fmt) => fmt && setPendingFormat(layer.layerId, fmt)"
                     >
-                      <v-btn value="mvt" size="x-small" class="format-btn">MVT</v-btn>
-                      <v-btn value="wms" size="x-small" class="format-btn">WMS</v-btn>
+                      <v-btn
+                        value="mvt"
+                        size="x-small"
+                        class="format-btn"
+                      >MVT</v-btn>
+                      <v-btn
+                        value="wms"
+                        size="x-small"
+                        class="format-btn"
+                      >WMS</v-btn>
                     </v-btn-toggle>
                   </div>
 
@@ -418,7 +523,10 @@
                   </div>
 
                   <template #append>
-                    <div class="d-flex flex-column" style="gap: 2px;">
+                    <div
+                      class="d-flex flex-column"
+                      style="gap: 2px;"
+                    >
                       <v-btn
                         icon
                         size="x-small"
@@ -447,7 +555,10 @@
           </div>
           <div class="sidebar-footer">
             <v-divider />
-            <div class="px-3 py-2 d-flex align-center" style="gap: 8px;">
+            <div
+              class="px-3 py-2 d-flex align-center"
+              style="gap: 8px;"
+            >
               <v-spacer />
               <v-btn
                 class="apply-btn"
@@ -484,7 +595,10 @@
             />
           </div>
           <div class="content-area">
-            <v-list v-if="filteredFragments.length > 0" density="comfortable">
+            <v-list
+              v-if="filteredFragments.length > 0"
+              density="comfortable"
+            >
               <v-list-item
                 v-for="item in filteredFragments"
                 :key="item.id"
@@ -521,7 +635,10 @@
               v-else-if="fragmentStore.fragments.length === 0"
               class="pa-8 text-center text-grey"
             >
-              <v-icon size="44" color="grey-lighten-2">mdi-map-marker-multiple-outline</v-icon>
+              <v-icon
+                size="44"
+                color="grey-lighten-2"
+              >mdi-map-marker-multiple-outline</v-icon>
               <div class="text-body-2 mt-2">Фрагменты не загружены</div>
               <v-btn
                 size="small"
@@ -537,13 +654,19 @@
               v-else
               class="pa-8 text-center text-grey"
             >
-              <v-icon size="44" color="grey-lighten-2">mdi-filter-off</v-icon>
+              <v-icon
+                size="44"
+                color="grey-lighten-2"
+              >mdi-filter-off</v-icon>
               <div class="text-body-2 mt-2">Ничего не найдено</div>
             </div>
           </div>
           <div class="sidebar-footer">
             <v-divider />
-            <div class="px-3 py-2 d-flex align-center flex-wrap" style="gap: 8px;">
+            <div
+              class="px-3 py-2 d-flex align-center flex-wrap"
+              style="gap: 8px;"
+            >
               <span class="text-caption text-grey">
                 В черновике: <strong>{{ pendingFragments.length }}</strong>
                 / {{ fragmentStore.fragments.length }}
@@ -618,7 +741,10 @@
                   </v-icon>
                   {{ item.label }}
                 </v-list-item-title>
-                <v-list-item-subtitle class="text-caption" style="padding-left: 24px;">
+                <v-list-item-subtitle
+                  class="text-caption"
+                  style="padding-left: 24px;"
+                >
                   {{ item.id }}
                 </v-list-item-subtitle>
               </v-list-item>
@@ -627,13 +753,19 @@
               v-if="filteredLabels.length === 0 && labelSearchLocal"
               class="pa-8 text-center text-grey"
             >
-              <v-icon size="44" color="grey-lighten-2">mdi-file-search-outline</v-icon>
+              <v-icon
+                size="44"
+                color="grey-lighten-2"
+              >mdi-file-search-outline</v-icon>
               <div class="text-body-2 mt-2">Ничего не найдено</div>
             </div>
           </div>
           <div class="sidebar-footer">
             <v-divider />
-            <div class="px-3 py-2 d-flex align-center flex-wrap" style="gap: 8px;">
+            <div
+              class="px-3 py-2 d-flex align-center flex-wrap"
+              style="gap: 8px;"
+            >
               <span class="text-caption text-grey">
                 В черновике: <strong>{{ pendingLabels.length }}</strong>
                 / {{ AVAILABLE_LABELS.length }}

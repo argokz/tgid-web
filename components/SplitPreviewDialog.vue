@@ -1,5 +1,9 @@
 <template>
-  <v-dialog v-model="open" max-width="600" persistent>
+  <v-dialog
+    v-model="open"
+    max-width="600"
+    persistent
+  >
     <v-card rounded="lg">
       <v-card-title class="d-flex align-center bg-primary text-white pa-3">
         <v-icon class="me-2">mdi-content-cut</v-icon>
@@ -7,8 +11,15 @@
       </v-card-title>
 
       <v-card-text class="pa-4">
-        <div v-if="loading" class="d-flex align-center justify-center py-6">
-          <v-progress-circular indeterminate color="primary" size="32" />
+        <div
+          v-if="loading"
+          class="d-flex align-center justify-center py-6"
+        >
+          <v-progress-circular
+            indeterminate
+            color="primary"
+            size="32"
+          />
           <span class="ms-3 text-body-2">Проверка зависимостей…</span>
         </div>
 
@@ -21,7 +32,11 @@
           <!-- Автоматически переносится -->
           <div class="mb-3">
             <div class="d-flex align-center mb-1">
-              <v-icon size="18" color="success" class="me-1">mdi-arrow-right-bold</v-icon>
+              <v-icon
+                size="18"
+                color="success"
+                class="me-1"
+              >mdi-arrow-right-bold</v-icon>
               <span class="text-caption font-weight-bold text-uppercase">Перенос на новую половину</span>
             </div>
             <template v-if="movedList.length">
@@ -36,25 +51,48 @@
                 {{ tableLabel(row.table) }}: {{ row.count }}
               </v-chip>
             </template>
-            <div v-else class="text-caption text-medium-emphasis">
+            <div
+              v-else
+              class="text-caption text-medium-emphasis"
+            >
               Нет объектов для автоматического переноса
             </div>
           </div>
 
           <!-- Решение оператора: оборудование без узла и позиции (B2) -->
-          <div v-if="reviewItems.length" class="mb-2">
+          <div
+            v-if="reviewItems.length"
+            class="mb-2"
+          >
             <div class="d-flex align-center mb-1">
-              <v-icon size="18" color="warning" class="me-1">mdi-hand-back-right</v-icon>
+              <v-icon
+                size="18"
+                color="warning"
+                class="me-1"
+              >mdi-hand-back-right</v-icon>
               <span class="text-caption font-weight-bold text-uppercase">Выберите половину</span>
             </div>
-            <v-alert type="warning" variant="tonal" density="compact" class="mb-2">
+            <v-alert
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-2"
+            >
               У этого оборудования нет узла установки и положения на участке — система
               не угадывает. Укажите для каждого объекта, на какой половине он окажется:
               первая — от начала участка до точки разреза, вторая — от точки разреза до конца.
             </v-alert>
             <div class="d-flex ga-2 mb-2">
-              <v-btn size="x-small" variant="outlined" @click="setAll('first')">Все на первую</v-btn>
-              <v-btn size="x-small" variant="outlined" @click="setAll('second')">Все на вторую</v-btn>
+              <v-btn
+                size="x-small"
+                variant="outlined"
+                @click="setAll('first')"
+              >Все на первую</v-btn>
+              <v-btn
+                size="x-small"
+                variant="outlined"
+                @click="setAll('second')"
+              >Все на вторую</v-btn>
             </div>
             <div
               v-for="item in reviewItems"
@@ -72,15 +110,27 @@
                 divided
                 color="primary"
               >
-                <v-btn value="first" size="small">1-я</v-btn>
-                <v-btn value="second" size="small">2-я</v-btn>
+                <v-btn
+                  value="first"
+                  size="small"
+                >1-я</v-btn>
+                <v-btn
+                  value="second"
+                  size="small"
+                >2-я</v-btn>
               </v-btn-toggle>
             </div>
-            <div v-if="undecided" class="text-caption text-warning mt-1">
+            <div
+              v-if="undecided"
+              class="text-caption text-warning mt-1"
+            >
               Не выбрано: {{ undecided }}
             </div>
           </div>
-          <div v-else-if="reviewList.length" class="mb-2">
+          <div
+            v-else-if="reviewList.length"
+            class="mb-2"
+          >
             <v-chip
               v-for="row in reviewList"
               :key="row.table"
@@ -93,12 +143,20 @@
             </v-chip>
           </div>
 
-          <div v-if="!movedList.length && !reviewList.length" class="text-caption text-medium-emphasis">
+          <div
+            v-if="!movedList.length && !reviewList.length"
+            class="text-caption text-medium-emphasis"
+          >
             На участке нет зависимого оборудования — разрезание безопасно.
           </div>
         </template>
 
-        <v-alert v-else-if="error" type="error" variant="tonal" density="compact">
+        <v-alert
+          v-else-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+        >
           {{ error }}
         </v-alert>
       </v-card-text>
@@ -106,7 +164,11 @@
       <v-divider />
       <v-card-actions class="pa-3">
         <v-spacer />
-        <v-btn variant="text" :disabled="confirming" @click="onCancel">Отмена</v-btn>
+        <v-btn
+          variant="text"
+          :disabled="confirming"
+          @click="onCancel"
+        >Отмена</v-btn>
         <v-btn
           color="primary"
           variant="flat"

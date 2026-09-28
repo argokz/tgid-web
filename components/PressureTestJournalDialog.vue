@@ -1,94 +1,292 @@
 <template>
   <Teleport to="body">
-    <v-dialog v-model="visible" :fullscreen="isMobile" max-width="1320" scrollable>
-      <v-card class="pressure-journal" :rounded="isMobile ? 0 : 'lg'">
+    <v-dialog
+      v-model="visible"
+      :fullscreen="isMobile"
+      max-width="1320"
+      scrollable
+    >
+      <v-card
+        class="pressure-journal"
+        :rounded="isMobile ? 0 : 'lg'"
+      >
         <v-card-title class="d-flex align-center ga-3 px-4 py-3">
-          <v-avatar color="blue-lighten-5" size="40"><v-icon color="blue-darken-2">mdi-gauge</v-icon></v-avatar>
-          <div class="flex-grow-1" style="min-width: 0">
+          <v-avatar
+            color="blue-lighten-5"
+            size="40"
+          ><v-icon color="blue-darken-2">mdi-gauge</v-icon></v-avatar>
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
             <div class="text-subtitle-1 font-weight-bold">Журнал опрессовок</div>
             <div class="text-caption text-medium-emphasis text-truncate">{{ scopeTitle }} · найдено {{ total }}</div>
           </div>
-          <v-btn v-if="mutationsEnabled" color="teal" variant="tonal" prepend-icon="mdi-stamper" class="mr-2" @click="batchApprovalRef?.open()">
+          <v-btn
+            v-if="mutationsEnabled"
+            color="teal"
+            variant="tonal"
+            prepend-icon="mdi-stamper"
+            class="mr-2"
+            @click="batchApprovalRef?.open()"
+          >
             Утвердить план
           </v-btn>
-          <v-btn v-if="mutationsEnabled" color="blue-darken-2" variant="flat" prepend-icon="mdi-plus" class="mr-2" @click="createPressureTest" :loading="creating">
+          <v-btn
+            v-if="mutationsEnabled"
+            color="blue-darken-2"
+            variant="flat"
+            prepend-icon="mdi-plus"
+            class="mr-2"
+            @click="createPressureTest"
+            :loading="creating"
+          >
             Создать
           </v-btn>
-          <v-btn icon variant="text" aria-label="Закрыть журнал" @click="visible = false"><v-icon>mdi-close</v-icon></v-btn>
+          <v-btn
+            icon
+            variant="text"
+            aria-label="Закрыть журнал"
+            @click="visible = false"
+          ><v-icon>mdi-close</v-icon></v-btn>
         </v-card-title>
         <v-divider />
 
         <div class="pa-3 pa-md-4 pressure-filters">
           <v-row dense>
-            <v-col cols="12" md="4">
-              <v-text-field v-model="search" label="Поиск по ID, контуру, источнику или решению"
-                prepend-inner-icon="mdi-magnify" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              md="4"
+            >
+              <v-text-field
+                v-model="search"
+                label="Поиск по ID, контуру, источнику или решению"
+                prepend-inner-icon="mdi-magnify"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-select v-model="stateId" :items="lookups.states" item-title="name" item-value="id"
-                label="Состояние" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-select
+                v-model="stateId"
+                :items="lookups.states"
+                item-title="name"
+                item-value="id"
+                label="Состояние"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="3">
-              <v-select v-model="testTypeId" :items="lookups.test_types" item-title="name" item-value="id"
-                label="Вид испытания" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="3"
+            >
+              <v-select
+                v-model="testTypeId"
+                :items="lookups.test_types"
+                item-title="name"
+                item-value="id"
+                label="Вид испытания"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="3">
-              <v-select v-model="heatSourceId" :items="lookups.heat_sources" item-title="name" item-value="id"
-                label="Источник тепла" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="3"
+            >
+              <v-select
+                v-model="heatSourceId"
+                :items="lookups.heat_sources"
+                item-title="name"
+                item-value="id"
+                label="Источник тепла"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="4">
-              <v-select v-model="responsibleId" :items="lookups.responsible_people" item-title="name" item-value="id"
-                label="Ответственный" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="4"
+            >
+              <v-select
+                v-model="responsibleId"
+                :items="lookups.responsible_people"
+                item-title="name"
+                item-value="id"
+                label="Ответственный"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-select v-model="approved" :items="approvalOptions" item-title="title" item-value="value"
-                label="Утверждение" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-select
+                v-model="approved"
+                :items="approvalOptions"
+                item-title="title"
+                item-value="value"
+                label="Утверждение"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-text-field v-model="dateFrom" type="date" label="С даты" density="compact" variant="outlined" hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-text-field
+                v-model="dateFrom"
+                type="date"
+                label="С даты"
+                density="compact"
+                variant="outlined"
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-text-field v-model="dateTo" type="date" label="По дату" density="compact" variant="outlined" hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-text-field
+                v-model="dateTo"
+                type="date"
+                label="По дату"
+                density="compact"
+                variant="outlined"
+                hide-details
+              />
             </v-col>
           </v-row>
           <div class="d-flex align-center flex-wrap ga-2 mt-3">
-            <v-chip v-if="scope.lineId" size="small" color="blue-darken-2" closable @click:close="clearScope">Трубопровод {{ scope.lineId }}</v-chip>
-            <v-chip v-if="scope.nodeId" size="small" color="blue-darken-2" closable @click:close="clearScope">Узел {{ scope.nodeId }}</v-chip>
+            <v-chip
+              v-if="scope.lineId"
+              size="small"
+              color="blue-darken-2"
+              closable
+              @click:close="clearScope"
+            >Трубопровод {{ scope.lineId }}</v-chip>
+            <v-chip
+              v-if="scope.nodeId"
+              size="small"
+              color="blue-darken-2"
+              closable
+              @click:close="clearScope"
+            >Узел {{ scope.nodeId }}</v-chip>
             <v-spacer />
-            <v-btn variant="text" prepend-icon="mdi-filter-remove-outline" @click="resetFilters">Сбросить</v-btn>
-            <v-btn color="blue-darken-2" prepend-icon="mdi-refresh" :loading="loading" @click="loadTests">Обновить</v-btn>
+            <v-btn
+              variant="text"
+              prepend-icon="mdi-filter-remove-outline"
+              @click="resetFilters"
+            >Сбросить</v-btn>
+            <v-btn
+              color="blue-darken-2"
+              prepend-icon="mdi-refresh"
+              :loading="loading"
+              @click="loadTests"
+            >Обновить</v-btn>
           </div>
         </div>
         <v-divider />
 
         <v-card-text class="pa-0 pressure-table-wrap">
-          <v-progress-linear v-if="loading" indeterminate color="blue-darken-2" />
-          <v-alert v-if="error" type="error" variant="tonal" class="ma-4">{{ error }}</v-alert>
-          <div v-else-if="!loading && items.length === 0" class="pressure-empty">
-            <v-icon size="56" color="grey-lighten-1">mdi-gauge-empty</v-icon>
+          <v-progress-linear
+            v-if="loading"
+            indeterminate
+            color="blue-darken-2"
+          />
+          <v-alert
+            v-if="error"
+            type="error"
+            variant="tonal"
+            class="ma-4"
+          >{{ error }}</v-alert>
+          <div
+            v-else-if="!loading && items.length === 0"
+            class="pressure-empty"
+          >
+            <v-icon
+              size="56"
+              color="grey-lighten-1"
+            >mdi-gauge-empty</v-icon>
             <div class="text-subtitle-1 mt-3">Опрессовки не найдены</div>
             <div class="text-body-2 text-medium-emphasis mt-1">Измените фильтры или загрузите исторические контуры TGID в таблицу opres.</div>
           </div>
-          <v-table v-else fixed-header hover density="compact" class="pressure-table">
+          <v-table
+            v-else
+            fixed-header
+            hover
+            density="compact"
+            class="pressure-table"
+          >
             <thead><tr>
               <th>ID</th><th>Период</th><th>Контур</th><th>Источник / вид</th><th>Состояние</th>
               <th>Давление I / II</th><th>Ответственный</th><th>Линии</th><th>Нарушения</th><th>Решение</th><th class="text-right">Действия</th>
             </tr></thead>
             <tbody>
-              <tr v-for="item in items" :key="item.id" class="pressure-row" @click="openDetails(item.id)">
+              <tr
+                v-for="item in items"
+                :key="item.id"
+                class="pressure-row"
+                @click="openDetails(item.id)"
+              >
                 <td class="font-weight-medium">{{ item.id }}</td>
                 <td class="text-no-wrap">{{ formatRange(item.effective_start, item.effective_finish) }}</td>
                 <td><div>{{ item.name || `Опрессовка ${item.id}` }}</div><div class="text-caption text-medium-emphasis">{{ item.contour_description || item.boundary_description || '—' }}</div></td>
                 <td>{{ [item.heat_source_name, item.test_type_name].filter(Boolean).join(' · ') || '—' }}</td>
-                <td><v-chip size="x-small" :color="stateColor(item.state_id)" variant="tonal">{{ item.state_name || 'Не указано' }}</v-chip></td>
+                <td><v-chip
+                  size="x-small"
+                  :color="stateColor(item.state_id)"
+                  variant="tonal"
+                >{{ item.state_name || 'Не указано' }}</v-chip></td>
                 <td class="text-no-wrap">{{ pressure(item.stage_one_pressure) }} / {{ pressure(item.stage_two_pressure) }}</td>
                 <td>{{ item.responsible_name || '—' }}</td><td>{{ item.line_count }}</td>
-                <td><v-chip size="x-small" :color="item.defect_count ? 'error' : 'success'" variant="tonal">{{ item.defect_count }}</v-chip></td>
+                <td><v-chip
+                  size="x-small"
+                  :color="item.defect_count ? 'error' : 'success'"
+                  variant="tonal"
+                >{{ item.defect_count }}</v-chip></td>
                 <td class="result-cell">{{ item.commission_decision || item.report || item.note || '—' }}</td>
                 <td class="text-right text-no-wrap">
-                  <v-btn v-if="hasCoordinates(item)" icon="mdi-crosshairs-gps" size="x-small" variant="text" color="blue-darken-2"
-                    aria-label="Показать контур на карте" @click.stop="locate(item, item.name || `Опрессовка ${item.id}`)" />
-                  <v-btn icon="mdi-chevron-right" size="x-small" variant="text" @click.stop="openDetails(item.id)" />
+                  <v-btn
+                    v-if="hasCoordinates(item)"
+                    icon="mdi-crosshairs-gps"
+                    size="x-small"
+                    variant="text"
+                    color="blue-darken-2"
+                    aria-label="Показать контур на карте"
+                    @click.stop="locate(item, item.name || `Опрессовка ${item.id}`)"
+                  />
+                  <v-btn
+                    icon="mdi-chevron-right"
+                    size="x-small"
+                    variant="text"
+                    @click.stop="openDetails(item.id)"
+                  />
                 </td>
               </tr>
             </tbody>
@@ -97,99 +295,277 @@
         <v-divider />
         <v-card-actions class="px-4 py-2">
           <span class="text-caption text-medium-emphasis">Страница {{ page }}{{ pages ? ` из ${pages}` : '' }}</span><v-spacer />
-          <v-pagination v-if="pages > 1" v-model="page" :length="pages" :total-visible="isMobile ? 3 : 7" density="compact" />
+          <v-pagination
+            v-if="pages > 1"
+            v-model="page"
+            :length="pages"
+            :total-visible="isMobile ? 3 : 7"
+            density="compact"
+          />
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="detailsVisible" :fullscreen="isMobile" max-width="1040" scrollable eager>
+    <v-dialog
+      v-model="detailsVisible"
+      :fullscreen="isMobile"
+      max-width="1040"
+      scrollable
+      eager
+    >
       <v-card :rounded="isMobile ? 0 : 'lg'">
         <v-card-title class="d-flex align-center ga-3 px-4 py-3">
           <v-icon color="blue-darken-2">mdi-gauge</v-icon>
-          <div class="flex-grow-1" style="min-width: 0">
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
             <div class="text-subtitle-1 font-weight-bold text-truncate">{{ isNew ? 'Новая опрессовка' : (selected?.name || `Опрессовка ${selected?.id || ''}`) }}</div>
-            <div class="text-caption text-medium-emphasis" v-if="!isNew">{{ selected?.state_name || 'Состояние не указано' }} · линий {{ selected?.line_count || 0 }} · документов {{ selected?.document_count || 0 }}</div>
+            <div
+              class="text-caption text-medium-emphasis"
+              v-if="!isNew"
+            >{{ selected?.state_name || 'Состояние не указано' }} · линий {{ selected?.line_count || 0 }} · документов {{ selected?.document_count || 0 }}</div>
           </div>
-          <v-btn icon variant="text" aria-label="Закрыть" @click="detailsVisible = false"><v-icon>mdi-close</v-icon></v-btn>
+          <v-btn
+            icon
+            variant="text"
+            aria-label="Закрыть"
+            @click="detailsVisible = false"
+          ><v-icon>mdi-close</v-icon></v-btn>
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-4">
-          <div v-if="detailsLoading" class="d-flex justify-center pa-10"><v-progress-circular indeterminate color="blue-darken-2" /></div>
-          <v-alert v-else-if="detailsError" type="error" variant="tonal">{{ detailsError }}</v-alert>
+          <div
+            v-if="detailsLoading"
+            class="d-flex justify-center pa-10"
+          ><v-progress-circular
+            indeterminate
+            color="blue-darken-2"
+          /></div>
+          <v-alert
+            v-else-if="detailsError"
+            type="error"
+            variant="tonal"
+          >{{ detailsError }}</v-alert>
           <template v-else-if="selected">
-            <v-expansion-panels multiple variant="accordion" :model-value="[0, 1]">
-              <v-expansion-panel v-for="(group, index) in detailGroups" :key="group.title" :value="index">
+            <v-expansion-panels
+              multiple
+              variant="accordion"
+              :model-value="[0, 1]"
+            >
+              <v-expansion-panel
+                v-for="(group, index) in detailGroups"
+                :key="group.title"
+                :value="index"
+              >
                 <v-expansion-panel-title>{{ group.title }}</v-expansion-panel-title>
                 <v-expansion-panel-text><v-row dense>
-                  <v-col v-for="field in group.fields" :key="field.label" cols="12" sm="6">
+                  <v-col
+                    v-for="field in group.fields"
+                    :key="field.label"
+                    cols="12"
+                    sm="6"
+                  >
                     <div class="detail-label mb-1">{{ field.label }}</div>
                     <template v-if="isEditing && field.key && isWritable(field.key)">
-                      <v-select v-if="field.type === 'select'" v-model="editFields[field.key]" :items="field.items" item-title="name" item-value="id" density="compact" hide-details variant="outlined" clearable />
-                      <v-text-field v-else-if="field.type === 'date'" v-model="editFields[field.key]" type="date" density="compact" hide-details variant="outlined" clearable />
-                      <v-text-field v-else-if="field.type === 'time'" v-model="editFields[field.key]" type="time" density="compact" hide-details variant="outlined" clearable />
-                      <v-textarea v-else-if="field.type === 'textarea'" v-model="editFields[field.key]" density="compact" hide-details variant="outlined" rows="3" auto-grow clearable />
-                      <v-text-field v-else-if="field.type === 'number'" v-model.number="editFields[field.key]" type="number" density="compact" hide-details variant="outlined" clearable />
-                      <v-text-field v-else v-model="editFields[field.key]" density="compact" hide-details variant="outlined" clearable />
+                      <v-select
+                        v-if="field.type === 'select'"
+                        v-model="editFields[field.key]"
+                        :items="field.items"
+                        item-title="name"
+                        item-value="id"
+                        density="compact"
+                        hide-details
+                        variant="outlined"
+                        clearable
+                      />
+                      <v-text-field
+                        v-else-if="field.type === 'date'"
+                        v-model="editFields[field.key]"
+                        type="date"
+                        density="compact"
+                        hide-details
+                        variant="outlined"
+                        clearable
+                      />
+                      <v-text-field
+                        v-else-if="field.type === 'time'"
+                        v-model="editFields[field.key]"
+                        type="time"
+                        density="compact"
+                        hide-details
+                        variant="outlined"
+                        clearable
+                      />
+                      <v-textarea
+                        v-else-if="field.type === 'textarea'"
+                        v-model="editFields[field.key]"
+                        density="compact"
+                        hide-details
+                        variant="outlined"
+                        rows="3"
+                        auto-grow
+                        clearable
+                      />
+                      <v-text-field
+                        v-else-if="field.type === 'number'"
+                        v-model.number="editFields[field.key]"
+                        type="number"
+                        density="compact"
+                        hide-details
+                        variant="outlined"
+                        clearable
+                      />
+                      <v-text-field
+                        v-else
+                        v-model="editFields[field.key]"
+                        density="compact"
+                        hide-details
+                        variant="outlined"
+                        clearable
+                      />
                     </template>
-                    <div v-else class="detail-value">{{ field.value }}</div>
+                    <div
+                      v-else
+                      class="detail-value"
+                    >{{ field.value }}</div>
                   </v-col>
                 </v-row></v-expansion-panel-text>
               </v-expansion-panel>
 
               <template v-if="!isEditing">
-                <v-expansion-panel v-if="testLines.length" :value="detailGroups.length">
-                <v-expansion-panel-title>Линии контура ({{ testLines.length }})</v-expansion-panel-title>
-                <v-expansion-panel-text><v-list density="compact" lines="two">
-                  <v-list-item v-for="line in testLines" :key="Number(line.id)" prepend-icon="mdi-pipe"
-                    :title="`Линия ${line.line_id} · ${nodeRange(line)}`" :subtitle="lineSummary(line)">
-                    <template v-if="hasCoordinates(line)" #append><v-btn icon="mdi-crosshairs-gps" size="x-small" variant="text" @click.stop="locateRelation(line, `Линия ${line.line_id}`)" /></template>
-                  </v-list-item>
-                </v-list></v-expansion-panel-text>
-              </v-expansion-panel>
+                <v-expansion-panel
+                  v-if="testLines.length"
+                  :value="detailGroups.length"
+                >
+                  <v-expansion-panel-title>Линии контура ({{ testLines.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text><v-list
+                    density="compact"
+                    lines="two"
+                  >
+                    <v-list-item
+                      v-for="line in testLines"
+                      :key="Number(line.id)"
+                      prepend-icon="mdi-pipe"
+                      :title="`Линия ${line.line_id} · ${nodeRange(line)}`"
+                      :subtitle="lineSummary(line)"
+                    >
+                      <template
+                        v-if="hasCoordinates(line)"
+                        #append
+                      ><v-btn
+                        icon="mdi-crosshairs-gps"
+                        size="x-small"
+                        variant="text"
+                        @click.stop="locateRelation(line, `Линия ${line.line_id}`)"
+                      /></template>
+                    </v-list-item>
+                  </v-list></v-expansion-panel-text>
+                </v-expansion-panel>
 
-              <v-expansion-panel v-if="boundaryNodes.length" :value="detailGroups.length + 1">
-                <v-expansion-panel-title>Границы раздела ({{ boundaryNodes.length }})</v-expansion-panel-title>
-                <v-expansion-panel-text><v-list density="compact">
-                  <v-list-item v-for="(node, index) in boundaryNodes" :key="`${node.kind}-${node.node_id}-${index}`" prepend-icon="mdi-map-marker-radius-outline"
-                    :title="`${node.kind}: ${node.node_name || `узел ${node.node_id}`}`">
-                    <template v-if="hasCoordinates(node)" #append><v-btn icon="mdi-crosshairs-gps" size="x-small" variant="text" @click.stop="locateRelation(node, String(node.node_name || `Узел ${node.node_id}`))" /></template>
-                  </v-list-item>
-                </v-list></v-expansion-panel-text>
-              </v-expansion-panel>
+                <v-expansion-panel
+                  v-if="boundaryNodes.length"
+                  :value="detailGroups.length + 1"
+                >
+                  <v-expansion-panel-title>Границы раздела ({{ boundaryNodes.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text><v-list density="compact">
+                    <v-list-item
+                      v-for="(node, index) in boundaryNodes"
+                      :key="`${node.kind}-${node.node_id}-${index}`"
+                      prepend-icon="mdi-map-marker-radius-outline"
+                      :title="`${node.kind}: ${node.node_name || `узел ${node.node_id}`}`"
+                    >
+                      <template
+                        v-if="hasCoordinates(node)"
+                        #append
+                      ><v-btn
+                        icon="mdi-crosshairs-gps"
+                        size="x-small"
+                        variant="text"
+                        @click.stop="locateRelation(node, String(node.node_name || `Узел ${node.node_id}`))"
+                      /></template>
+                    </v-list-item>
+                  </v-list></v-expansion-panel-text>
+                </v-expansion-panel>
 
-              <v-expansion-panel v-if="measures.length" :value="detailGroups.length + 2">
-                <v-expansion-panel-title>Мероприятия ({{ measures.length }})</v-expansion-panel-title>
-                <v-expansion-panel-text><v-chip v-for="measure in measures" :key="Number(measure.id)" class="ma-1" size="small" variant="tonal">{{ measure.measure_name || `Мероприятие ${measure.measure_id}` }}</v-chip></v-expansion-panel-text>
-              </v-expansion-panel>
+                <v-expansion-panel
+                  v-if="measures.length"
+                  :value="detailGroups.length + 2"
+                >
+                  <v-expansion-panel-title>Мероприятия ({{ measures.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text><v-chip
+                    v-for="measure in measures"
+                    :key="Number(measure.id)"
+                    class="ma-1"
+                    size="small"
+                    variant="tonal"
+                  >{{ measure.measure_name || `Мероприятие ${measure.measure_id}` }}</v-chip></v-expansion-panel-text>
+                </v-expansion-panel>
 
-              <v-expansion-panel v-if="relatedDefects.length" :value="detailGroups.length + 3">
-                <v-expansion-panel-title>Нарушения испытаний ({{ relatedDefects.length }})</v-expansion-panel-title>
-                <v-expansion-panel-text><v-list density="compact" lines="two">
-                  <v-list-item v-for="defect in relatedDefects" :key="Number(defect.id)" prepend-icon="mdi-alert-circle-outline"
-                    :title="`Нарушение ${defect.id} · ${defect.state_name || 'без состояния'}`"
-                    :subtitle="String(defect.description || defect.source_name || 'Описание не заполнено')" @click="openRelatedDefect(Number(defect.id))" />
-                </v-list></v-expansion-panel-text>
-              </v-expansion-panel>
+                <v-expansion-panel
+                  v-if="relatedDefects.length"
+                  :value="detailGroups.length + 3"
+                >
+                  <v-expansion-panel-title>Нарушения испытаний ({{ relatedDefects.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text><v-list
+                    density="compact"
+                    lines="two"
+                  >
+                    <v-list-item
+                      v-for="defect in relatedDefects"
+                      :key="Number(defect.id)"
+                      prepend-icon="mdi-alert-circle-outline"
+                      :title="`Нарушение ${defect.id} · ${defect.state_name || 'без состояния'}`"
+                      :subtitle="String(defect.description || defect.source_name || 'Описание не заполнено')"
+                      @click="openRelatedDefect(Number(defect.id))"
+                    />
+                  </v-list></v-expansion-panel-text>
+                </v-expansion-panel>
 
-              <v-expansion-panel v-if="documents.length" :value="detailGroups.length + 4">
-                <v-expansion-panel-title>Программы и акты ({{ documents.length }})</v-expansion-panel-title>
-                <v-expansion-panel-text><v-list density="compact">
-                  <v-list-item v-for="document in documents" :key="`${document.kind}-${document.id}`" prepend-icon="mdi-file-document-outline"
-                    :title="String(document.document_type_name || document.kind || 'Документ')" :subtitle="`${formatDate(document.date_doc)} · ${fileName(document.path)}`" />
-                </v-list></v-expansion-panel-text>
-              </v-expansion-panel>
+                <v-expansion-panel
+                  v-if="documents.length"
+                  :value="detailGroups.length + 4"
+                >
+                  <v-expansion-panel-title>Программы и акты ({{ documents.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text><v-list density="compact">
+                    <v-list-item
+                      v-for="document in documents"
+                      :key="`${document.kind}-${document.id}`"
+                      prepend-icon="mdi-file-document-outline"
+                      :title="String(document.document_type_name || document.kind || 'Документ')"
+                      :subtitle="`${formatDate(document.date_doc)} · ${fileName(document.path)}`"
+                    />
+                  </v-list></v-expansion-panel-text>
+                </v-expansion-panel>
               </template>
             </v-expansion-panels>
-            <JournalRecordPanels v-if="selected && !isEditing" class="mt-4" journal="pressure-tests" :record-id="selected.id"
+            <JournalRecordPanels
+              v-if="selected && !isEditing"
+              class="mt-4"
+              journal="pressure-tests"
+              :record-id="selected.id"
               :record-label="selected.name || `Опрессовка ${selected.id}`"
-              @changed="refreshSelected" @hide="hideForMap" @restore="restoreAfterMap" />
+              @changed="refreshSelected"
+              @hide="hideForMap"
+              @restore="restoreAfterMap"
+            />
           </template>
         </v-card-text>
         <v-divider />
         <v-card-actions class="px-4 py-3">
-          <v-btn v-if="!isEditing && selected && hasCoordinates(selected)" prepend-icon="mdi-crosshairs-gps" variant="tonal" color="blue-darken-2"
-            @click="locate(selected, selected.name || `Опрессовка ${selected.id}`)">На карте</v-btn>
-          <v-btn v-if="mutationsEnabled && (!isEditing)" variant="text" prepend-icon="mdi-pencil" @click="startEdit">Редактировать</v-btn>
+          <v-btn
+            v-if="!isEditing && selected && hasCoordinates(selected)"
+            prepend-icon="mdi-crosshairs-gps"
+            variant="tonal"
+            color="blue-darken-2"
+            @click="locate(selected, selected.name || `Опрессовка ${selected.id}`)"
+          >На карте</v-btn>
+          <v-btn
+            v-if="mutationsEnabled && (!isEditing)"
+            variant="text"
+            prepend-icon="mdi-pencil"
+            @click="startEdit"
+          >Редактировать</v-btn>
           <v-btn
             v-if="!isEditing && selected && !isNew"
             variant="text"
@@ -197,17 +573,42 @@
             :loading="exportingWord"
             @click="exportWord"
           >Word</v-btn>
-          <v-btn v-if="mutationsEnabled && !isEditing && selected && !isNew" color="error" variant="text" prepend-icon="mdi-delete" :loading="deleting" @click="deletePressureTest(selected.id)">Удалить</v-btn>
+          <v-btn
+            v-if="mutationsEnabled && !isEditing && selected && !isNew"
+            color="error"
+            variant="text"
+            prepend-icon="mdi-delete"
+            :loading="deleting"
+            @click="deletePressureTest(selected.id)"
+          >Удалить</v-btn>
           <v-spacer />
           <template v-if="isEditing">
-            <v-btn v-if="mutationsEnabled" variant="text" @click="cancelEdit">Отмена</v-btn>
-            <v-btn v-if="mutationsEnabled" color="blue-darken-2" variant="flat" :loading="saving" @click="saveChanges">Сохранить</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              variant="text"
+              @click="cancelEdit"
+            >Отмена</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="blue-darken-2"
+              variant="flat"
+              :loading="saving"
+              @click="saveChanges"
+            >Сохранить</v-btn>
           </template>
-          <v-btn v-else variant="text" @click="detailsVisible = false">Закрыть</v-btn>
+          <v-btn
+            v-else
+            variant="text"
+            @click="detailsVisible = false"
+          >Закрыть</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
-    <JournalBatchApprovalDialog ref="batchApprovalRef" journal="pressure-tests" @approved="loadTests" />
+    <JournalBatchApprovalDialog
+      ref="batchApprovalRef"
+      journal="pressure-tests"
+      @approved="loadTests"
+    />
   </Teleport>
 </template>
 

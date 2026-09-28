@@ -1,10 +1,22 @@
 <template>
-  <v-dialog :model-value="modelValue" max-width="640" @update:model-value="$emit('update:modelValue', $event)">
+  <v-dialog
+    :model-value="modelValue"
+    max-width="640"
+    @update:model-value="$emit('update:modelValue', $event)"
+  >
     <v-card>
-      <v-toolbar color="primary" density="compact">
+      <v-toolbar
+        color="primary"
+        density="compact"
+      >
         <v-toolbar-title>Направления пьезометра</v-toolbar-title>
         <v-spacer />
-        <v-btn icon size="small" aria-label="Закрыть" @click="$emit('update:modelValue', false)">
+        <v-btn
+          icon
+          size="small"
+          aria-label="Закрыть"
+          @click="$emit('update:modelValue', false)"
+        >
           <v-icon>mdi-close</v-icon>
         </v-btn>
       </v-toolbar>
@@ -14,7 +26,10 @@
           (таблицы directions и deployeddirections), путь между ними строится заново.
         </p>
 
-        <div v-if="canEditData" class="d-flex align-center ga-2 mb-3">
+        <div
+          v-if="canEditData"
+          class="d-flex align-center ga-2 mb-3"
+        >
           <v-text-field
             v-model="newName"
             label="Название для текущего маршрута"
@@ -33,10 +48,22 @@
             Сохранить
           </v-btn>
         </div>
-        <v-alert v-if="conflictName" type="warning" variant="tonal" density="compact" class="mb-3">
+        <v-alert
+          v-if="conflictName"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+        >
           Направление «{{ conflictName }}» уже есть в этом фрагменте.
           <template #append>
-            <v-btn size="small" variant="text" color="warning" :loading="saving" @click="save(true)">Заменить</v-btn>
+            <v-btn
+              size="small"
+              variant="text"
+              color="warning"
+              :loading="saving"
+              @click="save(true)"
+            >Заменить</v-btn>
           </template>
         </v-alert>
 
@@ -49,10 +76,29 @@
           clearable
           class="mb-2"
         />
-        <div v-if="loading" class="d-flex justify-center py-6"><v-progress-circular indeterminate color="primary" /></div>
-        <v-alert v-else-if="error" type="error" variant="tonal" density="compact">{{ error }}</v-alert>
-        <div v-else-if="!filtered.length" class="text-caption text-disabled py-4 text-center">Нет сохранённых направлений</div>
-        <v-list v-else density="compact" max-height="380" class="overflow-y-auto">
+        <div
+          v-if="loading"
+          class="d-flex justify-center py-6"
+        ><v-progress-circular
+          indeterminate
+          color="primary"
+        /></div>
+        <v-alert
+          v-else-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+        >{{ error }}</v-alert>
+        <div
+          v-else-if="!filtered.length"
+          class="text-caption text-disabled py-4 text-center"
+        >Нет сохранённых направлений</div>
+        <v-list
+          v-else
+          density="compact"
+          max-height="380"
+          class="overflow-y-auto"
+        >
           <v-list-item
             v-for="d in filtered"
             :key="d.id"

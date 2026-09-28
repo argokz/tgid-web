@@ -10,19 +10,48 @@
         <v-icon>mdi-printer</v-icon>
         Печать и экспорт карты
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" density="compact" aria-label="Закрыть" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          density="compact"
+          aria-label="Закрыть"
+          @click="visible = false"
+        />
       </v-card-title>
 
       <v-card-text class="pt-0">
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-3" closable @click:close="error = ''">
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+          closable
+          @click:close="error = ''"
+        >
           {{ error }}
         </v-alert>
         <v-row dense>
-          <v-col cols="12" md="4">
+          <v-col
+            cols="12"
+            md="4"
+          >
             <div class="text-subtitle-2 mb-1">Лист</div>
             <div class="d-flex ga-2">
-              <v-select v-model="form.format" :items="formats" label="Формат" density="compact" hide-details />
-              <v-select v-model="form.orientation" :items="orientations" label="Ориентация" density="compact" hide-details />
+              <v-select
+                v-model="form.format"
+                :items="formats"
+                label="Формат"
+                density="compact"
+                hide-details
+              />
+              <v-select
+                v-model="form.orientation"
+                :items="orientations"
+                label="Ориентация"
+                density="compact"
+                hide-details
+              />
             </div>
             <v-select
               v-model="form.dpi"
@@ -33,9 +62,19 @@
               class="mt-2"
             />
             <div class="text-subtitle-2 mt-3 mb-1">Масштаб</div>
-            <v-radio-group v-model="form.scaleMode" density="compact" hide-details>
-              <v-radio label="Вписать текущий вид карты" value="view" />
-              <v-radio label="Задать масштаб (центр — центр карты)" value="fixed" />
+            <v-radio-group
+              v-model="form.scaleMode"
+              density="compact"
+              hide-details
+            >
+              <v-radio
+                label="Вписать текущий вид карты"
+                value="view"
+              />
+              <v-radio
+                label="Задать масштаб (центр — центр карты)"
+                value="fixed"
+              />
             </v-radio-group>
             <v-combobox
               v-if="form.scaleMode === 'fixed'"
@@ -47,15 +86,48 @@
               class="mt-1"
             />
             <div class="text-subtitle-2 mt-3 mb-1">Оформление</div>
-            <v-text-field v-model="form.title" label="Заголовок" density="compact" hide-details class="mb-2" />
-            <v-checkbox v-model="form.showStamp" label="Штамп" density="compact" hide-details />
+            <v-text-field
+              v-model="form.title"
+              label="Заголовок"
+              density="compact"
+              hide-details
+              class="mb-2"
+            />
+            <v-checkbox
+              v-model="form.showStamp"
+              label="Штамп"
+              density="compact"
+              hide-details
+            />
             <template v-if="form.showStamp">
-              <v-text-field v-model="form.organization" label="Организация" density="compact" hide-details class="mb-2" />
+              <v-text-field
+                v-model="form.organization"
+                label="Организация"
+                density="compact"
+                hide-details
+                class="mb-2"
+              />
               <div class="d-flex ga-2 mb-2">
-                <v-text-field v-model="form.author" label="Исполнитель" density="compact" hide-details />
-                <v-text-field v-model="form.sheet" label="Лист" density="compact" hide-details style="max-width: 80px" />
+                <v-text-field
+                  v-model="form.author"
+                  label="Исполнитель"
+                  density="compact"
+                  hide-details
+                />
+                <v-text-field
+                  v-model="form.sheet"
+                  label="Лист"
+                  density="compact"
+                  hide-details
+                  style="max-width: 80px"
+                />
               </div>
-              <v-text-field v-model="form.date" label="Дата" density="compact" hide-details />
+              <v-text-field
+                v-model="form.date"
+                label="Дата"
+                density="compact"
+                hide-details
+              />
             </template>
             <v-checkbox
               v-model="form.showLegend"
@@ -64,18 +136,42 @@
               hide-details
             />
           </v-col>
-          <v-col cols="12" md="8">
+          <v-col
+            cols="12"
+            md="8"
+          >
             <div class="print-preview d-flex align-center justify-center">
-              <img v-if="previewUrl" :src="previewUrl" alt="Макет листа" class="print-preview__img" />
-              <div v-else class="text-medium-emphasis text-body-2 pa-6 text-center">
-                <v-progress-circular v-if="rendering" indeterminate class="mb-2" /><br />
+              <img
+                v-if="previewUrl"
+                :src="previewUrl"
+                alt="Макет листа"
+                class="print-preview__img"
+              >
+              <div
+                v-else
+                class="text-medium-emphasis text-body-2 pa-6 text-center"
+              >
+                <v-progress-circular
+                  v-if="rendering"
+                  indeterminate
+                  class="mb-2"
+                /><br>
                 {{ rendering ? 'Отрисовка карты для листа…' : 'Нажмите «Сформировать лист»' }}
               </div>
             </div>
-            <v-alert v-if="result?.incomplete" type="warning" variant="tonal" density="compact" class="mt-1">
+            <v-alert
+              v-if="result?.incomplete"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mt-1"
+            >
               Часть тайлов карты не загрузилась за 45 с — на листе могут быть пропуски. Сформируйте лист ещё раз.
             </v-alert>
-            <div v-if="result" class="text-caption text-medium-emphasis mt-1">
+            <div
+              v-if="result"
+              class="text-caption text-medium-emphasis mt-1"
+            >
               {{ form.format }}, {{ form.orientation === 'landscape' ? 'альбомная' : 'книжная' }},
               1:{{ result.scale.toLocaleString('ru-RU') }}, {{ result.canvas.width }}×{{ result.canvas.height }} px
               ({{ form.dpi }} dpi). Масштаб верен при печати в 100 % без «подгонки по размеру».
@@ -85,16 +181,40 @@
       </v-card-text>
 
       <v-card-actions class="flex-wrap ga-1">
-        <v-btn variant="text" prepend-icon="mdi-image-outline" :loading="snapshotting" @click="downloadSnapshot">
+        <v-btn
+          variant="text"
+          prepend-icon="mdi-image-outline"
+          :loading="snapshotting"
+          @click="downloadSnapshot"
+        >
           Снимок экрана PNG
         </v-btn>
         <v-spacer />
-        <v-btn color="primary" variant="tonal" prepend-icon="mdi-refresh" :loading="rendering" @click="render">
+        <v-btn
+          color="primary"
+          variant="tonal"
+          prepend-icon="mdi-refresh"
+          :loading="rendering"
+          @click="render"
+        >
           Сформировать лист
         </v-btn>
-        <v-btn :disabled="!result" prepend-icon="mdi-download" @click="downloadPng">PNG</v-btn>
-        <v-btn :disabled="!result" prepend-icon="mdi-file-pdf-box" @click="downloadPdf">PDF</v-btn>
-        <v-btn :disabled="!result" color="primary" prepend-icon="mdi-printer" @click="print">Печать</v-btn>
+        <v-btn
+          :disabled="!result"
+          prepend-icon="mdi-download"
+          @click="downloadPng"
+        >PNG</v-btn>
+        <v-btn
+          :disabled="!result"
+          prepend-icon="mdi-file-pdf-box"
+          @click="downloadPdf"
+        >PDF</v-btn>
+        <v-btn
+          :disabled="!result"
+          color="primary"
+          prepend-icon="mdi-printer"
+          @click="print"
+        >Печать</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

@@ -197,7 +197,10 @@
                   :disabled="!hasCoordinates(item)"
                   @click="emit('locate-consumer', { longitude: Number(item.longitude), latitude: Number(item.latitude), id: item.id, nodeId: item.node_id, label: item.name || `Потребитель П-${item.id}` })"
                 >
-                  <v-tooltip activator="parent" location="left">Найти на карте</v-tooltip>
+                  <v-tooltip
+                    activator="parent"
+                    location="left"
+                  >Найти на карте</v-tooltip>
                 </v-btn>
               </td>
             </tr>

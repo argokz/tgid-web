@@ -1,16 +1,35 @@
 <template>
-  <v-dialog v-model="visible" :fullscreen="isMobile" max-width="1100" scrollable>
-    <v-card rounded="lg" class="outage-dialog">
+  <v-dialog
+    v-model="visible"
+    :fullscreen="isMobile"
+    max-width="1100"
+    scrollable
+  >
+    <v-card
+      rounded="lg"
+      class="outage-dialog"
+    >
       <v-card-title class="d-flex align-center ga-2 bg-surface-variant py-3 px-4">
-        <v-icon color="error" size="24">mdi-valve-closed</v-icon>
+        <v-icon
+          color="error"
+          size="24"
+        >mdi-valve-closed</v-icon>
         <span class="text-h6 font-weight-bold">Анализ аварийного отключения (Локализация задвижек)</span>
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" size="small" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          @click="visible = false"
+        />
       </v-card-title>
 
       <v-card-text class="pa-4">
         <!-- Форма параметров аварийного участка -->
-        <v-card variant="outlined" class="mb-4 pa-3 rounded-lg bg-surface">
+        <v-card
+          variant="outlined"
+          class="mb-4 pa-3 rounded-lg bg-surface"
+        >
           <div class="d-flex flex-wrap align-center ga-3">
             <v-btn-toggle
               v-model="targetType"
@@ -20,11 +39,17 @@
               variant="outlined"
             >
               <v-btn value="line">
-                <v-icon start size="18">mdi-pipe</v-icon>
+                <v-icon
+                  start
+                  size="18"
+                >mdi-pipe</v-icon>
                 Трубопровод (Line ID)
               </v-btn>
               <v-btn value="node">
-                <v-icon start size="18">mdi-map-marker-radius</v-icon>
+                <v-icon
+                  start
+                  size="18"
+                >mdi-map-marker-radius</v-icon>
                 Узел сети (Node ID)
               </v-btn>
             </v-btn-toggle>
@@ -106,10 +131,21 @@
         </v-alert>
 
         <!-- KPI Сводка результатов -->
-        <div v-if="result?.summary" class="mb-4">
+        <div
+          v-if="result?.summary"
+          class="mb-4"
+        >
           <v-row dense>
-            <v-col cols="12" sm="6" md="3">
-              <v-card variant="tonal" color="error" class="pa-3 rounded-lg text-center">
+            <v-col
+              cols="12"
+              sm="6"
+              md="3"
+            >
+              <v-card
+                variant="tonal"
+                color="error"
+                class="pa-3 rounded-lg text-center"
+              >
                 <div class="text-caption text-medium-emphasis">Отсекающие задвижки</div>
                 <div class="text-h4 font-weight-bold d-flex align-center justify-center ga-2 mt-1">
                   <v-icon size="28">mdi-valve</v-icon>
@@ -119,8 +155,16 @@
               </v-card>
             </v-col>
 
-            <v-col cols="12" sm="6" md="3">
-              <v-card variant="tonal" color="amber-darken-4" class="pa-3 rounded-lg text-center">
+            <v-col
+              cols="12"
+              sm="6"
+              md="3"
+            >
+              <v-card
+                variant="tonal"
+                color="amber-darken-4"
+                class="pa-3 rounded-lg text-center"
+              >
                 <div class="text-caption text-medium-emphasis">Отключено зданий</div>
                 <div class="text-h4 font-weight-bold d-flex align-center justify-center ga-2 mt-1">
                   <v-icon size="28">mdi-home-alert-outline</v-icon>
@@ -132,8 +176,16 @@
               </v-card>
             </v-col>
 
-            <v-col cols="12" sm="6" md="3">
-              <v-card variant="tonal" color="deep-orange-darken-2" class="pa-3 rounded-lg text-center">
+            <v-col
+              cols="12"
+              sm="6"
+              md="3"
+            >
+              <v-card
+                variant="tonal"
+                color="deep-orange-darken-2"
+                class="pa-3 rounded-lg text-center"
+              >
                 <div class="text-caption text-medium-emphasis">Недоотпуск тепла</div>
                 <div class="text-h4 font-weight-bold d-flex align-center justify-center ga-2 mt-1">
                   <v-icon size="28">mdi-fire-alert</v-icon>
@@ -143,8 +195,16 @@
               </v-card>
             </v-col>
 
-            <v-col cols="12" sm="6" md="3">
-              <v-card variant="tonal" color="blue-grey-darken-3" class="pa-3 rounded-lg text-center">
+            <v-col
+              cols="12"
+              sm="6"
+              md="3"
+            >
+              <v-card
+                variant="tonal"
+                color="blue-grey-darken-3"
+                class="pa-3 rounded-lg text-center"
+              >
                 <div class="text-caption text-medium-emphasis">Сеть в зоне аварии</div>
                 <div class="text-h5 font-weight-bold d-flex align-center justify-center ga-2 mt-1">
                   {{ result.summary.total_pipe_length_m }} м / {{ result.summary.total_pipe_volume_m3 }} м³
@@ -156,8 +216,16 @@
         </div>
 
         <!-- Детальные таблицы -->
-        <v-card v-if="result" variant="outlined" class="rounded-lg">
-          <v-tabs v-model="activeTab" density="compact" color="primary">
+        <v-card
+          v-if="result"
+          variant="outlined"
+          class="rounded-lg"
+        >
+          <v-tabs
+            v-model="activeTab"
+            density="compact"
+            color="primary"
+          >
             <v-tab value="valves">
               <v-badge
                 :content="result.valves_to_close.length"
@@ -192,7 +260,10 @@
           <v-window v-model="activeTab">
             <!-- Таблица задвижек -->
             <v-window-item value="valves">
-              <v-table density="compact" hover>
+              <v-table
+                density="compact"
+                hover
+              >
                 <thead>
                   <tr>
                     <th>ID</th>
@@ -204,7 +275,10 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="v in result.valves_to_close" :key="v.id">
+                  <tr
+                    v-for="v in result.valves_to_close"
+                    :key="v.id"
+                  >
                     <td class="font-weight-bold">#{{ v.id }}</td>
                     <td>{{ v.lineid }}</td>
                     <td>{{ v.display_name }}</td>
@@ -232,7 +306,10 @@
                     </td>
                   </tr>
                   <tr v-if="!result.valves_to_close.length">
-                    <td colspan="6" class="text-center text-medium-emphasis py-4">
+                    <td
+                      colspan="6"
+                      class="text-center text-medium-emphasis py-4"
+                    >
                       Задвижки не найдены на границах изолированного сегмента
                     </td>
                   </tr>
@@ -242,7 +319,10 @@
 
             <!-- Таблица потребителей -->
             <v-window-item value="consumers">
-              <v-table density="compact" hover>
+              <v-table
+                density="compact"
+                hover
+              >
                 <thead>
                   <tr>
                     <th>ID</th>
@@ -256,13 +336,26 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="c in allConsumers" :key="`${c.downstream ? 'd' : 'z'}-${c.consumer_type}-${c.id}`">
+                  <tr
+                    v-for="c in allConsumers"
+                    :key="`${c.downstream ? 'd' : 'z'}-${c.consumer_type}-${c.id}`"
+                  >
                     <td>{{ c.id }}</td>
                     <td>
-                      <v-chip size="x-small" variant="tonal" color="info">
+                      <v-chip
+                        size="x-small"
+                        variant="tonal"
+                        color="info"
+                      >
                         {{ c.consumer_type === 'real' ? 'Реальный' : 'Обобщенный' }}
                       </v-chip>
-                      <v-chip v-if="c.downstream" size="x-small" variant="tonal" color="orange-darken-3" class="ml-1">
+                      <v-chip
+                        v-if="c.downstream"
+                        size="x-small"
+                        variant="tonal"
+                        color="orange-darken-3"
+                        class="ml-1"
+                      >
                         ниже задвижек
                       </v-chip>
                     </td>
@@ -283,7 +376,10 @@
                     </td>
                   </tr>
                   <tr v-if="!allConsumers.length">
-                    <td colspan="8" class="text-center text-medium-emphasis py-4">
+                    <td
+                      colspan="8"
+                      class="text-center text-medium-emphasis py-4"
+                    >
                       В изолированной зоне нет подключенных потребителей
                     </td>
                   </tr>
@@ -293,7 +389,10 @@
 
             <!-- Таблица труб -->
             <v-window-item value="pipes">
-              <v-table density="compact" hover>
+              <v-table
+                density="compact"
+                hover
+              >
                 <thead>
                   <tr>
                     <th>ID участка</th>
@@ -318,8 +417,15 @@
           </v-window>
         </v-card>
 
-        <div v-else-if="!loading" class="text-center py-8 text-medium-emphasis">
-          <v-icon size="48" color="medium-emphasis" class="mb-2">mdi-pipe-valve</v-icon>
+        <div
+          v-else-if="!loading"
+          class="text-center py-8 text-medium-emphasis"
+        >
+          <v-icon
+            size="48"
+            color="medium-emphasis"
+            class="mb-2"
+          >mdi-pipe-valve</v-icon>
           <div class="text-body-1">
             Выберите трубопровод или узел для расчета аварийной зоны и поиска отсекающих задвижек
           </div>
@@ -339,7 +445,10 @@
           Снять подсветку с карты
         </v-btn>
         <v-spacer />
-        <v-btn variant="text" @click="visible = false">Закрыть</v-btn>
+        <v-btn
+          variant="text"
+          @click="visible = false"
+        >Закрыть</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

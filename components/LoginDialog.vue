@@ -1,5 +1,9 @@
 <template>
-  <v-dialog v-model="visible" max-width="420" persistent>
+  <v-dialog
+    v-model="visible"
+    max-width="420"
+    persistent
+  >
     <v-card rounded="lg">
       <v-card-title class="d-flex align-center ga-2">
         <v-icon>mdi-login</v-icon>
@@ -36,14 +40,28 @@
           variant="outlined"
           hide-details
         />
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mt-3">
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mt-3"
+        >
           {{ error }}
         </v-alert>
       </v-card-text>
       <v-card-actions class="px-4 pb-4">
         <v-spacer />
-        <v-btn variant="text" @click="close">Отмена</v-btn>
-        <v-btn color="primary" variant="flat" :loading="loading" @click="submit">Войти</v-btn>
+        <v-btn
+          variant="text"
+          @click="close"
+        >Отмена</v-btn>
+        <v-btn
+          color="primary"
+          variant="flat"
+          :loading="loading"
+          @click="submit"
+        >Войти</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

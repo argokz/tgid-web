@@ -1,11 +1,20 @@
 <template>
-  <v-dialog v-model="visible" :fullscreen="isMobile" max-width="720" scrollable>
+  <v-dialog
+    v-model="visible"
+    :fullscreen="isMobile"
+    max-width="720"
+    scrollable
+  >
     <v-card rounded="lg">
       <v-card-title class="d-flex align-center ga-2">
         <v-icon>mdi-sigma</v-icon>
         Запросы по сети
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          @click="visible = false"
+        />
       </v-card-title>
       <v-card-text>
         <p class="text-body-2 text-medium-emphasis mb-3">
@@ -97,16 +106,28 @@
           </v-btn>
         </div>
 
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-3">
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+        >
           {{ error }}
         </v-alert>
 
         <template v-if="result">
           <div class="text-subtitle-1 mb-2">{{ result.title }}</div>
-          <div v-if="result.query === 'volume'" class="text-h6">
+          <div
+            v-if="result.query === 'volume'"
+            class="text-h6"
+          >
             {{ formatNum(result.volume_m3) }} м³
           </div>
-          <div v-else-if="result.query === 'length'" class="text-body-1">
+          <div
+            v-else-if="result.query === 'length'"
+            class="text-body-1"
+          >
             Всего: <strong>{{ formatNum(result.length_total_m) }}</strong> м<br>
             Подача: {{ formatNum(result.length_supply_m) }} м ·
             Обратка: {{ formatNum(result.length_return_m) }} м
@@ -118,7 +139,10 @@
                 <tr><th>Øусл</th><th>Длина, м</th></tr>
               </thead>
               <tbody>
-                <tr v-for="row in result.items || []" :key="String(row.diameter_condit)">
+                <tr
+                  v-for="row in result.items || []"
+                  :key="String(row.diameter_condit)"
+                >
                   <td>{{ row.diameter_condit ?? '—' }}</td>
                   <td>{{ formatNum(row.length_m) }}</td>
                 </tr>
@@ -132,14 +156,23 @@
                 <thead>
                   <tr>
                     <th>Øусл</th>
-                    <th v-for="col in result.columns || []" :key="col.key">{{ col.title }}</th>
+                    <th
+                      v-for="col in result.columns || []"
+                      :key="col.key"
+                    >{{ col.title }}</th>
                     <th>Всего, м</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="row in result.items || []" :key="String(row.diameter_condit)">
+                  <tr
+                    v-for="row in result.items || []"
+                    :key="String(row.diameter_condit)"
+                  >
                     <td>{{ row.diameter_condit ?? '—' }}</td>
-                    <td v-for="col in result.columns || []" :key="col.key">{{ formatNum(row.lengths?.[col.key] ?? 0) }}</td>
+                    <td
+                      v-for="col in result.columns || []"
+                      :key="col.key"
+                    >{{ formatNum(row.lengths?.[col.key] ?? 0) }}</td>
                     <td><strong>{{ formatNum(row.total_m) }}</strong></td>
                   </tr>
                 </tbody>
@@ -155,7 +188,10 @@
                 <tr><th>Показатель, Гкал/ч</th><th>Задано</th><th>Получено</th></tr>
               </thead>
               <tbody>
-                <tr v-for="row in heatRows" :key="row.key">
+                <tr
+                  v-for="row in heatRows"
+                  :key="row.key"
+                >
                   <td>{{ row.label }}</td>
                   <td>{{ formatNum(row.given) }}</td>
                   <td>{{ formatNum(row.received) }}</td>
@@ -165,8 +201,14 @@
           </div>
           <div v-else-if="result.query === 'closed_consumers'">
             <div class="mb-2">Найдено: <strong>{{ result.count }}</strong></div>
-            <div v-if="!result.count" class="text-body-2 text-medium-emphasis">Нет закрытых потребителей</div>
-            <div v-else class="nq-scroll">
+            <div
+              v-if="!result.count"
+              class="text-body-2 text-medium-emphasis"
+            >Нет закрытых потребителей</div>
+            <div
+              v-else
+              class="nq-scroll"
+            >
               <table class="nq-table">
                 <thead>
                   <tr><th>Код</th><th>Узел</th><th>Потребитель</th><th>Фрагмент</th></tr>

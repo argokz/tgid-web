@@ -1,5 +1,9 @@
 <template>
-  <v-dialog v-model="open" max-width="560" persistent>
+  <v-dialog
+    v-model="open"
+    max-width="560"
+    persistent
+  >
     <v-card rounded="lg">
       <v-card-title class="d-flex align-center bg-primary text-white pa-3">
         <v-icon class="me-2">mdi-call-merge</v-icon>
@@ -7,8 +11,15 @@
       </v-card-title>
 
       <v-card-text class="pa-4">
-        <div v-if="loading" class="d-flex align-center justify-center py-6">
-          <v-progress-circular indeterminate color="primary" size="32" />
+        <div
+          v-if="loading"
+          class="d-flex align-center justify-center py-6"
+        >
+          <v-progress-circular
+            indeterminate
+            color="primary"
+            size="32"
+          />
           <span class="ms-3 text-body-2">Проверка зависимостей…</span>
         </div>
 
@@ -20,15 +31,29 @@
           </p>
 
           <!-- Что блокирует -->
-          <v-alert v-if="blockerLines.length" type="error" variant="tonal" density="compact" class="mb-3">
+          <v-alert
+            v-if="blockerLines.length"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
             <div class="font-weight-bold mb-1">Слияние невозможно:</div>
-            <div v-for="line in blockerLines" :key="line" class="text-caption">{{ line }}</div>
+            <div
+              v-for="line in blockerLines"
+              :key="line"
+              class="text-caption"
+            >{{ line }}</div>
           </v-alert>
 
           <!-- Перенос ссылок -->
           <div class="mb-3">
             <div class="d-flex align-center mb-1">
-              <v-icon size="18" color="success" class="me-1">mdi-arrow-right-bold</v-icon>
+              <v-icon
+                size="18"
+                color="success"
+                class="me-1"
+              >mdi-arrow-right-bold</v-icon>
               <span class="text-caption font-weight-bold text-uppercase">Перенос на узел {{ targetId }}</span>
             </div>
             <template v-if="transferList.length">
@@ -43,17 +68,27 @@
                 {{ topologyRefLabel(row.key) }}: {{ row.count }}
               </v-chip>
             </template>
-            <div v-else class="text-caption text-medium-emphasis">На узле нет зависимых объектов</div>
+            <div
+              v-else
+              class="text-caption text-medium-emphasis"
+            >На узле нет зависимых объектов</div>
           </div>
 
           <!-- Участки -->
           <div class="mb-3 text-body-2">
             <div v-if="report.relinked_lines.length">
-              <v-icon size="16" class="me-1">mdi-vector-polyline</v-icon>
+              <v-icon
+                size="16"
+                class="me-1"
+              >mdi-vector-polyline</v-icon>
               Перепривязываются участки: {{ report.relinked_lines.join(', ') }}
             </div>
             <div v-if="report.removed_lines.length">
-              <v-icon size="16" color="warning" class="me-1">mdi-delete</v-icon>
+              <v-icon
+                size="16"
+                color="warning"
+                class="me-1"
+              >mdi-delete</v-icon>
               Снимаются участки между узлами: {{ report.removed_lines.join(', ') }}
             </div>
           </div>
@@ -69,13 +104,21 @@
             {{ report.warnings.parallel_lines_with.join(', ') }}
           </v-alert>
 
-          <div v-if="resultsList.length" class="text-caption text-medium-emphasis">
+          <div
+            v-if="resultsList.length"
+            class="text-caption text-medium-emphasis"
+          >
             Не переносятся (устареют до следующего расчёта):
             {{ resultsList.map((r) => `${topologyRefLabel(r.key)} ×${r.count}`).join(', ') }}
           </div>
         </template>
 
-        <v-alert v-else-if="error" type="error" variant="tonal" density="compact">
+        <v-alert
+          v-else-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+        >
           {{ error }}
         </v-alert>
       </v-card-text>
@@ -83,7 +126,11 @@
       <v-divider />
       <v-card-actions class="pa-3">
         <v-spacer />
-        <v-btn variant="text" :disabled="confirming" @click="onCancel">Отмена</v-btn>
+        <v-btn
+          variant="text"
+          :disabled="confirming"
+          @click="onCancel"
+        >Отмена</v-btn>
         <v-btn
           color="primary"
           variant="flat"

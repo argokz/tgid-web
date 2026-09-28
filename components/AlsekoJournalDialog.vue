@@ -1,75 +1,243 @@
 <template>
-  <v-dialog v-model="visible" :fullscreen="isMobile" max-width="1720" scrollable>
-    <v-card class="alseko-journal" :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="indigo-darken-2" density="comfortable">
+  <v-dialog
+    v-model="visible"
+    :fullscreen="isMobile"
+    max-width="1720"
+    scrollable
+  >
+    <v-card
+      class="alseko-journal"
+      :rounded="isMobile ? 0 : 'lg'"
+    >
+      <v-toolbar
+        color="indigo-darken-2"
+        density="comfortable"
+      >
         <v-icon class="ml-3">mdi-office-building-marker</v-icon>
         <v-toolbar-title>АЛСЕКО — договорные нагрузки</v-toolbar-title>
-        <v-chip v-if="counts" class="mr-2" size="small">{{ counts.total.toLocaleString('ru-RU') }} объектов</v-chip>
-        <v-btn icon="mdi-close" @click="visible = false" />
+        <v-chip
+          v-if="counts"
+          class="mr-2"
+          size="small"
+        >{{ counts.total.toLocaleString('ru-RU') }} объектов</v-chip>
+        <v-btn
+          icon="mdi-close"
+          @click="visible = false"
+        />
       </v-toolbar>
 
-      <v-tabs v-model="mode" color="indigo-darken-2" @update:model-value="changeMode">
+      <v-tabs
+        v-model="mode"
+        color="indigo-darken-2"
+        @update:model-value="changeMode"
+      >
         <v-tab value="loads">Договорные объекты</v-tab>
         <v-tab value="buildings">Здания без потребителя</v-tab>
         <v-tab value="reconciliation">Сверка и привязка</v-tab>
       </v-tabs>
 
-      <v-card-text v-if="mode === 'reconciliation'" class="pa-0 alseko-table-wrap">
-        <AlsekoReconciliationPanel :building-id="bindBuildingId" @open-building="openBuilding" @open-load="openLoad" />
+      <v-card-text
+        v-if="mode === 'reconciliation'"
+        class="pa-0 alseko-table-wrap"
+      >
+        <AlsekoReconciliationPanel
+          :building-id="bindBuildingId"
+          @open-building="openBuilding"
+          @open-load="openLoad"
+        />
       </v-card-text>
 
-      <div v-show="mode !== 'reconciliation'" class="pa-3 alseko-filters">
+      <div
+        v-show="mode !== 'reconciliation'"
+        class="pa-3 alseko-filters"
+      >
         <v-row dense>
-          <v-col cols="12" md="3">
-            <v-text-field v-model="filters.search" label="Адрес, договор, владелец, объект" density="compact" clearable hide-details prepend-inner-icon="mdi-magnify" @keyup.enter="reload" />
+          <v-col
+            cols="12"
+            md="3"
+          >
+            <v-text-field
+              v-model="filters.search"
+              label="Адрес, договор, владелец, объект"
+              density="compact"
+              clearable
+              hide-details
+              prepend-inner-icon="mdi-magnify"
+              @keyup.enter="reload"
+            />
           </v-col>
           <template v-if="mode === 'loads'">
-            <v-col cols="6" md="2"><v-select v-model="filters.match_status" :items="matchStatuses" label="Связь со зданием" density="compact" clearable hide-details /></v-col>
-            <v-col cols="6" md="2"><v-select v-model="filters.customer_group" :items="customerGroups" label="Группа" density="compact" clearable hide-details /></v-col>
-            <v-col cols="6" md="2"><v-select v-model="filters.operation_district" :items="lookups.operation_districts" item-title="name" item-value="name" label="Район эксплуатации" density="compact" clearable hide-details /></v-col>
-            <v-col cols="6" md="2"><v-select v-model="filters.administrative_district" :items="lookups.administrative_districts" item-title="name" item-value="name" label="Административный район" density="compact" clearable hide-details /></v-col>
-            <v-col cols="6" md="2"><v-select v-model="filters.heat_source" :items="lookups.heat_sources" item-title="name" item-value="name" label="Источник" density="compact" clearable hide-details /></v-col>
-            <v-col cols="6" md="2"><v-select v-model="filters.temperature_graph" :items="lookups.temperature_graphs" item-title="name" item-value="name" label="Температурный график" density="compact" clearable hide-details /></v-col>
+            <v-col
+              cols="6"
+              md="2"
+            ><v-select
+              v-model="filters.match_status"
+              :items="matchStatuses"
+              label="Связь со зданием"
+              density="compact"
+              clearable
+              hide-details
+            /></v-col>
+            <v-col
+              cols="6"
+              md="2"
+            ><v-select
+              v-model="filters.customer_group"
+              :items="customerGroups"
+              label="Группа"
+              density="compact"
+              clearable
+              hide-details
+            /></v-col>
+            <v-col
+              cols="6"
+              md="2"
+            ><v-select
+              v-model="filters.operation_district"
+              :items="lookups.operation_districts"
+              item-title="name"
+              item-value="name"
+              label="Район эксплуатации"
+              density="compact"
+              clearable
+              hide-details
+            /></v-col>
+            <v-col
+              cols="6"
+              md="2"
+            ><v-select
+              v-model="filters.administrative_district"
+              :items="lookups.administrative_districts"
+              item-title="name"
+              item-value="name"
+              label="Административный район"
+              density="compact"
+              clearable
+              hide-details
+            /></v-col>
+            <v-col
+              cols="6"
+              md="2"
+            ><v-select
+              v-model="filters.heat_source"
+              :items="lookups.heat_sources"
+              item-title="name"
+              item-value="name"
+              label="Источник"
+              density="compact"
+              clearable
+              hide-details
+            /></v-col>
+            <v-col
+              cols="6"
+              md="2"
+            ><v-select
+              v-model="filters.temperature_graph"
+              :items="lookups.temperature_graphs"
+              item-title="name"
+              item-value="name"
+              label="Температурный график"
+              density="compact"
+              clearable
+              hide-details
+            /></v-col>
           </template>
-          <v-col cols="12" md="2" class="d-flex ga-2">
-            <v-btn color="indigo-darken-2" prepend-icon="mdi-filter" @click="reload">Применить</v-btn>
-            <v-btn variant="text" icon="mdi-filter-remove" title="Сбросить" @click="resetFilters" />
+          <v-col
+            cols="12"
+            md="2"
+            class="d-flex ga-2"
+          >
+            <v-btn
+              color="indigo-darken-2"
+              prepend-icon="mdi-filter"
+              @click="reload"
+            >Применить</v-btn>
+            <v-btn
+              variant="text"
+              icon="mdi-filter-remove"
+              title="Сбросить"
+              @click="resetFilters"
+            />
           </v-col>
         </v-row>
-        <div v-if="counts && mode === 'loads'" class="d-flex flex-wrap ga-2 mt-3">
-          <v-chip size="small" color="green">Найдено по адресу: {{ counts.matched.toLocaleString('ru-RU') }}</v-chip>
-          <v-chip size="small" color="orange-darken-2">Не найдено: {{ counts.unmatched.toLocaleString('ru-RU') }}</v-chip>
+        <div
+          v-if="counts && mode === 'loads'"
+          class="d-flex flex-wrap ga-2 mt-3"
+        >
+          <v-chip
+            size="small"
+            color="green"
+          >Найдено по адресу: {{ counts.matched.toLocaleString('ru-RU') }}</v-chip>
+          <v-chip
+            size="small"
+            color="orange-darken-2"
+          >Не найдено: {{ counts.unmatched.toLocaleString('ru-RU') }}</v-chip>
           <v-chip size="small">МЖД: {{ counts.apartment.toLocaleString('ru-RU') }}</v-chip>
           <v-chip size="small">Прочие: {{ counts.other.toLocaleString('ru-RU') }}</v-chip>
         </div>
       </div>
 
-      <v-progress-linear v-if="loading" indeterminate color="indigo" />
-      <v-alert v-if="error" type="error" variant="tonal" class="ma-3">{{ error }}</v-alert>
+      <v-progress-linear
+        v-if="loading"
+        indeterminate
+        color="indigo"
+      />
+      <v-alert
+        v-if="error"
+        type="error"
+        variant="tonal"
+        class="ma-3"
+      >{{ error }}</v-alert>
 
-      <v-card-text v-show="mode !== 'reconciliation'" class="pa-0 alseko-table-wrap">
-        <div v-if="!loading && !items.length" class="alseko-empty">
-          <v-icon size="58" color="grey-lighten-1">mdi-database-search</v-icon>
+      <v-card-text
+        v-show="mode !== 'reconciliation'"
+        class="pa-0 alseko-table-wrap"
+      >
+        <div
+          v-if="!loading && !items.length"
+          class="alseko-empty"
+        >
+          <v-icon
+            size="58"
+            color="grey-lighten-1"
+          >mdi-database-search</v-icon>
           <div class="text-h6 mt-3">Записи не найдены</div>
           <div class="text-body-2 text-medium-emphasis">Измените фильтры или строку поиска.</div>
         </div>
 
-        <table v-else-if="mode === 'loads'" class="alseko-table">
+        <table
+          v-else-if="mode === 'loads'"
+          class="alseko-table"
+        >
           <thead><tr><th>ID</th><th>Адрес</th><th>Объект</th><th>Договор / реестр</th><th>Район</th><th>Источник</th><th>Отопление</th><th>ГВС</th><th>Вентиляция</th><th>Пар</th><th>Здания</th></tr></thead>
           <tbody>
-            <tr v-for="item in loadItems" :key="item.id" @click="openLoad(item.id)">
+            <tr
+              v-for="item in loadItems"
+              :key="item.id"
+              @click="openLoad(item.id)"
+            >
               <td>{{ item.id }}</td><td>{{ displayAddress(item) }}</td><td>{{ item.customer_type || '—' }}<div class="subtle">{{ item.owner || '' }}</div></td>
               <td>{{ item.contract_number || '—' }}<div class="subtle">{{ item.registry_number || '' }}</div></td><td>{{ item.operation_district || '—' }}</td><td>{{ item.heat_source || '—' }}</td>
               <td>{{ loadValue(item.heating_load) }}</td><td>{{ loadValue(item.hot_water_load) }}</td><td>{{ loadValue(item.ventilation_load) }}</td><td>{{ loadValue(item.steam_load) }}</td>
-              <td><v-chip size="x-small" :color="item.building_match_count ? 'green' : 'orange-darken-2'">{{ item.building_match_count }}</v-chip></td>
+              <td><v-chip
+                size="x-small"
+                :color="item.building_match_count ? 'green' : 'orange-darken-2'"
+              >{{ item.building_match_count }}</v-chip></td>
             </tr>
           </tbody>
         </table>
 
-        <table v-else class="alseko-table building-table">
+        <table
+          v-else
+          class="alseko-table building-table"
+        >
           <thead><tr><th>ID</th><th>Адрес</th><th>Отопление</th><th>ГВС</th><th>Вентиляция</th><th>Пар</th><th>Схема отопления</th><th>Схема ГВС</th><th>Карта</th></tr></thead>
           <tbody>
-            <tr v-for="item in buildingItems" :key="item.id" @click="openBuilding(item.id)">
+            <tr
+              v-for="item in buildingItems"
+              :key="item.id"
+              @click="openBuilding(item.id)"
+            >
               <td>{{ item.id }}</td><td>{{ displayAddress(item) }}</td><td>{{ loadValue(item.heating_load) }}</td><td>{{ loadValue(item.hot_water_load) }}</td><td>{{ loadValue(item.ventilation_load) }}</td><td>{{ loadValue(item.steam_load) }}</td><td>{{ item.heating_scheme_id ?? '—' }}</td><td>{{ item.hot_water_scheme_id ?? '—' }}</td>
               <td><v-icon :color="hasCoordinates(item) ? 'indigo' : 'grey'">mdi-map-marker</v-icon></td>
             </tr>
@@ -77,35 +245,103 @@
         </table>
       </v-card-text>
 
-      <v-card-actions v-show="mode !== 'reconciliation'" class="justify-center border-t-sm">
-        <v-pagination v-model="page" :length="pages || 1" :total-visible="isMobile ? 4 : 8" density="comfortable" @update:model-value="loadItemsPage" />
+      <v-card-actions
+        v-show="mode !== 'reconciliation'"
+        class="justify-center border-t-sm"
+      >
+        <v-pagination
+          v-model="page"
+          :length="pages || 1"
+          :total-visible="isMobile ? 4 : 8"
+          density="comfortable"
+          @update:model-value="loadItemsPage"
+        />
         <span class="text-caption text-medium-emphasis ml-3">Всего: {{ total.toLocaleString('ru-RU') }}</span>
       </v-card-actions>
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="detailsVisible" :fullscreen="isMobile" max-width="1050" scrollable>
-    <v-card v-if="selected" :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="indigo-darken-2" density="comfortable">
+  <v-dialog
+    v-model="detailsVisible"
+    :fullscreen="isMobile"
+    max-width="1050"
+    scrollable
+  >
+    <v-card
+      v-if="selected"
+      :rounded="isMobile ? 0 : 'lg'"
+    >
+      <v-toolbar
+        color="indigo-darken-2"
+        density="comfortable"
+      >
         <v-toolbar-title>{{ selectedKind === 'load' ? `Объект АЛСЕКО ${selected.id}` : `Здание АЛСЕКО ${selected.id}` }}</v-toolbar-title>
-        <v-btn v-if="selectedKind === 'building'" icon="mdi-link-variant" title="Привязка к адресу АЛСЕКО" @click="bindSelectedBuilding" />
-        <v-btn v-if="hasCoordinates(selected)" icon="mdi-crosshairs-gps" title="Показать на карте" @click="locateSelected" />
-        <v-btn icon="mdi-close" @click="detailsVisible = false" />
+        <v-btn
+          v-if="selectedKind === 'building'"
+          icon="mdi-link-variant"
+          title="Привязка к адресу АЛСЕКО"
+          @click="bindSelectedBuilding"
+        />
+        <v-btn
+          v-if="hasCoordinates(selected)"
+          icon="mdi-crosshairs-gps"
+          title="Показать на карте"
+          @click="locateSelected"
+        />
+        <v-btn
+          icon="mdi-close"
+          @click="detailsVisible = false"
+        />
       </v-toolbar>
-      <v-progress-linear v-if="detailsLoading" indeterminate />
+      <v-progress-linear
+        v-if="detailsLoading"
+        indeterminate
+      />
       <v-card-text>
         <template v-if="selectedKind === 'load'">
-          <v-alert v-if="Number(selected.building_match_count) > 1" type="warning" variant="tonal" class="mb-4">По адресу найдено несколько зданий: {{ selected.building_match_count }}. Связь неоднозначна и требует ручной проверки.</v-alert>
-          <DetailGrid title="Договорный объект" :items="loadMainDetails" />
-          <DetailGrid title="Нагрузки, ккал/ч" :items="loadBreakdown" />
-          <DetailGrid title="Эксплуатационная привязка" :items="loadNetworkDetails" />
-          <RelationTable title="Здания по адресу" :rows="loadRelations.matched_buildings" @open="openRelatedBuilding" />
-          <RelationTable title="Договоры по этому адресу" :rows="loadRelations.address_loads" @open="openRelatedLoad" />
+          <v-alert
+            v-if="Number(selected.building_match_count) > 1"
+            type="warning"
+            variant="tonal"
+            class="mb-4"
+          >По адресу найдено несколько зданий: {{ selected.building_match_count }}. Связь неоднозначна и требует ручной проверки.</v-alert>
+          <DetailGrid
+            title="Договорный объект"
+            :items="loadMainDetails"
+          />
+          <DetailGrid
+            title="Нагрузки, ккал/ч"
+            :items="loadBreakdown"
+          />
+          <DetailGrid
+            title="Эксплуатационная привязка"
+            :items="loadNetworkDetails"
+          />
+          <RelationTable
+            title="Здания по адресу"
+            :rows="loadRelations.matched_buildings"
+            @open="openRelatedBuilding"
+          />
+          <RelationTable
+            title="Договоры по этому адресу"
+            :rows="loadRelations.address_loads"
+            @open="openRelatedLoad"
+          />
         </template>
         <template v-else>
-          <DetailGrid title="Здание" :items="buildingMainDetails" />
-          <DetailGrid title="Нагрузки, ккал/ч" :items="buildingBreakdown" />
-          <RelationTable title="Договорные объекты по адресу" :rows="buildingRelations.matched_loads" @open="openRelatedLoad" />
+          <DetailGrid
+            title="Здание"
+            :items="buildingMainDetails"
+          />
+          <DetailGrid
+            title="Нагрузки, ккал/ч"
+            :items="buildingBreakdown"
+          />
+          <RelationTable
+            title="Договорные объекты по адресу"
+            :rows="buildingRelations.matched_loads"
+            @open="openRelatedLoad"
+          />
         </template>
       </v-card-text>
     </v-card>

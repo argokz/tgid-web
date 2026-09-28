@@ -308,28 +308,96 @@
         class="pa-4"
       >
         <div class="d-flex justify-end mb-2">
-          <v-btn v-if="mutationsEnabled && (!isEditingSeason)" color="primary" variant="text" prepend-icon="mdi-pencil" @click="startEditSeason">Редактировать</v-btn>
-          <div v-else class="d-flex ga-2">
-            <v-btn v-if="mutationsEnabled" color="error" variant="text" @click="cancelEditSeason" :disabled="saving">Отмена</v-btn>
-            <v-btn v-if="mutationsEnabled" color="primary" variant="flat" @click="saveSeason" :loading="saving">Сохранить</v-btn>
+          <v-btn
+            v-if="mutationsEnabled && (!isEditingSeason)"
+            color="primary"
+            variant="text"
+            prepend-icon="mdi-pencil"
+            @click="startEditSeason"
+          >Редактировать</v-btn>
+          <div
+            v-else
+            class="d-flex ga-2"
+          >
+            <v-btn
+              v-if="mutationsEnabled"
+              color="error"
+              variant="text"
+              @click="cancelEditSeason"
+              :disabled="saving"
+            >Отмена</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="primary"
+              variant="flat"
+              @click="saveSeason"
+              :loading="saving"
+            >Сохранить</v-btn>
           </div>
         </div>
-        <div class="detail-grid mb-5" v-if="!isEditingSeason">
-          <DetailValue label="Период" :value="`${formatDate(seasonDetails.d1)} — ${formatDate(seasonDetails.d2)}`" />
-          <DetailValue label="Город" :value="seasonDetails.city" />
-          <DetailValue label="Расчётная t отопления" :value="formatNumber(seasonDetails.t_ot, ' °C')" />
-          <DetailValue label="Расчётная t вентиляции" :value="formatNumber(seasonDetails.t_vent, ' °C')" />
-          <DetailValue label="Норма потерь воды" :value="formatNumber(seasonDetails.a)" />
-          <DetailValue label="Аккумуляторные баки" :value="formatNumber(seasonDetails.tankbattery_q)" />
-          <DetailValue label="Объём отопления" :value="formatNumber(seasonDetails.volwaterhs)" />
-          <DetailValue label="Объём вентиляции" :value="formatNumber(seasonDetails.volwatervs)" />
-          <DetailValue label="Объём открытого ГВС" :value="formatNumber(seasonDetails.volwateropengvs)" />
+        <div
+          class="detail-grid mb-5"
+          v-if="!isEditingSeason"
+        >
+          <DetailValue
+            label="Период"
+            :value="`${formatDate(seasonDetails.d1)} — ${formatDate(seasonDetails.d2)}`"
+          />
+          <DetailValue
+            label="Город"
+            :value="seasonDetails.city"
+          />
+          <DetailValue
+            label="Расчётная t отопления"
+            :value="formatNumber(seasonDetails.t_ot, ' °C')"
+          />
+          <DetailValue
+            label="Расчётная t вентиляции"
+            :value="formatNumber(seasonDetails.t_vent, ' °C')"
+          />
+          <DetailValue
+            label="Норма потерь воды"
+            :value="formatNumber(seasonDetails.a)"
+          />
+          <DetailValue
+            label="Аккумуляторные баки"
+            :value="formatNumber(seasonDetails.tankbattery_q)"
+          />
+          <DetailValue
+            label="Объём отопления"
+            :value="formatNumber(seasonDetails.volwaterhs)"
+          />
+          <DetailValue
+            label="Объём вентиляции"
+            :value="formatNumber(seasonDetails.volwatervs)"
+          />
+          <DetailValue
+            label="Объём открытого ГВС"
+            :value="formatNumber(seasonDetails.volwateropengvs)"
+          />
         </div>
-        <v-card variant="outlined" class="pa-3 mb-5" v-else>
+        <v-card
+          variant="outlined"
+          class="pa-3 mb-5"
+          v-else
+        >
           <v-row dense>
-            <v-col v-for="field in buildSeasonFields()" :key="field.key" cols="12" sm="6" md="4">
+            <v-col
+              v-for="field in buildSeasonFields()"
+              :key="field.key"
+              cols="12"
+              sm="6"
+              md="4"
+            >
               <div class="detail-label mb-1">{{ field.label }}</div>
-              <v-text-field v-model="editFields[field.key]" :type="field.type === 'number' ? 'number' : 'text'" density="compact" hide-details variant="outlined" clearable />
+              <v-text-field
+                v-model="editFields[field.key]"
+                :type="field.type === 'number' ? 'number' : 'text'"
+                density="compact"
+                hide-details
+                variant="outlined"
+                clearable
+              />
             </v-col>
           </v-row>
         </v-card>

@@ -1,27 +1,58 @@
 <template>
-  <v-dialog v-model="visible" :fullscreen="isMobile" max-width="1580" scrollable>
+  <v-dialog
+    v-model="visible"
+    :fullscreen="isMobile"
+    max-width="1580"
+    scrollable
+  >
     <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="indigo-darken-3" density="compact">
+      <v-toolbar
+        color="indigo-darken-3"
+        density="compact"
+      >
         <v-icon class="ml-3 mr-2">mdi-tune-vertical</v-icon>
         <v-toolbar-title>Сетевые регуляторы</v-toolbar-title>
-        <v-chip class="mr-2" size="small" color="white" variant="outlined">
+        <v-chip
+          class="mr-2"
+          size="small"
+          color="white"
+          variant="outlined"
+        >
           {{ lookups.counts.ready || 0 }}/{{ lookups.counts.total || 0 }} готовы
         </v-chip>
-        <v-btn icon="mdi-close" aria-label="Закрыть" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          aria-label="Закрыть"
+          @click="visible = false"
+        />
       </v-toolbar>
 
       <div class="alerts pa-3 pb-0">
-        <v-alert v-if="lookups.result_count === 0" type="info" variant="tonal" density="compact">
+        <v-alert
+          v-if="lookups.result_count === 0"
+          type="info"
+          variant="tonal"
+          density="compact"
+        >
           Расчётная таблица <code>RS_OUT</code> пуста. Исходные задания доступны, а полученные расход,
           напоры, сопротивление и положение клапана появятся после сохранения расчёта сети.
         </v-alert>
-        <v-alert type="warning" variant="tonal" density="compact">
+        <v-alert
+          type="warning"
+          variant="tonal"
+          density="compact"
+        >
           Геометрия доступна для {{ lookups.counts.locatable || 0 }} из {{ lookups.counts.total || 0 }} регуляторов.
           У {{ lookups.counts.control_node_missing || 0 }} записей давления/перепада отсутствует регулируемый узел.
         </v-alert>
       </div>
 
-      <v-tabs v-model="activeTab" color="indigo-darken-3" class="px-3 mt-2" @update:model-value="onTabChange">
+      <v-tabs
+        v-model="activeTab"
+        color="indigo-darken-3"
+        class="px-3 mt-2"
+        @update:model-value="onTabChange"
+      >
         <v-tab value="inventory">Установленные ({{ lookups.counts.total || 0 }})</v-tab>
         <v-tab value="catalog">Каталог ({{ lookups.catalog_counts.total || 0 }})</v-tab>
       </v-tabs>
@@ -51,12 +82,62 @@
               hide-details
               @keyup.enter="reloadInventory"
             />
-            <v-select v-model="filters.regulator_type" :items="typeOptions" label="Тип регулятора" density="compact" variant="outlined" clearable hide-details />
-            <v-select v-model="filters.quality_status" :items="qualityOptions" label="Качество данных" density="compact" variant="outlined" clearable hide-details />
-            <v-select v-model="filters.state_id" :items="lookups.states" item-title="name" item-value="id" label="Состояние" density="compact" variant="outlined" clearable hide-details />
-            <v-select v-model="filters.fragment_id" :items="lookups.fragments" item-title="name" item-value="id" label="Фрагмент" density="compact" variant="outlined" clearable hide-details />
-            <v-select v-model="filters.work_attribute_id" :items="lookups.work_attributes" item-title="name" item-value="id" label="Режим работы" density="compact" variant="outlined" clearable hide-details />
-            <v-btn color="indigo-darken-3" :loading="loading" @click="reloadInventory">Найти</v-btn>
+            <v-select
+              v-model="filters.regulator_type"
+              :items="typeOptions"
+              label="Тип регулятора"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-select
+              v-model="filters.quality_status"
+              :items="qualityOptions"
+              label="Качество данных"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-select
+              v-model="filters.state_id"
+              :items="lookups.states"
+              item-title="name"
+              item-value="id"
+              label="Состояние"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-select
+              v-model="filters.fragment_id"
+              :items="lookups.fragments"
+              item-title="name"
+              item-value="id"
+              label="Фрагмент"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-select
+              v-model="filters.work_attribute_id"
+              :items="lookups.work_attributes"
+              item-title="name"
+              item-value="id"
+              label="Режим работы"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-btn
+              color="indigo-darken-3"
+              :loading="loading"
+              @click="reloadInventory"
+            >Найти</v-btn>
           </div>
 
           <JournalError :message="error" />
@@ -69,7 +150,11 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in inventory" :key="`${item.regulator_type}-${item.id}`" @click="openItemDetails(item.regulator_type, item.id)">
+                <tr
+                  v-for="item in inventory"
+                  :key="`${item.regulator_type}-${item.id}`"
+                  @click="openItemDetails(item.regulator_type, item.id)"
+                >
                   <td>{{ item.id }}</td>
                   <td>{{ typeLabel(item.regulator_type) }}</td>
                   <td>
@@ -78,10 +163,16 @@
                   </td>
                   <td>{{ formatTarget(item.regulator_type, item.set_value) }}</td>
                   <td>{{ requiresControlNode(item.regulator_type) ? nodeLabel(item.control_node_code, item.control_node_name, item.control_node_id) : 'не требуется' }}</td>
-                  <td><v-chip size="x-small" :color="stateColor(item.state_name)">{{ item.state_name || '—' }}</v-chip></td>
+                  <td><v-chip
+                    size="x-small"
+                    :color="stateColor(item.state_name)"
+                  >{{ item.state_name || '—' }}</v-chip></td>
                   <td>{{ item.work_attribute_name || '—' }}</td>
                   <td>{{ item.fragment_name || `№${item.fragment_id || '—'}` }}</td>
-                  <td><v-chip size="x-small" :color="qualityColor(item.quality_status)">{{ qualityLabel(item.quality_status) }}</v-chip></td>
+                  <td><v-chip
+                    size="x-small"
+                    :color="qualityColor(item.quality_status)"
+                  >{{ qualityLabel(item.quality_status) }}</v-chip></td>
                   <td>
                     <v-btn
                       v-if="hasCoordinates(item)"
@@ -95,10 +186,23 @@
                 </tr>
               </tbody>
             </table>
-            <div v-if="!loading && !inventory.length" class="empty">Регуляторы не найдены</div>
-            <v-progress-linear v-if="loading" indeterminate color="indigo-darken-3" />
+            <div
+              v-if="!loading && !inventory.length"
+              class="empty"
+            >Регуляторы не найдены</div>
+            <v-progress-linear
+              v-if="loading"
+              indeterminate
+              color="indigo-darken-3"
+            />
           </div>
-          <v-pagination v-if="inventoryPages > 1" v-model="inventoryPage" :length="inventoryPages" density="comfortable" @update:model-value="loadInventory" />
+          <v-pagination
+            v-if="inventoryPages > 1"
+            v-model="inventoryPage"
+            :length="inventoryPages"
+            density="comfortable"
+            @update:model-value="loadInventory"
+          />
         </v-window-item>
 
         <v-window-item value="catalog">
@@ -113,119 +217,328 @@
               hide-details
               @keyup.enter="reloadCatalog"
             />
-            <v-select v-model="catalogFilters.catalog_type" :items="typeOptions" label="Тип каталога" density="compact" variant="outlined" clearable hide-details />
-            <v-select v-model="catalogFilters.quality_status" :items="catalogQualityOptions" label="Полнота паспорта" density="compact" variant="outlined" clearable hide-details />
-            <v-btn color="indigo-darken-3" :loading="loading" @click="reloadCatalog">Найти</v-btn>
+            <v-select
+              v-model="catalogFilters.catalog_type"
+              :items="typeOptions"
+              label="Тип каталога"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-select
+              v-model="catalogFilters.quality_status"
+              :items="catalogQualityOptions"
+              label="Полнота паспорта"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-btn
+              color="indigo-darken-3"
+              :loading="loading"
+              @click="reloadCatalog"
+            >Найти</v-btn>
           </div>
           <JournalError :message="error" />
           <div class="table-wrap catalog-table-wrap">
             <table class="journal-table">
               <thead><tr><th>ID</th><th>Тип</th><th>Наименование / модель</th><th>DN</th><th>Kv</th><th>Диапазон</th><th>Среда / привод</th><th>Изготовитель</th><th>Качество</th></tr></thead>
               <tbody>
-                <tr v-for="item in catalog" :key="`${item.catalog_type}-${item.id}`" @click="openCatalogDetails(item.catalog_type, item.id)">
+                <tr
+                  v-for="item in catalog"
+                  :key="`${item.catalog_type}-${item.id}`"
+                  @click="openCatalogDetails(item.catalog_type, item.id)"
+                >
                   <td>{{ item.id }}</td><td>{{ typeLabel(item.catalog_type) }}</td>
                   <td><strong>{{ item.display_name || item.model || '—' }}</strong><div class="muted">{{ [item.series, item.model].filter(Boolean).join(' · ') || '—' }}</div></td>
                   <td>{{ formatUnit(item.nominal_diameter, 'мм') }}</td><td>{{ formatNumber(item.capacity) }}</td>
                   <td>{{ pressureRange(item) }}</td><td>{{ item.medium || item.drive_type || '—' }}</td><td>{{ item.producer || '—' }}</td>
-                  <td><v-chip size="x-small" :color="item.quality_status === 'ready' ? 'green' : 'orange'">{{ item.quality_status === 'ready' ? 'готово' : 'неполный' }}</v-chip></td>
+                  <td><v-chip
+                    size="x-small"
+                    :color="item.quality_status === 'ready' ? 'green' : 'orange'"
+                  >{{ item.quality_status === 'ready' ? 'готово' : 'неполный' }}</v-chip></td>
                 </tr>
               </tbody>
             </table>
-            <div v-if="!loading && !catalog.length" class="empty">Модели не найдены</div>
-            <v-progress-linear v-if="loading" indeterminate color="indigo-darken-3" />
+            <div
+              v-if="!loading && !catalog.length"
+              class="empty"
+            >Модели не найдены</div>
+            <v-progress-linear
+              v-if="loading"
+              indeterminate
+              color="indigo-darken-3"
+            />
           </div>
-          <v-pagination v-if="catalogPages > 1" v-model="catalogPage" :length="catalogPages" density="comfortable" @update:model-value="loadCatalog" />
+          <v-pagination
+            v-if="catalogPages > 1"
+            v-model="catalogPage"
+            :length="catalogPages"
+            density="comfortable"
+            @update:model-value="loadCatalog"
+          />
         </v-window-item>
       </v-window>
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="detailVisible" :fullscreen="isMobile" max-width="1180" scrollable>
+  <v-dialog
+    v-model="detailVisible"
+    :fullscreen="isMobile"
+    max-width="1180"
+    scrollable
+  >
     <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="indigo-darken-3" density="compact">
-        <v-btn icon="mdi-arrow-left" aria-label="Вернуться к журналу" @click="detailVisible = false" />
+      <v-toolbar
+        color="indigo-darken-3"
+        density="compact"
+      >
+        <v-btn
+          icon="mdi-arrow-left"
+          aria-label="Вернуться к журналу"
+          @click="detailVisible = false"
+        />
         <v-toolbar-title>{{ detailTitle }}</v-toolbar-title>
-        <v-btn icon="mdi-close" aria-label="Закрыть карточку" @click="detailVisible = false" />
+        <v-btn
+          icon="mdi-close"
+          aria-label="Закрыть карточку"
+          @click="detailVisible = false"
+        />
       </v-toolbar>
-      <v-progress-linear v-if="detailLoading" indeterminate color="indigo-darken-3" />
+      <v-progress-linear
+        v-if="detailLoading"
+        indeterminate
+        color="indigo-darken-3"
+      />
 
       <template v-if="itemDetails && !detailLoading">
         <div class="alerts pa-3 pb-0">
-          <v-alert v-if="itemDetails.quality_status !== 'ready'" :type="itemDetails.quality_status === 'line_missing' ? 'error' : 'warning'" variant="tonal" density="compact">
+          <v-alert
+            v-if="itemDetails.quality_status !== 'ready'"
+            :type="itemDetails.quality_status === 'line_missing' ? 'error' : 'warning'"
+            variant="tonal"
+            density="compact"
+          >
             {{ qualityDescription(itemDetails.quality_status) }}
           </v-alert>
         </div>
         <v-card-text>
           <v-row>
-            <v-col cols="12" md="6">
-              <v-card variant="outlined" class="h-100">
+            <v-col
+              cols="12"
+              md="6"
+            >
+              <v-card
+                variant="outlined"
+                class="h-100"
+              >
                 <v-card-title class="text-subtitle-1">Сетевая привязка</v-card-title>
                 <v-card-text class="detail-grid">
-                  <DetailValue label="Тип / ID" :value="`${typeLabel(itemDetails.regulator_type)} / ${itemDetails.id}`" />
-                  <DetailValue label="Линия" :value="itemDetails.line_id" />
-                  <DetailValue label="Начальный узел" :value="nodeLabel(itemDetails.node_code_1, itemDetails.node_name_1, itemDetails.node_id_1)" />
-                  <DetailValue label="Конечный узел" :value="nodeLabel(itemDetails.node_code_2, itemDetails.node_name_2, itemDetails.node_id_2)" />
-                  <DetailValue label="Регулируемый узел" :value="requiresControlNode(itemDetails.regulator_type) ? nodeLabel(itemDetails.control_node_code, itemDetails.control_node_name, itemDetails.control_node_id) : 'не требуется'" />
-                  <DetailValue label="Фрагмент" :value="itemDetails.fragment_name || itemDetails.fragment_id" />
+                  <DetailValue
+                    label="Тип / ID"
+                    :value="`${typeLabel(itemDetails.regulator_type)} / ${itemDetails.id}`"
+                  />
+                  <DetailValue
+                    label="Линия"
+                    :value="itemDetails.line_id"
+                  />
+                  <DetailValue
+                    label="Начальный узел"
+                    :value="nodeLabel(itemDetails.node_code_1, itemDetails.node_name_1, itemDetails.node_id_1)"
+                  />
+                  <DetailValue
+                    label="Конечный узел"
+                    :value="nodeLabel(itemDetails.node_code_2, itemDetails.node_name_2, itemDetails.node_id_2)"
+                  />
+                  <DetailValue
+                    label="Регулируемый узел"
+                    :value="requiresControlNode(itemDetails.regulator_type) ? nodeLabel(itemDetails.control_node_code, itemDetails.control_node_name, itemDetails.control_node_id) : 'не требуется'"
+                  />
+                  <DetailValue
+                    label="Фрагмент"
+                    :value="itemDetails.fragment_name || itemDetails.fragment_id"
+                  />
                 </v-card-text>
               </v-card>
             </v-col>
-            <v-col cols="12" md="6">
-              <v-card variant="outlined" class="h-100">
+            <v-col
+              cols="12"
+              md="6"
+            >
+              <v-card
+                variant="outlined"
+                class="h-100"
+              >
                 <v-card-title class="text-subtitle-1">Задание регулятора</v-card-title>
-                <v-card-text class="detail-grid" v-if="!isEditing">
-                  <DetailValue label="Заданная величина" :value="formatTarget(itemDetails.regulator_type, itemDetails.set_value)" />
-                  <DetailValue label="Допустимое отклонение" :value="formatTarget(itemDetails.regulator_type, itemDetails.tolerance)" />
-                  <DetailValue label="Пропускная способность Kv" :value="formatNumber(itemDetails.capacity)" />
-                  <DetailValue label="Состояние" :value="itemDetails.state_name" />
-                  <DetailValue label="Режим работы" :value="itemDetails.work_attribute_name" />
-                  <DetailValue label="Трубопровод" :value="itemDetails.pipeline_sign_name" />
+                <v-card-text
+                  class="detail-grid"
+                  v-if="!isEditing"
+                >
+                  <DetailValue
+                    label="Заданная величина"
+                    :value="formatTarget(itemDetails.regulator_type, itemDetails.set_value)"
+                  />
+                  <DetailValue
+                    label="Допустимое отклонение"
+                    :value="formatTarget(itemDetails.regulator_type, itemDetails.tolerance)"
+                  />
+                  <DetailValue
+                    label="Пропускная способность Kv"
+                    :value="formatNumber(itemDetails.capacity)"
+                  />
+                  <DetailValue
+                    label="Состояние"
+                    :value="itemDetails.state_name"
+                  />
+                  <DetailValue
+                    label="Режим работы"
+                    :value="itemDetails.work_attribute_name"
+                  />
+                  <DetailValue
+                    label="Трубопровод"
+                    :value="itemDetails.pipeline_sign_name"
+                  />
                 </v-card-text>
                 <v-card-text v-else>
                   <v-row dense>
-                    <v-col v-for="field in buildFields().assignment" :key="field.key" cols="12" sm="6">
+                    <v-col
+                      v-for="field in buildFields().assignment"
+                      :key="field.key"
+                      cols="12"
+                      sm="6"
+                    >
                       <div class="detail-label mb-1">{{ field.label }}</div>
-                      <v-select v-if="field.type === 'select'" v-model="editFields[field.key]" :items="field.items" item-title="name" item-value="id" density="compact" hide-details variant="outlined" clearable />
-                      <v-text-field v-else v-model="editFields[field.key]" :type="field.type === 'number' ? 'number' : 'text'" density="compact" hide-details variant="outlined" clearable />
+                      <v-select
+                        v-if="field.type === 'select'"
+                        v-model="editFields[field.key]"
+                        :items="field.items"
+                        item-title="name"
+                        item-value="id"
+                        density="compact"
+                        hide-details
+                        variant="outlined"
+                        clearable
+                      />
+                      <v-text-field
+                        v-else
+                        v-model="editFields[field.key]"
+                        :type="field.type === 'number' ? 'number' : 'text'"
+                        density="compact"
+                        hide-details
+                        variant="outlined"
+                        clearable
+                      />
                     </v-col>
                   </v-row>
                 </v-card-text>
               </v-card>
             </v-col>
-            <v-col cols="12" md="6">
-              <v-card variant="outlined" class="h-100">
+            <v-col
+              cols="12"
+              md="6"
+            >
+              <v-card
+                variant="outlined"
+                class="h-100"
+              >
                 <v-card-title class="text-subtitle-1">Параметры клапана</v-card-title>
-                <v-card-text class="detail-grid" v-if="!isEditing">
-                  <DetailValue label="Сопротивление, открыт" :value="formatNumber(itemDetails.hydraulic_resistance_open, 6)" />
-                  <DetailValue label="Сопротивление, закрыт" :value="formatNumber(itemDetails.hydraulic_resistance_closed, 6)" />
-                  <DetailValue label="Относительная утечка" :value="formatNumber(itemDetails.relative_leakage)" />
-                  <DetailValue label="Расход утечки" :value="formatNumber(itemDetails.leakage_flow)" />
-                  <DetailValue label="Фактический расход (исходное поле)" :value="formatNumber(itemDetails.actual_flow)" />
-                  <DetailValue label="Фактический перепад (исходное поле)" :value="formatNumber(itemDetails.actual_value)" />
+                <v-card-text
+                  class="detail-grid"
+                  v-if="!isEditing"
+                >
+                  <DetailValue
+                    label="Сопротивление, открыт"
+                    :value="formatNumber(itemDetails.hydraulic_resistance_open, 6)"
+                  />
+                  <DetailValue
+                    label="Сопротивление, закрыт"
+                    :value="formatNumber(itemDetails.hydraulic_resistance_closed, 6)"
+                  />
+                  <DetailValue
+                    label="Относительная утечка"
+                    :value="formatNumber(itemDetails.relative_leakage)"
+                  />
+                  <DetailValue
+                    label="Расход утечки"
+                    :value="formatNumber(itemDetails.leakage_flow)"
+                  />
+                  <DetailValue
+                    label="Фактический расход (исходное поле)"
+                    :value="formatNumber(itemDetails.actual_flow)"
+                  />
+                  <DetailValue
+                    label="Фактический перепад (исходное поле)"
+                    :value="formatNumber(itemDetails.actual_value)"
+                  />
                 </v-card-text>
                 <v-card-text v-else>
                   <v-row dense>
-                    <v-col v-for="field in buildFields().valve" :key="field.key" cols="12" sm="6">
+                    <v-col
+                      v-for="field in buildFields().valve"
+                      :key="field.key"
+                      cols="12"
+                      sm="6"
+                    >
                       <div class="detail-label mb-1">{{ field.label }}</div>
-                      <v-text-field v-model="editFields[field.key]" :type="field.type === 'number' ? 'number' : 'text'" density="compact" hide-details variant="outlined" clearable />
+                      <v-text-field
+                        v-model="editFields[field.key]"
+                        :type="field.type === 'number' ? 'number' : 'text'"
+                        density="compact"
+                        hide-details
+                        variant="outlined"
+                        clearable
+                      />
                     </v-col>
                   </v-row>
                 </v-card-text>
               </v-card>
             </v-col>
-            <v-col cols="12" md="6">
-              <v-card variant="outlined" class="h-100">
+            <v-col
+              cols="12"
+              md="6"
+            >
+              <v-card
+                variant="outlined"
+                class="h-100"
+              >
                 <v-card-title class="text-subtitle-1">Расчётный режим RS_OUT</v-card-title>
-                <v-card-text v-if="itemDetails.latest_output" class="detail-grid">
-                  <DetailValue label="Расход через клапан" :value="formatNumber(outputValue('flow'))" />
-                  <DetailValue label="Гидравлическое сопротивление" :value="formatNumber(outputValue('hydraulic_resistance'), 6)" />
-                  <DetailValue label="Пьезометрический напор, вход" :value="formatNumber(outputValue('piezometric_head_in'))" />
-                  <DetailValue label="Пьезометрический напор, выход" :value="formatNumber(outputValue('piezometric_head_out'))" />
-                  <DetailValue label="Задано / получено" :value="`${formatNumber(outputValue('target_value'))} / ${formatNumber(outputValue('actual_value'))}`" />
-                  <DetailValue label="Положение клапана" :value="outputValue('valve_position')" />
+                <v-card-text
+                  v-if="itemDetails.latest_output"
+                  class="detail-grid"
+                >
+                  <DetailValue
+                    label="Расход через клапан"
+                    :value="formatNumber(outputValue('flow'))"
+                  />
+                  <DetailValue
+                    label="Гидравлическое сопротивление"
+                    :value="formatNumber(outputValue('hydraulic_resistance'), 6)"
+                  />
+                  <DetailValue
+                    label="Пьезометрический напор, вход"
+                    :value="formatNumber(outputValue('piezometric_head_in'))"
+                  />
+                  <DetailValue
+                    label="Пьезометрический напор, выход"
+                    :value="formatNumber(outputValue('piezometric_head_out'))"
+                  />
+                  <DetailValue
+                    label="Задано / получено"
+                    :value="`${formatNumber(outputValue('target_value'))} / ${formatNumber(outputValue('actual_value'))}`"
+                  />
+                  <DetailValue
+                    label="Положение клапана"
+                    :value="outputValue('valve_position')"
+                  />
                 </v-card-text>
                 <v-card-text v-else>
-                  <v-alert type="info" variant="tonal" density="compact">Гидравлический режим для этого регулятора пока не рассчитан.</v-alert>
+                  <v-alert
+                    type="info"
+                    variant="tonal"
+                    density="compact"
+                  >Гидравлический режим для этого регулятора пока не рассчитан.</v-alert>
                 </v-card-text>
               </v-card>
             </v-col>
@@ -233,43 +546,119 @@
         </v-card-text>
         <v-card-actions class="px-4 py-3 bg-grey-lighten-4">
           <v-spacer />
-          <v-btn v-if="!isEditing && hasCoordinates(itemDetails)" color="indigo-darken-3" variant="text" prepend-icon="mdi-map-marker" @click="locate(itemDetails)">Показать на карте</v-btn>
+          <v-btn
+            v-if="!isEditing && hasCoordinates(itemDetails)"
+            color="indigo-darken-3"
+            variant="text"
+            prepend-icon="mdi-map-marker"
+            @click="locate(itemDetails)"
+          >Показать на карте</v-btn>
           <template v-if="!isEditing">
-            <v-btn v-if="mutationsEnabled" color="primary" variant="flat" prepend-icon="mdi-pencil" @click="startEdit">Редактировать</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="primary"
+              variant="flat"
+              prepend-icon="mdi-pencil"
+              @click="startEdit"
+            >Редактировать</v-btn>
           </template>
           <template v-else>
-            <v-btn v-if="mutationsEnabled" color="error" variant="text" @click="cancelEdit" :disabled="saving">Отмена</v-btn>
-            <v-btn v-if="mutationsEnabled" color="primary" variant="flat" @click="saveChanges" :loading="saving">Сохранить</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="error"
+              variant="text"
+              @click="cancelEdit"
+              :disabled="saving"
+            >Отмена</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="primary"
+              variant="flat"
+              @click="saveChanges"
+              :loading="saving"
+            >Сохранить</v-btn>
           </template>
         </v-card-actions>
       </template>
 
       <template v-if="catalogDetails && !detailLoading">
         <v-card-text>
-          <v-alert type="info" variant="tonal" density="compact" class="mb-3">{{ catalogDetails.link_note }}</v-alert>
+          <v-alert
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >{{ catalogDetails.link_note }}</v-alert>
           <v-row>
-            <v-col cols="12" md="6">
-              <v-card variant="outlined" class="h-100">
+            <v-col
+              cols="12"
+              md="6"
+            >
+              <v-card
+                variant="outlined"
+                class="h-100"
+              >
                 <v-card-title class="text-subtitle-1">Паспорт модели</v-card-title>
                 <v-card-text class="detail-grid">
-                  <DetailValue label="Тип / ID" :value="`${typeLabel(catalogDetails.catalog_type)} / ${catalogDetails.id}`" />
-                  <DetailValue label="Наименование" :value="catalogDetails.display_name" />
-                  <DetailValue label="Серия / модель" :value="[catalogDetails.series, catalogDetails.model].filter(Boolean).join(' / ')" />
-                  <DetailValue label="DN" :value="formatUnit(catalogDetails.nominal_diameter, 'мм')" />
-                  <DetailValue label="Kv" :value="formatNumber(catalogDetails.capacity)" />
-                  <DetailValue label="Изготовитель" :value="catalogDetails.producer" />
-                  <DetailValue label="Рабочая среда" :value="catalogDetails.medium" />
-                  <DetailValue label="Макс. температура" :value="formatUnit(catalogDetails.max_temperature, '°C')" />
-                  <DetailValue label="Диапазон задания" :value="pressureRange(catalogDetails)" />
-                  <DetailValue label="Привод / установка" :value="catalogDetails.drive_type || catalogDetails.installation_place" />
+                  <DetailValue
+                    label="Тип / ID"
+                    :value="`${typeLabel(catalogDetails.catalog_type)} / ${catalogDetails.id}`"
+                  />
+                  <DetailValue
+                    label="Наименование"
+                    :value="catalogDetails.display_name"
+                  />
+                  <DetailValue
+                    label="Серия / модель"
+                    :value="[catalogDetails.series, catalogDetails.model].filter(Boolean).join(' / ')"
+                  />
+                  <DetailValue
+                    label="DN"
+                    :value="formatUnit(catalogDetails.nominal_diameter, 'мм')"
+                  />
+                  <DetailValue
+                    label="Kv"
+                    :value="formatNumber(catalogDetails.capacity)"
+                  />
+                  <DetailValue
+                    label="Изготовитель"
+                    :value="catalogDetails.producer"
+                  />
+                  <DetailValue
+                    label="Рабочая среда"
+                    :value="catalogDetails.medium"
+                  />
+                  <DetailValue
+                    label="Макс. температура"
+                    :value="formatUnit(catalogDetails.max_temperature, '°C')"
+                  />
+                  <DetailValue
+                    label="Диапазон задания"
+                    :value="pressureRange(catalogDetails)"
+                  />
+                  <DetailValue
+                    label="Привод / установка"
+                    :value="catalogDetails.drive_type || catalogDetails.installation_place"
+                  />
                 </v-card-text>
               </v-card>
             </v-col>
-            <v-col cols="12" md="6">
-              <v-card variant="outlined" class="h-100">
+            <v-col
+              cols="12"
+              md="6"
+            >
+              <v-card
+                variant="outlined"
+                class="h-100"
+              >
                 <v-card-title class="text-subtitle-1">Исходные поля каталога</v-card-title>
                 <v-card-text class="attribute-grid">
-                  <DetailValue v-for="entry in catalogAttributeEntries" :key="entry[0]" :label="entry[0]" :value="formatAttribute(entry[1])" />
+                  <DetailValue
+                    v-for="entry in catalogAttributeEntries"
+                    :key="entry[0]"
+                    :label="entry[0]"
+                    :value="formatAttribute(entry[1])"
+                  />
                 </v-card-text>
               </v-card>
             </v-col>

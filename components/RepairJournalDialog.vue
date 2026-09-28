@@ -1,34 +1,77 @@
 <template>
   <Teleport to="body">
-    <v-dialog v-model="visible" :fullscreen="isMobile" max-width="1320" scrollable>
-      <v-card class="repair-journal" :rounded="isMobile ? 0 : 'lg'">
+    <v-dialog
+      v-model="visible"
+      :fullscreen="isMobile"
+      max-width="1320"
+      scrollable
+    >
+      <v-card
+        class="repair-journal"
+        :rounded="isMobile ? 0 : 'lg'"
+      >
         <v-card-title class="d-flex align-center ga-3 px-4 py-3">
-          <v-avatar color="deep-purple-lighten-5" size="40">
+          <v-avatar
+            color="deep-purple-lighten-5"
+            size="40"
+          >
             <v-icon color="deep-purple-darken-2">mdi-hammer-wrench</v-icon>
           </v-avatar>
-          <div class="flex-grow-1" style="min-width: 0">
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
             <div class="text-subtitle-1 font-weight-bold">Журнал ремонтов</div>
             <div class="text-caption text-medium-emphasis text-truncate">
               {{ scopeTitle }} · найдено {{ total }}
             </div>
           </div>
-          <v-btn color="secondary" variant="tonal" prepend-icon="mdi-printer" class="mr-2" @click="openForm10Report">
+          <v-btn
+            color="secondary"
+            variant="tonal"
+            prepend-icon="mdi-printer"
+            class="mr-2"
+            @click="openForm10Report"
+          >
             Печать (Форма 10)
           </v-btn>
-          <v-btn v-if="mutationsEnabled" color="teal" variant="tonal" prepend-icon="mdi-stamper" class="mr-2" @click="batchApprovalRef?.open()">
+          <v-btn
+            v-if="mutationsEnabled"
+            color="teal"
+            variant="tonal"
+            prepend-icon="mdi-stamper"
+            class="mr-2"
+            @click="batchApprovalRef?.open()"
+          >
             Утвердить план
           </v-btn>
-          <v-btn v-if="mutationsEnabled" color="primary" variant="flat" prepend-icon="mdi-plus" class="mr-2" @click="createRepair" :loading="creating">
+          <v-btn
+            v-if="mutationsEnabled"
+            color="primary"
+            variant="flat"
+            prepend-icon="mdi-plus"
+            class="mr-2"
+            @click="createRepair"
+            :loading="creating"
+          >
             Создать
           </v-btn>
-          <v-btn icon variant="text" aria-label="Закрыть журнал" @click="visible = false">
+          <v-btn
+            icon
+            variant="text"
+            aria-label="Закрыть журнал"
+            @click="visible = false"
+          >
             <v-icon>mdi-close</v-icon>
           </v-btn>
         </v-card-title>
         <v-divider />
         <div class="pa-3 pa-md-4 repair-filters">
           <v-row dense>
-            <v-col cols="12" md="4">
+            <v-col
+              cols="12"
+              md="4"
+            >
               <v-text-field
                 v-model="search"
                 label="Поиск по ID, названию, работам или приказу"
@@ -39,62 +82,191 @@
                 hide-details
               />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-select v-model="stateId" :items="lookups.states" item-title="name" item-value="id"
-                label="Состояние" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-select
+                v-model="stateId"
+                :items="lookups.states"
+                item-title="name"
+                item-value="id"
+                label="Состояние"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-select v-model="repairTypeId" :items="lookups.repair_types" item-title="name" item-value="id"
-                label="Вид ремонта" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-select
+                v-model="repairTypeId"
+                :items="lookups.repair_types"
+                item-title="name"
+                item-value="id"
+                label="Вид ремонта"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-select v-model="categoryId" :items="lookups.categories" item-title="name" item-value="id"
-                label="Категория" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-select
+                v-model="categoryId"
+                :items="lookups.categories"
+                item-title="name"
+                item-value="id"
+                label="Категория"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-select v-model="approved" :items="approvalOptions" item-title="title" item-value="value"
-                label="Утверждение" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-select
+                v-model="approved"
+                :items="approvalOptions"
+                item-title="title"
+                item-value="value"
+                label="Утверждение"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="4">
-              <v-select v-model="responsibleId" :items="lookups.responsible_people" item-title="name" item-value="id"
-                label="Ответственный" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="4"
+            >
+              <v-select
+                v-model="responsibleId"
+                :items="lookups.responsible_people"
+                item-title="name"
+                item-value="id"
+                label="Ответственный"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-text-field v-model="dateFrom" type="date" label="С даты" density="compact" variant="outlined" hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-text-field
+                v-model="dateFrom"
+                type="date"
+                label="С даты"
+                density="compact"
+                variant="outlined"
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-text-field v-model="dateTo" type="date" label="По дату" density="compact" variant="outlined" hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-text-field
+                v-model="dateTo"
+                type="date"
+                label="По дату"
+                density="compact"
+                variant="outlined"
+                hide-details
+              />
             </v-col>
           </v-row>
 
           <div class="d-flex align-center flex-wrap ga-2 mt-3">
-            <v-chip v-if="scope.lineId" size="small" color="deep-purple" closable @click:close="clearScope">
+            <v-chip
+              v-if="scope.lineId"
+              size="small"
+              color="deep-purple"
+              closable
+              @click:close="clearScope"
+            >
               Трубопровод {{ scope.lineId }}
             </v-chip>
-            <v-chip v-if="scope.nodeId" size="small" color="deep-purple" closable @click:close="clearScope">
+            <v-chip
+              v-if="scope.nodeId"
+              size="small"
+              color="deep-purple"
+              closable
+              @click:close="clearScope"
+            >
               Узел {{ scope.nodeId }}
             </v-chip>
             <v-spacer />
-            <v-btn variant="text" prepend-icon="mdi-filter-remove-outline" @click="resetFilters">Сбросить</v-btn>
-            <v-btn color="deep-purple" prepend-icon="mdi-refresh" :loading="loading" @click="loadRepairs">Обновить</v-btn>
+            <v-btn
+              variant="text"
+              prepend-icon="mdi-filter-remove-outline"
+              @click="resetFilters"
+            >Сбросить</v-btn>
+            <v-btn
+              color="deep-purple"
+              prepend-icon="mdi-refresh"
+              :loading="loading"
+              @click="loadRepairs"
+            >Обновить</v-btn>
           </div>
         </div>
 
         <v-divider />
 
         <v-card-text class="pa-0 repair-table-wrap">
-          <v-progress-linear v-if="loading" indeterminate color="deep-purple" />
-          <v-alert v-if="error" type="error" variant="tonal" class="ma-4">{{ error }}</v-alert>
+          <v-progress-linear
+            v-if="loading"
+            indeterminate
+            color="deep-purple"
+          />
+          <v-alert
+            v-if="error"
+            type="error"
+            variant="tonal"
+            class="ma-4"
+          >{{ error }}</v-alert>
 
-          <div v-else-if="!loading && items.length === 0" class="repair-empty">
-            <v-icon size="56" color="grey-lighten-1">mdi-hammer-wrench</v-icon>
+          <div
+            v-else-if="!loading && items.length === 0"
+            class="repair-empty"
+          >
+            <v-icon
+              size="56"
+              color="grey-lighten-1"
+            >mdi-hammer-wrench</v-icon>
             <div class="text-subtitle-1 mt-3">Ремонты не найдены</div>
             <div class="text-body-2 text-medium-emphasis mt-1">
               Измените фильтры или загрузите исторические данные TGID в таблицу remont2.
             </div>
           </div>
 
-          <v-table v-else fixed-header hover density="compact" class="repair-table">
+          <v-table
+            v-else
+            fixed-header
+            hover
+            density="compact"
+            class="repair-table"
+          >
             <thead>
               <tr>
                 <th>ID</th><th>Период</th><th>Ремонт</th><th>Вид / категория</th><th>Состояние</th>
@@ -102,7 +274,12 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in items" :key="item.id" class="repair-row" @click="openDetails(item.id)">
+              <tr
+                v-for="item in items"
+                :key="item.id"
+                class="repair-row"
+                @click="openDetails(item.id)"
+              >
                 <td class="font-weight-medium">{{ item.id }}</td>
                 <td class="text-no-wrap">{{ formatRange(item.effective_start, item.effective_finish) }}</td>
                 <td>
@@ -110,15 +287,31 @@
                   <div class="text-caption text-medium-emphasis">{{ item.network_type_name || item.section_characteristics || '—' }}</div>
                 </td>
                 <td>{{ [item.repair_type_name, item.category_name].filter(Boolean).join(' · ') || '—' }}</td>
-                <td><v-chip size="x-small" :color="stateColor(item.state_id)" variant="tonal">{{ item.state_name || 'Не указано' }}</v-chip></td>
+                <td><v-chip
+                  size="x-small"
+                  :color="stateColor(item.state_id)"
+                  variant="tonal"
+                >{{ item.state_name || 'Не указано' }}</v-chip></td>
                 <td>{{ item.responsible_name || '—' }}</td>
                 <td>{{ item.line_count }}</td>
                 <td class="text-no-wrap">{{ formatMoney(item.planned_budget) }} / {{ formatMoney(item.actual_budget) }}</td>
                 <td class="result-cell">{{ item.results || item.work_description || item.note || '—' }}</td>
                 <td class="text-right text-no-wrap">
-                  <v-btn v-if="hasCoordinates(item)" icon="mdi-crosshairs-gps" size="x-small" variant="text"
-                    color="deep-purple" aria-label="Показать ремонт на карте" @click.stop="locate(item, item.name || `Ремонт ${item.id}`)" />
-                  <v-btn icon="mdi-chevron-right" size="x-small" variant="text" @click.stop="openDetails(item.id)" />
+                  <v-btn
+                    v-if="hasCoordinates(item)"
+                    icon="mdi-crosshairs-gps"
+                    size="x-small"
+                    variant="text"
+                    color="deep-purple"
+                    aria-label="Показать ремонт на карте"
+                    @click.stop="locate(item, item.name || `Ремонт ${item.id}`)"
+                  />
+                  <v-btn
+                    icon="mdi-chevron-right"
+                    size="x-small"
+                    variant="text"
+                    @click.stop="openDetails(item.id)"
+                  />
                 </td>
               </tr>
             </tbody>
@@ -129,42 +322,103 @@
         <v-card-actions class="px-4 py-2">
           <span class="text-caption text-medium-emphasis">Страница {{ page }}{{ pages ? ` из ${pages}` : '' }}</span>
           <v-spacer />
-          <v-pagination v-if="pages > 1" v-model="page" :length="pages" :total-visible="isMobile ? 3 : 7" density="compact" />
+          <v-pagination
+            v-if="pages > 1"
+            v-model="page"
+            :length="pages"
+            :total-visible="isMobile ? 3 : 7"
+            density="compact"
+          />
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="detailsVisible" :fullscreen="isMobile" max-width="1040" scrollable eager>
+    <v-dialog
+      v-model="detailsVisible"
+      :fullscreen="isMobile"
+      max-width="1040"
+      scrollable
+      eager
+    >
       <v-card :rounded="isMobile ? 0 : 'lg'">
         <v-card-title class="d-flex align-center ga-3 px-4 py-3">
           <v-icon color="deep-purple-darken-2">mdi-hammer-wrench</v-icon>
-          <div class="flex-grow-1" style="min-width: 0">
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
             <div class="text-subtitle-1 font-weight-bold text-truncate">{{ selected?.name || `Ремонт ${selected?.id || ''}` }}</div>
             <div class="text-caption text-medium-emphasis">
               {{ selected?.state_name || 'Состояние не указано' }} · линий {{ selected?.line_count || 0 }} · нарушений {{ selected?.defect_count || 0 }}
             </div>
           </div>
-          <v-btn v-if="mutationsEnabled && selected" icon variant="text" aria-label="Удалить" color="error" class="mr-1" @click="deleteRepair(selected.id)" :loading="deleting" title="Удалить ремонт">
+          <v-btn
+            v-if="mutationsEnabled && selected"
+            icon
+            variant="text"
+            aria-label="Удалить"
+            color="error"
+            class="mr-1"
+            @click="deleteRepair(selected.id)"
+            :loading="deleting"
+            title="Удалить ремонт"
+          >
             <v-icon>mdi-delete</v-icon>
           </v-btn>
-          <v-btn icon variant="text" @click="detailsVisible = false"><v-icon>mdi-close</v-icon></v-btn>
+          <v-btn
+            icon
+            variant="text"
+            @click="detailsVisible = false"
+          ><v-icon>mdi-close</v-icon></v-btn>
         </v-card-title>
         <v-divider />
 
         <v-card-text class="pa-4">
-          <div v-if="detailsLoading" class="d-flex justify-center pa-10"><v-progress-circular indeterminate color="deep-purple" /></div>
-          <v-alert v-else-if="detailsError" type="error" variant="tonal">{{ detailsError }}</v-alert>
+          <div
+            v-if="detailsLoading"
+            class="d-flex justify-center pa-10"
+          ><v-progress-circular
+            indeterminate
+            color="deep-purple"
+          /></div>
+          <v-alert
+            v-else-if="detailsError"
+            type="error"
+            variant="tonal"
+          >{{ detailsError }}</v-alert>
           <template v-else-if="selected || isEditing">
-            <v-btn-toggle v-if="isNew" v-model="createMode" mandatory density="compact" color="deep-purple" class="mb-3">
+            <v-btn-toggle
+              v-if="isNew"
+              v-model="createMode"
+              mandatory
+              density="compact"
+              color="deep-purple"
+              class="mb-3"
+            >
               <v-btn value="plan">План (капитальный / инвестиционный)</v-btn>
               <v-btn value="current">Текущий ремонт</v-btn>
             </v-btn-toggle>
-            <v-expansion-panels multiple variant="accordion" :model-value="[0, 1]">
-              <v-expansion-panel v-for="(group, index) in detailGroups" :key="group.title" :value="index">
+            <v-expansion-panels
+              multiple
+              variant="accordion"
+              :model-value="[0, 1]"
+            >
+              <v-expansion-panel
+                v-for="(group, index) in detailGroups"
+                :key="group.title"
+                :value="index"
+              >
                 <v-expansion-panel-title>{{ group.title }}</v-expansion-panel-title>
                 <v-expansion-panel-text>
                   <v-row dense>
-                    <v-col v-for="field in group.fields" :key="field.label" cols="12" sm="6" md="4" lg="3">
+                    <v-col
+                      v-for="field in group.fields"
+                      :key="field.label"
+                      cols="12"
+                      sm="6"
+                      md="4"
+                      lg="3"
+                    >
                       <div class="detail-label mb-1">{{ field.label }}</div>
                       <template v-if="isEditing && field.key && isWritable(field.key)">
                         <v-select
@@ -202,85 +456,171 @@
                           variant="outlined"
                         />
                       </template>
-                      <div v-else class="detail-value">{{ field.value }}</div>
+                      <div
+                        v-else
+                        class="detail-value"
+                      >{{ field.value }}</div>
                     </v-col>
                   </v-row>
                 </v-expansion-panel-text>
               </v-expansion-panel>
 
-              <v-expansion-panel v-if="repairLines.length && !isEditing" :value="detailGroups.length">
+              <v-expansion-panel
+                v-if="repairLines.length && !isEditing"
+                :value="detailGroups.length"
+              >
                 <v-expansion-panel-title>Линии контура ({{ repairLines.length }})</v-expansion-panel-title>
                 <v-expansion-panel-text>
-                  <v-list density="compact" lines="two">
-                    <v-list-item v-for="line in repairLines" :key="Number(line.id)" prepend-icon="mdi-pipe"
-                      :title="`Линия ${line.line_id} · ${nodeRange(line)}`" :subtitle="lineSummary(line)">
-                      <template v-if="hasCoordinates(line)" #append>
-                        <v-btn icon="mdi-crosshairs-gps" size="x-small" variant="text" @click.stop="locateRelation(line, `Линия ${line.line_id}`)" />
+                  <v-list
+                    density="compact"
+                    lines="two"
+                  >
+                    <v-list-item
+                      v-for="line in repairLines"
+                      :key="Number(line.id)"
+                      prepend-icon="mdi-pipe"
+                      :title="`Линия ${line.line_id} · ${nodeRange(line)}`"
+                      :subtitle="lineSummary(line)"
+                    >
+                      <template
+                        v-if="hasCoordinates(line)"
+                        #append
+                      >
+                        <v-btn
+                          icon="mdi-crosshairs-gps"
+                          size="x-small"
+                          variant="text"
+                          @click.stop="locateRelation(line, `Линия ${line.line_id}`)"
+                        />
                       </template>
                     </v-list-item>
                   </v-list>
                 </v-expansion-panel-text>
               </v-expansion-panel>
 
-              <v-expansion-panel v-if="workSections.length && !isEditing" :value="detailGroups.length + 1">
+              <v-expansion-panel
+                v-if="workSections.length && !isEditing"
+                :value="detailGroups.length + 1"
+              >
                 <v-expansion-panel-title>Участки работ ({{ workSections.length }})</v-expansion-panel-title>
                 <v-expansion-panel-text>
-                  <v-list density="compact" lines="two">
-                    <v-list-item v-for="section in workSections" :key="Number(section.id)" prepend-icon="mdi-ruler-square"
-                      :title="`Участок ${section.legacy_pipe_section_id || section.id}`" :subtitle="sectionSummary(section)" />
+                  <v-list
+                    density="compact"
+                    lines="two"
+                  >
+                    <v-list-item
+                      v-for="section in workSections"
+                      :key="Number(section.id)"
+                      prepend-icon="mdi-ruler-square"
+                      :title="`Участок ${section.legacy_pipe_section_id || section.id}`"
+                      :subtitle="sectionSummary(section)"
+                    />
                   </v-list>
                 </v-expansion-panel-text>
               </v-expansion-panel>
 
-              <v-expansion-panel v-if="workItems.length && !isEditing" :value="detailGroups.length + 2">
+              <v-expansion-panel
+                v-if="workItems.length && !isEditing"
+                :value="detailGroups.length + 2"
+              >
                 <v-expansion-panel-title>Состав работ ({{ workItems.length }})</v-expansion-panel-title>
                 <v-expansion-panel-text>
-                  <v-chip v-for="(item, index) in workItems" :key="`${item.category}-${item.name}-${index}`" class="ma-1" size="small" variant="tonal">
+                  <v-chip
+                    v-for="(item, index) in workItems"
+                    :key="`${item.category}-${item.name}-${index}`"
+                    class="ma-1"
+                    size="small"
+                    variant="tonal"
+                  >
                     {{ item.category }} · {{ item.name }}
                   </v-chip>
                 </v-expansion-panel-text>
               </v-expansion-panel>
 
-              <v-expansion-panel v-if="relatedDefects.length && !isEditing" :value="detailGroups.length + 3">
+              <v-expansion-panel
+                v-if="relatedDefects.length && !isEditing"
+                :value="detailGroups.length + 3"
+              >
                 <v-expansion-panel-title>Связанные нарушения ({{ relatedDefects.length }})</v-expansion-panel-title>
                 <v-expansion-panel-text>
-                  <v-list density="compact" lines="two">
-                    <v-list-item v-for="defect in relatedDefects" :key="Number(defect.id)" prepend-icon="mdi-alert-circle-outline"
+                  <v-list
+                    density="compact"
+                    lines="two"
+                  >
+                    <v-list-item
+                      v-for="defect in relatedDefects"
+                      :key="Number(defect.id)"
+                      prepend-icon="mdi-alert-circle-outline"
                       :title="`Нарушение ${defect.id} · ${defect.state_name || 'без состояния'}`"
                       :subtitle="String(defect.description || defect.source_name || 'Описание не заполнено')"
-                      @click="openRelatedDefect(Number(defect.id))" />
+                      @click="openRelatedDefect(Number(defect.id))"
+                    />
                   </v-list>
                 </v-expansion-panel-text>
               </v-expansion-panel>
 
-              <v-expansion-panel v-if="documents.length && !isEditing" :value="detailGroups.length + 4">
+              <v-expansion-panel
+                v-if="documents.length && !isEditing"
+                :value="detailGroups.length + 4"
+              >
                 <v-expansion-panel-title>Документы ({{ documents.length }})</v-expansion-panel-title>
                 <v-expansion-panel-text>
                   <v-list density="compact">
-                    <v-list-item v-for="document in documents" :key="Number(document.id)" prepend-icon="mdi-file-document-outline"
+                    <v-list-item
+                      v-for="document in documents"
+                      :key="Number(document.id)"
+                      prepend-icon="mdi-file-document-outline"
                       :title="String(document.document_type_name || 'Документ')"
-                      :subtitle="`${formatDate(document.date_doc)} · ${fileName(document.path)}`" />
+                      :subtitle="`${formatDate(document.date_doc)} · ${fileName(document.path)}`"
+                    />
                   </v-list>
                 </v-expansion-panel-text>
               </v-expansion-panel>
             </v-expansion-panels>
-            <JournalRecordPanels v-if="selected && !isEditing" class="mt-4" journal="repairs" :record-id="selected.id"
+            <JournalRecordPanels
+              v-if="selected && !isEditing"
+              class="mt-4"
+              journal="repairs"
+              :record-id="selected.id"
               :record-label="selected.name || `Ремонт ${selected.id}`"
-              @changed="refreshSelected" @hide="hideForMap" @restore="restoreAfterMap" />
+              @changed="refreshSelected"
+              @hide="hideForMap"
+              @restore="restoreAfterMap"
+            />
           </template>
         </v-card-text>
 
         <v-divider />
         <v-card-actions class="px-4 py-3">
-          <v-btn v-if="selected && hasCoordinates(selected) && !isEditing" prepend-icon="mdi-crosshairs-gps" variant="tonal"
-            color="deep-purple" @click="locate(selected, selected.name || `Ремонт ${selected.id}`)">На карте</v-btn>
+          <v-btn
+            v-if="selected && hasCoordinates(selected) && !isEditing"
+            prepend-icon="mdi-crosshairs-gps"
+            variant="tonal"
+            color="deep-purple"
+            @click="locate(selected, selected.name || `Ремонт ${selected.id}`)"
+          >На карте</v-btn>
           <v-spacer />
           <template v-if="isEditing">
-            <v-btn v-if="mutationsEnabled" variant="text" @click="cancelEdit">Отмена</v-btn>
-            <v-btn v-if="mutationsEnabled" color="primary" variant="elevated" :loading="saving" @click="saveChanges">Сохранить</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              variant="text"
+              @click="cancelEdit"
+            >Отмена</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="primary"
+              variant="elevated"
+              :loading="saving"
+              @click="saveChanges"
+            >Сохранить</v-btn>
           </template>
           <template v-else>
-            <v-btn v-if="mutationsEnabled" color="primary" variant="tonal" @click="startEdit">Редактировать</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="primary"
+              variant="tonal"
+              @click="startEdit"
+            >Редактировать</v-btn>
             <v-btn
               v-if="selected"
               variant="tonal"
@@ -288,12 +628,19 @@
               :loading="exportingWord"
               @click="exportWord"
             >Word</v-btn>
-            <v-btn variant="text" @click="detailsVisible = false">Закрыть</v-btn>
+            <v-btn
+              variant="text"
+              @click="detailsVisible = false"
+            >Закрыть</v-btn>
           </template>
         </v-card-actions>
       </v-card>
     </v-dialog>
-    <JournalBatchApprovalDialog ref="batchApprovalRef" journal="repairs" @approved="loadRepairs" />
+    <JournalBatchApprovalDialog
+      ref="batchApprovalRef"
+      journal="repairs"
+      @approved="loadRepairs"
+    />
   </Teleport>
 </template>
 

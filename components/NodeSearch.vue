@@ -9,10 +9,17 @@
     >
       <v-card :rounded="mobile ? '0' : undefined">
         <v-card-title class="d-flex align-center flex-wrap pa-4 gap-2">
-          <v-icon class="mr-2" color="primary">mdi-map-search</v-icon>
+          <v-icon
+            class="mr-2"
+            color="primary"
+          >mdi-map-search</v-icon>
           <span class="text-h6">Поиск узлов</span>
           <v-spacer />
-          <v-btn icon variant="text" @click="dialog = false">
+          <v-btn
+            icon
+            variant="text"
+            @click="dialog = false"
+          >
             <v-icon>mdi-close</v-icon>
           </v-btn>
         </v-card-title>
@@ -32,7 +39,10 @@
             @update:model-value="onSearchInput"
             :loading="loading"
           />
-          <div v-if="!loading && nodes.length > 0" class="text-caption text-grey-darken-1 mt-2">
+          <div
+            v-if="!loading && nodes.length > 0"
+            class="text-caption text-grey-darken-1 mt-2"
+          >
             Найдено узлов: {{ nodes.length }}
           </div>
         </v-card-text>
@@ -44,14 +54,29 @@
           :style="resultsScrollStyle"
         >
           <!-- Loading -->
-          <div v-if="loading" class="pa-12 text-center">
-            <v-progress-circular indeterminate color="primary" size="64" width="4" />
+          <div
+            v-if="loading"
+            class="pa-12 text-center"
+          >
+            <v-progress-circular
+              indeterminate
+              color="primary"
+              size="64"
+              width="4"
+            />
             <div class="mt-6 text-h6 text-grey">Поиск узлов...</div>
           </div>
 
           <!-- Results (сгруппировано: тип → код РС → фрагмент) -->
-          <v-list v-else-if="nodes.length > 0" class="pa-2 node-search-grouped-list" density="compact">
-            <template v-for="group in nodeGroups" :key="group.key">
+          <v-list
+            v-else-if="nodes.length > 0"
+            class="pa-2 node-search-grouped-list"
+            density="compact"
+          >
+            <template
+              v-for="group in nodeGroups"
+              :key="group.key"
+            >
               <v-list-subheader class="node-group-subheader text-wrap py-2">
                 {{ group.label }}
               </v-list-subheader>
@@ -63,21 +88,39 @@
                 @click="selectNode(item)"
               >
                 <template #prepend>
-                  <v-avatar color="primary" size="48" class="elevation-2">
-                    <v-icon color="white" size="28">mdi-map-marker</v-icon>
+                  <v-avatar
+                    color="primary"
+                    size="48"
+                    class="elevation-2"
+                  >
+                    <v-icon
+                      color="white"
+                      size="28"
+                    >mdi-map-marker</v-icon>
                   </v-avatar>
                 </template>
                 <v-list-item-title class="font-weight-medium mb-1">
                   {{ getNodeTitle(item) }}
                 </v-list-item-title>
                 <v-list-item-subtitle class="text-caption">
-                  <div v-if="getNodeSubtitle(item)" class="d-flex align-center">
-                    <v-icon size="14" class="mr-1">mdi-information-outline</v-icon>
+                  <div
+                    v-if="getNodeSubtitle(item)"
+                    class="d-flex align-center"
+                  >
+                    <v-icon
+                      size="14"
+                      class="mr-1"
+                    >mdi-information-outline</v-icon>
                     {{ getNodeSubtitle(item) }}
                   </div>
                 </v-list-item-subtitle>
                 <template #append>
-                  <v-btn icon variant="text" size="small" color="primary">
+                  <v-btn
+                    icon
+                    variant="text"
+                    size="small"
+                    color="primary"
+                  >
                     <v-icon>mdi-chevron-right</v-icon>
                   </v-btn>
                 </template>
@@ -86,18 +129,38 @@
           </v-list>
 
           <!-- Empty state -->
-          <div v-else-if="!loading && !searchText" class="pa-12 text-center text-grey">
-            <v-avatar color="grey-lighten-3" size="80" class="mb-4">
-              <v-icon size="48" color="grey">mdi-map-search-outline</v-icon>
+          <div
+            v-else-if="!loading && !searchText"
+            class="pa-12 text-center text-grey"
+          >
+            <v-avatar
+              color="grey-lighten-3"
+              size="80"
+              class="mb-4"
+            >
+              <v-icon
+                size="48"
+                color="grey"
+              >mdi-map-search-outline</v-icon>
             </v-avatar>
             <div class="text-h6 mb-2">Начните поиск</div>
             <div class="text-body-2">Введите текст для поиска узлов</div>
           </div>
 
           <!-- No results -->
-          <div v-else-if="!loading && searchText && nodes.length === 0" class="pa-12 text-center text-grey">
-            <v-avatar color="grey-lighten-3" size="80" class="mb-4">
-              <v-icon size="48" color="grey">mdi-alert-circle-outline</v-icon>
+          <div
+            v-else-if="!loading && searchText && nodes.length === 0"
+            class="pa-12 text-center text-grey"
+          >
+            <v-avatar
+              color="grey-lighten-3"
+              size="80"
+              class="mb-4"
+            >
+              <v-icon
+                size="48"
+                color="grey"
+              >mdi-alert-circle-outline</v-icon>
             </v-avatar>
             <div class="text-h6 mb-2">Ничего не найдено</div>
             <div class="text-body-2">Попробуйте изменить запрос</div>
@@ -106,7 +169,10 @@
 
         <v-divider />
 
-        <v-card-actions class="pa-4 d-flex flex-wrap gap-2" :class="mobile ? 'flex-column' : ''">
+        <v-card-actions
+          class="pa-4 d-flex flex-wrap gap-2"
+          :class="mobile ? 'flex-column' : ''"
+        >
           <v-btn
             variant="text"
             color="grey"
@@ -117,12 +183,21 @@
             Очистить маркер
           </v-btn>
           <v-spacer v-if="!mobile" />
-          <v-btn variant="text" :block="mobile" @click="dialog = false">Закрыть</v-btn>
+          <v-btn
+            variant="text"
+            :block="mobile"
+            @click="dialog = false"
+          >Закрыть</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000" location="top">
+    <v-snackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      :timeout="3000"
+      location="top"
+    >
       {{ snackbarText }}
     </v-snackbar>
   </div>

@@ -1,27 +1,59 @@
 <template>
-  <v-dialog v-model="visible" :fullscreen="isMobile" max-width="1520" scrollable>
+  <v-dialog
+    v-model="visible"
+    :fullscreen="isMobile"
+    max-width="1520"
+    scrollable
+  >
     <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="cyan-darken-4" density="compact">
+      <v-toolbar
+        color="cyan-darken-4"
+        density="compact"
+      >
         <v-icon class="ml-3 mr-2">mdi-pipe-valve</v-icon>
         <v-toolbar-title>Байпасы наружных теплопроводов</v-toolbar-title>
-        <v-chip class="mr-2" size="small" color="white" variant="outlined">
+        <v-chip
+          class="mr-2"
+          size="small"
+          color="white"
+          variant="outlined"
+        >
           {{ lookups.counts.ready || 0 }}/{{ lookups.counts.total || 0 }} готовы
         </v-chip>
-        <v-btn icon="mdi-close" aria-label="Закрыть" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          aria-label="Закрыть"
+          @click="visible = false"
+        />
       </v-toolbar>
 
       <div class="alerts pa-3 pb-0">
-        <v-alert v-if="lookups.counts.total === 0" type="warning" variant="tonal" density="compact">
+        <v-alert
+          v-if="lookups.counts.total === 0"
+          type="warning"
+          variant="tonal"
+          density="compact"
+        >
           Таблица <code>bypass</code> текущей БД пуста. Журнал и карточка готовы для существующих данных,
           а каталог стандартных труб доступен отдельно.
         </v-alert>
-        <v-alert v-if="lookups.result_count === 0" type="info" variant="tonal" density="compact">
+        <v-alert
+          v-if="lookups.result_count === 0"
+          type="info"
+          variant="tonal"
+          density="compact"
+        >
           Расчётная таблица <code>BP_OUT</code> пуста. Диаметр диафрагмы, расход и потери напора
           появятся после сохранения расчёта сети.
         </v-alert>
       </div>
 
-      <v-tabs v-model="activeTab" color="cyan-darken-4" class="px-3 mt-2" @update:model-value="onTabChange">
+      <v-tabs
+        v-model="activeTab"
+        color="cyan-darken-4"
+        class="px-3 mt-2"
+        @update:model-value="onTabChange"
+      >
         <v-tab value="inventory">Байпасы ({{ lookups.counts.total || 0 }})</v-tab>
         <v-tab value="tubes">Стандартные трубы ({{ lookups.tube_counts.total || 0 }})</v-tab>
       </v-tabs>
@@ -41,12 +73,63 @@
           </div>
 
           <div class="filters pa-3">
-            <v-text-field v-model="filters.search" label="Узел, линия, место или ID" prepend-inner-icon="mdi-magnify" density="compact" variant="outlined" clearable hide-details @keyup.enter="reloadInventory" />
-            <v-select v-model="filters.quality_status" :items="qualityOptions" label="Качество данных" density="compact" variant="outlined" clearable hide-details />
-            <v-select v-model="filters.state_id" :items="lookups.states" item-title="name" item-value="id" label="Состояние" density="compact" variant="outlined" clearable hide-details />
-            <v-select v-model="filters.pipeline_sign_id" :items="lookups.pipeline_signs" item-title="name" item-value="id" label="Трубопровод" density="compact" variant="outlined" clearable hide-details />
-            <v-select v-model="filters.fragment_id" :items="lookups.fragments" item-title="name" item-value="id" label="Фрагмент" density="compact" variant="outlined" clearable hide-details />
-            <v-btn color="cyan-darken-4" :loading="loading" @click="reloadInventory">Найти</v-btn>
+            <v-text-field
+              v-model="filters.search"
+              label="Узел, линия, место или ID"
+              prepend-inner-icon="mdi-magnify"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+              @keyup.enter="reloadInventory"
+            />
+            <v-select
+              v-model="filters.quality_status"
+              :items="qualityOptions"
+              label="Качество данных"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-select
+              v-model="filters.state_id"
+              :items="lookups.states"
+              item-title="name"
+              item-value="id"
+              label="Состояние"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-select
+              v-model="filters.pipeline_sign_id"
+              :items="lookups.pipeline_signs"
+              item-title="name"
+              item-value="id"
+              label="Трубопровод"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-select
+              v-model="filters.fragment_id"
+              :items="lookups.fragments"
+              item-title="name"
+              item-value="id"
+              label="Фрагмент"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-btn
+              color="cyan-darken-4"
+              :loading="loading"
+              @click="reloadInventory"
+            >Найти</v-btn>
           </div>
 
           <JournalError :message="error" />
@@ -56,7 +139,11 @@
                 <tr><th>ID</th><th>Место установки</th><th>Линия / узлы</th><th>Задание</th><th>Узел присоединения</th><th>Трубопровод</th><th>L / Dвн</th><th>Состояние</th><th>Фрагмент</th><th>Качество</th><th /></tr>
               </thead>
               <tbody>
-                <tr v-for="item in inventory" :key="item.id" @click="openItemDetails(item.id)">
+                <tr
+                  v-for="item in inventory"
+                  :key="item.id"
+                  @click="openItemDetails(item.id)"
+                >
                   <td>{{ item.id }}</td>
                   <td>{{ item.installation_place || item.display_name || '—' }}</td>
                   <td>{{ item.line_id ?? '—' }}<div class="muted">{{ nodeLabel(item.node_code_1, item.node_name_1, item.node_id_1) }} → {{ nodeLabel(item.node_code_2, item.node_name_2, item.node_id_2) }}</div></td>
@@ -64,140 +151,483 @@
                   <td>{{ nodeLabel(item.connection_node_code, item.connection_node_name, item.connection_node_id) }}</td>
                   <td>{{ item.pipeline_sign_name || '—' }}</td>
                   <td>{{ formatUnit(item.length, 'м') }} / {{ formatUnit(item.internal_diameter, 'мм') }}</td>
-                  <td><v-chip size="x-small" :color="stateColor(item.state_name)">{{ item.state_name || '—' }}</v-chip></td>
+                  <td><v-chip
+                    size="x-small"
+                    :color="stateColor(item.state_name)"
+                  >{{ item.state_name || '—' }}</v-chip></td>
                   <td>{{ item.fragment_name || `№${item.fragment_id || '—'}` }}</td>
-                  <td><v-chip size="x-small" :color="qualityColor(item.quality_status)">{{ qualityLabel(item.quality_status) }}</v-chip></td>
-                  <td><v-btn v-if="hasCoordinates(item)" icon="mdi-map-marker" size="x-small" variant="text" aria-label="Показать байпас на карте" @click.stop="locate(item)" /></td>
+                  <td><v-chip
+                    size="x-small"
+                    :color="qualityColor(item.quality_status)"
+                  >{{ qualityLabel(item.quality_status) }}</v-chip></td>
+                  <td><v-btn
+                    v-if="hasCoordinates(item)"
+                    icon="mdi-map-marker"
+                    size="x-small"
+                    variant="text"
+                    aria-label="Показать байпас на карте"
+                    @click.stop="locate(item)"
+                  /></td>
                 </tr>
               </tbody>
             </table>
-            <div v-if="!loading && !inventory.length" class="empty">
+            <div
+              v-if="!loading && !inventory.length"
+              class="empty"
+            >
               В текущей базе байпасы отсутствуют
             </div>
-            <v-progress-linear v-if="loading" indeterminate color="cyan-darken-4" />
+            <v-progress-linear
+              v-if="loading"
+              indeterminate
+              color="cyan-darken-4"
+            />
           </div>
-          <v-pagination v-if="inventoryPages > 1" v-model="inventoryPage" :length="inventoryPages" density="comfortable" @update:model-value="loadInventory" />
+          <v-pagination
+            v-if="inventoryPages > 1"
+            v-model="inventoryPage"
+            :length="inventoryPages"
+            density="comfortable"
+            @update:model-value="loadInventory"
+          />
         </v-window-item>
 
         <v-window-item value="tubes">
           <div class="filters pa-3">
-            <v-text-field v-model="tubeFilters.search" label="Стандарт, DN, материал или ID" prepend-inner-icon="mdi-magnify" density="compact" variant="outlined" clearable hide-details @keyup.enter="reloadTubes" />
-            <v-select v-model="tubeFilters.standard" :items="lookups.tube_standards" item-title="name" item-value="name" label="Стандарт" density="compact" variant="outlined" clearable hide-details />
-            <v-select v-model="tubeFilters.quality_status" :items="tubeQualityOptions" label="Полнота паспорта" density="compact" variant="outlined" clearable hide-details />
-            <v-btn color="cyan-darken-4" :loading="loading" @click="reloadTubes">Найти</v-btn>
+            <v-text-field
+              v-model="tubeFilters.search"
+              label="Стандарт, DN, материал или ID"
+              prepend-inner-icon="mdi-magnify"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+              @keyup.enter="reloadTubes"
+            />
+            <v-select
+              v-model="tubeFilters.standard"
+              :items="lookups.tube_standards"
+              item-title="name"
+              item-value="name"
+              label="Стандарт"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-select
+              v-model="tubeFilters.quality_status"
+              :items="tubeQualityOptions"
+              label="Полнота паспорта"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-btn
+              color="cyan-darken-4"
+              :loading="loading"
+              @click="reloadTubes"
+            >Найти</v-btn>
           </div>
           <JournalError :message="error" />
           <div class="table-wrap catalog-table-wrap">
             <table class="journal-table">
               <thead><tr><th>ID</th><th>Стандарт</th><th>DN</th><th>Dнар</th><th>Dвн</th><th>Стенка</th><th>Площадь сечения</th><th>Установлено</th><th>Качество</th></tr></thead>
               <tbody>
-                <tr v-for="tube in tubes" :key="tube.id" @click="openTubeDetails(tube.id)">
+                <tr
+                  v-for="tube in tubes"
+                  :key="tube.id"
+                  @click="openTubeDetails(tube.id)"
+                >
                   <td>{{ tube.id }}</td><td><strong>{{ tube.standard || '—' }}</strong></td>
                   <td>{{ formatUnit(tube.nominal_diameter, 'мм') }}</td><td>{{ formatUnit(tube.external_diameter, 'мм') }}</td><td>{{ formatUnit(tube.internal_diameter, 'мм') }}</td><td>{{ formatUnit(tube.wall_thickness, 'мм') }}</td>
                   <td>{{ formatNumber(tube.section_area, 8) }}</td><td>{{ tube.installed_count }}</td>
-                  <td><v-chip size="x-small" :color="tube.quality_status === 'ready' ? 'green' : 'orange'">{{ tube.quality_status === 'ready' ? 'готово' : 'неполный' }}</v-chip></td>
+                  <td><v-chip
+                    size="x-small"
+                    :color="tube.quality_status === 'ready' ? 'green' : 'orange'"
+                  >{{ tube.quality_status === 'ready' ? 'готово' : 'неполный' }}</v-chip></td>
                 </tr>
               </tbody>
             </table>
-            <div v-if="!loading && !tubes.length" class="empty">Типоразмеры не найдены</div>
-            <v-progress-linear v-if="loading" indeterminate color="cyan-darken-4" />
+            <div
+              v-if="!loading && !tubes.length"
+              class="empty"
+            >Типоразмеры не найдены</div>
+            <v-progress-linear
+              v-if="loading"
+              indeterminate
+              color="cyan-darken-4"
+            />
           </div>
-          <v-pagination v-if="tubePages > 1" v-model="tubePage" :length="tubePages" density="comfortable" @update:model-value="loadTubes" />
+          <v-pagination
+            v-if="tubePages > 1"
+            v-model="tubePage"
+            :length="tubePages"
+            density="comfortable"
+            @update:model-value="loadTubes"
+          />
         </v-window-item>
       </v-window>
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="detailVisible" :fullscreen="isMobile" max-width="1160" scrollable>
+  <v-dialog
+    v-model="detailVisible"
+    :fullscreen="isMobile"
+    max-width="1160"
+    scrollable
+  >
     <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="cyan-darken-4" density="compact">
-        <v-btn icon="mdi-arrow-left" aria-label="Вернуться к журналу" @click="detailVisible = false" />
+      <v-toolbar
+        color="cyan-darken-4"
+        density="compact"
+      >
+        <v-btn
+          icon="mdi-arrow-left"
+          aria-label="Вернуться к журналу"
+          @click="detailVisible = false"
+        />
         <v-toolbar-title>{{ detailTitle }}</v-toolbar-title>
-        <v-btn icon="mdi-close" aria-label="Закрыть карточку" @click="detailVisible = false" />
+        <v-btn
+          icon="mdi-close"
+          aria-label="Закрыть карточку"
+          @click="detailVisible = false"
+        />
       </v-toolbar>
-      <v-progress-linear v-if="detailLoading" indeterminate color="cyan-darken-4" />
+      <v-progress-linear
+        v-if="detailLoading"
+        indeterminate
+        color="cyan-darken-4"
+      />
 
       <template v-if="itemDetails && !detailLoading">
         <div class="alerts pa-3 pb-0">
-          <v-alert v-if="itemDetails.quality_status !== 'ready'" :type="itemDetails.quality_status === 'line_missing' ? 'error' : 'warning'" variant="tonal" density="compact">{{ qualityDescription(itemDetails.quality_status) }}</v-alert>
+          <v-alert
+            v-if="itemDetails.quality_status !== 'ready'"
+            :type="itemDetails.quality_status === 'line_missing' ? 'error' : 'warning'"
+            variant="tonal"
+            density="compact"
+          >{{ qualityDescription(itemDetails.quality_status) }}</v-alert>
         </div>
         <v-card-text>
           <v-row>
-            <v-col cols="12" md="6"><v-card variant="outlined" class="h-100"><v-card-title class="text-subtitle-1">Сетевая привязка</v-card-title><v-card-text class="detail-grid">
-              <DetailValue label="Байпас / ID" :value="itemDetails.id" /><DetailValue label="Линия" :value="itemDetails.line_id" />
-              <DetailValue label="Начальный узел" :value="nodeLabel(itemDetails.node_code_1, itemDetails.node_name_1, itemDetails.node_id_1)" /><DetailValue label="Конечный узел" :value="nodeLabel(itemDetails.node_code_2, itemDetails.node_name_2, itemDetails.node_id_2)" />
-              <DetailValue label="Узел присоединения" :value="nodeLabel(itemDetails.connection_node_code, itemDetails.connection_node_name, itemDetails.connection_node_id)" /><DetailValue label="Фрагмент" :value="itemDetails.fragment_name || itemDetails.fragment_id" />
+            <v-col
+              cols="12"
+              md="6"
+            ><v-card
+              variant="outlined"
+              class="h-100"
+            ><v-card-title class="text-subtitle-1">Сетевая привязка</v-card-title><v-card-text class="detail-grid">
+              <DetailValue
+                label="Байпас / ID"
+                :value="itemDetails.id"
+              /><DetailValue
+                label="Линия"
+                :value="itemDetails.line_id"
+              />
+              <DetailValue
+                label="Начальный узел"
+                :value="nodeLabel(itemDetails.node_code_1, itemDetails.node_name_1, itemDetails.node_id_1)"
+              /><DetailValue
+                label="Конечный узел"
+                :value="nodeLabel(itemDetails.node_code_2, itemDetails.node_name_2, itemDetails.node_id_2)"
+              />
+              <DetailValue
+                label="Узел присоединения"
+                :value="nodeLabel(itemDetails.connection_node_code, itemDetails.connection_node_name, itemDetails.connection_node_id)"
+              /><DetailValue
+                label="Фрагмент"
+                :value="itemDetails.fragment_name || itemDetails.fragment_id"
+              />
             </v-card-text></v-card></v-col>
-            <v-col cols="12" md="6"><v-card variant="outlined" class="h-100">
+            <v-col
+              cols="12"
+              md="6"
+            ><v-card
+              variant="outlined"
+              class="h-100"
+            >
               <v-card-title class="text-subtitle-1">Задание байпаса</v-card-title>
-              <v-card-text class="detail-grid" v-if="!isEditing">
-                <DetailValue label="Регулируемый расход" :value="formatUnit(itemDetails.target_flow, 'т/ч')" /><DetailValue label="Допуск расхода" :value="formatUnit(itemDetails.flow_tolerance, 'т/ч')" />
-                <DetailValue label="Заданный напор" :value="formatUnit(itemDetails.target_head, 'м')" /><DetailValue label="Допуск напора" :value="formatUnit(itemDetails.head_tolerance, 'м')" />
-                <DetailValue label="Состояние" :value="itemDetails.state_name" /><DetailValue label="Трубопровод" :value="itemDetails.pipeline_sign_name" /><DetailValue label="Место установки" :value="itemDetails.installation_place" />
+              <v-card-text
+                class="detail-grid"
+                v-if="!isEditing"
+              >
+                <DetailValue
+                  label="Регулируемый расход"
+                  :value="formatUnit(itemDetails.target_flow, 'т/ч')"
+                /><DetailValue
+                  label="Допуск расхода"
+                  :value="formatUnit(itemDetails.flow_tolerance, 'т/ч')"
+                />
+                <DetailValue
+                  label="Заданный напор"
+                  :value="formatUnit(itemDetails.target_head, 'м')"
+                /><DetailValue
+                  label="Допуск напора"
+                  :value="formatUnit(itemDetails.head_tolerance, 'м')"
+                />
+                <DetailValue
+                  label="Состояние"
+                  :value="itemDetails.state_name"
+                /><DetailValue
+                  label="Трубопровод"
+                  :value="itemDetails.pipeline_sign_name"
+                /><DetailValue
+                  label="Место установки"
+                  :value="itemDetails.installation_place"
+                />
               </v-card-text>
               <v-card-text v-else>
                 <v-row dense>
-                  <v-col v-for="field in buildFields().assignment" :key="field.key" cols="12" sm="6">
+                  <v-col
+                    v-for="field in buildFields().assignment"
+                    :key="field.key"
+                    cols="12"
+                    sm="6"
+                  >
                     <div class="detail-label mb-1">{{ field.label }}</div>
-                    <v-select v-if="field.type === 'select'" v-model="editFields[field.key]" :items="field.items" item-title="name" item-value="id" density="compact" hide-details variant="outlined" clearable />
-                    <v-text-field v-else v-model="editFields[field.key]" :type="field.type === 'number' ? 'number' : 'text'" density="compact" hide-details variant="outlined" clearable />
+                    <v-select
+                      v-if="field.type === 'select'"
+                      v-model="editFields[field.key]"
+                      :items="field.items"
+                      item-title="name"
+                      item-value="id"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      clearable
+                    />
+                    <v-text-field
+                      v-else
+                      v-model="editFields[field.key]"
+                      :type="field.type === 'number' ? 'number' : 'text'"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      clearable
+                    />
                   </v-col>
                 </v-row>
               </v-card-text>
             </v-card></v-col>
-            <v-col cols="12" md="6"><v-card variant="outlined" class="h-100">
+            <v-col
+              cols="12"
+              md="6"
+            ><v-card
+              variant="outlined"
+              class="h-100"
+            >
               <v-card-title class="text-subtitle-1">Параметры трубопровода</v-card-title>
-              <v-card-text class="detail-grid" v-if="!isEditing">
-                <DetailValue label="Длина" :value="formatUnit(itemDetails.length, 'м')" /><DetailValue label="Внутренний диаметр" :value="formatUnit(itemDetails.internal_diameter, 'мм')" />
-                <DetailValue label="Экв. шероховатость" :value="formatUnit(itemDetails.tube_roughness, 'мм')" /><DetailValue label="Σ местных сопротивлений" :value="formatNumber(itemDetails.local_resistance_coefficients, 5)" />
-                <DetailValue label="Стандарт" :value="itemDetails.standard_name" /><DetailValue label="Типовая труба" :value="itemDetails.selected_tube?.display_name || itemDetails.standard_tube_id" />
-                <DetailValue label="Сопротивление линии" :value="formatNumber(itemDetails.line_hydraulic_resistance, 8)" />
+              <v-card-text
+                class="detail-grid"
+                v-if="!isEditing"
+              >
+                <DetailValue
+                  label="Длина"
+                  :value="formatUnit(itemDetails.length, 'м')"
+                /><DetailValue
+                  label="Внутренний диаметр"
+                  :value="formatUnit(itemDetails.internal_diameter, 'мм')"
+                />
+                <DetailValue
+                  label="Экв. шероховатость"
+                  :value="formatUnit(itemDetails.tube_roughness, 'мм')"
+                /><DetailValue
+                  label="Σ местных сопротивлений"
+                  :value="formatNumber(itemDetails.local_resistance_coefficients, 5)"
+                />
+                <DetailValue
+                  label="Стандарт"
+                  :value="itemDetails.standard_name"
+                /><DetailValue
+                  label="Типовая труба"
+                  :value="itemDetails.selected_tube?.display_name || itemDetails.standard_tube_id"
+                />
+                <DetailValue
+                  label="Сопротивление линии"
+                  :value="formatNumber(itemDetails.line_hydraulic_resistance, 8)"
+                />
               </v-card-text>
               <v-card-text v-else>
                 <v-row dense>
-                  <v-col v-for="field in buildFields().pipeline" :key="field.key" cols="12" sm="6">
+                  <v-col
+                    v-for="field in buildFields().pipeline"
+                    :key="field.key"
+                    cols="12"
+                    sm="6"
+                  >
                     <div class="detail-label mb-1">{{ field.label }}</div>
-                    <v-select v-if="field.type === 'select'" v-model="editFields[field.key]" :items="field.items" item-title="name" item-value="id" density="compact" hide-details variant="outlined" clearable />
-                    <v-text-field v-else v-model="editFields[field.key]" :type="field.type === 'number' ? 'number' : 'text'" density="compact" hide-details variant="outlined" clearable />
+                    <v-select
+                      v-if="field.type === 'select'"
+                      v-model="editFields[field.key]"
+                      :items="field.items"
+                      item-title="name"
+                      item-value="id"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      clearable
+                    />
+                    <v-text-field
+                      v-else
+                      v-model="editFields[field.key]"
+                      :type="field.type === 'number' ? 'number' : 'text'"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      clearable
+                    />
                   </v-col>
                 </v-row>
               </v-card-text>
             </v-card></v-col>
-            <v-col cols="12" md="6"><v-card variant="outlined" class="h-100"><v-card-title class="text-subtitle-1">Расчётный режим BP_OUT</v-card-title>
-              <v-card-text v-if="itemDetails.latest_output" class="detail-grid">
-                <DetailValue label="Диаметр диафрагмы" :value="formatUnit(outputValue('diaphragm_diameter'), 'мм')" /><DetailValue label="Напор на диафрагме" :value="formatUnit(outputValue('diaphragm_head_loss'), 'м')" />
-                <DetailValue label="Расход" :value="formatUnit(outputValue('flow'), 'т/ч')" /><DetailValue label="Потери на байпасе" :value="formatUnit(outputValue('bypass_head_loss'), 'м')" />
-                <DetailValue label="Суммарный гасимый напор" :value="formatUnit(outputValue('total_head_loss'), 'м')" /><DetailValue label="Гидравлическое сопротивление" :value="formatNumber(outputValue('hydraulic_resistance'), 8)" />
-              </v-card-text><v-card-text v-else><v-alert type="info" variant="tonal" density="compact">Гидравлический режим для этого байпаса пока не рассчитан.</v-alert></v-card-text>
+            <v-col
+              cols="12"
+              md="6"
+            ><v-card
+              variant="outlined"
+              class="h-100"
+            ><v-card-title class="text-subtitle-1">Расчётный режим BP_OUT</v-card-title>
+              <v-card-text
+                v-if="itemDetails.latest_output"
+                class="detail-grid"
+              >
+                <DetailValue
+                  label="Диаметр диафрагмы"
+                  :value="formatUnit(outputValue('diaphragm_diameter'), 'мм')"
+                /><DetailValue
+                  label="Напор на диафрагме"
+                  :value="formatUnit(outputValue('diaphragm_head_loss'), 'м')"
+                />
+                <DetailValue
+                  label="Расход"
+                  :value="formatUnit(outputValue('flow'), 'т/ч')"
+                /><DetailValue
+                  label="Потери на байпасе"
+                  :value="formatUnit(outputValue('bypass_head_loss'), 'м')"
+                />
+                <DetailValue
+                  label="Суммарный гасимый напор"
+                  :value="formatUnit(outputValue('total_head_loss'), 'м')"
+                /><DetailValue
+                  label="Гидравлическое сопротивление"
+                  :value="formatNumber(outputValue('hydraulic_resistance'), 8)"
+                />
+              </v-card-text><v-card-text v-else><v-alert
+                type="info"
+                variant="tonal"
+                density="compact"
+              >Гидравлический режим для этого байпаса пока не рассчитан.</v-alert></v-card-text>
             </v-card></v-col>
           </v-row>
         </v-card-text>
         <v-divider />
         <v-card-actions class="px-4 py-3 bg-grey-lighten-4">
           <v-spacer />
-          <v-btn v-if="!isEditing && hasCoordinates(itemDetails)" color="cyan-darken-4" variant="text" prepend-icon="mdi-map-marker" @click="locate(itemDetails)">Показать на карте</v-btn>
+          <v-btn
+            v-if="!isEditing && hasCoordinates(itemDetails)"
+            color="cyan-darken-4"
+            variant="text"
+            prepend-icon="mdi-map-marker"
+            @click="locate(itemDetails)"
+          >Показать на карте</v-btn>
           <template v-if="!isEditing">
-            <v-btn v-if="mutationsEnabled" color="primary" variant="flat" prepend-icon="mdi-pencil" @click="startEdit">Редактировать</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="primary"
+              variant="flat"
+              prepend-icon="mdi-pencil"
+              @click="startEdit"
+            >Редактировать</v-btn>
           </template>
           <template v-else>
-            <v-btn v-if="mutationsEnabled" color="error" variant="text" @click="cancelEdit" :disabled="saving">Отмена</v-btn>
-            <v-btn v-if="mutationsEnabled" color="primary" variant="flat" @click="saveChanges" :loading="saving">Сохранить</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="error"
+              variant="text"
+              @click="cancelEdit"
+              :disabled="saving"
+            >Отмена</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="primary"
+              variant="flat"
+              @click="saveChanges"
+              :loading="saving"
+            >Сохранить</v-btn>
           </template>
         </v-card-actions>
       </template>
 
       <template v-if="tubeDetails && !detailLoading">
         <v-card-text><v-row>
-          <v-col cols="12" md="6"><v-card variant="outlined" class="h-100"><v-card-title class="text-subtitle-1">Паспорт стандартной трубы</v-card-title><v-card-text class="detail-grid">
-            <DetailValue label="ID" :value="tubeDetails.id" /><DetailValue label="Стандарт" :value="tubeDetails.standard" /><DetailValue label="DN" :value="formatUnit(tubeDetails.nominal_diameter, 'мм')" />
-            <DetailValue label="Наружный диаметр" :value="formatUnit(tubeDetails.external_diameter, 'мм')" /><DetailValue label="Внутренний диаметр" :value="formatUnit(tubeDetails.internal_diameter, 'мм')" /><DetailValue label="Толщина стенки" :value="formatUnit(tubeDetails.wall_thickness, 'мм')" />
-            <DetailValue label="Материал" :value="tubeDetails.material" /><DetailValue label="Изготовитель" :value="tubeDetails.manufacturer" /><DetailValue label="Связано с байпасами" :value="tubeDetails.installed_count" />
+          <v-col
+            cols="12"
+            md="6"
+          ><v-card
+            variant="outlined"
+            class="h-100"
+          ><v-card-title class="text-subtitle-1">Паспорт стандартной трубы</v-card-title><v-card-text class="detail-grid">
+            <DetailValue
+              label="ID"
+              :value="tubeDetails.id"
+            /><DetailValue
+              label="Стандарт"
+              :value="tubeDetails.standard"
+            /><DetailValue
+              label="DN"
+              :value="formatUnit(tubeDetails.nominal_diameter, 'мм')"
+            />
+            <DetailValue
+              label="Наружный диаметр"
+              :value="formatUnit(tubeDetails.external_diameter, 'мм')"
+            /><DetailValue
+              label="Внутренний диаметр"
+              :value="formatUnit(tubeDetails.internal_diameter, 'мм')"
+            /><DetailValue
+              label="Толщина стенки"
+              :value="formatUnit(tubeDetails.wall_thickness, 'мм')"
+            />
+            <DetailValue
+              label="Материал"
+              :value="tubeDetails.material"
+            /><DetailValue
+              label="Изготовитель"
+              :value="tubeDetails.manufacturer"
+            /><DetailValue
+              label="Связано с байпасами"
+              :value="tubeDetails.installed_count"
+            />
           </v-card-text></v-card></v-col>
-          <v-col cols="12" md="6"><v-card variant="outlined" class="h-100"><v-card-title class="text-subtitle-1">Расчётные свойства</v-card-title><v-card-text class="detail-grid">
-            <DetailValue label="Площадь сечения" :value="formatNumber(tubeDetails.section_area, 8)" /><DetailValue label="Поверхность на метр" :value="formatNumber(tubeDetails.surface_per_meter, 8)" />
-            <DetailValue label="Масса на метр" :value="formatNumber(tubeDetails.mass_per_meter, 5)" /><DetailValue label="Масса с изоляцией" :value="formatNumber(tubeDetails.insulated_mass_per_meter, 5)" />
+          <v-col
+            cols="12"
+            md="6"
+          ><v-card
+            variant="outlined"
+            class="h-100"
+          ><v-card-title class="text-subtitle-1">Расчётные свойства</v-card-title><v-card-text class="detail-grid">
+            <DetailValue
+              label="Площадь сечения"
+              :value="formatNumber(tubeDetails.section_area, 8)"
+            /><DetailValue
+              label="Поверхность на метр"
+              :value="formatNumber(tubeDetails.surface_per_meter, 8)"
+            />
+            <DetailValue
+              label="Масса на метр"
+              :value="formatNumber(tubeDetails.mass_per_meter, 5)"
+            /><DetailValue
+              label="Масса с изоляцией"
+              :value="formatNumber(tubeDetails.insulated_mass_per_meter, 5)"
+            />
           </v-card-text></v-card></v-col>
-          <v-col cols="12"><v-card variant="outlined"><v-card-title class="text-subtitle-1">Исходные поля standardtubes</v-card-title><v-card-text class="attribute-grid"><DetailValue v-for="entry in tubeAttributeEntries" :key="entry[0]" :label="entry[0]" :value="formatAttribute(entry[1])" /></v-card-text></v-card></v-col>
+          <v-col cols="12"><v-card variant="outlined"><v-card-title class="text-subtitle-1">Исходные поля standardtubes</v-card-title><v-card-text class="attribute-grid"><DetailValue
+            v-for="entry in tubeAttributeEntries"
+            :key="entry[0]"
+            :label="entry[0]"
+            :value="formatAttribute(entry[1])"
+          /></v-card-text></v-card></v-col>
         </v-row></v-card-text>
       </template>
     </v-card>

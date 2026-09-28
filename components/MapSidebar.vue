@@ -2,8 +2,14 @@
   <div>
     <!-- Кнопка открытия (десктоп свёрнут / мобильный) -->
     <transition name="fade">
-      <div v-if="showToggleBtn" class="sidebar-toggle-wrap">
-        <v-tooltip text="Открыть панель слоёв" location="right">
+      <div
+        v-if="showToggleBtn"
+        class="sidebar-toggle-wrap"
+      >
+        <v-tooltip
+          text="Открыть панель слоёв"
+          location="right"
+        >
           <template #activator="{ props: tp }">
             <v-btn
               v-bind="tp"
@@ -53,7 +59,11 @@
         v-if="!mobile && !desktopCollapsed"
         class="desktop-sidebar"
       >
-        <v-card elevation="2" rounded="0" class="sidebar-card">
+        <v-card
+          elevation="2"
+          rounded="0"
+          class="sidebar-card"
+        >
           <MapSidebarPanel
             :layer-opacities="layerOpacities"
             :fragments-loading="fragmentsLoading"

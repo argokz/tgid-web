@@ -10,14 +10,34 @@
         <v-icon>mdi-select-group</v-icon>
         Групповые установщики
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" density="compact" aria-label="Закрыть" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          density="compact"
+          aria-label="Закрыть"
+          @click="visible = false"
+        />
       </v-card-title>
 
       <v-card-text class="pt-0">
-        <v-alert v-if="!canEditData" type="info" variant="tonal" density="compact" class="mb-3">
+        <v-alert
+          v-if="!canEditData"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+        >
           Предпросмотр доступен редактору; применение — при включённой записи на сервере (MUTATIONS_ENABLED).
         </v-alert>
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-3" closable @click:close="error = ''">
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+          closable
+          @click:close="error = ''"
+        >
           {{ error }}
         </v-alert>
 
@@ -36,7 +56,10 @@
           class="mb-2"
         >
           <template #item="{ props: itemProps, item }">
-            <v-list-item v-bind="itemProps" :subtitle="item.raw.subtitle" />
+            <v-list-item
+              v-bind="itemProps"
+              :subtitle="item.raw.subtitle"
+            />
           </template>
         </v-autocomplete>
 
@@ -45,7 +68,13 @@
             {{ setter.target_label }} · пишется: {{ setter.writes.join(', ') }} · десктоп: {{ setter.desktop }}
             <span v-if="setter.note"><br>{{ setter.note }}</span>
           </div>
-          <v-alert v-if="setter.affects_calc" type="warning" variant="tonal" density="compact" class="mb-2">
+          <v-alert
+            v-if="setter.affects_calc"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-2"
+          >
             Поле участвует в гидравлическом расчёте — после изменения пересчитайте режим.
           </v-alert>
 
@@ -58,7 +87,12 @@
                 :fragment-ids="selectionFragmentIds"
                 label="Новое значение"
               />
-              <v-alert v-else type="info" variant="tonal" density="compact">
+              <v-alert
+                v-else
+                type="info"
+                variant="tonal"
+                density="compact"
+              >
                 {{ setter.key === 'length' ? 'Значение вычисляется для каждого объекта (длина по геометрии участка).' : 'Значение не задаётся: поля очищаются.' }}
               </v-alert>
             </div>
@@ -66,10 +100,26 @@
 
           <!-- 2. Набор объектов -->
           <div class="text-subtitle-2 mb-1">2. Для каких объектов</div>
-          <v-btn-toggle v-model="draft.mode" mandatory density="compact" color="primary" variant="outlined" class="mb-2 flex-wrap">
-            <v-btn value="fragment" prepend-icon="mdi-layers-outline">Фрагмент</v-btn>
-            <v-btn value="map" prepend-icon="mdi-cursor-default-click-outline">Выбрать на карте</v-btn>
-            <v-btn value="filter" prepend-icon="mdi-filter-outline">Фильтр</v-btn>
+          <v-btn-toggle
+            v-model="draft.mode"
+            mandatory
+            density="compact"
+            color="primary"
+            variant="outlined"
+            class="mb-2 flex-wrap"
+          >
+            <v-btn
+              value="fragment"
+              prepend-icon="mdi-layers-outline"
+            >Фрагмент</v-btn>
+            <v-btn
+              value="map"
+              prepend-icon="mdi-cursor-default-click-outline"
+            >Выбрать на карте</v-btn>
+            <v-btn
+              value="filter"
+              prepend-icon="mdi-filter-outline"
+            >Фильтр</v-btn>
           </v-btn-toggle>
 
           <v-autocomplete
@@ -88,11 +138,23 @@
             class="mb-2"
           />
 
-          <div v-if="draft.mode === 'map'" class="d-flex flex-wrap align-center ga-2 mb-2">
-            <v-btn prepend-icon="mdi-cursor-default-click-outline" color="orange-darken-3" variant="tonal" @click="pickOnMap">
+          <div
+            v-if="draft.mode === 'map'"
+            class="d-flex flex-wrap align-center ga-2 mb-2"
+          >
+            <v-btn
+              prepend-icon="mdi-cursor-default-click-outline"
+              color="orange-darken-3"
+              variant="tonal"
+              @click="pickOnMap"
+            >
               {{ draft.pickedIds.length ? 'Изменить выбор' : 'Выбрать' }} {{ pickKind === 'node' ? 'узлы' : 'участки' }}
             </v-btn>
-            <v-chip v-if="draft.pickedIds.length" closable @click:close="draft.pickedIds = []">
+            <v-chip
+              v-if="draft.pickedIds.length"
+              closable
+              @click:close="draft.pickedIds = []"
+            >
               Выбрано: {{ draft.pickedIds.length }}
             </v-chip>
             <span class="text-caption text-medium-emphasis">
@@ -107,7 +169,11 @@
               hide-details
               label="Только в видимой области карты (как «Выделить область» десктопа)"
             />
-            <div v-for="(cond, idx) in draft.conditions" :key="idx" class="d-flex flex-wrap ga-2 align-start mb-2">
+            <div
+              v-for="(cond, idx) in draft.conditions"
+              :key="idx"
+              class="d-flex flex-wrap ga-2 align-start mb-2"
+            >
               <v-select
                 v-model="cond.field"
                 :items="filterFieldItems"
@@ -129,7 +195,10 @@
                 hide-details
                 style="flex: 0 1 150px;"
               />
-              <div v-if="cond.op === 'eq' && settersByKey[cond.field]" style="flex: 1 1 220px;">
+              <div
+                v-if="cond.op === 'eq' && settersByKey[cond.field]"
+                style="flex: 1 1 220px;"
+              >
                 <SetterValueInput
                   v-model="cond.value"
                   :setter="filterSetter(cond.field)"
@@ -137,16 +206,35 @@
                   label="Значение"
                 />
               </div>
-              <v-btn icon="mdi-delete" variant="text" density="compact" aria-label="Удалить условие" @click="draft.conditions.splice(idx, 1)" />
+              <v-btn
+                icon="mdi-delete"
+                variant="text"
+                density="compact"
+                aria-label="Удалить условие"
+                @click="draft.conditions.splice(idx, 1)"
+              />
             </div>
-            <v-btn size="small" variant="text" prepend-icon="mdi-plus" :disabled="!filterFieldItems.length" @click="addCondition">
+            <v-btn
+              size="small"
+              variant="text"
+              prepend-icon="mdi-plus"
+              :disabled="!filterFieldItems.length"
+              @click="addCondition"
+            >
               Условие по полю
             </v-btn>
           </template>
 
           <!-- 3. Предпросмотр -->
           <div class="d-flex flex-wrap ga-2 mt-3">
-            <v-btn color="primary" variant="tonal" prepend-icon="mdi-magnify" :loading="previewing" :disabled="!canPreview" @click="runPreview">
+            <v-btn
+              color="primary"
+              variant="tonal"
+              prepend-icon="mdi-magnify"
+              :loading="previewing"
+              :disabled="!canPreview"
+              @click="runPreview"
+            >
               Предпросмотр
             </v-btn>
             <v-btn
@@ -161,8 +249,17 @@
             </v-btn>
           </div>
 
-          <div v-if="preview" class="mt-3">
-            <v-alert v-if="previewStale" type="warning" variant="tonal" density="compact" class="mb-2">
+          <div
+            v-if="preview"
+            class="mt-3"
+          >
+            <v-alert
+              v-if="previewStale"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-2"
+            >
               Параметры изменились — повторите предпросмотр.
             </v-alert>
             <div class="text-body-2 mb-1">
@@ -170,19 +267,43 @@
               <span v-if="preview.value_label"> · значение «{{ preview.value_label }}»</span>
             </div>
             <div class="text-caption text-medium-emphasis mb-1">
-              <span v-for="(t, name) in preview.by_table" :key="name" class="me-3">{{ name }}: {{ t.changes }} из {{ t.rows }}</span>
+              <span
+                v-for="(t, name) in preview.by_table"
+                :key="name"
+                class="me-3"
+              >{{ name }}: {{ t.changes }} из {{ t.rows }}</span>
             </div>
-            <div v-if="!preview.changes" class="text-body-2 text-medium-emphasis mb-2">
+            <div
+              v-if="!preview.changes"
+              class="text-body-2 text-medium-emphasis mb-2"
+            >
               Изменять нечего: у всех объектов набора уже это значение.
             </div>
-            <v-alert v-if="preview.missing_ids.length" type="info" variant="tonal" density="compact" class="mb-2">
+            <v-alert
+              v-if="preview.missing_ids.length"
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="mb-2"
+            >
               Не подходят для установщика (нет объекта, удалён или не {{ setter.target_label.toLowerCase() }}):
               {{ preview.missing_ids.slice(0, 20).join(', ') }}<span v-if="preview.missing_ids.length > 20"> …</span>
             </v-alert>
-            <v-alert v-for="w in preview.warnings.filter((x) => !x.startsWith('Поле используется'))" :key="w" type="warning" variant="tonal" density="compact" class="mb-2">
+            <v-alert
+              v-for="w in preview.warnings.filter((x) => !x.startsWith('Поле используется'))"
+              :key="w"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-2"
+            >
               {{ w }}
             </v-alert>
-            <v-table v-if="preview.sample?.length" density="compact" class="sample-table">
+            <v-table
+              v-if="preview.sample?.length"
+              density="compact"
+              class="sample-table"
+            >
               <thead>
                 <tr>
                   <th>Объект</th>
@@ -191,20 +312,32 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in preview.sample" :key="`${row.table}-${row.row_id}`">
+                <tr
+                  v-for="row in preview.sample"
+                  :key="`${row.table}-${row.row_id}`"
+                >
                   <td>{{ row.name || '—' }} <span class="text-medium-emphasis">#{{ row.object_id }}</span></td>
                   <td class="text-caption">{{ row.table }}</td>
                   <td class="text-caption">{{ describeChange(row.old, row.new) }}</td>
                 </tr>
               </tbody>
             </v-table>
-            <div v-if="preview.sample_truncated" class="text-caption text-medium-emphasis">
+            <div
+              v-if="preview.sample_truncated"
+              class="text-caption text-medium-emphasis"
+            >
               Показаны первые {{ preview.sample?.length }} изменений.
             </div>
           </div>
         </template>
 
-        <v-alert v-if="lastResult" type="success" variant="tonal" density="compact" class="mt-3">
+        <v-alert
+          v-if="lastResult"
+          type="success"
+          variant="tonal"
+          density="compact"
+          class="mt-3"
+        >
           <div>
             «{{ lastResult.label }}»: изменено {{ lastResult.changed }} строк.
             Группа изменений {{ lastResult.change_group_id }} (История правок).

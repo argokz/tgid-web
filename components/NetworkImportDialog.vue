@@ -10,22 +10,54 @@
         <v-icon>mdi-database-import</v-icon>
         Импорт сети: SHP, Excel, координаты
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" density="compact" aria-label="Закрыть" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          density="compact"
+          aria-label="Закрыть"
+          @click="visible = false"
+        />
       </v-card-title>
 
       <v-card-text class="pt-0">
-        <v-alert v-if="!canApply" type="info" variant="tonal" density="compact" class="mb-3">
+        <v-alert
+          v-if="!canApply"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+        >
           Разбор и превью — редактору при включённых правках топологии на сервере;
           применение — только администратору (создание и перенос узлов и участков).
         </v-alert>
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-3" closable @click:close="error = ''">
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+          closable
+          @click:close="error = ''"
+        >
           {{ error }}
         </v-alert>
 
         <!-- 1. Файл -->
         <div class="text-subtitle-2 mb-1">1. Что и откуда импортировать</div>
-        <v-btn-toggle v-model="mode" mandatory density="compact" color="primary" class="mb-2" @update:model-value="resetInspect">
-          <v-btn v-for="m in IMPORT_MODES" :key="m.value" :value="m.value" size="small">{{ m.title }}</v-btn>
+        <v-btn-toggle
+          v-model="mode"
+          mandatory
+          density="compact"
+          color="primary"
+          class="mb-2"
+          @update:model-value="resetInspect"
+        >
+          <v-btn
+            v-for="m in IMPORT_MODES"
+            :key="m.value"
+            :value="m.value"
+            size="small"
+          >{{ m.title }}</v-btn>
         </v-btn-toggle>
         <div class="text-caption text-medium-emphasis mb-2">{{ currentMode.hint }}</div>
         <div class="d-flex flex-wrap ga-2 align-center">
@@ -50,13 +82,26 @@
             style="max-width: 200px"
             @update:model-value="runInspect"
           />
-          <v-btn color="primary" variant="tonal" :loading="busy === 'inspect'" :disabled="!files.length" @click="runInspect">
+          <v-btn
+            color="primary"
+            variant="tonal"
+            :loading="busy === 'inspect'"
+            :disabled="!files.length"
+            @click="runInspect"
+          >
             Разобрать файл
           </v-btn>
         </div>
 
         <template v-if="inspect">
-          <v-alert v-for="w in inspect.warnings" :key="w" type="warning" variant="tonal" density="compact" class="mt-2">
+          <v-alert
+            v-for="w in inspect.warnings"
+            :key="w"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-2"
+          >
             {{ w }}
           </v-alert>
           <div class="text-caption text-medium-emphasis mt-2">
@@ -67,7 +112,10 @@
           <!-- 2. Параметры и сопоставление -->
           <div class="text-subtitle-2 mt-4 mb-1">2. Параметры и сопоставление полей</div>
           <v-row dense>
-            <v-col cols="12" md="4">
+            <v-col
+              cols="12"
+              md="4"
+            >
               <v-autocomplete
                 v-model="fileid"
                 :items="fragmentItems"
@@ -77,13 +125,36 @@
                 hide-details
               />
             </v-col>
-            <v-col cols="12" md="4">
-              <v-select v-model="sourceCrs" :items="crsItems" label="Система координат" density="compact" hide-details />
+            <v-col
+              cols="12"
+              md="4"
+            >
+              <v-select
+                v-model="sourceCrs"
+                :items="crsItems"
+                label="Система координат"
+                density="compact"
+                hide-details
+              />
             </v-col>
-            <v-col v-if="mode === 'coords'" cols="12" md="4">
-              <v-select v-model="matchBy" :items="matchItems" label="Узел в файле — это" density="compact" hide-details />
+            <v-col
+              v-if="mode === 'coords'"
+              cols="12"
+              md="4"
+            >
+              <v-select
+                v-model="matchBy"
+                :items="matchItems"
+                label="Узел в файле — это"
+                density="compact"
+                hide-details
+              />
             </v-col>
-            <v-col v-if="mode === 'lines'" cols="12" md="4">
+            <v-col
+              v-if="mode === 'lines'"
+              cols="12"
+              md="4"
+            >
               <v-text-field
                 v-model.number="snapTolerance"
                 type="number"
@@ -96,17 +167,39 @@
               />
             </v-col>
           </v-row>
-          <div v-if="mode === 'coords'" class="d-flex flex-wrap ga-4">
-            <v-checkbox v-model="recalcLengths" label="Пересчитать длины участков по геометрии" density="compact" hide-details />
-            <v-checkbox v-model="buildMissingLines" label="Построить геометрию участков без линии" density="compact" hide-details />
+          <div
+            v-if="mode === 'coords'"
+            class="d-flex flex-wrap ga-4"
+          >
+            <v-checkbox
+              v-model="recalcLengths"
+              label="Пересчитать длины участков по геометрии"
+              density="compact"
+              hide-details
+            />
+            <v-checkbox
+              v-model="buildMissingLines"
+              label="Построить геометрию участков без линии"
+              density="compact"
+              hide-details
+            />
           </div>
-          <v-table density="compact" class="mt-2">
+          <v-table
+            density="compact"
+            class="mt-2"
+          >
             <thead>
               <tr><th>Поле</th><th>Колонка файла</th><th>Пример</th></tr>
             </thead>
             <tbody>
-              <tr v-for="t in inspect.targets" :key="t.key">
-                <td>{{ t.label }}<span v-if="t.required" class="text-error"> *</span></td>
+              <tr
+                v-for="t in inspect.targets"
+                :key="t.key"
+              >
+                <td>{{ t.label }}<span
+                  v-if="t.required"
+                  class="text-error"
+                > *</span></td>
                 <td style="min-width: 220px">
                   <v-select
                     v-model="mapping[t.key]"
@@ -127,36 +220,77 @@
           <div class="d-flex align-center ga-2 mt-4">
             <div class="text-subtitle-2">3. Превью</div>
             <v-spacer />
-            <v-checkbox v-model="skipErrors" label="Пропустить строки с ошибками" density="compact" hide-details />
-            <v-btn color="primary" variant="tonal" :loading="busy === 'preview'" :disabled="!canPreview" @click="runPreview">
+            <v-checkbox
+              v-model="skipErrors"
+              label="Пропустить строки с ошибками"
+              density="compact"
+              hide-details
+            />
+            <v-btn
+              color="primary"
+              variant="tonal"
+              :loading="busy === 'preview'"
+              :disabled="!canPreview"
+              @click="runPreview"
+            >
               Проверить (dry-run)
             </v-btn>
           </div>
-          <div v-if="missing.length" class="text-caption text-error">Не сопоставлено: {{ missing.join(', ') }}</div>
+          <div
+            v-if="missing.length"
+            class="text-caption text-error"
+          >Не сопоставлено: {{ missing.join(', ') }}</div>
 
           <template v-if="report">
-            <v-alert :type="report.dry_run ? 'info' : 'success'" variant="tonal" density="compact" class="mt-2">
+            <v-alert
+              :type="report.dry_run ? 'info' : 'success'"
+              variant="tonal"
+              density="compact"
+              class="mt-2"
+            >
               {{ importSummary(report) }}
               <span v-if="!report.dry_run && report.operation_id">
                 — операция отмены №{{ report.operation_id }}{{ undone ? ' (импорт отменён)' : '' }}
               </span>
             </v-alert>
-            <v-row dense class="mt-1">
-              <v-col v-if="report.errors.length" cols="12" md="6">
+            <v-row
+              dense
+              class="mt-1"
+            >
+              <v-col
+                v-if="report.errors.length"
+                cols="12"
+                md="6"
+              >
                 <div class="text-caption font-weight-bold mb-1">Ошибки по строкам ({{ report.errors.length }})</div>
                 <div class="report-list">
-                  <div v-for="e in report.errors" :key="`e${e.row}`" class="text-caption">
+                  <div
+                    v-for="e in report.errors"
+                    :key="`e${e.row}`"
+                    class="text-caption"
+                  >
                     <b>стр. {{ e.row }}</b>: {{ e.message }}
                   </div>
                 </div>
               </v-col>
-              <v-col v-if="report.actions.length" cols="12" :md="report.errors.length ? 6 : 12">
+              <v-col
+                v-if="report.actions.length"
+                cols="12"
+                :md="report.errors.length ? 6 : 12"
+              >
                 <div class="text-caption font-weight-bold mb-1">
                   {{ report.dry_run ? 'Будет сделано' : 'Сделано' }}{{ report.actions_truncated ? ' (первые 500)' : '' }}
-                  <span v-if="report.dry_run" class="text-medium-emphasis font-weight-regular">— id в превью условные</span>
+                  <span
+                    v-if="report.dry_run"
+                    class="text-medium-emphasis font-weight-regular"
+                  >— id в превью условные</span>
                 </div>
                 <div class="report-list">
-                  <div v-for="a in report.actions" :key="`a${a.row}-${a.id}`" class="text-caption">
+                  <div
+                    v-for="a in report.actions"
+                    :key="`a${a.row}-${a.id}`"
+                    class="text-caption"
+                  >
                     стр. {{ a.row }}: {{ describeImportAction(a) }}
                   </div>
                 </div>
@@ -179,7 +313,10 @@
           {{ undone ? 'Импорт отменён' : 'Отменить импорт' }}
         </v-btn>
         <v-spacer />
-        <v-btn variant="text" @click="visible = false">Закрыть</v-btn>
+        <v-btn
+          variant="text"
+          @click="visible = false"
+        >Закрыть</v-btn>
         <v-btn
           color="primary"
           prepend-icon="mdi-database-import"

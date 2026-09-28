@@ -15,7 +15,6 @@
       persistent
 
       :transition="isMobile ? 'dialog-bottom-transition' : 'dialog-transition'"
-
     >
 
       <v-card
@@ -27,18 +26,30 @@
         elevation="8"
 
         :rounded="isMobile ? '0' : 'lg'"
-
       >
 
         <!-- ── Шапка ── -->
 
-        <div class="ap-header" :class="isMobile ? 'pa-3' : 'pa-4'">
+        <div
+          class="ap-header"
+          :class="isMobile ? 'pa-3' : 'pa-4'"
+        >
 
-          <div class="d-flex align-center" style="gap: 12px; min-width: 0; flex: 1;">
+          <div
+            class="d-flex align-center"
+            style="gap: 12px; min-width: 0; flex: 1;"
+          >
 
-            <v-avatar size="40" color="primary" class="ap-avatar flex-shrink-0">
+            <v-avatar
+              size="40"
+              color="primary"
+              class="ap-avatar flex-shrink-0"
+            >
 
-              <v-icon size="20" color="white">mdi-information-outline</v-icon>
+              <v-icon
+                size="20"
+                color="white"
+              >mdi-information-outline</v-icon>
 
             </v-avatar>
 
@@ -60,7 +71,10 @@
 
           </div>
 
-          <div class="d-flex align-center" style="gap: 4px; flex-shrink: 0;">
+          <div
+            class="d-flex align-center"
+            style="gap: 4px; flex-shrink: 0;"
+          >
 
             <v-btn
 
@@ -75,12 +89,14 @@
               color="success"
 
               @click="downloadPassport"
-
             >
 
               <v-icon size="18">mdi-file-excel-box</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Скачать паспорт (Excel)</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Скачать паспорт (Excel)</v-tooltip>
 
             </v-btn>
 
@@ -93,7 +109,10 @@
               @click="emit('open-outage-simulation', { lineId: Number(propsData.id) })"
             >
               <v-icon size="18">mdi-valve-closed</v-icon>
-              <v-tooltip activator="parent" location="bottom">Анализ отключения: какие задвижки закрыть</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Анализ отключения: какие задвижки закрыть</v-tooltip>
             </v-btn>
 
             <!-- Разворот меняет топологию: только в режиме редактирования сети -->
@@ -107,7 +126,10 @@
               @click="reverseLineDirection"
             >
               <v-icon size="18">mdi-swap-horizontal</v-icon>
-              <v-tooltip activator="parent" location="bottom">Развернуть направление линии</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Развернуть направление линии</v-tooltip>
             </v-btn>
 
             <v-btn
@@ -123,12 +145,14 @@
               color="deep-orange-darken-2"
 
               @click="openDefectJournal"
-
             >
 
               <v-icon size="18">mdi-alert-decagram-outline</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Журнал нарушений объекта</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Журнал нарушений объекта</v-tooltip>
 
             </v-btn>
 
@@ -145,12 +169,14 @@
               color="brown-darken-2"
 
               @click="openShurfJournal"
-
             >
 
               <v-icon size="18">mdi-shovel</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Журнал шурфовок объекта</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Журнал шурфовок объекта</v-tooltip>
 
             </v-btn>
 
@@ -167,12 +193,14 @@
               color="teal-darken-2"
 
               @click="openInspectionJournal"
-
             >
 
               <v-icon size="18">mdi-clipboard-search-outline</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Журнал осмотров объекта</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Журнал осмотров объекта</v-tooltip>
 
             </v-btn>
 
@@ -189,12 +217,14 @@
               color="deep-purple-darken-2"
 
               @click="openRepairJournal"
-
             >
 
               <v-icon size="18">mdi-hammer-wrench</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Журнал ремонтов объекта</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Журнал ремонтов объекта</v-tooltip>
 
             </v-btn>
 
@@ -211,12 +241,14 @@
               color="blue-darken-2"
 
               @click="openPressureTestJournal"
-
             >
 
               <v-icon size="18">mdi-gauge</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Журнал опрессовок объекта</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Журнал опрессовок объекта</v-tooltip>
 
             </v-btn>
 
@@ -233,12 +265,14 @@
               color="cyan-darken-3"
 
               @click="openTechnicalConditionJournal"
-
             >
 
               <v-icon size="18">mdi-file-certificate-outline</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Технические условия объекта</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Технические условия объекта</v-tooltip>
 
             </v-btn>
 
@@ -255,12 +289,14 @@
               color="orange-darken-3"
 
               @click="openCorrosionIndicatorJournal"
-
             >
 
               <v-icon size="18">mdi-test-tube</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Индикаторы коррозии объекта</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Индикаторы коррозии объекта</v-tooltip>
 
             </v-btn>
 
@@ -277,12 +313,14 @@
               color="indigo-darken-2"
 
               @click="openAlsekoJournal"
-
             >
 
               <v-icon size="18">mdi-office-building-marker</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Объекты АЛСЕКО по адресу</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Объекты АЛСЕКО по адресу</v-tooltip>
 
             </v-btn>
 
@@ -299,12 +337,14 @@
               color="amber-darken-4"
 
               @click="openElectricalNetworkJournal"
-
             >
 
               <v-icon size="18">mdi-transmission-tower</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Карточка объекта электросети</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Карточка объекта электросети</v-tooltip>
 
             </v-btn>
 
@@ -321,12 +361,14 @@
               color="deep-orange-darken-3"
 
               @click="openHeatLossJournal"
-
             >
 
               <v-icon size="18">mdi-heat-wave</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Исходные данные тепловых потерь</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Исходные данные тепловых потерь</v-tooltip>
 
             </v-btn>
 
@@ -343,12 +385,14 @@
               color="purple-darken-3"
 
               @click="openTemperatureGraphJournal"
-
             >
 
               <v-icon size="18">mdi-chart-bell-curve-cumulative</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Температурный график источника</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Температурный график источника</v-tooltip>
 
             </v-btn>
 
@@ -365,12 +409,14 @@
               color="teal-darken-3"
 
               @click="openConsumerLoadDiagnostics"
-
             >
 
               <v-icon size="18">mdi-home-lightning-bolt-outline</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Диагностика нагрузки потребителя</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Диагностика нагрузки потребителя</v-tooltip>
 
             </v-btn>
 
@@ -387,12 +433,14 @@
               color="blue-grey-darken-3"
 
               @click="openPumpEquipment"
-
             >
 
               <v-icon size="18">mdi-pump</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Насосное оборудование и характеристики</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Насосное оборудование и характеристики</v-tooltip>
 
             </v-btn>
 
@@ -409,12 +457,14 @@
               color="deep-purple-darken-3"
 
               @click="openNetworkArmatures"
-
             >
 
               <v-icon size="18">mdi-valve</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Запорная и регулирующая арматура</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Запорная и регулирующая арматура</v-tooltip>
 
             </v-btn>
 
@@ -431,12 +481,14 @@
               color="indigo-darken-3"
 
               @click="openNetworkRegulators"
-
             >
 
               <v-icon size="18">mdi-tune-vertical</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Сетевые регуляторы</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Сетевые регуляторы</v-tooltip>
 
             </v-btn>
 
@@ -453,12 +505,14 @@
               color="cyan-darken-4"
 
               @click="openNetworkBypasses"
-
             >
 
               <v-icon size="18">mdi-pipe-valve</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Байпасы наружных теплопроводов</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Байпасы наружных теплопроводов</v-tooltip>
 
             </v-btn>
 
@@ -475,12 +529,14 @@
               color="teal-darken-4"
 
               @click="openNetworkDiaphragms"
-
             >
 
               <v-icon size="18">mdi-circle-slice-8</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Диафрагмы наружных теплопроводов</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Диафрагмы наружных теплопроводов</v-tooltip>
 
             </v-btn>
 
@@ -497,12 +553,14 @@
               color="primary"
 
               @click="downloadWordReport"
-
             >
 
               <v-icon size="18">mdi-file-word-box</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Карта повреждаемости (Word)</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Карта повреждаемости (Word)</v-tooltip>
 
             </v-btn>
 
@@ -519,12 +577,15 @@
               :loading="copying"
 
               @click="copyToClipboard"
-
             >
 
               <v-icon size="18">mdi-content-copy</v-icon>
 
-              <v-tooltip activator="parent" location="bottom" aria-label="Копировать всё">Копировать всё</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+                aria-label="Копировать всё"
+              >Копировать всё</v-tooltip>
 
             </v-btn>
 
@@ -538,7 +599,10 @@
               @click="$emit('open-audit-history', historyTarget)"
             >
               <v-icon size="18">mdi-history</v-icon>
-              <v-tooltip activator="parent" location="bottom">История правок объекта</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >История правок объекта</v-tooltip>
             </v-btn>
 
             <v-btn
@@ -554,16 +618,24 @@
               color="error"
 
               @click="$emit('delete-feature', propsData.id, cardVersion)"
-
             >
 
               <v-icon size="18">mdi-delete</v-icon>
 
-              <v-tooltip activator="parent" location="bottom">Удалить объект</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Удалить объект</v-tooltip>
 
             </v-btn>
 
-            <v-btn icon variant="text" size="small" color="grey-darken-1" @click="close">
+            <v-btn
+              icon
+              variant="text"
+              size="small"
+              color="grey-darken-1"
+              @click="close"
+            >
 
               <v-icon>mdi-close</v-icon>
 
@@ -579,7 +651,10 @@
 
         <!-- ── Поиск ── -->
 
-        <div class="ap-search" :class="isMobile ? 'pa-3 pb-2' : 'pa-3 pb-2'">
+        <div
+          class="ap-search"
+          :class="isMobile ? 'pa-3 pb-2' : 'pa-3 pb-2'"
+        >
 
           <v-text-field
 
@@ -600,12 +675,18 @@
             rounded="lg"
 
             bg-color="grey-lighten-5"
-
           >
 
-            <template v-if="search && totalFilteredCount !== totalAttributesCount" #append-inner>
+            <template
+              v-if="search && totalFilteredCount !== totalAttributesCount"
+              #append-inner
+            >
 
-              <v-chip size="x-small" color="primary" variant="tonal">{{ totalFilteredCount }}</v-chip>
+              <v-chip
+                size="x-small"
+                color="primary"
+                variant="tonal"
+              >{{ totalFilteredCount }}</v-chip>
 
             </template>
 
@@ -631,7 +712,6 @@
             slider-color="primary"
 
             class="ap-tabs"
-
           >
 
             <v-tab
@@ -643,12 +723,17 @@
               :value="idx"
 
               class="ap-tab"
-
             >
 
               {{ tab.tabName }}
 
-              <v-chip size="x-small" color="primary" variant="tonal" class="ml-1" style="pointer-events:none;">
+              <v-chip
+                size="x-small"
+                color="primary"
+                variant="tonal"
+                class="ml-1"
+                style="pointer-events:none;"
+              >
 
                 {{ getTabFieldsCount(tab) }}
 
@@ -665,40 +750,52 @@
 
         <!-- ── Контент ── -->
 
-                <div class="ap-content">
+        <div class="ap-content">
           <!-- Calculation Results Section -->
-          <div v-if="propsData._isCalculationResult" class="pa-2">
-            <v-card variant="outlined" class="mb-2 border-primary bg-blue-grey-lighten-5">
+          <div
+            v-if="propsData._isCalculationResult"
+            class="pa-2"
+          >
+            <v-card
+              variant="outlined"
+              class="mb-2 border-primary bg-blue-grey-lighten-5"
+            >
               <v-card-title class="text-subtitle-2 font-weight-bold text-primary py-2 px-3">
-                <v-icon size="small" class="mr-1">mdi-calculator</v-icon>
+                <v-icon
+                  size="small"
+                  class="mr-1"
+                >mdi-calculator</v-icon>
                 Результаты расчета
               </v-card-title>
-              <v-divider></v-divider>
+              <v-divider />
               <v-card-text class="pa-0">
-                <v-list density="compact" class="bg-transparent">
+                <v-list
+                  density="compact"
+                  class="bg-transparent"
+                >
                   <v-list-item v-if="propsData.flow !== undefined">
-                    <template v-slot:title><span class="text-caption text-medium-emphasis">Расход воды (т/ч)</span></template>
-                    <template v-slot:append><span class="text-body-2 font-weight-medium">{{ propsData.flow?.toFixed(2) ?? '-' }}</span></template>
+                    <template #title><span class="text-caption text-medium-emphasis">Расход воды (т/ч)</span></template>
+                    <template #append><span class="text-body-2 font-weight-medium">{{ propsData.flow?.toFixed(2) ?? '-' }}</span></template>
                   </v-list-item>
                   <v-list-item v-if="propsData.velocity !== undefined">
-                    <template v-slot:title><span class="text-caption text-medium-emphasis">Скорость воды (м/с)</span></template>
-                    <template v-slot:append><span class="text-body-2 font-weight-medium">{{ propsData.velocity?.toFixed(2) ?? '-' }}</span></template>
+                    <template #title><span class="text-caption text-medium-emphasis">Скорость воды (м/с)</span></template>
+                    <template #append><span class="text-body-2 font-weight-medium">{{ propsData.velocity?.toFixed(2) ?? '-' }}</span></template>
                   </v-list-item>
                   <v-list-item v-if="propsData.pressure_drop !== undefined">
-                    <template v-slot:title><span class="text-caption text-medium-emphasis">Падение давления (м)</span></template>
-                    <template v-slot:append><span class="text-body-2 font-weight-medium">{{ propsData.pressure_drop?.toFixed(2) ?? '-' }}</span></template>
+                    <template #title><span class="text-caption text-medium-emphasis">Падение давления (м)</span></template>
+                    <template #append><span class="text-body-2 font-weight-medium">{{ propsData.pressure_drop?.toFixed(2) ?? '-' }}</span></template>
                   </v-list-item>
                   <v-list-item v-if="propsData.specific_pressure_drop !== undefined">
-                    <template v-slot:title><span class="text-caption text-medium-emphasis">Удельное падение давления (мм/м)</span></template>
-                    <template v-slot:append><span class="text-body-2 font-weight-medium">{{ propsData.specific_pressure_drop?.toFixed(2) ?? '-' }}</span></template>
+                    <template #title><span class="text-caption text-medium-emphasis">Удельное падение давления (мм/м)</span></template>
+                    <template #append><span class="text-body-2 font-weight-medium">{{ propsData.specific_pressure_drop?.toFixed(2) ?? '-' }}</span></template>
                   </v-list-item>
                   <v-list-item v-if="propsData.head_start !== undefined">
-                    <template v-slot:title><span class="text-caption text-medium-emphasis">Напор в начале (м)</span></template>
-                    <template v-slot:append><span class="text-body-2 font-weight-medium">{{ propsData.head_start?.toFixed(2) ?? '-' }}</span></template>
+                    <template #title><span class="text-caption text-medium-emphasis">Напор в начале (м)</span></template>
+                    <template #append><span class="text-body-2 font-weight-medium">{{ propsData.head_start?.toFixed(2) ?? '-' }}</span></template>
                   </v-list-item>
                   <v-list-item v-if="propsData.head_end !== undefined">
-                    <template v-slot:title><span class="text-caption text-medium-emphasis">Напор в конце (м)</span></template>
-                    <template v-slot:append><span class="text-body-2 font-weight-medium">{{ propsData.head_end?.toFixed(2) ?? '-' }}</span></template>
+                    <template #title><span class="text-caption text-medium-emphasis">Напор в конце (м)</span></template>
+                    <template #append><span class="text-body-2 font-weight-medium">{{ propsData.head_end?.toFixed(2) ?? '-' }}</span></template>
                   </v-list-item>
                 </v-list>
               </v-card-text>
@@ -707,7 +804,10 @@
 
           <!-- Tabbed view -->
 
-          <v-window v-if="hasTabsStructure" v-model="activeTab">
+          <v-window
+            v-if="hasTabsStructure"
+            v-model="activeTab"
+          >
 
             <v-window-item
 
@@ -716,10 +816,12 @@
               :key="tabIdx"
 
               :value="tabIdx"
-
             >
 
-              <div v-if="getFilteredTabSections(tab).length > 0" class="pa-2">
+              <div
+                v-if="getFilteredTabSections(tab).length > 0"
+                class="pa-2"
+              >
 
                 <v-expansion-panels
 
@@ -730,7 +832,6 @@
                   flat
 
                   class="ap-panels"
-
                 >
 
                   <v-expansion-panel
@@ -746,14 +847,19 @@
                     elevation="0"
 
                     rounded="lg"
-
                   >
 
                     <v-expansion-panel-title class="ap-panel-title px-3 py-2">
 
-                      <div class="d-flex align-center w-100" style="gap: 8px;">
+                      <div
+                        class="d-flex align-center w-100"
+                        style="gap: 8px;"
+                      >
 
-                        <v-icon size="15" color="primary">mdi-table-of-contents</v-icon>
+                        <v-icon
+                          size="15"
+                          color="primary"
+                        >mdi-table-of-contents</v-icon>
 
                         <span class="text-body-2 font-weight-semibold">{{ section.sectionName }}</span>
 
@@ -768,7 +874,6 @@
                           class="ms-auto"
 
                           style="pointer-events: none;"
-
                         >
 
                           {{ section.fields.length }}
@@ -791,7 +896,6 @@
                           :key="field.key"
 
                           class="ap-field-row"
-
                         >
 
                           <span class="ap-field-label">{{ field.label }}</span>
@@ -803,7 +907,6 @@
                               class="ap-field-value"
 
                               :class="{ 'ap-field-value--empty': !hasValue(field.value) }"
-
                             >
 
                               {{ hasValue(field.value) ? formatValue(field.value) : '—' }}
@@ -825,12 +928,15 @@
                               class="ap-copy-btn"
 
                               @click.stop="copyAttribute(field.key, field.value)"
-
                             >
 
                               <v-icon size="13">mdi-content-copy</v-icon>
 
-                              <v-tooltip activator="parent" location="left" aria-label="Копировать">Копировать</v-tooltip>
+                              <v-tooltip
+                                activator="parent"
+                                location="left"
+                                aria-label="Копировать"
+                              >Копировать</v-tooltip>
 
                             </v-btn>
 
@@ -848,9 +954,15 @@
 
               </div>
 
-              <div v-else class="ap-empty">
+              <div
+                v-else
+                class="ap-empty"
+              >
 
-                <v-icon size="40" color="grey-lighten-2">mdi-file-search-outline</v-icon>
+                <v-icon
+                  size="40"
+                  color="grey-lighten-2"
+                >mdi-file-search-outline</v-icon>
 
                 <div class="text-body-2 text-grey mt-2">{{ search ? 'Атрибуты не найдены' : 'Нет данных' }}</div>
 
@@ -863,9 +975,15 @@
 
           <!-- Simple list (no tabs) -->
 
-          <div v-else class="pa-2">
+          <div
+            v-else
+            class="pa-2"
+          >
 
-            <div v-if="Object.keys(filteredAttributesList).length > 0" class="ap-fields pa-1">
+            <div
+              v-if="Object.keys(filteredAttributesList).length > 0"
+              class="ap-fields pa-1"
+            >
 
               <div
 
@@ -874,7 +992,6 @@
                 :key="key"
 
                 class="ap-field-row"
-
               >
 
                 <span class="ap-field-label">{{ formatAttributeLabel(String(key)) }}</span>
@@ -886,7 +1003,6 @@
                     class="ap-field-value"
 
                     :class="{ 'ap-field-value--empty': !hasValue(value) }"
-
                   >
 
                     {{ hasValue(value) ? formatValue(value) : '—' }}
@@ -897,17 +1013,23 @@
 
                     v-if="hasValue(value)"
 
-                    icon size="x-small" variant="text" color="grey"
+                    icon
+                    size="x-small"
+                    variant="text"
+                    color="grey"
 
                     class="ap-copy-btn"
 
                     @click.stop="copyAttribute(String(key), value)"
-
                   >
 
                     <v-icon size="13">mdi-content-copy</v-icon>
 
-                    <v-tooltip activator="parent" location="left" aria-label="Копировать">Копировать</v-tooltip>
+                    <v-tooltip
+                      activator="parent"
+                      location="left"
+                      aria-label="Копировать"
+                    >Копировать</v-tooltip>
 
                   </v-btn>
 
@@ -917,9 +1039,15 @@
 
             </div>
 
-            <div v-else class="ap-empty">
+            <div
+              v-else
+              class="ap-empty"
+            >
 
-              <v-icon size="40" color="grey-lighten-2">mdi-file-search-outline</v-icon>
+              <v-icon
+                size="40"
+                color="grey-lighten-2"
+              >mdi-file-search-outline</v-icon>
 
               <div class="text-body-2 text-grey mt-2">{{ search ? 'Не найдено' : 'Нет данных' }}</div>
 
@@ -945,9 +1073,18 @@
       :error="reversePreviewError"
       @confirm="confirmReverse"
     />
-    <v-snackbar v-model="showNotification" :timeout="2000" color="primary" location="bottom" rounded="pill">
+    <v-snackbar
+      v-model="showNotification"
+      :timeout="2000"
+      color="primary"
+      location="bottom"
+      rounded="pill"
+    >
 
-      <div class="d-flex align-center" style="gap: 8px;">
+      <div
+        class="d-flex align-center"
+        style="gap: 8px;"
+      >
 
         <v-icon size="16">mdi-check-circle</v-icon>
 

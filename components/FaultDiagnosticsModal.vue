@@ -1,67 +1,132 @@
 <template>
-  <v-dialog v-model="dialog" max-width="900" scrollable>
+  <v-dialog
+    v-model="dialog"
+    max-width="900"
+    scrollable
+  >
     <v-card>
       <v-card-title class="d-flex align-center bg-primary text-white pa-4">
         <v-icon class="mr-3">mdi-alert-octagon</v-icon>
         Диагностика неисправностей
-        <v-spacer></v-spacer>
-        <v-btn icon="mdi-refresh" variant="text" @click="fetchData" :loading="loading" class="mr-2" />
-        <v-btn icon="mdi-close" variant="text" @click="dialog = false" />
+        <v-spacer />
+        <v-btn
+          icon="mdi-refresh"
+          variant="text"
+          @click="fetchData"
+          :loading="loading"
+          class="mr-2"
+        />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          @click="dialog = false"
+        />
       </v-card-title>
       
-      <v-tabs v-model="activeTab" bg-color="primary" align-tabs="center">
+      <v-tabs
+        v-model="activeTab"
+        bg-color="primary"
+        align-tabs="center"
+      >
         <v-tab value="layers">Слои на карте</v-tab>
         <v-tab value="list">Список неисправностей</v-tab>
       </v-tabs>
       
-      <v-card-text class="pa-0" style="min-height: 400px; max-height: 600px;">
+      <v-card-text
+        class="pa-0"
+        style="min-height: 400px; max-height: 600px;"
+      >
         <v-window v-model="activeTab">
           <v-window-item value="layers">
-            <v-list lines="two" class="pa-4">
+            <v-list
+              lines="two"
+              class="pa-4"
+            >
               <v-list-item>
-                <template v-slot:prepend>
-                  <v-avatar color="error" size="48">
+                <template #prepend>
+                  <v-avatar
+                    color="error"
+                    size="48"
+                  >
                     <v-icon color="white">mdi-tools</v-icon>
                   </v-avatar>
                 </template>
                 <v-list-item-title class="font-weight-medium">Дефекты</v-list-item-title>
                 <v-list-item-subtitle class="mt-1">Отображать известные дефекты на карте (красные маркеры)</v-list-item-subtitle>
-                <template v-slot:append>
-                  <v-switch v-model="mapStore.isDefectsLayerVisible" color="error" hide-details></v-switch>
+                <template #append>
+                  <v-switch
+                    v-model="mapStore.isDefectsLayerVisible"
+                    color="error"
+                    hide-details
+                  />
                 </template>
               </v-list-item>
-              <v-divider class="my-2"></v-divider>
+              <v-divider class="my-2" />
               <v-list-item>
-                <template v-slot:prepend>
-                  <v-avatar color="warning" size="48">
+                <template #prepend>
+                  <v-avatar
+                    color="warning"
+                    size="48"
+                  >
                     <v-icon color="white">mdi-water-alert</v-icon>
                   </v-avatar>
                 </template>
                 <v-list-item-title class="font-weight-medium">Индикаторы коррозии</v-list-item-title>
                 <v-list-item-subtitle class="mt-1">Отображать индикаторы коррозии на карте (оранжевые маркеры)</v-list-item-subtitle>
-                <template v-slot:append>
-                  <v-switch v-model="mapStore.isCorrosionLayerVisible" color="warning" hide-details></v-switch>
+                <template #append>
+                  <v-switch
+                    v-model="mapStore.isCorrosionLayerVisible"
+                    color="warning"
+                    hide-details
+                  />
                 </template>
               </v-list-item>
             </v-list>
           </v-window-item>
           
           <v-window-item value="list">
-            <div v-if="loading" class="d-flex flex-column justify-center align-center h-100 pa-10">
-              <v-progress-circular indeterminate color="primary" size="48" class="mb-4" />
+            <div
+              v-if="loading"
+              class="d-flex flex-column justify-center align-center h-100 pa-10"
+            >
+              <v-progress-circular
+                indeterminate
+                color="primary"
+                size="48"
+                class="mb-4"
+              />
               <div class="text-subtitle-1 text-medium-emphasis">Загрузка данных...</div>
             </div>
             
-            <div v-else-if="error" class="pa-6 text-center text-error">
-              <v-icon size="48" class="mb-3">mdi-alert-circle</v-icon>
+            <div
+              v-else-if="error"
+              class="pa-6 text-center text-error"
+            >
+              <v-icon
+                size="48"
+                class="mb-3"
+              >mdi-alert-circle</v-icon>
               <div>{{ error }}</div>
-              <v-btn class="mt-4" variant="tonal" color="primary" size="small" @click="fetchData">
+              <v-btn
+                class="mt-4"
+                variant="tonal"
+                color="primary"
+                size="small"
+                @click="fetchData"
+              >
                 Повторить
               </v-btn>
             </div>
 
-            <div v-else-if="!faults.length" class="pa-8 text-center text-medium-emphasis">
-              <v-icon size="48" class="mb-3" color="success">mdi-check-circle-outline</v-icon>
+            <div
+              v-else-if="!faults.length"
+              class="pa-8 text-center text-medium-emphasis"
+            >
+              <v-icon
+                size="48"
+                class="mb-3"
+                color="success"
+              >mdi-check-circle-outline</v-icon>
               <div class="text-subtitle-1 mb-1">Неисправности не зарегистрированы</div>
               <div class="text-caption">
                 В базе нет записей о дефектах и индикаторах коррозии —
@@ -69,10 +134,22 @@
               </div>
             </div>
 
-            <v-list v-else lines="two" class="pa-0">
-              <v-list-item v-for="(fault, index) in faults" :key="index" class="border-bottom" @click="locateFault(fault)">
-                <template v-slot:prepend>
-                  <v-avatar :color="fault.type === 'defect' ? 'error' : 'warning'" size="48">
+            <v-list
+              v-else
+              lines="two"
+              class="pa-0"
+            >
+              <v-list-item
+                v-for="(fault, index) in faults"
+                :key="index"
+                class="border-bottom"
+                @click="locateFault(fault)"
+              >
+                <template #prepend>
+                  <v-avatar
+                    :color="fault.type === 'defect' ? 'error' : 'warning'"
+                    size="48"
+                  >
                     <v-icon color="white">{{ fault.type === 'defect' ? 'mdi-tools' : 'mdi-water-alert' }}</v-icon>
                   </v-avatar>
                 </template>
@@ -85,8 +162,14 @@
                   {{ fault.description }}
                 </v-list-item-subtitle>
                 
-                <template v-slot:append>
-                  <v-btn icon="mdi-crosshairs-gps" size="small" variant="text" color="primary" @click.stop="locateFault(fault)" />
+                <template #append>
+                  <v-btn
+                    icon="mdi-crosshairs-gps"
+                    size="small"
+                    variant="text"
+                    color="primary"
+                    @click.stop="locateFault(fault)"
+                  />
                 </template>
               </v-list-item>
             </v-list>
@@ -95,11 +178,17 @@
       </v-card-text>
       
       <v-card-actions class="pa-4 bg-grey-lighten-4 border-top">
-        <div v-if="activeTab === 'list'" class="text-caption text-medium-emphasis">
+        <div
+          v-if="activeTab === 'list'"
+          class="text-caption text-medium-emphasis"
+        >
           Всего найдено: {{ faults.length }}
         </div>
-        <v-spacer></v-spacer>
-        <v-btn variant="text" @click="dialog = false">Закрыть</v-btn>
+        <v-spacer />
+        <v-btn
+          variant="text"
+          @click="dialog = false"
+        >Закрыть</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

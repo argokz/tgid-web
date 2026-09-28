@@ -1,56 +1,173 @@
 <template>
-  <v-dialog v-model="visible" max-width="760" scrollable>
+  <v-dialog
+    v-model="visible"
+    max-width="760"
+    scrollable
+  >
     <v-card>
       <v-card-title class="d-flex align-center ga-2">
         <v-icon color="teal-darken-2">mdi-stamper</v-icon>
         <span class="text-subtitle-1 font-weight-bold">Утверждение плана: {{ title }}</span>
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" aria-label="Закрыть" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          aria-label="Закрыть"
+          @click="visible = false"
+        />
       </v-card-title>
       <v-divider />
       <v-card-text>
         <v-row dense>
-          <v-col cols="6" sm="4">
-            <v-text-field v-model="dateFrom" type="date" label="Начало по плану с" density="compact" variant="outlined" hide-details />
+          <v-col
+            cols="6"
+            sm="4"
+          >
+            <v-text-field
+              v-model="dateFrom"
+              type="date"
+              label="Начало по плану с"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
           </v-col>
-          <v-col cols="6" sm="4">
-            <v-text-field v-model="dateTo" type="date" label="по" density="compact" variant="outlined" hide-details />
+          <v-col
+            cols="6"
+            sm="4"
+          >
+            <v-text-field
+              v-model="dateTo"
+              type="date"
+              label="по"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
           </v-col>
-          <v-col cols="12" sm="4" class="d-flex align-center">
-            <v-btn variant="tonal" prepend-icon="mdi-refresh" :loading="loading" @click="loadCandidates">Показать</v-btn>
+          <v-col
+            cols="12"
+            sm="4"
+            class="d-flex align-center"
+          >
+            <v-btn
+              variant="tonal"
+              prepend-icon="mdi-refresh"
+              :loading="loading"
+              @click="loadCandidates"
+            >Показать</v-btn>
           </v-col>
         </v-row>
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" class="my-2">{{ error }}</v-alert>
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="my-2"
+        >{{ error }}</v-alert>
         <div class="d-flex align-center mt-3 mb-1">
           <span class="text-subtitle-2">Неутверждённые планы: {{ candidates.length }}</span>
           <v-spacer />
-          <v-btn size="small" variant="text" :disabled="!candidates.length" @click="toggleAll">
+          <v-btn
+            size="small"
+            variant="text"
+            :disabled="!candidates.length"
+            @click="toggleAll"
+          >
             {{ selectedIds.length && selectedIds.length === candidates.length ? 'Снять все' : 'Выбрать все' }}
           </v-btn>
         </div>
         <div class="candidate-list">
-          <v-checkbox v-for="item in candidates" :key="item.id" v-model="selectedIds" :value="item.id" density="compact" hide-details
-            :label="`№ ${item.id} · ${item.name || 'без названия'} · начало ${formatDate(item.planned_start)}`" />
-          <div v-if="!candidates.length && !loading" class="text-caption text-medium-emphasis pa-2">Нет планов для утверждения.</div>
+          <v-checkbox
+            v-for="item in candidates"
+            :key="item.id"
+            v-model="selectedIds"
+            :value="item.id"
+            density="compact"
+            hide-details
+            :label="`№ ${item.id} · ${item.name || 'без названия'} · начало ${formatDate(item.planned_start)}`"
+          />
+          <div
+            v-if="!candidates.length && !loading"
+            class="text-caption text-medium-emphasis pa-2"
+          >Нет планов для утверждения.</div>
         </div>
         <v-divider class="my-3" />
         <v-row dense>
-          <v-col cols="12" sm="4">
-            <v-text-field v-model="approvedOn" type="date" label="Дата утверждения *" density="compact" variant="outlined" hide-details />
+          <v-col
+            cols="12"
+            sm="4"
+          >
+            <v-text-field
+              v-model="approvedOn"
+              type="date"
+              label="Дата утверждения *"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
           </v-col>
-          <v-col v-for="(signer, key) in schema?.approval?.signers || {}" :key="key" cols="12" sm="4">
-            <v-select v-if="signer.ref === 'dolzhnosti'" v-model="signers[key]" :items="schema?.positions || []" item-title="name"
-              item-value="id" :label="signer.label" density="compact" variant="outlined" clearable hide-details />
-            <v-select v-else-if="signer.ref === 'subdivisions'" v-model="signers[key]" :items="schema?.subdivisions || []"
-              item-title="name" item-value="id" :label="signer.label" density="compact" variant="outlined" clearable hide-details />
-            <v-text-field v-else v-model="signers[key]" :label="signer.label" density="compact" variant="outlined" hide-details />
+          <v-col
+            v-for="(signer, key) in schema?.approval?.signers || {}"
+            :key="key"
+            cols="12"
+            sm="4"
+          >
+            <v-select
+              v-if="signer.ref === 'dolzhnosti'"
+              v-model="signers[key]"
+              :items="schema?.positions || []"
+              item-title="name"
+              item-value="id"
+              :label="signer.label"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-select
+              v-else-if="signer.ref === 'subdivisions'"
+              v-model="signers[key]"
+              :items="schema?.subdivisions || []"
+              item-title="name"
+              item-value="id"
+              :label="signer.label"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+            <v-text-field
+              v-else
+              v-model="signers[key]"
+              :label="signer.label"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
           </v-col>
         </v-row>
-        <div v-if="result" class="mt-3">
-          <v-alert v-if="result.approved.length" type="success" variant="tonal" density="compact" class="mb-2">
+        <div
+          v-if="result"
+          class="mt-3"
+        >
+          <v-alert
+            v-if="result.approved.length"
+            type="success"
+            variant="tonal"
+            density="compact"
+            class="mb-2"
+          >
             Утверждено: {{ result.approved.join(', ') }}
           </v-alert>
-          <v-alert v-for="(reason, id) in result.rejected" :key="id" type="warning" variant="tonal" density="compact" class="mb-1">
+          <v-alert
+            v-for="(reason, id) in result.rejected"
+            :key="id"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-1"
+          >
             № {{ id }}: {{ describeRejection(reason) }}
           </v-alert>
         </div>
@@ -59,8 +176,17 @@
       <v-card-actions>
         <span class="text-caption text-medium-emphasis">Выбрано {{ selectedIds.length }}</span>
         <v-spacer />
-        <v-btn variant="text" @click="visible = false">Закрыть</v-btn>
-        <v-btn color="teal" variant="flat" :disabled="!selectedIds.length || !approvedOn" :loading="approving" @click="approve">
+        <v-btn
+          variant="text"
+          @click="visible = false"
+        >Закрыть</v-btn>
+        <v-btn
+          color="teal"
+          variant="flat"
+          :disabled="!selectedIds.length || !approvedOn"
+          :loading="approving"
+          @click="approve"
+        >
           Утвердить выбранные
         </v-btn>
       </v-card-actions>

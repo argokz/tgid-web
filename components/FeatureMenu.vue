@@ -12,10 +12,18 @@
         <v-card-title class="bg-gradient-info text-white py-4">
           <div class="d-flex align-center justify-space-between">
             <div class="d-flex align-center">
-              <v-icon class="mr-2" size="large">mdi-cursor-default-click</v-icon>
+              <v-icon
+                class="mr-2"
+                size="large"
+              >mdi-cursor-default-click</v-icon>
               <span class="text-h6 font-weight-bold">Выберите объект</span>
             </div>
-            <v-chip size="small" color="white" variant="flat" class="font-weight-bold">
+            <v-chip
+              size="small"
+              color="white"
+              variant="flat"
+              class="font-weight-bold"
+            >
               {{ mapStore.potentialFeatures.length }}
             </v-chip>
           </div>
@@ -28,20 +36,34 @@
             v-if="groupedFeatures.length === 0"
             class="empty-state d-flex flex-column align-center justify-center text-center px-6 py-10"
           >
-            <v-icon size="36" color="blue-lighten-2" class="mb-3">mdi-layers-off</v-icon>
+            <v-icon
+              size="36"
+              color="blue-lighten-2"
+              class="mb-3"
+            >mdi-layers-off</v-icon>
             <div class="text-body-1 font-weight-medium mb-1">
               Нет объектов для отображения
             </div>
           </div>
-          <div v-else class="layer-group-list">
+          <div
+            v-else
+            class="layer-group-list"
+          >
             <div
               v-for="group in groupedFeatures"
               :key="group.workspaceId"
             >
               <div class="layer-header">
                 <div class="d-flex align-center">
-                  <v-avatar size="32" color="blue-lighten-4" class="mr-3">
-                    <v-icon color="blue-darken-2" size="18">mdi-layers</v-icon>
+                  <v-avatar
+                    size="32"
+                    color="blue-lighten-4"
+                    class="mr-3"
+                  >
+                    <v-icon
+                      color="blue-darken-2"
+                      size="18"
+                    >mdi-layers</v-icon>
                   </v-avatar>
                   <div>
                     <div class="text-body-1 font-weight-medium">
@@ -72,8 +94,15 @@
                       @click.stop="selectFeature(item.feature)"
                     >
                       <template #prepend>
-                        <v-avatar size="36" color="blue-lighten-5" class="menu-avatar">
-                          <v-icon color="blue-darken-2" size="small">
+                        <v-avatar
+                          size="36"
+                          color="blue-lighten-5"
+                          class="menu-avatar"
+                        >
+                          <v-icon
+                            color="blue-darken-2"
+                            size="small"
+                          >
                             {{ getFeatureIcon(item.feature) }}
                           </v-icon>
                         </v-avatar>
@@ -85,14 +114,20 @@
                         {{ formatFeatureDetails(item.feature) }}
                       </v-list-item-subtitle>
                       <template #append>
-                        <v-icon size="small" color="blue-darken-1">mdi-chevron-right</v-icon>
+                        <v-icon
+                          size="small"
+                          color="blue-darken-1"
+                        >mdi-chevron-right</v-icon>
                       </template>
                     </v-list-item>
                   </template>
                 </v-virtual-scroll>
               </v-list>
 
-              <v-divider v-if="group !== groupedFeatures[groupedFeatures.length - 1]" class="my-2" />
+              <v-divider
+                v-if="group !== groupedFeatures[groupedFeatures.length - 1]"
+                class="my-2"
+              />
             </div>
           </div>
         </div>

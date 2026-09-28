@@ -1,29 +1,62 @@
 <template>
-  <v-dialog v-model="visible" :fullscreen="isMobile" max-width="950" scrollable>
-    <v-card rounded="lg" class="throttling-dialog">
+  <v-dialog
+    v-model="visible"
+    :fullscreen="isMobile"
+    max-width="950"
+    scrollable
+  >
+    <v-card
+      rounded="lg"
+      class="throttling-dialog"
+    >
       <v-card-title class="d-flex align-center ga-2 bg-surface-variant py-3 px-4">
-        <v-icon color="teal-darken-3" size="24">mdi-calculator-variant</v-icon>
+        <v-icon
+          color="teal-darken-3"
+          size="24"
+        >mdi-calculator-variant</v-icon>
         <span class="text-h6 font-weight-bold">Калькулятор дросселирования (Шайбы и Элеваторы)</span>
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" size="small" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          @click="visible = false"
+        />
       </v-card-title>
 
       <v-card-text class="pa-4">
-        <v-tabs v-model="activeTab" density="compact" color="primary" class="mb-4">
+        <v-tabs
+          v-model="activeTab"
+          density="compact"
+          color="primary"
+          class="mb-4"
+        >
           <v-tab value="orifice">
-            <v-icon start size="18">mdi-circle-slice-8</v-icon>
+            <v-icon
+              start
+              size="18"
+            >mdi-circle-slice-8</v-icon>
             Дроссельная шайба
           </v-tab>
           <v-tab value="elevator">
-            <v-icon start size="18">mdi-elevator</v-icon>
+            <v-icon
+              start
+              size="18"
+            >mdi-elevator</v-icon>
             Сопло и элеватор
           </v-tab>
           <v-tab value="engine">
-            <v-icon start size="18">mdi-pipe-valve</v-icon>
+            <v-icon
+              start
+              size="18"
+            >mdi-pipe-valve</v-icon>
             По напорам узла (движок)
           </v-tab>
           <v-tab value="excel">
-            <v-icon start size="18">mdi-file-excel</v-icon>
+            <v-icon
+              start
+              size="18"
+            >mdi-file-excel</v-icon>
             Официальный бланк (Excel)
           </v-tab>
         </v-tabs>
@@ -32,8 +65,14 @@
           <!-- 1. Дроссельная шайба -->
           <v-window-item value="orifice">
             <v-row dense>
-              <v-col cols="12" md="6">
-                <v-card variant="outlined" class="pa-4 rounded-lg h-100">
+              <v-col
+                cols="12"
+                md="6"
+              >
+                <v-card
+                  variant="outlined"
+                  class="pa-4 rounded-lg h-100"
+                >
                   <div class="text-subtitle-1 font-weight-bold mb-3">Параметры ввода</div>
 
                   <v-select
@@ -80,9 +119,20 @@
                     hide-details
                   />
 
-                  <v-radio-group v-model="orificeForm.flowMode" inline density="compact" class="mb-2">
-                    <v-radio label="Задать расход G (т/ч)" value="flow" />
-                    <v-radio label="Рассчитать из нагрузки Q" value="load" />
+                  <v-radio-group
+                    v-model="orificeForm.flowMode"
+                    inline
+                    density="compact"
+                    class="mb-2"
+                  >
+                    <v-radio
+                      label="Задать расход G (т/ч)"
+                      value="flow"
+                    />
+                    <v-radio
+                      label="Рассчитать из нагрузки Q"
+                      value="load"
+                    />
                   </v-radio-group>
 
                   <v-text-field
@@ -96,7 +146,10 @@
                     hide-details
                   />
 
-                  <div v-else class="d-flex flex-column ga-2">
+                  <div
+                    v-else
+                    class="d-flex flex-column ga-2"
+                  >
                     <v-text-field
                       v-model.number="orificeForm.qLoad"
                       label="Тепловая нагрузка Q, Гкал/ч"
@@ -139,8 +192,15 @@
                 </v-card>
               </v-col>
 
-              <v-col cols="12" md="6">
-                <v-card variant="tonal" color="teal-darken-4" class="pa-4 rounded-lg h-100 text-center d-flex flex-column justify-center align-center">
+              <v-col
+                cols="12"
+                md="6"
+              >
+                <v-card
+                  variant="tonal"
+                  color="teal-darken-4"
+                  class="pa-4 rounded-lg h-100 text-center d-flex flex-column justify-center align-center"
+                >
                   <div class="text-subtitle-1 font-weight-medium">Рассчитанный диаметр шайбы</div>
                   <div
                     class="font-weight-bold text-teal my-3"
@@ -148,7 +208,10 @@
                   >
                     {{ orificeDiameterText }}
                   </div>
-                  <div v-if="orificeResult?.recommended_standard_diameter != null" class="text-body-2 text-medium-emphasis">
+                  <div
+                    v-if="orificeResult?.recommended_standard_diameter != null"
+                    class="text-body-2 text-medium-emphasis"
+                  >
                     Рекомендуемый стандартный: <span class="font-weight-bold">{{ orificeResult.recommended_standard_diameter }} мм</span>
                   </div>
                   <v-alert
@@ -163,7 +226,10 @@
 
                   <v-divider class="my-4 w-100" />
 
-                  <div v-if="orificeResult" class="w-100 text-left px-4">
+                  <div
+                    v-if="orificeResult"
+                    class="w-100 text-left px-4"
+                  >
                     <div class="d-flex justify-space-between py-1">
                       <span class="text-medium-emphasis">Расход G:</span>
                       <span class="font-weight-bold">{{ orificeResult.flow_g }} т/ч</span>
@@ -180,7 +246,10 @@
                       Формула бланка dross: d = {{ orificeResult.scheme === 'nozzle' ? '9.6' : '10' }} · (G² / Hгас)¼, не менее 3 мм
                     </div>
                   </div>
-                  <div v-else class="text-medium-emphasis">
+                  <div
+                    v-else
+                    class="text-medium-emphasis"
+                  >
                     Заполните параметры слева и нажмите «Рассчитать»
                   </div>
                 </v-card>
@@ -191,8 +260,14 @@
           <!-- 2. Сопло и элеватор -->
           <v-window-item value="elevator">
             <v-row dense>
-              <v-col cols="12" md="6">
-                <v-card variant="outlined" class="pa-4 rounded-lg h-100">
+              <v-col
+                cols="12"
+                md="6"
+              >
+                <v-card
+                  variant="outlined"
+                  class="pa-4 rounded-lg h-100"
+                >
                   <div class="text-subtitle-1 font-weight-bold mb-3">Параметры элеваторного узла</div>
 
                   <div class="d-flex ga-2 mb-3">
@@ -277,8 +352,15 @@
                 </v-card>
               </v-col>
 
-              <v-col cols="12" md="6">
-                <v-card variant="tonal" color="indigo-darken-4" class="pa-4 rounded-lg h-100 text-center d-flex flex-column justify-center align-center">
+              <v-col
+                cols="12"
+                md="6"
+              >
+                <v-card
+                  variant="tonal"
+                  color="indigo-darken-4"
+                  class="pa-4 rounded-lg h-100 text-center d-flex flex-column justify-center align-center"
+                >
                   <div class="text-subtitle-1 font-weight-medium">Рекомендуемый типоразмер</div>
                   <div class="text-h2 font-weight-bold text-indigo my-2">
                     {{ elevatorResult ? `Элеватор №${elevatorResult.elevator_number}` : '—' }}
@@ -286,7 +368,10 @@
 
                   <v-divider class="my-3 w-100" />
 
-                  <div v-if="elevatorResult" class="w-100 text-left px-4">
+                  <div
+                    v-if="elevatorResult"
+                    class="w-100 text-left px-4"
+                  >
                     <div class="d-flex justify-space-between py-1">
                       <span class="text-medium-emphasis">Диаметр сопла (Dс):</span>
                       <span class="font-weight-bold text-h6 text-primary">{{ elevatorResult.nozzle_diameter_mm }} мм</span>
@@ -322,7 +407,10 @@
                       {{ w }}
                     </v-alert>
                   </div>
-                  <div v-else class="text-medium-emphasis">
+                  <div
+                    v-else
+                    class="text-medium-emphasis"
+                  >
                     Заполните параметры и нажмите кнопку расчета
                   </div>
                 </v-card>
@@ -338,23 +426,88 @@
               напора не гасится.
             </p>
             <v-row dense>
-              <v-col cols="12" md="6">
-                <v-card variant="outlined" class="pa-4 rounded-lg h-100">
+              <v-col
+                cols="12"
+                md="6"
+              >
+                <v-card
+                  variant="outlined"
+                  class="pa-4 rounded-lg h-100"
+                >
                   <div class="text-subtitle-1 font-weight-bold mb-3">Элеватор и диафрагма перед соплом</div>
                   <v-row dense>
-                    <v-col cols="6"><v-text-field v-model.number="engineElevator.available_head" label="Располагаемый напор Нп − Но, м" type="number" density="compact" variant="outlined" /></v-col>
-                    <v-col cols="6"><v-text-field v-model.number="engineElevator.heating_flow" label="Расход на отопление, т/ч" type="number" density="compact" variant="outlined" /></v-col>
-                    <v-col cols="6"><v-text-field v-model.number="engineElevator.mixing_ratio" label="Коэффициент смешения u" type="number" density="compact" variant="outlined" /></v-col>
-                    <v-col cols="6"><v-text-field v-model.number="engineElevator.system_loss" label="Потери в системе hс, м" type="number" density="compact" variant="outlined" /></v-col>
-                    <v-col cols="6"><v-text-field v-model.number="engineElevator.min_nozzle_diameter" label="Мин. диаметр сопла, мм" type="number" density="compact" variant="outlined" /></v-col>
-                    <v-col cols="6"><v-select v-model="engineElevator.regime" :items="[1, 6]" label="Режим расчёта" density="compact" variant="outlined" hint="6: при напоре > 40 м половину гасит диафрагма" persistent-hint /></v-col>
-                    <v-col cols="6"><v-text-field v-model.number="engineElevator.street_share" label="Доля уличного фасада" type="number" density="compact" variant="outlined" /></v-col>
-                    <v-col cols="6"><v-text-field v-model.number="engineElevator.circulation_head" label="Напор подпорно-цирк. диафрагмы, м" type="number" density="compact" variant="outlined" /></v-col>
+                    <v-col cols="6"><v-text-field
+                      v-model.number="engineElevator.available_head"
+                      label="Располагаемый напор Нп − Но, м"
+                      type="number"
+                      density="compact"
+                      variant="outlined"
+                    /></v-col>
+                    <v-col cols="6"><v-text-field
+                      v-model.number="engineElevator.heating_flow"
+                      label="Расход на отопление, т/ч"
+                      type="number"
+                      density="compact"
+                      variant="outlined"
+                    /></v-col>
+                    <v-col cols="6"><v-text-field
+                      v-model.number="engineElevator.mixing_ratio"
+                      label="Коэффициент смешения u"
+                      type="number"
+                      density="compact"
+                      variant="outlined"
+                    /></v-col>
+                    <v-col cols="6"><v-text-field
+                      v-model.number="engineElevator.system_loss"
+                      label="Потери в системе hс, м"
+                      type="number"
+                      density="compact"
+                      variant="outlined"
+                    /></v-col>
+                    <v-col cols="6"><v-text-field
+                      v-model.number="engineElevator.min_nozzle_diameter"
+                      label="Мин. диаметр сопла, мм"
+                      type="number"
+                      density="compact"
+                      variant="outlined"
+                    /></v-col>
+                    <v-col cols="6"><v-select
+                      v-model="engineElevator.regime"
+                      :items="[1, 6]"
+                      label="Режим расчёта"
+                      density="compact"
+                      variant="outlined"
+                      hint="6: при напоре > 40 м половину гасит диафрагма"
+                      persistent-hint
+                    /></v-col>
+                    <v-col cols="6"><v-text-field
+                      v-model.number="engineElevator.street_share"
+                      label="Доля уличного фасада"
+                      type="number"
+                      density="compact"
+                      variant="outlined"
+                    /></v-col>
+                    <v-col cols="6"><v-text-field
+                      v-model.number="engineElevator.circulation_head"
+                      label="Напор подпорно-цирк. диафрагмы, м"
+                      type="number"
+                      density="compact"
+                      variant="outlined"
+                    /></v-col>
                   </v-row>
-                  <v-btn color="teal-darken-3" :loading="loadingEngineElevator" block class="mt-2" @click="calcEngineElevator">
+                  <v-btn
+                    color="teal-darken-3"
+                    :loading="loadingEngineElevator"
+                    block
+                    class="mt-2"
+                    @click="calcEngineElevator"
+                  >
                     Рассчитать
                   </v-btn>
-                  <div v-if="engineElevatorResult" class="mt-3 text-body-2">
+                  <div
+                    v-if="engineElevatorResult"
+                    class="mt-3 text-body-2"
+                  >
                     <div>Сопло: <b>{{ fmtMm(engineElevatorResult.nozzle_diameter_mm) }}</b>, напор на сопле {{ fmtM(engineElevatorResult.nozzle_head_m) }}, элеватор №{{ engineElevatorResult.elevator_number ?? '—' }}</div>
                     <div v-if="engineElevatorResult.pre_nozzle">
                       Диафрагма перед соплом: <b>{{ fmtMm(engineElevatorResult.pre_nozzle.diameter_mm) }}</b> × {{ engineElevatorResult.pre_nozzle.count }},
@@ -365,35 +518,93 @@
                     <div v-if="engineElevatorResult.yard_facade">
                       Дворовый фасад: {{ fmtMm(engineElevatorResult.yard_facade.diameter_mm) }} × {{ engineElevatorResult.yard_facade.count }}
                     </div>
-                    <v-alert v-for="w in engineElevatorResult.warnings" :key="w" type="warning" density="compact" variant="tonal" class="mt-2">{{ w }}</v-alert>
+                    <v-alert
+                      v-for="w in engineElevatorResult.warnings"
+                      :key="w"
+                      type="warning"
+                      density="compact"
+                      variant="tonal"
+                      class="mt-2"
+                    >{{ w }}</v-alert>
                   </div>
                 </v-card>
               </v-col>
-              <v-col cols="12" md="6">
-                <v-card variant="outlined" class="pa-4 rounded-lg h-100">
+              <v-col
+                cols="12"
+                md="6"
+              >
+                <v-card
+                  variant="outlined"
+                  class="pa-4 rounded-lg h-100"
+                >
                   <div class="text-subtitle-1 font-weight-bold mb-3">Циркуляционная линия ГВС</div>
                   <v-row dense>
-                    <v-col cols="6"><v-text-field v-model.number="engineCirc.circulation_flow" label="Расход циркуляции, т/ч" type="number" density="compact" variant="outlined" /></v-col>
-                    <v-col cols="6"><v-text-field v-model.number="engineCirc.return_head" label="Напор в обратном узла, м" type="number" density="compact" variant="outlined" /></v-col>
-                    <v-col cols="6"><v-text-field v-model.number="engineCirc.required_head" label="Напор у водоразборных приборов a12, м" type="number" density="compact" variant="outlined" /></v-col>
-                    <v-col cols="6"><v-text-field v-model.number="engineCirc.circulation_loss" label="Потери в циркуляции a11, м" type="number" density="compact" variant="outlined" /></v-col>
+                    <v-col cols="6"><v-text-field
+                      v-model.number="engineCirc.circulation_flow"
+                      label="Расход циркуляции, т/ч"
+                      type="number"
+                      density="compact"
+                      variant="outlined"
+                    /></v-col>
+                    <v-col cols="6"><v-text-field
+                      v-model.number="engineCirc.return_head"
+                      label="Напор в обратном узла, м"
+                      type="number"
+                      density="compact"
+                      variant="outlined"
+                    /></v-col>
+                    <v-col cols="6"><v-text-field
+                      v-model.number="engineCirc.required_head"
+                      label="Напор у водоразборных приборов a12, м"
+                      type="number"
+                      density="compact"
+                      variant="outlined"
+                    /></v-col>
+                    <v-col cols="6"><v-text-field
+                      v-model.number="engineCirc.circulation_loss"
+                      label="Потери в циркуляции a11, м"
+                      type="number"
+                      density="compact"
+                      variant="outlined"
+                    /></v-col>
                     <v-col cols="12">
-                      <v-btn-toggle v-model="engineCirc.draw_from" mandatory density="compact" color="teal-darken-3">
+                      <v-btn-toggle
+                        v-model="engineCirc.draw_from"
+                        mandatory
+                        density="compact"
+                        color="teal-darken-3"
+                      >
                         <v-btn value="supply">Водоразбор из подающего</v-btn>
                         <v-btn value="return">из обратного</v-btn>
                       </v-btn-toggle>
                     </v-col>
                   </v-row>
-                  <v-btn color="teal-darken-3" :loading="loadingEngineCirc" block class="mt-3" @click="calcEngineCirc">
+                  <v-btn
+                    color="teal-darken-3"
+                    :loading="loadingEngineCirc"
+                    block
+                    class="mt-3"
+                    @click="calcEngineCirc"
+                  >
                     Рассчитать
                   </v-btn>
-                  <div v-if="engineCircResult" class="mt-3 text-body-2">
+                  <div
+                    v-if="engineCircResult"
+                    class="mt-3 text-body-2"
+                  >
                     <div>Гасимый напор a12 − a11 − Hобр: {{ fmtM(engineCircResult.available_head_m) }}</div>
                     <div v-if="engineCircResult.diameter_mm != null">
                       Диафрагма: <b>{{ fmtMm(engineCircResult.diameter_mm) }}</b> × {{ engineCircResult.count }},
                       гасит {{ fmtM(engineCircResult.head_dissipated_m) }}
                     </div>
-                    <v-alert v-for="w in engineCircResult.warnings" :key="w" type="warning" density="compact" variant="tonal" class="mt-2">{{ w }}</v-alert>
+                    <v-alert
+                      v-for="w in engineCircResult.warnings"
+                      :key="w"
+                      type="warning"
+                      density="compact"
+                      variant="tonal"
+                      class="mt-2"
+                    >{{ w }}</v-alert>
                   </div>
                 </v-card>
               </v-col>
@@ -402,7 +613,10 @@
 
           <!-- 3. Официальный бланк Excel -->
           <v-window-item value="excel">
-            <v-card variant="outlined" class="pa-4 rounded-lg">
+            <v-card
+              variant="outlined"
+              class="pa-4 rounded-lg"
+            >
               <div class="text-subtitle-1 font-weight-bold mb-3">
                 Формирование официального бланка расчета теплового ввода
               </div>
@@ -412,7 +626,10 @@
               </p>
 
               <v-row dense>
-                <v-col cols="12" sm="6">
+                <v-col
+                  cols="12"
+                  sm="6"
+                >
                   <v-text-field
                     v-model="excelForm.district"
                     label="Эксплуатационный район (РЭТ)"
@@ -422,7 +639,10 @@
                     hide-details
                   />
                 </v-col>
-                <v-col cols="12" sm="6">
+                <v-col
+                  cols="12"
+                  sm="6"
+                >
                   <v-text-field
                     v-model="excelForm.siteName"
                     label="Участок / Номер ТК"
@@ -432,7 +652,10 @@
                     hide-details
                   />
                 </v-col>
-                <v-col cols="12" sm="6">
+                <v-col
+                  cols="12"
+                  sm="6"
+                >
                   <v-text-field
                     v-model="excelForm.consumerName"
                     label="Наименование потребителя"
@@ -442,7 +665,10 @@
                     hide-details
                   />
                 </v-col>
-                <v-col cols="12" sm="6">
+                <v-col
+                  cols="12"
+                  sm="6"
+                >
                   <v-text-field
                     v-model="excelForm.address"
                     label="Адрес объекта"
@@ -452,7 +678,10 @@
                     hide-details
                   />
                 </v-col>
-                <v-col cols="12" sm="6">
+                <v-col
+                  cols="12"
+                  sm="6"
+                >
                   <v-text-field
                     v-model.number="excelForm.qVent"
                     label="Нагрузка вентиляции Qв, Гкал/ч"
@@ -464,7 +693,10 @@
                     hide-details
                   />
                 </v-col>
-                <v-col cols="12" sm="6">
+                <v-col
+                  cols="12"
+                  sm="6"
+                >
                   <v-text-field
                     v-model.number="excelForm.qGvsMax"
                     label="Нагрузка ГВС максимальная, Гкал/ч"
@@ -476,7 +708,12 @@
                     hide-details
                   />
                 </v-col>
-                <v-col v-for="(signer, i) in excelForm.signers" :key="i" cols="12" sm="6">
+                <v-col
+                  v-for="(signer, i) in excelForm.signers"
+                  :key="i"
+                  cols="12"
+                  sm="6"
+                >
                   <div class="d-flex ga-2 mb-3">
                     <v-text-field
                       v-model="signer.position"
@@ -525,7 +762,10 @@
 
       <v-card-actions class="px-4 py-2">
         <v-spacer />
-        <v-btn variant="text" @click="visible = false">Закрыть</v-btn>
+        <v-btn
+          variant="text"
+          @click="visible = false"
+        >Закрыть</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

@@ -1,13 +1,30 @@
 <template>
-  <v-dialog v-model="visible" :fullscreen="isMobile" max-width="1580" scrollable>
+  <v-dialog
+    v-model="visible"
+    :fullscreen="isMobile"
+    max-width="1580"
+    scrollable
+  >
     <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="deep-purple-darken-3" density="compact">
+      <v-toolbar
+        color="deep-purple-darken-3"
+        density="compact"
+      >
         <v-icon class="ml-3 mr-2">mdi-valve</v-icon>
         <v-toolbar-title>Запорная и регулирующая арматура</v-toolbar-title>
-        <v-chip class="mr-2" size="small" color="white" variant="outlined">
+        <v-chip
+          class="mr-2"
+          size="small"
+          color="white"
+          variant="outlined"
+        >
           {{ lookups.counts.ready || 0 }}/{{ lookups.counts.total || 0 }} на активных линиях
         </v-chip>
-        <v-btn icon="mdi-close" aria-label="Закрыть" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          aria-label="Закрыть"
+          @click="visible = false"
+        />
       </v-toolbar>
 
       <div class="alerts pa-3 pb-0">
@@ -21,13 +38,23 @@
           Расчётные таблицы <code>ZD_OUT</code> и <code>ZD2_OUT</code> пусты. Паспортные параметры доступны,
           а расход, потеря напора и гидравлическое сопротивление появятся после сохранения расчёта сети.
         </v-alert>
-        <v-alert type="warning" variant="tonal" density="compact" class="mb-2">
+        <v-alert
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="mb-2"
+        >
           Геометрия доступна только для {{ lookups.counts.locatable || 0 }} из {{ lookups.counts.total || 0 }} записей.
           Остальные задвижки принадлежат расчётным линиям без геометрии или потеряли связь с линией.
         </v-alert>
       </div>
 
-      <v-tabs v-model="activeTab" color="deep-purple-darken-3" class="px-3 mt-2" @update:model-value="onTabChange">
+      <v-tabs
+        v-model="activeTab"
+        color="deep-purple-darken-3"
+        class="px-3 mt-2"
+        @update:model-value="onTabChange"
+      >
         <v-tab value="inventory">Оборудование ({{ lookups.counts.total || 0 }})</v-tab>
         <v-tab value="catalog">Каталог задвижек ({{ lookups.catalog_count || 0 }})</v-tab>
       </v-tabs>
@@ -108,7 +135,11 @@
               clearable
               hide-details
             />
-            <v-btn color="deep-purple-darken-3" :loading="loading" @click="reloadInventory">Найти</v-btn>
+            <v-btn
+              color="deep-purple-darken-3"
+              :loading="loading"
+              @click="reloadInventory"
+            >Найти</v-btn>
           </div>
 
           <JournalError :message="error" />
@@ -121,7 +152,11 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in inventory" :key="`${item.equipment_type}-${item.id}`" @click="openItemDetails(item.equipment_type, item.id)">
+                <tr
+                  v-for="item in inventory"
+                  :key="`${item.equipment_type}-${item.id}`"
+                  @click="openItemDetails(item.equipment_type, item.id)"
+                >
                   <td>{{ item.id }}</td>
                   <td>{{ equipmentTypeLabel(item.equipment_type) }}</td>
                   <td>
@@ -131,9 +166,15 @@
                   <td>{{ item.purpose_name || 'не указано' }}</td>
                   <td>{{ formatUnit(item.nominal_diameter, 'мм') }}</td>
                   <td>{{ formatUnit(item.opening_percent, '%') }}</td>
-                  <td><v-chip size="x-small" :color="stateColor(item.state_name)">{{ item.state_name || '—' }}</v-chip></td>
+                  <td><v-chip
+                    size="x-small"
+                    :color="stateColor(item.state_name)"
+                  >{{ item.state_name || '—' }}</v-chip></td>
                   <td>{{ item.fragment_name || `№${item.fragment_id || '—'}` }}</td>
-                  <td><v-chip size="x-small" :color="qualityColor(item.quality_status)">{{ qualityLabel(item.quality_status) }}</v-chip></td>
+                  <td><v-chip
+                    size="x-small"
+                    :color="qualityColor(item.quality_status)"
+                  >{{ qualityLabel(item.quality_status) }}</v-chip></td>
                   <td>
                     <v-btn
                       v-if="hasCoordinates(item)"
@@ -147,10 +188,23 @@
                 </tr>
               </tbody>
             </table>
-            <div v-if="!loading && !inventory.length" class="empty">Оборудование не найдено</div>
-            <v-progress-linear v-if="loading" indeterminate color="deep-purple-darken-3" />
+            <div
+              v-if="!loading && !inventory.length"
+              class="empty"
+            >Оборудование не найдено</div>
+            <v-progress-linear
+              v-if="loading"
+              indeterminate
+              color="deep-purple-darken-3"
+            />
           </div>
-          <v-pagination v-if="inventoryPages > 1" v-model="inventoryPage" :length="inventoryPages" density="comfortable" @update:model-value="loadInventory" />
+          <v-pagination
+            v-if="inventoryPages > 1"
+            v-model="inventoryPage"
+            :length="inventoryPages"
+            density="comfortable"
+            @update:model-value="loadInventory"
+          />
         </v-window-item>
 
         <v-window-item value="catalog">
@@ -165,58 +219,133 @@
               hide-details
               @keyup.enter="reloadCatalog"
             />
-            <v-btn color="deep-purple-darken-3" :loading="loading" @click="reloadCatalog">Найти</v-btn>
+            <v-btn
+              color="deep-purple-darken-3"
+              :loading="loading"
+              @click="reloadCatalog"
+            >Найти</v-btn>
           </div>
           <JournalError :message="error" />
           <div class="table-wrap catalog-table-wrap">
             <table class="journal-table">
               <thead><tr><th>ID</th><th>Марка</th><th>DN</th><th>Давление</th><th>Температура</th><th>Присоединение</th><th>Привод</th><th>Материал</th><th>Используется</th></tr></thead>
               <tbody>
-                <tr v-for="item in catalog" :key="item.id" @click="openCatalogDetails(item.id)">
+                <tr
+                  v-for="item in catalog"
+                  :key="item.id"
+                  @click="openCatalogDetails(item.id)"
+                >
                   <td>{{ item.id }}</td><td><strong>{{ item.name_zc || item.name || '—' }}</strong></td>
                   <td>{{ formatUnit(item.d, 'мм') }}</td><td>{{ formatNumber(item.p) }}</td><td>{{ formatUnit(item.t, '°C') }}</td>
                   <td>{{ item.tris || '—' }}</td><td>{{ item.tip_privod || '—' }}</td><td>{{ item.material || '—' }}</td><td>{{ item.installed_count }}</td>
                 </tr>
               </tbody>
             </table>
-            <div v-if="!loading && !catalog.length" class="empty">Модели не найдены</div>
-            <v-progress-linear v-if="loading" indeterminate color="deep-purple-darken-3" />
+            <div
+              v-if="!loading && !catalog.length"
+              class="empty"
+            >Модели не найдены</div>
+            <v-progress-linear
+              v-if="loading"
+              indeterminate
+              color="deep-purple-darken-3"
+            />
           </div>
-          <v-pagination v-if="catalogPages > 1" v-model="catalogPage" :length="catalogPages" density="comfortable" @update:model-value="loadCatalog" />
+          <v-pagination
+            v-if="catalogPages > 1"
+            v-model="catalogPage"
+            :length="catalogPages"
+            density="comfortable"
+            @update:model-value="loadCatalog"
+          />
         </v-window-item>
       </v-window>
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="detailVisible" :fullscreen="isMobile" max-width="1180" scrollable>
+  <v-dialog
+    v-model="detailVisible"
+    :fullscreen="isMobile"
+    max-width="1180"
+    scrollable
+  >
     <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="deep-purple-darken-3" density="compact">
-        <v-btn icon="mdi-arrow-left" aria-label="Вернуться к журналу" @click="detailVisible = false" />
+      <v-toolbar
+        color="deep-purple-darken-3"
+        density="compact"
+      >
+        <v-btn
+          icon="mdi-arrow-left"
+          aria-label="Вернуться к журналу"
+          @click="detailVisible = false"
+        />
         <v-toolbar-title>{{ detailTitle }}</v-toolbar-title>
-        <v-btn icon="mdi-close" aria-label="Закрыть карточку" @click="detailVisible = false" />
+        <v-btn
+          icon="mdi-close"
+          aria-label="Закрыть карточку"
+          @click="detailVisible = false"
+        />
       </v-toolbar>
-      <v-progress-linear v-if="detailLoading" indeterminate color="deep-purple-darken-3" />
+      <v-progress-linear
+        v-if="detailLoading"
+        indeterminate
+        color="deep-purple-darken-3"
+      />
 
       <template v-if="itemDetails && !detailLoading">
         <div class="alerts pa-3 pb-0">
-          <v-alert v-if="itemDetails.quality_status !== 'ready'" :type="itemDetails.quality_status === 'line_missing' ? 'error' : 'warning'" variant="tonal" density="compact">
+          <v-alert
+            v-if="itemDetails.quality_status !== 'ready'"
+            :type="itemDetails.quality_status === 'line_missing' ? 'error' : 'warning'"
+            variant="tonal"
+            density="compact"
+          >
             {{ qualityDescription(itemDetails.quality_status) }}
           </v-alert>
-          <v-alert v-if="itemDetails.catalog_status === 'unassigned'" type="info" variant="tonal" density="compact">
+          <v-alert
+            v-if="itemDetails.catalog_status === 'unassigned'"
+            type="info"
+            variant="tonal"
+            density="compact"
+          >
             Паспортная модель не выбрана. В текущей базе все установленные задвижки не связаны с шестью моделями каталога.
           </v-alert>
         </div>
         <v-row class="ma-0 pa-3">
-          <v-col cols="12" md="6">
-            <v-card variant="outlined" class="mb-3">
+          <v-col
+            cols="12"
+            md="6"
+          >
+            <v-card
+              variant="outlined"
+              class="mb-3"
+            >
               <v-card-title class="text-subtitle-1">Сетевая привязка</v-card-title>
               <v-card-text class="detail-grid">
-                <DetailValue label="Тип / ID" :value="`${equipmentTypeLabel(itemDetails.equipment_type)} / ${itemDetails.id}`" />
-                <DetailValue label="Линия" :value="itemDetails.line_id" />
-                <DetailValue label="Начальный узел" :value="nodeLabel(itemDetails.node_code_1, itemDetails.node_name_1, itemDetails.node_id_1)" />
-                <DetailValue label="Конечный узел" :value="nodeLabel(itemDetails.node_code_2, itemDetails.node_name_2, itemDetails.node_id_2)" />
-                <DetailValue label="Фрагмент" :value="itemDetails.fragment_name" />
-                <DetailValue label="Статус линии" :value="qualityLabel(itemDetails.quality_status)" />
+                <DetailValue
+                  label="Тип / ID"
+                  :value="`${equipmentTypeLabel(itemDetails.equipment_type)} / ${itemDetails.id}`"
+                />
+                <DetailValue
+                  label="Линия"
+                  :value="itemDetails.line_id"
+                />
+                <DetailValue
+                  label="Начальный узел"
+                  :value="nodeLabel(itemDetails.node_code_1, itemDetails.node_name_1, itemDetails.node_id_1)"
+                />
+                <DetailValue
+                  label="Конечный узел"
+                  :value="nodeLabel(itemDetails.node_code_2, itemDetails.node_name_2, itemDetails.node_id_2)"
+                />
+                <DetailValue
+                  label="Фрагмент"
+                  :value="itemDetails.fragment_name"
+                />
+                <DetailValue
+                  label="Статус линии"
+                  :value="qualityLabel(itemDetails.quality_status)"
+                />
               </v-card-text>
             </v-card>
             
@@ -224,16 +353,48 @@
               <v-card variant="outlined">
                 <v-card-title class="text-subtitle-1">Исходные параметры</v-card-title>
                 <v-card-text class="detail-grid">
-                  <DetailValue label="Назначение" :value="itemDetails.purpose_name" />
-                  <DetailValue label="Состояние" :value="itemDetails.state_name" />
-                  <DetailValue label="Условный диаметр" :value="formatUnit(itemDetails.nominal_diameter, 'мм')" />
-                  <DetailValue label="Степень открытия" :value="formatUnit(itemDetails.opening_percent, '%')" />
-                  <DetailValue label="Относительная утечка" :value="formatNumber(itemDetails.relative_leakage, 6)" />
-                  <DetailValue label="Сопротивление линии" :value="formatNumber(itemDetails.line_hydraulic_resistance, 6)" />
-                  <DetailValue label="Число оборотов" :value="itemDetails.turn_count" />
-                  <DetailValue label="Управление затвором" :value="itemDetails.gate_control" />
-                  <DetailValue v-if="itemDetails.equipment_type === 'regulating'" label="Заданный перепад" :value="formatNumber(itemDetails.set_pressure_drop, 6)" />
-                  <DetailValue v-if="itemDetails.equipment_type === 'regulating'" label="Заданный расход" :value="formatNumber(itemDetails.set_flow, 6)" />
+                  <DetailValue
+                    label="Назначение"
+                    :value="itemDetails.purpose_name"
+                  />
+                  <DetailValue
+                    label="Состояние"
+                    :value="itemDetails.state_name"
+                  />
+                  <DetailValue
+                    label="Условный диаметр"
+                    :value="formatUnit(itemDetails.nominal_diameter, 'мм')"
+                  />
+                  <DetailValue
+                    label="Степень открытия"
+                    :value="formatUnit(itemDetails.opening_percent, '%')"
+                  />
+                  <DetailValue
+                    label="Относительная утечка"
+                    :value="formatNumber(itemDetails.relative_leakage, 6)"
+                  />
+                  <DetailValue
+                    label="Сопротивление линии"
+                    :value="formatNumber(itemDetails.line_hydraulic_resistance, 6)"
+                  />
+                  <DetailValue
+                    label="Число оборотов"
+                    :value="itemDetails.turn_count"
+                  />
+                  <DetailValue
+                    label="Управление затвором"
+                    :value="itemDetails.gate_control"
+                  />
+                  <DetailValue
+                    v-if="itemDetails.equipment_type === 'regulating'"
+                    label="Заданный перепад"
+                    :value="formatNumber(itemDetails.set_pressure_drop, 6)"
+                  />
+                  <DetailValue
+                    v-if="itemDetails.equipment_type === 'regulating'"
+                    label="Заданный расход"
+                    :value="formatNumber(itemDetails.set_flow, 6)"
+                  />
                 </v-card-text>
               </v-card>
             </template>
@@ -242,7 +403,12 @@
                 <v-card-title class="text-subtitle-1">Редактирование параметров</v-card-title>
                 <v-card-text>
                   <v-row dense>
-                    <v-col v-for="field in buildFields()" :key="field.key" cols="12" sm="6">
+                    <v-col
+                      v-for="field in buildFields()"
+                      :key="field.key"
+                      cols="12"
+                      sm="6"
+                    >
                       <div class="detail-label mb-1">{{ field.label }}</div>
                       <v-select
                         v-if="field.type === 'select'"
@@ -270,34 +436,97 @@
               </v-card>
             </template>
           </v-col>
-          <v-col cols="12" md="6">
-            <v-card v-if="itemDetails.standard" variant="outlined" class="mb-3">
+          <v-col
+            cols="12"
+            md="6"
+          >
+            <v-card
+              v-if="itemDetails.standard"
+              variant="outlined"
+              class="mb-3"
+            >
               <v-card-title class="text-subtitle-1">Паспорт модели</v-card-title>
               <v-card-text class="detail-grid">
-                <DetailValue label="Марка" :value="itemDetails.standard.name_zc" />
-                <DetailValue label="DN" :value="formatUnit(itemDetails.standard.d, 'мм')" />
-                <DetailValue label="Давление" :value="formatNumber(itemDetails.standard.p)" />
-                <DetailValue label="Температура" :value="formatUnit(itemDetails.standard.t, '°C')" />
-                <DetailValue label="Присоединение" :value="itemDetails.standard.tris" />
-                <DetailValue label="Привод" :value="itemDetails.standard.tip_privod" />
-                <DetailValue label="Материал" :value="itemDetails.standard.material" />
-                <DetailValue label="Изготовитель" :value="itemDetails.standard.producer" />
+                <DetailValue
+                  label="Марка"
+                  :value="itemDetails.standard.name_zc"
+                />
+                <DetailValue
+                  label="DN"
+                  :value="formatUnit(itemDetails.standard.d, 'мм')"
+                />
+                <DetailValue
+                  label="Давление"
+                  :value="formatNumber(itemDetails.standard.p)"
+                />
+                <DetailValue
+                  label="Температура"
+                  :value="formatUnit(itemDetails.standard.t, '°C')"
+                />
+                <DetailValue
+                  label="Присоединение"
+                  :value="itemDetails.standard.tris"
+                />
+                <DetailValue
+                  label="Привод"
+                  :value="itemDetails.standard.tip_privod"
+                />
+                <DetailValue
+                  label="Материал"
+                  :value="itemDetails.standard.material"
+                />
+                <DetailValue
+                  label="Изготовитель"
+                  :value="itemDetails.standard.producer"
+                />
               </v-card-text>
             </v-card>
-            <v-alert v-if="!itemDetails.latest_output" type="info" variant="tonal" density="compact">
+            <v-alert
+              v-if="!itemDetails.latest_output"
+              type="info"
+              variant="tonal"
+              density="compact"
+            >
               Гидравлический режим для этой арматуры пока не рассчитан.
             </v-alert>
-            <v-card v-else variant="outlined">
+            <v-card
+              v-else
+              variant="outlined"
+            >
               <v-card-title class="text-subtitle-1">Последний расчётный режим</v-card-title>
               <v-card-text class="detail-grid">
-                <DetailValue label="Состояние" :value="outputValue('state_text')" />
-                <DetailValue label="Расход" :value="formatNumber(outputValue('flow'), 6)" />
-                <DetailValue label="Потеря напора" :value="formatNumber(outputValue('head_loss'), 6)" />
-                <DetailValue label="Гидравлическое сопротивление" :value="formatNumber(outputValue('hydraulic_resistance'), 6)" />
-                <DetailValue label="Располагаемый напор в конце" :value="formatNumber(outputValue('available_head_end'), 6)" />
-                <DetailValue label="Пьезометрический напор в конце" :value="formatNumber(outputValue('piezometric_head_end'), 6)" />
-                <DetailValue label="Геодезическая отметка" :value="formatNumber(outputValue('geodetic_mark_end'), 6)" />
-                <DetailValue label="Полный напор в конце" :value="formatNumber(outputValue('total_head_end'), 6)" />
+                <DetailValue
+                  label="Состояние"
+                  :value="outputValue('state_text')"
+                />
+                <DetailValue
+                  label="Расход"
+                  :value="formatNumber(outputValue('flow'), 6)"
+                />
+                <DetailValue
+                  label="Потеря напора"
+                  :value="formatNumber(outputValue('head_loss'), 6)"
+                />
+                <DetailValue
+                  label="Гидравлическое сопротивление"
+                  :value="formatNumber(outputValue('hydraulic_resistance'), 6)"
+                />
+                <DetailValue
+                  label="Располагаемый напор в конце"
+                  :value="formatNumber(outputValue('available_head_end'), 6)"
+                />
+                <DetailValue
+                  label="Пьезометрический напор в конце"
+                  :value="formatNumber(outputValue('piezometric_head_end'), 6)"
+                />
+                <DetailValue
+                  label="Геодезическая отметка"
+                  :value="formatNumber(outputValue('geodetic_mark_end'), 6)"
+                />
+                <DetailValue
+                  label="Полный напор в конце"
+                  :value="formatNumber(outputValue('total_head_end'), 6)"
+                />
               </v-card-text>
             </v-card>
             <v-btn
@@ -313,40 +542,110 @@
         <v-card-actions class="px-4 py-3 bg-grey-lighten-4">
           <v-spacer />
           <template v-if="!isEditing">
-            <v-btn v-if="mutationsEnabled" color="primary" variant="flat" prepend-icon="mdi-pencil" @click="startEdit">Редактировать</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="primary"
+              variant="flat"
+              prepend-icon="mdi-pencil"
+              @click="startEdit"
+            >Редактировать</v-btn>
           </template>
           <template v-else>
-            <v-btn v-if="mutationsEnabled" color="error" variant="text" @click="cancelEdit" :disabled="saving">Отмена</v-btn>
-            <v-btn v-if="mutationsEnabled" color="primary" variant="flat" @click="saveChanges" :loading="saving">Сохранить</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="error"
+              variant="text"
+              @click="cancelEdit"
+              :disabled="saving"
+            >Отмена</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="primary"
+              variant="flat"
+              @click="saveChanges"
+              :loading="saving"
+            >Сохранить</v-btn>
           </template>
         </v-card-actions>
       </template>
 
       <template v-else-if="catalogDetails && !detailLoading">
         <v-row class="ma-0 pa-3">
-          <v-col cols="12" md="6">
+          <v-col
+            cols="12"
+            md="6"
+          >
             <v-card variant="outlined">
               <v-card-title class="text-subtitle-1">Паспорт задвижки</v-card-title>
               <v-card-text class="detail-grid">
-                <DetailValue label="ID / марка" :value="`${catalogDetails.id} / ${catalogDetails.name_zc || '—'}`" />
-                <DetailValue label="Наименование" :value="catalogDetails.name" />
-                <DetailValue label="Условный диаметр" :value="formatUnit(catalogDetails.d, 'мм')" />
-                <DetailValue label="Давление" :value="formatNumber(catalogDetails.p)" />
-                <DetailValue label="Макс. температура" :value="formatUnit(catalogDetails.t, '°C')" />
-                <DetailValue label="Присоединение" :value="catalogDetails.tris" />
-                <DetailValue label="Число болтов" :value="catalogDetails.kol_bolt" />
-                <DetailValue label="Тип привода" :value="catalogDetails.tip_privod" />
-                <DetailValue label="Исполнение привода" :value="catalogDetails.isp_privod" />
-                <DetailValue label="Обороты маховика" :value="catalogDetails.obor_maxovik" />
-                <DetailValue label="Материал" :value="catalogDetails.material" />
-                <DetailValue label="Масса" :value="formatUnit(catalogDetails.macca, 'кг')" />
-                <DetailValue label="Изготовитель" :value="catalogDetails.producer" />
-                <DetailValue label="Установлено" :value="catalogDetails.installed_count" />
+                <DetailValue
+                  label="ID / марка"
+                  :value="`${catalogDetails.id} / ${catalogDetails.name_zc || '—'}`"
+                />
+                <DetailValue
+                  label="Наименование"
+                  :value="catalogDetails.name"
+                />
+                <DetailValue
+                  label="Условный диаметр"
+                  :value="formatUnit(catalogDetails.d, 'мм')"
+                />
+                <DetailValue
+                  label="Давление"
+                  :value="formatNumber(catalogDetails.p)"
+                />
+                <DetailValue
+                  label="Макс. температура"
+                  :value="formatUnit(catalogDetails.t, '°C')"
+                />
+                <DetailValue
+                  label="Присоединение"
+                  :value="catalogDetails.tris"
+                />
+                <DetailValue
+                  label="Число болтов"
+                  :value="catalogDetails.kol_bolt"
+                />
+                <DetailValue
+                  label="Тип привода"
+                  :value="catalogDetails.tip_privod"
+                />
+                <DetailValue
+                  label="Исполнение привода"
+                  :value="catalogDetails.isp_privod"
+                />
+                <DetailValue
+                  label="Обороты маховика"
+                  :value="catalogDetails.obor_maxovik"
+                />
+                <DetailValue
+                  label="Материал"
+                  :value="catalogDetails.material"
+                />
+                <DetailValue
+                  label="Масса"
+                  :value="formatUnit(catalogDetails.macca, 'кг')"
+                />
+                <DetailValue
+                  label="Изготовитель"
+                  :value="catalogDetails.producer"
+                />
+                <DetailValue
+                  label="Установлено"
+                  :value="catalogDetails.installed_count"
+                />
               </v-card-text>
             </v-card>
           </v-col>
-          <v-col cols="12" md="6">
-            <v-alert type="info" variant="tonal" density="compact">
+          <v-col
+            cols="12"
+            md="6"
+          >
+            <v-alert
+              type="info"
+              variant="tonal"
+              density="compact"
+            >
               Справочник содержит шесть моделей 30ч47бр, но ни одна установленная задвижка текущей базы с ними не связана.
             </v-alert>
           </v-col>

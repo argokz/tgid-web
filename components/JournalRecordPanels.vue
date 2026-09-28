@@ -1,163 +1,453 @@
 <template>
   <div class="journal-record-panels">
-    <v-alert v-if="schemaError" type="warning" variant="tonal" density="compact" class="mb-3">{{ schemaError }}</v-alert>
+    <v-alert
+      v-if="schemaError"
+      type="warning"
+      variant="tonal"
+      density="compact"
+      class="mb-3"
+    >{{ schemaError }}</v-alert>
 
     <!-- Утверждение плана (gid6: «Утверждение плана ремонтов/шурфовок») -->
-    <v-card v-if="schema?.approval" variant="outlined" class="mb-3">
+    <v-card
+      v-if="schema?.approval"
+      variant="outlined"
+      class="mb-3"
+    >
       <v-card-title class="text-subtitle-2 d-flex align-center ga-2">
-        <v-icon size="18" color="teal-darken-2">mdi-stamper</v-icon>
+        <v-icon
+          size="18"
+          color="teal-darken-2"
+        >mdi-stamper</v-icon>
         Утверждение плана
         <v-spacer />
-        <v-chip v-if="approval" size="small" variant="tonal" :color="approvalColor">{{ approvalLabel }}</v-chip>
+        <v-chip
+          v-if="approval"
+          size="small"
+          variant="tonal"
+          :color="approvalColor"
+        >{{ approvalLabel }}</v-chip>
       </v-card-title>
       <v-card-text class="pt-0">
-        <v-progress-linear v-if="approvalLoading" indeterminate color="teal" class="mb-2" />
+        <v-progress-linear
+          v-if="approvalLoading"
+          indeterminate
+          color="teal"
+          class="mb-2"
+        />
         <template v-if="approval">
-          <div v-if="approval.last_action" class="text-caption text-medium-emphasis mb-1">
+          <div
+            v-if="approval.last_action"
+            class="text-caption text-medium-emphasis mb-1"
+          >
             {{ approval.last_action.operation === 'APPROVE' ? 'Утвердил' : 'Снял утверждение' }}:
             {{ approval.last_action.by }} · {{ formatDateTime(approval.last_action.at) }}
           </div>
-          <div v-if="signerSummary" class="text-caption mb-1">{{ signerSummary }}</div>
-          <v-alert v-if="!approval.approved && !approval.not_applicable && approval.missing_fields.length"
-            type="info" variant="tonal" density="compact" class="my-2">
+          <div
+            v-if="signerSummary"
+            class="text-caption mb-1"
+          >{{ signerSummary }}</div>
+          <v-alert
+            v-if="!approval.approved && !approval.not_applicable && approval.missing_fields.length"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="my-2"
+          >
             Для утверждения заполните: {{ approval.missing_fields.map(labelOf).join(', ') }}
           </v-alert>
-          <v-alert v-if="!approval.approved && schema.approval.require_contour && approval.contour_size === 0"
-            type="info" variant="tonal" density="compact" class="my-2">
+          <v-alert
+            v-if="!approval.approved && schema.approval.require_contour && approval.contour_size === 0"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="my-2"
+          >
             Контур пуст — выберите участки, затем утверждайте план.
           </v-alert>
         </template>
         <template v-if="canEdit && approval && !approval.not_applicable">
-          <div v-if="!approval.approved && approveFormOpen" class="approve-form mt-2">
+          <div
+            v-if="!approval.approved && approveFormOpen"
+            class="approve-form mt-2"
+          >
             <v-row dense>
-              <v-col cols="12" sm="4">
-                <v-text-field v-model="approveForm.approved_on" type="date" label="Дата утверждения"
-                  density="compact" variant="outlined" hide-details />
+              <v-col
+                cols="12"
+                sm="4"
+              >
+                <v-text-field
+                  v-model="approveForm.approved_on"
+                  type="date"
+                  label="Дата утверждения"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                />
               </v-col>
-              <v-col v-for="(signer, key) in schema.approval.signers" :key="key" cols="12" sm="4">
-                <v-select v-if="signer.ref === 'dolzhnosti'" v-model="approveForm.signers[key]" :items="schema.positions || []"
-                  item-title="name" item-value="id" :label="signer.label" density="compact" variant="outlined" clearable hide-details />
-                <v-select v-else-if="signer.ref === 'subdivisions'" v-model="approveForm.signers[key]" :items="schema.subdivisions || []"
-                  item-title="name" item-value="id" :label="signer.label" density="compact" variant="outlined" clearable hide-details />
-                <v-text-field v-else v-model="approveForm.signers[key]" :label="signer.label"
-                  density="compact" variant="outlined" hide-details />
+              <v-col
+                v-for="(signer, key) in schema.approval.signers"
+                :key="key"
+                cols="12"
+                sm="4"
+              >
+                <v-select
+                  v-if="signer.ref === 'dolzhnosti'"
+                  v-model="approveForm.signers[key]"
+                  :items="schema.positions || []"
+                  item-title="name"
+                  item-value="id"
+                  :label="signer.label"
+                  density="compact"
+                  variant="outlined"
+                  clearable
+                  hide-details
+                />
+                <v-select
+                  v-else-if="signer.ref === 'subdivisions'"
+                  v-model="approveForm.signers[key]"
+                  :items="schema.subdivisions || []"
+                  item-title="name"
+                  item-value="id"
+                  :label="signer.label"
+                  density="compact"
+                  variant="outlined"
+                  clearable
+                  hide-details
+                />
+                <v-text-field
+                  v-else
+                  v-model="approveForm.signers[key]"
+                  :label="signer.label"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                />
               </v-col>
             </v-row>
           </div>
           <div class="d-flex flex-wrap ga-2 mt-2">
             <template v-if="!approval.approved">
-              <v-btn v-if="!approveFormOpen" size="small" color="teal" variant="tonal" prepend-icon="mdi-stamper"
-                @click="openApproveForm">Утвердить…</v-btn>
+              <v-btn
+                v-if="!approveFormOpen"
+                size="small"
+                color="teal"
+                variant="tonal"
+                prepend-icon="mdi-stamper"
+                @click="openApproveForm"
+              >Утвердить…</v-btn>
               <template v-else>
-                <v-btn size="small" color="teal" variant="flat" :loading="approving" @click="askApprove">Утвердить план</v-btn>
-                <v-btn size="small" variant="text" @click="approveFormOpen = false">Отмена</v-btn>
+                <v-btn
+                  size="small"
+                  color="teal"
+                  variant="flat"
+                  :loading="approving"
+                  @click="askApprove"
+                >Утвердить план</v-btn>
+                <v-btn
+                  size="small"
+                  variant="text"
+                  @click="approveFormOpen = false"
+                >Отмена</v-btn>
               </template>
             </template>
-            <v-btn v-else size="small" color="warning" variant="tonal" prepend-icon="mdi-stamper" :loading="approving"
-              @click="askUnapprove">Снять утверждение</v-btn>
+            <v-btn
+              v-else
+              size="small"
+              color="warning"
+              variant="tonal"
+              prepend-icon="mdi-stamper"
+              :loading="approving"
+              @click="askUnapprove"
+            >Снять утверждение</v-btn>
           </div>
         </template>
       </v-card-text>
     </v-card>
 
     <!-- Контур (remont2Deployed / opresDeployed / osmotrDeployed) -->
-    <v-card v-if="schema?.has_contour" variant="outlined" class="mb-3">
+    <v-card
+      v-if="schema?.has_contour"
+      variant="outlined"
+      class="mb-3"
+    >
       <v-card-title class="text-subtitle-2 d-flex align-center ga-2">
-        <v-icon size="18" color="deep-purple">mdi-vector-polyline</v-icon>
+        <v-icon
+          size="18"
+          color="deep-purple"
+        >mdi-vector-polyline</v-icon>
         Контур: {{ contourIds.length }} участков
-        <v-chip v-if="contourDirty" size="x-small" color="warning" variant="tonal">не сохранён</v-chip>
+        <v-chip
+          v-if="contourDirty"
+          size="x-small"
+          color="warning"
+          variant="tonal"
+        >не сохранён</v-chip>
         <v-spacer />
-        <v-btn size="small" variant="text" prepend-icon="mdi-map-search-outline" :disabled="!contour?.bbox || contourDirty"
-          @click="showOnMap">На карте</v-btn>
+        <v-btn
+          size="small"
+          variant="text"
+          prepend-icon="mdi-map-search-outline"
+          :disabled="!contour?.bbox || contourDirty"
+          @click="showOnMap"
+        >На карте</v-btn>
       </v-card-title>
       <v-card-text class="pt-0">
-        <v-progress-linear v-if="contourLoading" indeterminate color="deep-purple" class="mb-2" />
-        <v-alert v-for="warning in contour?.warnings || []" :key="warning" type="warning" variant="tonal"
-          density="compact" class="mb-2 text-caption">{{ warning }}</v-alert>
-        <div v-if="contourIds.length" class="contour-list">
-          <div v-for="lineId in contourIds" :key="lineId" class="contour-line d-flex align-center ga-2">
-            <v-icon size="16" :color="lineInfo(lineId)?.removed ? 'error' : 'deep-purple'">mdi-pipe</v-icon>
+        <v-progress-linear
+          v-if="contourLoading"
+          indeterminate
+          color="deep-purple"
+          class="mb-2"
+        />
+        <v-alert
+          v-for="warning in contour?.warnings || []"
+          :key="warning"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="mb-2 text-caption"
+        >{{ warning }}</v-alert>
+        <div
+          v-if="contourIds.length"
+          class="contour-list"
+        >
+          <div
+            v-for="lineId in contourIds"
+            :key="lineId"
+            class="contour-line d-flex align-center ga-2"
+          >
+            <v-icon
+              size="16"
+              :color="lineInfo(lineId)?.removed ? 'error' : 'deep-purple'"
+            >mdi-pipe</v-icon>
             <span class="font-weight-medium">{{ lineId }}</span>
             <span class="text-caption text-medium-emphasis text-truncate">{{ lineCaption(lineId) }}</span>
             <v-spacer />
-            <v-btn v-if="canEdit" icon="mdi-close" size="x-small" variant="text" :aria-label="`Убрать участок ${lineId}`"
-              @click="removeLine(lineId)" />
+            <v-btn
+              v-if="canEdit"
+              icon="mdi-close"
+              size="x-small"
+              variant="text"
+              :aria-label="`Убрать участок ${lineId}`"
+              @click="removeLine(lineId)"
+            />
           </div>
         </div>
-        <div v-else-if="!contourLoading" class="text-caption text-medium-emphasis">Участки не выбраны.</div>
+        <div
+          v-else-if="!contourLoading"
+          class="text-caption text-medium-emphasis"
+        >Участки не выбраны.</div>
         <template v-if="canEdit">
           <div class="d-flex flex-wrap align-center ga-2 mt-3">
-            <v-btn size="small" color="deep-purple" variant="tonal" prepend-icon="mdi-cursor-default-click-outline"
-              @click="pickOnMap">Выбрать на карте</v-btn>
-            <v-text-field v-model="lineIdsText" density="compact" variant="outlined" hide-details
-              placeholder="ID участков через запятую" class="line-ids-input" @keyup.enter="addTypedLines" />
-            <v-btn size="small" variant="text" :disabled="!lineIdsText.trim()" @click="addTypedLines">Добавить</v-btn>
-            <v-checkbox v-model="includePairs" density="compact" hide-details label="с парной трубой (подача/обратка)" />
+            <v-btn
+              size="small"
+              color="deep-purple"
+              variant="tonal"
+              prepend-icon="mdi-cursor-default-click-outline"
+              @click="pickOnMap"
+            >Выбрать на карте</v-btn>
+            <v-text-field
+              v-model="lineIdsText"
+              density="compact"
+              variant="outlined"
+              hide-details
+              placeholder="ID участков через запятую"
+              class="line-ids-input"
+              @keyup.enter="addTypedLines"
+            />
+            <v-btn
+              size="small"
+              variant="text"
+              :disabled="!lineIdsText.trim()"
+              @click="addTypedLines"
+            >Добавить</v-btn>
+            <v-checkbox
+              v-model="includePairs"
+              density="compact"
+              hide-details
+              label="с парной трубой (подача/обратка)"
+            />
           </div>
-          <div v-if="contourDirty" class="d-flex ga-2 mt-2">
-            <v-btn size="small" color="deep-purple" variant="flat" :loading="contourSaving" @click="askSaveContour">Сохранить контур</v-btn>
-            <v-btn size="small" variant="text" @click="resetContour">Отменить изменения</v-btn>
+          <div
+            v-if="contourDirty"
+            class="d-flex ga-2 mt-2"
+          >
+            <v-btn
+              size="small"
+              color="deep-purple"
+              variant="flat"
+              :loading="contourSaving"
+              @click="askSaveContour"
+            >Сохранить контур</v-btn>
+            <v-btn
+              size="small"
+              variant="text"
+              @click="resetContour"
+            >Отменить изменения</v-btn>
           </div>
         </template>
       </v-card-text>
     </v-card>
 
     <!-- Документы (remontDocuments / opresDocuments / …) -->
-    <v-card v-if="schema?.has_documents" variant="outlined" class="mb-3">
+    <v-card
+      v-if="schema?.has_documents"
+      variant="outlined"
+      class="mb-3"
+    >
       <v-card-title class="text-subtitle-2 d-flex align-center ga-2">
-        <v-icon size="18" color="blue-grey">mdi-file-document-multiple-outline</v-icon>
+        <v-icon
+          size="18"
+          color="blue-grey"
+        >mdi-file-document-multiple-outline</v-icon>
         Документы ({{ documents.length }})
         <v-spacer />
-        <v-btn v-if="canEdit && !docForm.open" size="small" variant="text" prepend-icon="mdi-plus" @click="openDocForm()">Добавить</v-btn>
+        <v-btn
+          v-if="canEdit && !docForm.open"
+          size="small"
+          variant="text"
+          prepend-icon="mdi-plus"
+          @click="openDocForm()"
+        >Добавить</v-btn>
       </v-card-title>
       <v-card-text class="pt-0">
-        <v-progress-linear v-if="docsLoading" indeterminate color="blue-grey" class="mb-2" />
-        <div v-for="doc in documents" :key="doc.id" class="d-flex align-center ga-2 doc-row">
+        <v-progress-linear
+          v-if="docsLoading"
+          indeterminate
+          color="blue-grey"
+          class="mb-2"
+        />
+        <div
+          v-for="doc in documents"
+          :key="doc.id"
+          class="d-flex align-center ga-2 doc-row"
+        >
           <v-icon size="16">mdi-file-document-outline</v-icon>
-          <div class="flex-grow-1" style="min-width: 0">
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
             <div class="text-body-2 text-truncate">{{ doc.document_type_name || 'Документ' }} · {{ formatDate(doc.date_doc) }}</div>
-            <a v-if="isLink(doc.path)" :href="String(doc.path)" target="_blank" rel="noopener noreferrer"
-              class="text-caption text-truncate d-block">{{ doc.path }}</a>
-            <div v-else class="text-caption text-medium-emphasis text-truncate">{{ doc.path }}</div>
+            <a
+              v-if="isLink(doc.path)"
+              :href="String(doc.path)"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-caption text-truncate d-block"
+            >{{ doc.path }}</a>
+            <div
+              v-else
+              class="text-caption text-medium-emphasis text-truncate"
+            >{{ doc.path }}</div>
           </div>
           <template v-if="canEdit">
-            <v-btn icon="mdi-pencil" size="x-small" variant="text" aria-label="Изменить документ" @click="openDocForm(doc)" />
-            <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" aria-label="Удалить документ" @click="askDeleteDoc(doc)" />
+            <v-btn
+              icon="mdi-pencil"
+              size="x-small"
+              variant="text"
+              aria-label="Изменить документ"
+              @click="openDocForm(doc)"
+            />
+            <v-btn
+              icon="mdi-delete"
+              size="x-small"
+              variant="text"
+              color="error"
+              aria-label="Удалить документ"
+              @click="askDeleteDoc(doc)"
+            />
           </template>
         </div>
-        <div v-if="!documents.length && !docsLoading" class="text-caption text-medium-emphasis">Документов нет.</div>
-        <div v-if="docForm.open" class="mt-3">
+        <div
+          v-if="!documents.length && !docsLoading"
+          class="text-caption text-medium-emphasis"
+        >Документов нет.</div>
+        <div
+          v-if="docForm.open"
+          class="mt-3"
+        >
           <v-row dense>
-            <v-col cols="12" sm="4">
-              <v-select v-model="docForm.document_type_id" :items="schema.document_types || []" item-title="name" item-value="id"
-                label="Вид документа" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="4"
+            >
+              <v-select
+                v-model="docForm.document_type_id"
+                :items="schema.document_types || []"
+                item-title="name"
+                item-value="id"
+                label="Вид документа"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="3">
-              <v-text-field v-model="docForm.date_doc" type="date" label="Дата" density="compact" variant="outlined" hide-details />
+            <v-col
+              cols="12"
+              sm="3"
+            >
+              <v-text-field
+                v-model="docForm.date_doc"
+                type="date"
+                label="Дата"
+                density="compact"
+                variant="outlined"
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="5">
-              <v-text-field v-model="docForm.path" label="Файл (сетевой путь) или ссылка *" density="compact" variant="outlined"
-                :error-messages="docFormError ? [docFormError] : []" hide-details="auto" />
+            <v-col
+              cols="12"
+              sm="5"
+            >
+              <v-text-field
+                v-model="docForm.path"
+                label="Файл (сетевой путь) или ссылка *"
+                density="compact"
+                variant="outlined"
+                :error-messages="docFormError ? [docFormError] : []"
+                hide-details="auto"
+              />
             </v-col>
           </v-row>
           <div class="d-flex ga-2 mt-2">
-            <v-btn size="small" color="primary" variant="flat" :loading="docSaving" @click="saveDoc">
+            <v-btn
+              size="small"
+              color="primary"
+              variant="flat"
+              :loading="docSaving"
+              @click="saveDoc"
+            >
               {{ docForm.id ? 'Сохранить документ' : 'Добавить документ' }}
             </v-btn>
-            <v-btn size="small" variant="text" @click="docForm.open = false">Отмена</v-btn>
+            <v-btn
+              size="small"
+              variant="text"
+              @click="docForm.open = false"
+            >Отмена</v-btn>
           </div>
         </div>
       </v-card-text>
     </v-card>
 
-    <v-dialog v-model="confirm.visible" max-width="460">
+    <v-dialog
+      v-model="confirm.visible"
+      max-width="460"
+    >
       <v-card>
         <v-card-title class="text-subtitle-1">{{ confirm.title }}</v-card-title>
         <v-card-text>{{ confirm.text }}</v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="confirm.visible = false">Отмена</v-btn>
-          <v-btn :color="confirm.color" variant="flat" @click="runConfirm">{{ confirm.action }}</v-btn>
+          <v-btn
+            variant="text"
+            @click="confirm.visible = false"
+          >Отмена</v-btn>
+          <v-btn
+            :color="confirm.color"
+            variant="flat"
+            @click="runConfirm"
+          >{{ confirm.action }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

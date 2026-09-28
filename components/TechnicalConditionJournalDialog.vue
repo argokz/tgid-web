@@ -1,12 +1,26 @@
 <template>
   <Teleport to="body">
-    <v-dialog v-model="visible" :fullscreen="isMobile" max-width="1380" scrollable>
-      <v-card class="tu-journal" :rounded="isMobile ? 0 : 'lg'">
+    <v-dialog
+      v-model="visible"
+      :fullscreen="isMobile"
+      max-width="1380"
+      scrollable
+    >
+      <v-card
+        class="tu-journal"
+        :rounded="isMobile ? 0 : 'lg'"
+      >
         <v-card-title class="d-flex align-center ga-3 px-4 py-3">
-          <v-avatar color="cyan-lighten-5" size="40">
+          <v-avatar
+            color="cyan-lighten-5"
+            size="40"
+          >
             <v-icon color="cyan-darken-3">mdi-file-certificate-outline</v-icon>
           </v-avatar>
-          <div class="flex-grow-1" style="min-width: 0">
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
             <div class="text-subtitle-1 font-weight-bold">Технические условия</div>
             <div class="text-caption text-medium-emphasis text-truncate">
               {{ scopeTitle }} · найдено {{ total }}
@@ -22,10 +36,23 @@
           >
             Свод
           </v-btn>
-          <v-btn v-if="mutationsEnabled" color="cyan-darken-3" variant="flat" prepend-icon="mdi-plus" class="mr-2" @click="createTechnicalCondition" :loading="creating">
+          <v-btn
+            v-if="mutationsEnabled"
+            color="cyan-darken-3"
+            variant="flat"
+            prepend-icon="mdi-plus"
+            class="mr-2"
+            @click="createTechnicalCondition"
+            :loading="creating"
+          >
             Создать
           </v-btn>
-          <v-btn icon variant="text" aria-label="Закрыть журнал" @click="visible = false">
+          <v-btn
+            icon
+            variant="text"
+            aria-label="Закрыть журнал"
+            @click="visible = false"
+          >
             <v-icon>mdi-close</v-icon>
           </v-btn>
         </v-card-title>
@@ -33,7 +60,10 @@
 
         <div class="pa-3 pa-md-4 tu-filters">
           <v-row dense>
-            <v-col cols="12" md="4">
+            <v-col
+              cols="12"
+              md="4"
+            >
               <v-text-field
                 v-model="search"
                 label="Номер, организация, объект, адрес или договор"
@@ -44,77 +74,223 @@
                 hide-details
               />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-select v-model="stateId" :items="lookups.states" item-title="name" item-value="id"
-                label="Состояние" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-select
+                v-model="stateId"
+                :items="lookups.states"
+                item-title="name"
+                item-value="id"
+                label="Состояние"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-select v-model="issueYear" :items="lookups.years" item-title="value" item-value="value"
-                label="Год выдачи" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-select
+                v-model="issueYear"
+                :items="lookups.years"
+                item-title="value"
+                item-value="value"
+                label="Год выдачи"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="4">
-              <v-select v-model="heatSource" :items="lookups.heat_sources" item-title="name" item-value="name"
-                label="Источник" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="4"
+            >
+              <v-select
+                v-model="heatSource"
+                :items="lookups.heat_sources"
+                item-title="name"
+                item-value="name"
+                label="Источник"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="4">
-              <v-select v-model="district" :items="lookups.districts" item-title="name" item-value="name"
-                label="Район эксплуатации" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="4"
+            >
+              <v-select
+                v-model="district"
+                :items="lookups.districts"
+                item-title="name"
+                item-value="name"
+                label="Район эксплуатации"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-select v-model="linked" :items="linkOptions" item-title="title" item-value="value"
-                label="Привязка" density="compact" variant="outlined" clearable hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-select
+                v-model="linked"
+                :items="linkOptions"
+                item-title="title"
+                item-value="value"
+                label="Привязка"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-text-field v-model="dateFrom" type="date" label="Выдано с" density="compact" variant="outlined" hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-text-field
+                v-model="dateFrom"
+                type="date"
+                label="Выдано с"
+                density="compact"
+                variant="outlined"
+                hide-details
+              />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-text-field v-model="dateTo" type="date" label="Выдано по" density="compact" variant="outlined" hide-details />
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <v-text-field
+                v-model="dateTo"
+                type="date"
+                label="Выдано по"
+                density="compact"
+                variant="outlined"
+                hide-details
+              />
             </v-col>
           </v-row>
           <div class="d-flex align-center flex-wrap ga-2 mt-3">
-            <v-chip v-if="scope.buildingId" size="small" color="cyan-darken-3" closable @click:close="clearScope">
+            <v-chip
+              v-if="scope.buildingId"
+              size="small"
+              color="cyan-darken-3"
+              closable
+              @click:close="clearScope"
+            >
               Здание {{ scope.buildingId }}
             </v-chip>
-            <v-chip v-if="scope.pipeId" size="small" color="cyan-darken-3" closable @click:close="clearScope">
+            <v-chip
+              v-if="scope.pipeId"
+              size="small"
+              color="cyan-darken-3"
+              closable
+              @click:close="clearScope"
+            >
               Трубопровод {{ scope.pipeId }}
             </v-chip>
             <v-spacer />
-            <v-btn variant="text" prepend-icon="mdi-filter-remove-outline" @click="resetFilters">Сбросить</v-btn>
-            <v-btn color="cyan-darken-3" prepend-icon="mdi-refresh" :loading="loading" @click="loadConditions">Обновить</v-btn>
+            <v-btn
+              variant="text"
+              prepend-icon="mdi-filter-remove-outline"
+              @click="resetFilters"
+            >Сбросить</v-btn>
+            <v-btn
+              color="cyan-darken-3"
+              prepend-icon="mdi-refresh"
+              :loading="loading"
+              @click="loadConditions"
+            >Обновить</v-btn>
           </div>
         </div>
         <v-divider />
 
         <v-card-text class="pa-0 tu-table-wrap">
-          <v-progress-linear v-if="loading" indeterminate color="cyan-darken-3" />
-          <v-alert v-if="error" type="error" variant="tonal" class="ma-4">{{ error }}</v-alert>
-          <div v-else-if="!loading && !items.length" class="tu-empty">
-            <v-icon size="56" color="grey-lighten-1">mdi-file-search-outline</v-icon>
+          <v-progress-linear
+            v-if="loading"
+            indeterminate
+            color="cyan-darken-3"
+          />
+          <v-alert
+            v-if="error"
+            type="error"
+            variant="tonal"
+            class="ma-4"
+          >{{ error }}</v-alert>
+          <div
+            v-else-if="!loading && !items.length"
+            class="tu-empty"
+          >
+            <v-icon
+              size="56"
+              color="grey-lighten-1"
+            >mdi-file-search-outline</v-icon>
             <div class="text-subtitle-1 mt-3">Технические условия не найдены</div>
             <div class="text-body-2 text-medium-emphasis mt-1">Измените фильтры и повторите поиск.</div>
           </div>
-          <table v-else class="tu-table">
+          <table
+            v-else
+            class="tu-table"
+          >
             <thead>
               <tr>
                 <th>№ ТУ / дата</th><th>Состояние</th><th>Объект и адрес</th><th>Организация</th>
-                <th>Источник / район</th><th>Нагрузка</th><th>Привязка</th><th></th>
+                <th>Источник / район</th><th>Нагрузка</th><th>Привязка</th><th />
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in items" :key="item.id" class="tu-row" @click="openDetails(item.id)">
+              <tr
+                v-for="item in items"
+                :key="item.id"
+                class="tu-row"
+                @click="openDetails(item.id)"
+              >
                 <td><strong>{{ item.number || `ТУ ${item.id}` }}</strong><div class="cell-note">{{ formatDate(item.issued_on) }}</div></td>
-                <td><v-chip size="small" :color="stateColor(item.state_id)" variant="tonal">{{ item.state_name || 'Не задано' }}</v-chip></td>
+                <td><v-chip
+                  size="small"
+                  :color="stateColor(item.state_id)"
+                  variant="tonal"
+                >{{ item.state_name || 'Не задано' }}</v-chip></td>
                 <td class="wide-cell"><strong>{{ item.object_name || 'Объект не указан' }}</strong><div class="cell-note">{{ item.address || item.building_address || 'Адрес не указан' }}</div></td>
                 <td class="wide-cell">{{ item.organization_name || '—' }}</td>
                 <td>{{ item.heat_source_name || '—' }}<div class="cell-note">{{ item.district_name || 'Район не указан' }}</div></td>
-                <td>{{ heatLoad(item.total_heat_load) }}<div v-if="item.load_increase != null" class="cell-note">прирост {{ heatLoad(item.load_increase) }}</div></td>
+                <td>{{ heatLoad(item.total_heat_load) }}<div
+                  v-if="item.load_increase != null"
+                  class="cell-note"
+                >прирост {{ heatLoad(item.load_increase) }}</div></td>
                 <td>
-                  <v-icon :color="item.building_link_valid ? 'success' : 'warning'" size="18">
+                  <v-icon
+                    :color="item.building_link_valid ? 'success' : 'warning'"
+                    size="18"
+                  >
                     {{ item.building_link_valid ? 'mdi-link-variant' : 'mdi-link-variant-off' }}
                   </v-icon>
                   <span class="ml-1">{{ item.building_id || 'нет' }}</span>
                 </td>
-                <td><v-btn icon="mdi-chevron-right" size="small" variant="text" aria-label="Открыть карточку" /></td>
+                <td><v-btn
+                  icon="mdi-chevron-right"
+                  size="small"
+                  variant="text"
+                  aria-label="Открыть карточку"
+                /></td>
               </tr>
             </tbody>
           </table>
@@ -123,96 +299,262 @@
         <v-card-actions class="px-4 py-2">
           <span class="text-caption text-medium-emphasis">Страница {{ page }} из {{ pages || 1 }}</span>
           <v-spacer />
-          <v-pagination v-if="pages > 1" v-model="page" :length="pages" :total-visible="isMobile ? 3 : 7" density="compact" />
+          <v-pagination
+            v-if="pages > 1"
+            v-model="page"
+            :length="pages"
+            :total-visible="isMobile ? 3 : 7"
+            density="compact"
+          />
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="detailsVisible" :fullscreen="isMobile" max-width="980" scrollable>
+    <v-dialog
+      v-model="detailsVisible"
+      :fullscreen="isMobile"
+      max-width="980"
+      scrollable
+    >
       <v-card :rounded="isMobile ? 0 : 'lg'">
         <v-card-title class="d-flex align-center ga-3 px-4 py-3">
-          <v-avatar color="cyan-darken-3" size="40"><v-icon color="white">mdi-file-certificate-outline</v-icon></v-avatar>
-          <div class="flex-grow-1" style="min-width: 0">
+          <v-avatar
+            color="cyan-darken-3"
+            size="40"
+          ><v-icon color="white">mdi-file-certificate-outline</v-icon></v-avatar>
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
             <div class="text-subtitle-1 font-weight-bold text-truncate">{{ isNew ? 'Новые ТУ' : selectedTitle }}</div>
-            <div class="text-caption text-medium-emphasis" v-if="!isNew">{{ selected?.state_name || 'Состояние не указано' }}</div>
+            <div
+              class="text-caption text-medium-emphasis"
+              v-if="!isNew"
+            >{{ selected?.state_name || 'Состояние не указано' }}</div>
           </div>
-          <v-btn icon variant="text" @click="detailsVisible = false"><v-icon>mdi-close</v-icon></v-btn>
+          <v-btn
+            icon
+            variant="text"
+            @click="detailsVisible = false"
+          ><v-icon>mdi-close</v-icon></v-btn>
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-4">
-          <div v-if="detailsLoading" class="d-flex justify-center pa-10"><v-progress-circular indeterminate color="cyan-darken-3" /></div>
-          <v-alert v-else-if="detailsError" type="error" variant="tonal">{{ detailsError }}</v-alert>
+          <div
+            v-if="detailsLoading"
+            class="d-flex justify-center pa-10"
+          ><v-progress-circular
+            indeterminate
+            color="cyan-darken-3"
+          /></div>
+          <v-alert
+            v-else-if="detailsError"
+            type="error"
+            variant="tonal"
+          >{{ detailsError }}</v-alert>
           <template v-else-if="selected">
-            <v-alert v-if="selected.building_id && !selected.building_link_valid" type="warning" variant="tonal" class="mb-4">
+            <v-alert
+              v-if="selected.building_id && !selected.building_link_valid"
+              type="warning"
+              variant="tonal"
+              class="mb-4"
+            >
               В исходной базе ссылка на здание {{ selected.building_id }} не найдена. Карточка ТУ доступна, позиционирование на карте — нет.
             </v-alert>
-            <v-expansion-panels multiple variant="accordion" :model-value="[0, 1]">
-              <v-expansion-panel v-for="(group, index) in detailGroups" :key="group.title" :value="index">
+            <v-expansion-panels
+              multiple
+              variant="accordion"
+              :model-value="[0, 1]"
+            >
+              <v-expansion-panel
+                v-for="(group, index) in detailGroups"
+                :key="group.title"
+                :value="index"
+              >
                 <v-expansion-panel-title>{{ group.title }}</v-expansion-panel-title>
                 <v-expansion-panel-text>
                   <v-row dense>
-                    <v-col v-for="field in group.fields" :key="field.label" cols="12" sm="6">
+                    <v-col
+                      v-for="field in group.fields"
+                      :key="field.label"
+                      cols="12"
+                      sm="6"
+                    >
                       <div class="detail-label mb-1">{{ field.label }}</div>
                       <template v-if="isEditing && field.key">
-                        <v-select v-if="field.type === 'select'" v-model="editFields[field.key]" :items="field.items" item-title="name" item-value="id" density="compact" hide-details variant="outlined" clearable />
-                        <v-text-field v-else-if="field.type === 'date'" v-model="editFields[field.key]" type="date" density="compact" hide-details variant="outlined" clearable />
-                        <v-text-field v-else-if="field.type === 'time'" v-model="editFields[field.key]" type="time" density="compact" hide-details variant="outlined" clearable />
-                        <v-textarea v-else-if="field.type === 'textarea'" v-model="editFields[field.key]" density="compact" hide-details variant="outlined" rows="3" auto-grow clearable />
-                        <v-text-field v-else-if="field.type === 'number'" v-model.number="editFields[field.key]" type="number" density="compact" hide-details variant="outlined" clearable />
-                        <v-text-field v-else v-model="editFields[field.key]" density="compact" hide-details variant="outlined" clearable />
+                        <v-select
+                          v-if="field.type === 'select'"
+                          v-model="editFields[field.key]"
+                          :items="field.items"
+                          item-title="name"
+                          item-value="id"
+                          density="compact"
+                          hide-details
+                          variant="outlined"
+                          clearable
+                        />
+                        <v-text-field
+                          v-else-if="field.type === 'date'"
+                          v-model="editFields[field.key]"
+                          type="date"
+                          density="compact"
+                          hide-details
+                          variant="outlined"
+                          clearable
+                        />
+                        <v-text-field
+                          v-else-if="field.type === 'time'"
+                          v-model="editFields[field.key]"
+                          type="time"
+                          density="compact"
+                          hide-details
+                          variant="outlined"
+                          clearable
+                        />
+                        <v-textarea
+                          v-else-if="field.type === 'textarea'"
+                          v-model="editFields[field.key]"
+                          density="compact"
+                          hide-details
+                          variant="outlined"
+                          rows="3"
+                          auto-grow
+                          clearable
+                        />
+                        <v-text-field
+                          v-else-if="field.type === 'number'"
+                          v-model.number="editFields[field.key]"
+                          type="number"
+                          density="compact"
+                          hide-details
+                          variant="outlined"
+                          clearable
+                        />
+                        <v-text-field
+                          v-else
+                          v-model="editFields[field.key]"
+                          density="compact"
+                          hide-details
+                          variant="outlined"
+                          clearable
+                        />
                       </template>
-                      <div v-else class="detail-value">{{ field.value }}</div>
+                      <div
+                        v-else
+                        class="detail-value"
+                      >{{ field.value }}</div>
                     </v-col>
                   </v-row>
                 </v-expansion-panel-text>
               </v-expansion-panel>
 
               <template v-if="!isEditing">
-              <v-expansion-panel v-if="extensions.length" :value="detailGroups.length">
-                <v-expansion-panel-title>Изменения и продления ({{ extensions.length }})</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-card v-for="extension in extensions" :key="Number(extension.index)" variant="outlined" class="mb-3 pa-3">
-                    <div class="font-weight-bold">Продление {{ extension.index }} · {{ formatDate(extension.changed_on) }}</div>
-                    <div v-if="extension.description" class="text-body-2 mt-2">{{ extension.description }}</div>
-                    <div class="text-caption text-medium-emphasis mt-2">Нагрузка: {{ heatLoad(extension.total_heat_load) }} · прирост: {{ heatLoad(extension.load_increase) }}</div>
-                    <div v-if="extension.additional_measures" class="text-body-2 mt-2">{{ extension.additional_measures }}</div>
-                  </v-card>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
+                <v-expansion-panel
+                  v-if="extensions.length"
+                  :value="detailGroups.length"
+                >
+                  <v-expansion-panel-title>Изменения и продления ({{ extensions.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-card
+                      v-for="extension in extensions"
+                      :key="Number(extension.index)"
+                      variant="outlined"
+                      class="mb-3 pa-3"
+                    >
+                      <div class="font-weight-bold">Продление {{ extension.index }} · {{ formatDate(extension.changed_on) }}</div>
+                      <div
+                        v-if="extension.description"
+                        class="text-body-2 mt-2"
+                      >{{ extension.description }}</div>
+                      <div class="text-caption text-medium-emphasis mt-2">Нагрузка: {{ heatLoad(extension.total_heat_load) }} · прирост: {{ heatLoad(extension.load_increase) }}</div>
+                      <div
+                        v-if="extension.additional_measures"
+                        class="text-body-2 mt-2"
+                      >{{ extension.additional_measures }}</div>
+                    </v-card>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
 
-              <v-expansion-panel v-if="connections.length" :value="detailGroups.length + 1">
-                <v-expansion-panel-title>Узлы присоединения ({{ connections.length }})</v-expansion-panel-title>
-                <v-expansion-panel-text><v-list density="compact">
-                  <v-list-item v-for="connection in connections" :key="Number(connection.index)" prepend-icon="mdi-source-branch"
-                    :title="String(connection.node || connection.code || `Присоединение ${connection.index}`)"
-                    :subtitle="[connection.code && `код ${connection.code}`, connection.load_percent != null && `${connection.load_percent}% нагрузки`].filter(Boolean).join(' · ')" />
-                </v-list></v-expansion-panel-text>
-              </v-expansion-panel>
+                <v-expansion-panel
+                  v-if="connections.length"
+                  :value="detailGroups.length + 1"
+                >
+                  <v-expansion-panel-title>Узлы присоединения ({{ connections.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text><v-list density="compact">
+                    <v-list-item
+                      v-for="connection in connections"
+                      :key="Number(connection.index)"
+                      prepend-icon="mdi-source-branch"
+                      :title="String(connection.node || connection.code || `Присоединение ${connection.index}`)"
+                      :subtitle="[connection.code && `код ${connection.code}`, connection.load_percent != null && `${connection.load_percent}% нагрузки`].filter(Boolean).join(' · ')"
+                    />
+                  </v-list></v-expansion-panel-text>
+                </v-expansion-panel>
 
-              <v-expansion-panel v-if="documents.length" :value="detailGroups.length + 2">
-                <v-expansion-panel-title>Документы ({{ documents.length }})</v-expansion-panel-title>
-                <v-expansion-panel-text><v-list density="compact">
-                  <v-list-item v-for="(document, index) in documents" :key="`${document.kind}-${document.index || index}`" prepend-icon="mdi-file-document-outline"
-                    :title="documentTitle(document)" :subtitle="fileName(document.path)" />
-                </v-list></v-expansion-panel-text>
-              </v-expansion-panel>
+                <v-expansion-panel
+                  v-if="documents.length"
+                  :value="detailGroups.length + 2"
+                >
+                  <v-expansion-panel-title>Документы ({{ documents.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text><v-list density="compact">
+                    <v-list-item
+                      v-for="(document, index) in documents"
+                      :key="`${document.kind}-${document.index || index}`"
+                      prepend-icon="mdi-file-document-outline"
+                      :title="documentTitle(document)"
+                      :subtitle="fileName(document.path)"
+                    />
+                  </v-list></v-expansion-panel-text>
+                </v-expansion-panel>
               </template>
             </v-expansion-panels>
           </template>
         </v-card-text>
         <v-divider />
         <v-card-actions class="px-4 py-3">
-          <v-btn v-if="!isEditing && selected && hasCoordinates(selected)" prepend-icon="mdi-crosshairs-gps" variant="tonal" color="cyan-darken-3" @click="locateSelected">
+          <v-btn
+            v-if="!isEditing && selected && hasCoordinates(selected)"
+            prepend-icon="mdi-crosshairs-gps"
+            variant="tonal"
+            color="cyan-darken-3"
+            @click="locateSelected"
+          >
             На карте
           </v-btn>
-          <v-btn v-if="mutationsEnabled && (!isEditing)" variant="text" prepend-icon="mdi-pencil" @click="startEdit">Редактировать</v-btn>
-          <v-btn v-if="mutationsEnabled && !isEditing && selected && !isNew" color="error" variant="text" prepend-icon="mdi-delete" :loading="deleting" @click="deleteTechnicalCondition(selected.id)">Удалить</v-btn>
+          <v-btn
+            v-if="mutationsEnabled && (!isEditing)"
+            variant="text"
+            prepend-icon="mdi-pencil"
+            @click="startEdit"
+          >Редактировать</v-btn>
+          <v-btn
+            v-if="mutationsEnabled && !isEditing && selected && !isNew"
+            color="error"
+            variant="text"
+            prepend-icon="mdi-delete"
+            :loading="deleting"
+            @click="deleteTechnicalCondition(selected.id)"
+          >Удалить</v-btn>
           <v-spacer />
           <template v-if="isEditing">
-            <v-btn v-if="mutationsEnabled" variant="text" @click="cancelEdit">Отмена</v-btn>
-            <v-btn v-if="mutationsEnabled" color="cyan-darken-3" variant="flat" :loading="saving" @click="saveChanges">Сохранить</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              variant="text"
+              @click="cancelEdit"
+            >Отмена</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="cyan-darken-3"
+              variant="flat"
+              :loading="saving"
+              @click="saveChanges"
+            >Сохранить</v-btn>
           </template>
-          <v-btn v-else variant="text" @click="detailsVisible = false">Закрыть</v-btn>
+          <v-btn
+            v-else
+            variant="text"
+            @click="detailsVisible = false"
+          >Закрыть</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

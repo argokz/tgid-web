@@ -1,8 +1,14 @@
 ﻿<template>
   <client-only>
-    <v-card flat class="mb-4">
+    <v-card
+      flat
+      class="mb-4"
+    >
       <v-card-title class="text-subtitle-2 py-2 d-flex align-center">
-        <v-icon start color="primary">mdi-puzzle</v-icon>
+        <v-icon
+          start
+          color="primary"
+        >mdi-puzzle</v-icon>
         Фрагменты (районы сети)
         <v-spacer />
         <v-btn
@@ -14,24 +20,47 @@
           @click="transferOpen = true"
         />
       </v-card-title>
-      <LazyFragmentTransferDialog v-if="transferOpen" v-model="transferOpen" />
+      <LazyFragmentTransferDialog
+        v-if="transferOpen"
+        v-model="transferOpen"
+      />
       <v-card-text class="pa-0">
         <template v-if="loading">
-          <v-skeleton-loader type="list-item-two-line" class="pa-2" />
-          <v-skeleton-loader type="list-item-two-line" class="pa-2" />
+          <v-skeleton-loader
+            type="list-item-two-line"
+            class="pa-2"
+          />
+          <v-skeleton-loader
+            type="list-item-two-line"
+            class="pa-2"
+          />
         </template>
         <template v-else-if="loadError">
-          <v-alert type="error" variant="tonal" class="ma-2" density="compact">
+          <v-alert
+            type="error"
+            variant="tonal"
+            class="ma-2"
+            density="compact"
+          >
             {{ loadError }}
             <template #append>
-              <v-btn variant="text" color="error" size="small" @click="retryLoad">Повторить</v-btn>
+              <v-btn
+                variant="text"
+                color="error"
+                size="small"
+                @click="retryLoad"
+              >Повторить</v-btn>
             </template>
           </v-alert>
         </template>
         <template v-else-if="fragments.length === 0">
           <div class="text-caption text-medium-emphasis pa-3 text-center">Фрагменты не найдены</div>
         </template>
-        <v-list v-else density="compact" select-strategy="leaf">
+        <v-list
+          v-else
+          density="compact"
+          select-strategy="leaf"
+        >
           <v-list-item
             v-for="fragment in fragments"
             :key="fragment.id"

@@ -1,381 +1,486 @@
 <template>
   <client-only>
     <div class="map-viewer-root">
-    <div class="map-container">
-      <!-- 2D Map (MapLibre) -->
-      <div v-show="cesiumStore.viewMode === '2D'" id="map" class="map-canvas-host" />
-      
-      <!-- 3D Map (Cesium) -->
-      <CesiumViewer
-        v-if="cesiumStore.viewMode === '3D' || cesiumStore.isInitialized"
-        v-show="cesiumStore.viewMode === '3D'"
-        @ready="onCesiumReady"
-      />
-
-      <v-card
-        v-if="mapInitLoading || (layerSyncProgressVisible && isLayerSyncInProgress)"
-        class="map-loading-card pa-2"
-        elevation="6"
-        role="status"
-      >
-        <div class="d-flex align-center ga-2">
-          <v-progress-circular
-            indeterminate
-            size="20"
-            color="primary"
-            width="3"
-            aria-label="Индикатор загрузки карты"
-          />
-          <!-- Текст только для screen readers — уменьшает «element render delay» в Lighthouse (LCP на span) -->
-          <span class="map-loading-sr-only">
-            {{ mapInitLoading ? 'Подготавливаем карту.' : 'Загружаем тематические слои.' }}
-            Всего слоёв: {{ totalAvailableLayers }}.
-            <template v-if="hasLayerProgress">
-              Загружено {{ layerStore.loadingCompletedLayers }} из {{ layerStore.loadingTotalLayers }}.
-              <template v-if="layerStore.loadingFailedLayers > 0">
-                Ошибок: {{ layerStore.loadingFailedLayers }}.
-              </template>
-            </template>
-          </span>
-          <v-progress-linear
-            v-if="hasLayerProgress"
-            class="map-loading-card__bar flex-grow-1"
-            :model-value="layerLoadingPercent"
-            color="primary"
-            height="4"
-            rounded
-            aria-label="Прогресс загрузки тематических слоёв"
-          />
-        </div>
-      </v-card>
-
-      <v-alert
-        v-if="layersError"
-        class="map-error-alert ma-3"
-        type="warning"
-        variant="tonal"
-      >
-        Не удалось загрузить часть слоев. Карта работает в ограниченном режиме.
-        <template #append>
-          <v-btn size="small" variant="text" color="warning" @click="$emit('retry-layers')">
-            Повторить
-          </v-btn>
-        </template>
-      </v-alert>
-
-      <!-- Error overlay -->
-      <v-overlay v-model="mapInitError" class="align-center justify-center" persistent>
-        <v-alert type="error" variant="tonal" class="ma-4" style="max-width: 400px">
-          Ошибка при инициализации карты.
-          <template #append>
-            <v-btn variant="text" color="error" @click="retryMapInit">Повторить</v-btn>
-          </template>
-        </v-alert>
-      </v-overlay>
-
-      <!-- Loading feature data indicator -->
-      <v-progress-circular
-        v-if="mapStore.objectDataLoading"
-        indeterminate
-        size="32"
-        color="primary"
-        class="object-loading-indicator"
-        aria-label="Загрузка данных объекта"
-      />
-
-      <!-- Left Sidebar -->
-      <MapSidebar />
-
-      <!-- Панель инструментов приложения (журналы, реестры, отчёты) -->
-      <LazyToolsPanel
-        v-if="uiStore.toolsPanelOpen || toolsPanelMounted"
-        v-model="uiStore.toolsPanelOpen"
-        @open-tool="onOpenTool"
-      />
-
-      <!-- Панель рисования и измерений на карте -->
-      <LazyDrawPanel
-        v-if="uiStore.drawPanelOpen"
-        v-model="uiStore.drawPanelOpen"
-        :map="mapStore.map"
-      />
-
-      <!-- Right Map Controls -->
-      <MapControls
-        :map="mapStore.map"
-        :initial-identify-mode="savedPageState?.identifyMode ?? true"
-        :topology-editing-enabled="topologyEditingEnabled"
-        v-model:isTraceMode="isTraceMode"
-        v-model:isEditTopologyMode="isEditTopologyMode"
-        @layer-change="onBaseLayerChange"
-        @identify-mode-change="onIdentifyModeChange"
-        @open-node-search="openLazyDialog('nodeSearch')"
-        @open-topology-diagnostics="openLazyDialog('topologyDiagnostics')"
-        @open-fault-diagnostics="openLazyDialog('faultDiagnostics')"
-        @open-calculation-diagnostics="openLazyDialog('calculationDiagnostics')"
-        @toggle-trace-mode="toggleTraceMode"
-        @toggle-edit-topology-mode="toggleEditTopologyMode"
-        @open-passport-dialog="openLazyDialog('passport')"
-        @open-defect-journal="openLazyDialog('defect')"
-        @open-shurf-journal="openLazyDialog('shurf')"
-        @open-inspection-journal="openLazyDialog('inspection')"
-        @open-repair-journal="openLazyDialog('repair')"
-        @open-pressure-test-journal="openLazyDialog('pressureTest')"
-        @open-technical-condition-journal="openLazyDialog('technicalCondition')"
-        @open-corrosion-indicator-journal="openLazyDialog('corrosionIndicator')"
-        @open-alseko-journal="openLazyDialog('alseko')"
-        @open-electrical-network-journal="openLazyDialog('electricalNetwork')"
-        @open-heat-loss-journal="openLazyDialog('heatLoss')"
-        @open-temperature-graph-journal="openLazyDialog('temperatureGraph')"
-        @open-consumer-load-diagnostics="openLazyDialog('consumerLoad')"
-        @open-pump-equipment="openLazyDialog('pumpEquipment')"
-        @open-network-armatures="openLazyDialog('networkArmature')"
-        @open-network-regulators="openLazyDialog('networkRegulator')"
-        @open-network-bypasses="openLazyDialog('networkBypass')"
-        @open-network-diaphragms="openLazyDialog('networkDiaphragm')"
-        @open-elevators="openLazyDialog('elevator')"
-      />
-
-      <!-- Диалоги инструментов монтируются лениво (таблица toolDialogs): чанк подгружается при первом открытии через openLazyDialog -->
-      <template v-for="dialog in toolDialogs" :key="dialog.key">
-        <component
-          :is="dialog.component"
-          v-if="mountedDialogs[dialog.key]"
-          :ref="dialogRef(dialog.key)"
-          v-on="dialog.on ?? {}"
+      <div class="map-container">
+        <!-- 2D Map (MapLibre) -->
+        <div
+          v-show="cesiumStore.viewMode === '2D'"
+          id="map"
+          class="map-canvas-host"
         />
-      </template>
+      
+        <!-- 3D Map (Cesium) -->
+        <CesiumViewer
+          v-if="cesiumStore.viewMode === '3D' || cesiumStore.isInitialized"
+          v-show="cesiumStore.viewMode === '3D'"
+          @ready="onCesiumReady"
+        />
 
-      <!-- Attribute properties panel dialog (лениво: монтируется при первом identify-клике) -->
-      <LazyAttributePanel
-        v-if="mountedDialogs.attributePanel"
-        ref="attributePanelRef"
-        :is-edit-topology-mode="isEditTopologyMode"
-        @delete-feature="onDeleteFeature"
-        @refresh-layers="onCardRefreshLayers"
-        @open-defect-journal="openLazyDialog('defect', $event)"
-        @open-shurf-journal="openLazyDialog('shurf', $event)"
-        @open-inspection-journal="openLazyDialog('inspection', $event)"
-        @open-repair-journal="openLazyDialog('repair', $event)"
-        @open-pressure-test-journal="openLazyDialog('pressureTest', $event)"
-        @open-technical-condition-journal="openLazyDialog('technicalCondition', $event)"
-        @open-corrosion-indicator-journal="openLazyDialog('corrosionIndicator', $event)"
-        @open-alseko-journal="openLazyDialog('alseko', $event)"
-        @open-electrical-network-journal="openLazyDialog('electricalNetwork', $event)"
-        @open-heat-loss-journal="openLazyDialog('heatLoss', $event)"
-        @open-temperature-graph-journal="openLazyDialog('temperatureGraph', $event)"
-        @open-consumer-load-diagnostics="openLazyDialog('consumerLoad', $event)"
-        @open-pump-equipment="openLazyDialog('pumpEquipment', $event)"
-        @open-network-armatures="openLazyDialog('networkArmature', $event)"
-        @open-network-regulators="openLazyDialog('networkRegulator', $event)"
-        @open-network-bypasses="openLazyDialog('networkBypass', $event)"
-        @open-network-diaphragms="openLazyDialog('networkDiaphragm', $event)"
-        @open-outage-simulation="openLazyDialog('outageSimulation', $event)"
-        @open-audit-history="openLazyDialog('auditHistory', $event)"
-      />
-
-      <!-- Node search dialog -->
-      <LazyNodeSearch
-        v-if="mountedDialogs.nodeSearch"
-        :ref="dialogRef('nodeSearch')"
-        :map="mapStore.map"
-      />
-
-      <!-- Контур журнала: показ на карте и выбор участков (этап 9) -->
-      <JournalContourPickBar />
-
-      <!-- Панель трассировки маршрута пьезометра -->
-      <v-card
-        v-if="isTraceMode"
-        class="trace-panel"
-        elevation="8"
-        rounded="lg"
-        role="region"
-        aria-label="Построение маршрута пьезометра"
-      >
-        <div class="trace-panel__header px-3 py-2">
-          <v-icon size="18" color="primary" class="me-2">mdi-chart-line-variant</v-icon>
-          <span class="text-subtitle-2 font-weight-bold">Маршрут пьезометра</span>
-          <v-spacer />
-          <v-btn icon size="x-small" variant="text" aria-label="Закрыть трассировку" @click="toggleTraceMode">
-            <v-icon size="18">mdi-close</v-icon>
-          </v-btn>
-        </div>
-        <v-divider />
-        <div class="pa-3">
-          <div class="text-caption text-medium-emphasis mb-2">
-            Кликайте по узлам сети — маршрут пройдёт через них по порядку.
+        <v-card
+          v-if="mapInitLoading || (layerSyncProgressVisible && isLayerSyncInProgress)"
+          class="map-loading-card pa-2"
+          elevation="6"
+          role="status"
+        >
+          <div class="d-flex align-center ga-2">
+            <v-progress-circular
+              indeterminate
+              size="20"
+              color="primary"
+              width="3"
+              aria-label="Индикатор загрузки карты"
+            />
+            <!-- Текст только для screen readers — уменьшает «element render delay» в Lighthouse (LCP на span) -->
+            <span class="map-loading-sr-only">
+              {{ mapInitLoading ? 'Подготавливаем карту.' : 'Загружаем тематические слои.' }}
+              Всего слоёв: {{ totalAvailableLayers }}.
+              <template v-if="hasLayerProgress">
+                Загружено {{ layerStore.loadingCompletedLayers }} из {{ layerStore.loadingTotalLayers }}.
+                <template v-if="layerStore.loadingFailedLayers > 0">
+                  Ошибок: {{ layerStore.loadingFailedLayers }}.
+                </template>
+              </template>
+            </span>
+            <v-progress-linear
+              v-if="hasLayerProgress"
+              class="map-loading-card__bar flex-grow-1"
+              :model-value="layerLoadingPercent"
+              color="primary"
+              height="4"
+              rounded
+              aria-label="Прогресс загрузки тематических слоёв"
+            />
           </div>
-          <div v-if="traceNodes.length" class="trace-chips mb-2">
-            <v-chip
-              v-for="(nodeId, idx) in traceNodes"
-              :key="`${nodeId}-${idx}`"
-              size="small"
-              class="me-1 mb-1"
-              :color="idx === 0 ? 'success' : idx === traceNodes.length - 1 ? 'error' : 'primary'"
-              variant="tonal"
-            >
-              {{ idx + 1 }}. Узел {{ nodeId }}
-            </v-chip>
-          </div>
-          <div v-else class="text-caption text-disabled mb-2">Узлы не выбраны</div>
-          <div class="d-flex flex-wrap" style="gap: 6px;">
+        </v-card>
+
+        <v-alert
+          v-if="layersError"
+          class="map-error-alert ma-3"
+          type="warning"
+          variant="tonal"
+        >
+          Не удалось загрузить часть слоев. Карта работает в ограниченном режиме.
+          <template #append>
             <v-btn
               size="small"
-              color="primary"
-              variant="flat"
-              :disabled="traceNodes.length < 2 || piezometerLoading"
-              :loading="piezometerLoading"
-              @click="buildPiezometerRoute"
+              variant="text"
+              color="warning"
+              @click="$emit('retry-layers')"
             >
-              Построить график
+              Повторить
             </v-btn>
-            <v-btn size="small" variant="text" :disabled="!traceNodes.length" @click="undoTraceNode">
-              Отменить точку
-            </v-btn>
-            <v-btn size="small" variant="text" prepend-icon="mdi-bookmark-multiple" @click="piezometerDirectionsOpen = true">
-              Направления
-            </v-btn>
+          </template>
+        </v-alert>
+
+        <!-- Error overlay -->
+        <v-overlay
+          v-model="mapInitError"
+          class="align-center justify-center"
+          persistent
+        >
+          <v-alert
+            type="error"
+            variant="tonal"
+            class="ma-4"
+            style="max-width: 400px"
+          >
+            Ошибка при инициализации карты.
+            <template #append>
+              <v-btn
+                variant="text"
+                color="error"
+                @click="retryMapInit"
+              >Повторить</v-btn>
+            </template>
+          </v-alert>
+        </v-overlay>
+
+        <!-- Loading feature data indicator -->
+        <v-progress-circular
+          v-if="mapStore.objectDataLoading"
+          indeterminate
+          size="32"
+          color="primary"
+          class="object-loading-indicator"
+          aria-label="Загрузка данных объекта"
+        />
+
+        <!-- Left Sidebar -->
+        <MapSidebar />
+
+        <!-- Панель инструментов приложения (журналы, реестры, отчёты) -->
+        <LazyToolsPanel
+          v-if="uiStore.toolsPanelOpen || toolsPanelMounted"
+          v-model="uiStore.toolsPanelOpen"
+          @open-tool="onOpenTool"
+        />
+
+        <!-- Панель рисования и измерений на карте -->
+        <LazyDrawPanel
+          v-if="uiStore.drawPanelOpen"
+          v-model="uiStore.drawPanelOpen"
+          :map="mapStore.map"
+        />
+
+        <!-- Right Map Controls -->
+        <MapControls
+          :map="mapStore.map"
+          :initial-identify-mode="savedPageState?.identifyMode ?? true"
+          :topology-editing-enabled="topologyEditingEnabled"
+          v-model:isTraceMode="isTraceMode"
+          v-model:isEditTopologyMode="isEditTopologyMode"
+          @layer-change="onBaseLayerChange"
+          @identify-mode-change="onIdentifyModeChange"
+          @open-node-search="openLazyDialog('nodeSearch')"
+          @open-topology-diagnostics="openLazyDialog('topologyDiagnostics')"
+          @open-fault-diagnostics="openLazyDialog('faultDiagnostics')"
+          @open-calculation-diagnostics="openLazyDialog('calculationDiagnostics')"
+          @toggle-trace-mode="toggleTraceMode"
+          @toggle-edit-topology-mode="toggleEditTopologyMode"
+          @open-passport-dialog="openLazyDialog('passport')"
+          @open-defect-journal="openLazyDialog('defect')"
+          @open-shurf-journal="openLazyDialog('shurf')"
+          @open-inspection-journal="openLazyDialog('inspection')"
+          @open-repair-journal="openLazyDialog('repair')"
+          @open-pressure-test-journal="openLazyDialog('pressureTest')"
+          @open-technical-condition-journal="openLazyDialog('technicalCondition')"
+          @open-corrosion-indicator-journal="openLazyDialog('corrosionIndicator')"
+          @open-alseko-journal="openLazyDialog('alseko')"
+          @open-electrical-network-journal="openLazyDialog('electricalNetwork')"
+          @open-heat-loss-journal="openLazyDialog('heatLoss')"
+          @open-temperature-graph-journal="openLazyDialog('temperatureGraph')"
+          @open-consumer-load-diagnostics="openLazyDialog('consumerLoad')"
+          @open-pump-equipment="openLazyDialog('pumpEquipment')"
+          @open-network-armatures="openLazyDialog('networkArmature')"
+          @open-network-regulators="openLazyDialog('networkRegulator')"
+          @open-network-bypasses="openLazyDialog('networkBypass')"
+          @open-network-diaphragms="openLazyDialog('networkDiaphragm')"
+          @open-elevators="openLazyDialog('elevator')"
+        />
+
+        <!-- Диалоги инструментов монтируются лениво (таблица toolDialogs): чанк подгружается при первом открытии через openLazyDialog -->
+        <template
+          v-for="dialog in toolDialogs"
+          :key="dialog.key"
+        >
+          <component
+            :is="dialog.component"
+            v-if="mountedDialogs[dialog.key]"
+            :ref="dialogRef(dialog.key)"
+            v-on="dialog.on ?? {}"
+          />
+        </template>
+
+        <!-- Attribute properties panel dialog (лениво: монтируется при первом identify-клике) -->
+        <LazyAttributePanel
+          v-if="mountedDialogs.attributePanel"
+          ref="attributePanelRef"
+          :is-edit-topology-mode="isEditTopologyMode"
+          @delete-feature="onDeleteFeature"
+          @refresh-layers="onCardRefreshLayers"
+          @open-defect-journal="openLazyDialog('defect', $event)"
+          @open-shurf-journal="openLazyDialog('shurf', $event)"
+          @open-inspection-journal="openLazyDialog('inspection', $event)"
+          @open-repair-journal="openLazyDialog('repair', $event)"
+          @open-pressure-test-journal="openLazyDialog('pressureTest', $event)"
+          @open-technical-condition-journal="openLazyDialog('technicalCondition', $event)"
+          @open-corrosion-indicator-journal="openLazyDialog('corrosionIndicator', $event)"
+          @open-alseko-journal="openLazyDialog('alseko', $event)"
+          @open-electrical-network-journal="openLazyDialog('electricalNetwork', $event)"
+          @open-heat-loss-journal="openLazyDialog('heatLoss', $event)"
+          @open-temperature-graph-journal="openLazyDialog('temperatureGraph', $event)"
+          @open-consumer-load-diagnostics="openLazyDialog('consumerLoad', $event)"
+          @open-pump-equipment="openLazyDialog('pumpEquipment', $event)"
+          @open-network-armatures="openLazyDialog('networkArmature', $event)"
+          @open-network-regulators="openLazyDialog('networkRegulator', $event)"
+          @open-network-bypasses="openLazyDialog('networkBypass', $event)"
+          @open-network-diaphragms="openLazyDialog('networkDiaphragm', $event)"
+          @open-outage-simulation="openLazyDialog('outageSimulation', $event)"
+          @open-audit-history="openLazyDialog('auditHistory', $event)"
+        />
+
+        <!-- Node search dialog -->
+        <LazyNodeSearch
+          v-if="mountedDialogs.nodeSearch"
+          :ref="dialogRef('nodeSearch')"
+          :map="mapStore.map"
+        />
+
+        <!-- Контур журнала: показ на карте и выбор участков (этап 9) -->
+        <JournalContourPickBar />
+
+        <!-- Панель трассировки маршрута пьезометра -->
+        <v-card
+          v-if="isTraceMode"
+          class="trace-panel"
+          elevation="8"
+          rounded="lg"
+          role="region"
+          aria-label="Построение маршрута пьезометра"
+        >
+          <div class="trace-panel__header px-3 py-2">
+            <v-icon
+              size="18"
+              color="primary"
+              class="me-2"
+            >mdi-chart-line-variant</v-icon>
+            <span class="text-subtitle-2 font-weight-bold">Маршрут пьезометра</span>
             <v-spacer />
-            <v-btn size="small" variant="text" color="error" :disabled="!traceNodes.length" @click="clearTrace">
-              Очистить
+            <v-btn
+              icon
+              size="x-small"
+              variant="text"
+              aria-label="Закрыть трассировку"
+              @click="toggleTraceMode"
+            >
+              <v-icon size="18">mdi-close</v-icon>
             </v-btn>
           </div>
-        </div>
-      </v-card>
-
-      <!-- Piezometer modal (лениво: ECharts-чанк подгружается при первом построении графика) -->
-      <LazyPiezometerModal
-        v-if="piezometerActivated"
-        v-model="piezometerModalOpen"
-        :path-data="piezometerPathData"
-        :loading="piezometerLoading"
-        :error="piezometerError"
-        :has-calculation="piezometerHasCalc"
-        :total-length="piezometerTotalLength"
-        :waypoints="traceNodes"
-        :calculation-id="piezometerRoute?.calculation_id ?? null"
-        :calculation-id2="piezometerCalc2"
-        :fragment-ids="piezometerRoute?.fragment_ids ?? []"
-        :static-head="piezometerRoute?.static_head ?? null"
-        @node-hover="onPiezometerNodeHover"
-        @double="onPiezometerDouble"
-      />
-      <LazyPiezometerDirectionsDialog
-        v-if="piezometerDirectionsOpen"
-        v-model="piezometerDirectionsOpen"
-        :waypoints="traceNodes"
-        @load="onPiezometerDirectionLoad"
-      />
-
-      <!-- Превью разрезания участка (dry-run → подтверждение) -->
-      <LazySplitPreviewDialog
-        v-if="splitPreviewOpen"
-        v-model="splitPreviewOpen"
-        :line-id="splitPreviewTarget?.lineId ?? null"
-        :report="splitPreviewReport"
-        :loading="splitPreviewLoading"
-        :confirming="splitPreviewConfirming"
-        :error="splitPreviewError"
-        @confirm="confirmSplit"
-        @cancel="cancelSplit"
-      />
-
-      <!-- Панель инструментов CAD топологии -->
-      <div v-if="isEditTopologyMode" class="topology-edit-toolbar elevation-4">
-        <div class="d-flex align-center ga-2 pa-2">
-          <v-chip size="small" color="primary" variant="flat">
-            CAD Топология
-          </v-chip>
-          <v-btn
-            size="small"
-            :color="isMergeMode ? 'warning' : 'default'"
-            :variant="isMergeMode ? 'flat' : 'outlined'"
-            @click="toggleMergeMode"
-          >
-            <v-icon start size="16">mdi-call-merge</v-icon>
-            {{ isMergeMode ? 'Отменить слияние' : 'Слияние узлов' }}
-          </v-btn>
-          <span v-if="isMergeMode && !mergeTargetNodeId" class="text-caption text-medium-emphasis">
-            Кликните целевой узел
-          </span>
-          <span v-else-if="isMergeMode && mergeTargetNodeId" class="text-caption text-warning font-weight-medium">
-            Узел {{ mergeTargetNodeId }} выбран. Кликните узел для слияния.
-          </span>
-          <v-btn
-            size="small"
-            :color="isVertexMode ? 'warning' : 'default'"
-            :variant="isVertexMode ? 'flat' : 'outlined'"
-            @click="toggleVertexMode"
-          >
-            <v-icon start size="16">mdi-vector-polyline-edit</v-icon>
-            {{ isVertexMode ? 'Закрыть вершины' : 'Вершины' }}
-          </v-btn>
-          <template v-if="isVertexMode">
-            <span v-if="!vertexEditor.active.value" class="text-caption text-medium-emphasis">
-              Кликните участок
-            </span>
-            <template v-else>
-              <span class="text-caption">
-                Участок {{ vertexEditor.lineId.value }}: тяните вершину, «○» — добавить, правый клик — удалить
-              </span>
+          <v-divider />
+          <div class="pa-3">
+            <div class="text-caption text-medium-emphasis mb-2">
+              Кликайте по узлам сети — маршрут пройдёт через них по порядку.
+            </div>
+            <div
+              v-if="traceNodes.length"
+              class="trace-chips mb-2"
+            >
+              <v-chip
+                v-for="(nodeId, idx) in traceNodes"
+                :key="`${nodeId}-${idx}`"
+                size="small"
+                class="me-1 mb-1"
+                :color="idx === 0 ? 'success' : idx === traceNodes.length - 1 ? 'error' : 'primary'"
+                variant="tonal"
+              >
+                {{ idx + 1 }}. Узел {{ nodeId }}
+              </v-chip>
+            </div>
+            <div
+              v-else
+              class="text-caption text-disabled mb-2"
+            >Узлы не выбраны</div>
+            <div
+              class="d-flex flex-wrap"
+              style="gap: 6px;"
+            >
               <v-btn
                 size="small"
                 color="primary"
                 variant="flat"
-                :disabled="!vertexEditor.dirty.value"
-                :loading="vertexEditor.saving.value"
-                @click="vertexEditor.save()"
+                :disabled="traceNodes.length < 2 || piezometerLoading"
+                :loading="piezometerLoading"
+                @click="buildPiezometerRoute"
               >
-                <v-icon start size="16">mdi-content-save</v-icon>
-                Сохранить
+                Построить график
               </v-btn>
-              <v-btn size="small" variant="text" :disabled="!vertexEditor.dirty.value" @click="vertexEditor.reset()">
-                <v-icon start size="16">mdi-restore</v-icon>
-                Сбросить
+              <v-btn
+                size="small"
+                variant="text"
+                :disabled="!traceNodes.length"
+                @click="undoTraceNode"
+              >
+                Отменить точку
               </v-btn>
+              <v-btn
+                size="small"
+                variant="text"
+                prepend-icon="mdi-bookmark-multiple"
+                @click="piezometerDirectionsOpen = true"
+              >
+                Направления
+              </v-btn>
+              <v-spacer />
+              <v-btn
+                size="small"
+                variant="text"
+                color="error"
+                :disabled="!traceNodes.length"
+                @click="clearTrace"
+              >
+                Очистить
+              </v-btn>
+            </div>
+          </div>
+        </v-card>
+
+        <!-- Piezometer modal (лениво: ECharts-чанк подгружается при первом построении графика) -->
+        <LazyPiezometerModal
+          v-if="piezometerActivated"
+          v-model="piezometerModalOpen"
+          :path-data="piezometerPathData"
+          :loading="piezometerLoading"
+          :error="piezometerError"
+          :has-calculation="piezometerHasCalc"
+          :total-length="piezometerTotalLength"
+          :waypoints="traceNodes"
+          :calculation-id="piezometerRoute?.calculation_id ?? null"
+          :calculation-id2="piezometerCalc2"
+          :fragment-ids="piezometerRoute?.fragment_ids ?? []"
+          :static-head="piezometerRoute?.static_head ?? null"
+          @node-hover="onPiezometerNodeHover"
+          @double="onPiezometerDouble"
+        />
+        <LazyPiezometerDirectionsDialog
+          v-if="piezometerDirectionsOpen"
+          v-model="piezometerDirectionsOpen"
+          :waypoints="traceNodes"
+          @load="onPiezometerDirectionLoad"
+        />
+
+        <!-- Превью разрезания участка (dry-run → подтверждение) -->
+        <LazySplitPreviewDialog
+          v-if="splitPreviewOpen"
+          v-model="splitPreviewOpen"
+          :line-id="splitPreviewTarget?.lineId ?? null"
+          :report="splitPreviewReport"
+          :loading="splitPreviewLoading"
+          :confirming="splitPreviewConfirming"
+          :error="splitPreviewError"
+          @confirm="confirmSplit"
+          @cancel="cancelSplit"
+        />
+
+        <!-- Панель инструментов CAD топологии -->
+        <div
+          v-if="isEditTopologyMode"
+          class="topology-edit-toolbar elevation-4"
+        >
+          <div class="d-flex align-center ga-2 pa-2">
+            <v-chip
+              size="small"
+              color="primary"
+              variant="flat"
+            >
+              CAD Топология
+            </v-chip>
+            <v-btn
+              size="small"
+              :color="isMergeMode ? 'warning' : 'default'"
+              :variant="isMergeMode ? 'flat' : 'outlined'"
+              @click="toggleMergeMode"
+            >
+              <v-icon
+                start
+                size="16"
+              >mdi-call-merge</v-icon>
+              {{ isMergeMode ? 'Отменить слияние' : 'Слияние узлов' }}
+            </v-btn>
+            <span
+              v-if="isMergeMode && !mergeTargetNodeId"
+              class="text-caption text-medium-emphasis"
+            >
+              Кликните целевой узел
+            </span>
+            <span
+              v-else-if="isMergeMode && mergeTargetNodeId"
+              class="text-caption text-warning font-weight-medium"
+            >
+              Узел {{ mergeTargetNodeId }} выбран. Кликните узел для слияния.
+            </span>
+            <v-btn
+              size="small"
+              :color="isVertexMode ? 'warning' : 'default'"
+              :variant="isVertexMode ? 'flat' : 'outlined'"
+              @click="toggleVertexMode"
+            >
+              <v-icon
+                start
+                size="16"
+              >mdi-vector-polyline-edit</v-icon>
+              {{ isVertexMode ? 'Закрыть вершины' : 'Вершины' }}
+            </v-btn>
+            <template v-if="isVertexMode">
+              <span
+                v-if="!vertexEditor.active.value"
+                class="text-caption text-medium-emphasis"
+              >
+                Кликните участок
+              </span>
+              <template v-else>
+                <span class="text-caption">
+                  Участок {{ vertexEditor.lineId.value }}: тяните вершину, «○» — добавить, правый клик — удалить
+                </span>
+                <v-btn
+                  size="small"
+                  color="primary"
+                  variant="flat"
+                  :disabled="!vertexEditor.dirty.value"
+                  :loading="vertexEditor.saving.value"
+                  @click="vertexEditor.save()"
+                >
+                  <v-icon
+                    start
+                    size="16"
+                  >mdi-content-save</v-icon>
+                  Сохранить
+                </v-btn>
+                <v-btn
+                  size="small"
+                  variant="text"
+                  :disabled="!vertexEditor.dirty.value"
+                  @click="vertexEditor.reset()"
+                >
+                  <v-icon
+                    start
+                    size="16"
+                  >mdi-restore</v-icon>
+                  Сбросить
+                </v-btn>
+              </template>
             </template>
-          </template>
-          <v-divider vertical class="mx-1" />
-          <v-btn
-            size="small"
-            variant="outlined"
-            :disabled="!lastTopologyOperation || !lastTopologyOperation.undo_supported"
-            :loading="undoBusy"
-            @click="undoLastTopologyOperation"
-          >
-            <v-icon start size="16">mdi-undo</v-icon>
-            Отменить
-            <v-tooltip activator="parent" location="bottom">
-              {{ lastTopologyOperation ? `Отменить: ${topologyOperationLabel(lastTopologyOperation)}` : 'Нет операций для отмены' }}
-            </v-tooltip>
-          </v-btn>
+            <v-divider
+              vertical
+              class="mx-1"
+            />
+            <v-btn
+              size="small"
+              variant="outlined"
+              :disabled="!lastTopologyOperation || !lastTopologyOperation.undo_supported"
+              :loading="undoBusy"
+              @click="undoLastTopologyOperation"
+            >
+              <v-icon
+                start
+                size="16"
+              >mdi-undo</v-icon>
+              Отменить
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >
+                {{ lastTopologyOperation ? `Отменить: ${topologyOperationLabel(lastTopologyOperation)}` : 'Нет операций для отмены' }}
+              </v-tooltip>
+            </v-btn>
+          </div>
         </div>
+
+        <!-- Превью слияния узлов (dry-run: что и куда перенесётся, что блокирует) -->
+        <LazyMergePreviewDialog
+          v-if="mergeConfirmDialogOpen"
+          v-model="mergeConfirmDialogOpen"
+          :target-id="mergeTargetNodeId"
+          :source-id="mergeSourceNodeId"
+          :report="mergePreviewReport"
+          :loading="mergePreviewLoading"
+          :confirming="mergeLoading"
+          :error="mergePreviewError"
+          @confirm="confirmMerge"
+          @cancel="cancelMerge"
+        />
+
+        <!-- Feature selection menu -->
+        <FeatureMenu />
       </div>
-
-      <!-- Превью слияния узлов (dry-run: что и куда перенесётся, что блокирует) -->
-      <LazyMergePreviewDialog
-        v-if="mergeConfirmDialogOpen"
-        v-model="mergeConfirmDialogOpen"
-        :target-id="mergeTargetNodeId"
-        :source-id="mergeSourceNodeId"
-        :report="mergePreviewReport"
-        :loading="mergePreviewLoading"
-        :confirming="mergeLoading"
-        :error="mergePreviewError"
-        @confirm="confirmMerge"
-        @cancel="cancelMerge"
-      />
-
-      <!-- Feature selection menu -->
-      <FeatureMenu />
-    </div>
     </div>
 
     <template #fallback>
       <div class="map-viewer-root">
         <div class="map-container map-skeleton">
-          <div class="map-canvas-host map-skeleton-host" aria-hidden="true" />
+          <div
+            class="map-canvas-host map-skeleton-host"
+            aria-hidden="true"
+          />
           <div class="map-skeleton__spinner d-flex flex-column align-center">
             <v-progress-circular
               indeterminate

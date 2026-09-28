@@ -1,11 +1,20 @@
 <template>
-  <v-dialog v-model="visible" :fullscreen="isMobile" max-width="1100" scrollable>
+  <v-dialog
+    v-model="visible"
+    :fullscreen="isMobile"
+    max-width="1100"
+    scrollable
+  >
     <v-card rounded="lg">
       <v-card-title class="d-flex align-center ga-2">
         <v-icon>mdi-gauge</v-icon>
         Анализ режима
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          @click="visible = false"
+        />
       </v-card-title>
       <v-card-text>
         <p class="text-body-2 text-medium-emphasis mb-3">
@@ -35,24 +44,46 @@
             hide-details
             style="min-width: 320px; flex: 1"
           />
-          <v-btn color="primary" :loading="loading" :disabled="!fragmentId || !queryKey" @click="run">
+          <v-btn
+            color="primary"
+            :loading="loading"
+            :disabled="!fragmentId || !queryKey"
+            @click="run"
+          >
             Выполнить
           </v-btn>
         </div>
 
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-3">
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+        >
           {{ error }}
         </v-alert>
 
         <template v-if="result">
           <div class="d-flex flex-wrap align-center ga-2 mb-2">
             <span class="text-subtitle-1">{{ result.title }}</span>
-            <v-chip size="small" variant="tonal">{{ result.count }}</v-chip>
-            <v-chip v-if="result.calculation_id" size="small" variant="tonal" color="primary">
+            <v-chip
+              size="small"
+              variant="tonal"
+            >{{ result.count }}</v-chip>
+            <v-chip
+              v-if="result.calculation_id"
+              size="small"
+              variant="tonal"
+              color="primary"
+            >
               Расчёт №{{ result.calculation_id }}<template v-if="result.tn != null">, Tн {{ result.tn }} °C</template>
             </v-chip>
           </div>
-          <p v-if="result.note" class="text-caption text-medium-emphasis mb-2">{{ result.note }}</p>
+          <p
+            v-if="result.note"
+            class="text-caption text-medium-emphasis mb-2"
+          >{{ result.note }}</p>
 
           <v-alert
             v-if="result.query === 'hydrostatic_zones' && result.full_static_head_m != null"
@@ -68,7 +99,10 @@
             Ниже — узлы нижней зоны.
           </v-alert>
 
-          <div v-if="summaryChips.length" class="d-flex flex-wrap ga-1 mb-2">
+          <div
+            v-if="summaryChips.length"
+            class="d-flex flex-wrap ga-1 mb-2"
+          >
             <v-chip
               v-for="chip in summaryChips"
               :key="chip.mode"
@@ -86,7 +120,10 @@
               <thead>
                 <tr>
                   <th />
-                  <th v-for="col in columns" :key="col.key">{{ col.title }}</th>
+                  <th
+                    v-for="col in columns"
+                    :key="col.key"
+                  >{{ col.title }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -97,17 +134,35 @@
                   @click="locate(row)"
                 >
                   <td>
-                    <v-icon v-if="hasCoords(row)" size="16" color="primary">mdi-crosshairs-gps</v-icon>
+                    <v-icon
+                      v-if="hasCoords(row)"
+                      size="16"
+                      color="primary"
+                    >mdi-crosshairs-gps</v-icon>
                   </td>
-                  <td v-for="col in columns" :key="col.key">{{ formatCell(row[col.key]) }}</td>
+                  <td
+                    v-for="col in columns"
+                    :key="col.key"
+                  >{{ formatCell(row[col.key]) }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div v-if="filteredRows.length > pageSize" class="d-flex justify-center mt-2">
-            <v-pagination v-model="page" :length="Math.ceil(filteredRows.length / pageSize)" density="compact" total-visible="7" />
+          <div
+            v-if="filteredRows.length > pageSize"
+            class="d-flex justify-center mt-2"
+          >
+            <v-pagination
+              v-model="page"
+              :length="Math.ceil(filteredRows.length / pageSize)"
+              density="compact"
+              total-visible="7"
+            />
           </div>
-          <div v-if="!filteredRows.length" class="text-body-2 text-medium-emphasis mt-2">Записей нет.</div>
+          <div
+            v-if="!filteredRows.length"
+            class="text-body-2 text-medium-emphasis mt-2"
+          >Записей нет.</div>
         </template>
       </v-card-text>
     </v-card>

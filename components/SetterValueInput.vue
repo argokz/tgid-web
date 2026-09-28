@@ -17,9 +17,15 @@
     @update:model-value="emit('update:modelValue', $event)"
   >
     <template #item="{ props: itemProps, item }">
-      <v-list-item v-bind="itemProps" :subtitle="item.raw.fileid ? `фрагмент ${item.raw.fileid}` : undefined" />
+      <v-list-item
+        v-bind="itemProps"
+        :subtitle="item.raw.fileid ? `фрагмент ${item.raw.fileid}` : undefined"
+      />
     </template>
-    <template v-if="total > items.length" #append-item>
+    <template
+      v-if="total > items.length"
+      #append-item
+    >
       <div class="text-caption text-medium-emphasis px-4 py-1">
         Показано {{ items.length }} из {{ total }} — уточните поиск
       </div>

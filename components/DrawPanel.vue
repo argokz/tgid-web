@@ -8,7 +8,11 @@
     aria-label="Панель рисования и измерений"
   >
     <div class="draw-panel__header px-3 py-2">
-      <v-icon size="18" color="primary" class="me-2">mdi-draw</v-icon>
+      <v-icon
+        size="18"
+        color="primary"
+        class="me-2"
+      >mdi-draw</v-icon>
       <span class="text-subtitle-2 font-weight-bold">Рисование и измерения</span>
       <v-spacer />
       <v-btn
@@ -37,7 +41,10 @@
           :aria-pressed="draw.mode.value === tool.mode"
           @click="toggleMode(tool.mode)"
         >
-          <v-icon size="20" :color="draw.mode.value === tool.mode ? 'primary' : undefined">
+          <v-icon
+            size="20"
+            :color="draw.mode.value === tool.mode ? 'primary' : undefined"
+          >
             {{ tool.icon }}
           </v-icon>
           <span class="draw-tile__label">{{ tool.label }}</span>
@@ -56,7 +63,10 @@
           :aria-pressed="draw.mode.value === tool.mode"
           @click="toggleMode(tool.mode)"
         >
-          <v-icon size="20" :color="draw.mode.value === tool.mode ? 'primary' : undefined">
+          <v-icon
+            size="20"
+            :color="draw.mode.value === tool.mode ? 'primary' : undefined"
+          >
             {{ tool.icon }}
           </v-icon>
           <span class="draw-tile__label">{{ tool.label }}</span>
@@ -67,7 +77,10 @@
     <v-divider />
 
     <!-- Текущее измерение -->
-    <div v-if="draw.draftPoints.value.length > 0" class="px-3 py-2 draw-panel__live">
+    <div
+      v-if="draw.draftPoints.value.length > 0"
+      class="px-3 py-2 draw-panel__live"
+    >
       <div class="d-flex align-center justify-space-between">
         <span class="text-caption text-medium-emphasis">Точек: {{ draw.draftPoints.value.length }}</span>
         <span class="text-body-2 font-weight-medium">{{ liveMeasure }}</span>
@@ -79,7 +92,10 @@
 
     <v-divider v-if="draw.draftPoints.value.length > 0" />
 
-    <div class="pa-2 d-flex flex-wrap" style="gap: 6px;">
+    <div
+      class="pa-2 d-flex flex-wrap"
+      style="gap: 6px;"
+    >
       <v-btn
         size="small"
         variant="tonal"

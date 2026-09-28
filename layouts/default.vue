@@ -20,14 +20,24 @@
       </v-btn>
 
       <!-- Брендинг -->
-      <div class="app-brand d-flex align-center" :class="mobile ? 'ms-1 me-2' : 'ms-3 me-4'">
-        <v-icon size="26" color="primary" class="brand-icon">mdi-layers</v-icon>
+      <div
+        class="app-brand d-flex align-center"
+        :class="mobile ? 'ms-1 me-2' : 'ms-3 me-4'"
+      >
+        <v-icon
+          size="26"
+          color="primary"
+          class="brand-icon"
+        >mdi-layers</v-icon>
         <span class="brand-title ms-2">ITwin</span>
         <span class="brand-subtitle">Map</span>
       </div>
 
       <!-- Навигация (десктоп) -->
-      <nav v-if="!mobile" class="nav-links d-flex align-center">
+      <nav
+        v-if="!mobile"
+        class="nav-links d-flex align-center"
+      >
         <v-btn
           v-for="link in links"
           :key="link.to"
@@ -81,7 +91,7 @@
         </v-btn>
 
         <v-menu offset-y>
-          <template v-slot:activator="{ props }">
+          <template #activator="{ props }">
             <v-btn
               v-bind="props"
               prepend-icon="mdi-export"
@@ -95,9 +105,21 @@
             </v-btn>
           </template>
           <v-list density="compact">
-            <v-list-item title="SHP (узлы и участки, zip)" prepend-icon="mdi-export" @click="downloadShp" />
-            <v-list-item title="DXF (линии участков)" prepend-icon="mdi-vector-polyline" @click="downloadDxf" />
-            <v-list-item title="GeoJSON (геометрия и паспорт)" prepend-icon="mdi-code-json" @click="downloadGeoJson(false)" />
+            <v-list-item
+              title="SHP (узлы и участки, zip)"
+              prepend-icon="mdi-export"
+              @click="downloadShp"
+            />
+            <v-list-item
+              title="DXF (линии участков)"
+              prepend-icon="mdi-vector-polyline"
+              @click="downloadDxf"
+            />
+            <v-list-item
+              title="GeoJSON (геометрия и паспорт)"
+              prepend-icon="mdi-code-json"
+              @click="downloadGeoJson(false)"
+            />
             <v-list-item
               title="GeoJSON с атрибутами (L, D, K_E)"
               subtitle="Для ZuluGIS/QGIS: короткие имена полей"
@@ -108,7 +130,7 @@
         </v-menu>
 
         <v-menu offset-y>
-          <template v-slot:activator="{ props }">
+          <template #activator="{ props }">
             <v-btn
               v-bind="props"
               prepend-icon="mdi-file-excel"
@@ -121,12 +143,36 @@
             </v-btn>
           </template>
           <v-list density="compact">
-            <v-list-item title="Участки теплопроводов" prepend-icon="mdi-pipe" @click="downloadExcel('ut')" />
-            <v-list-item title="Задвижки и арматура" prepend-icon="mdi-valve" @click="downloadExcel('zd')" />
-            <v-list-item title="Байпасы" prepend-icon="mdi-dip-switch" @click="downloadExcel('bp')" />
-            <v-list-item title="Насосные агрегаты" prepend-icon="mdi-water-pump" @click="downloadExcel('ns')" />
-            <v-list-item title="Потребители" prepend-icon="mdi-home-city" @click="downloadExcel('pt')" />
-            <v-list-item title="Технические условия" prepend-icon="mdi-file-certificate-outline" @click="downloadExcel('tu')" />
+            <v-list-item
+              title="Участки теплопроводов"
+              prepend-icon="mdi-pipe"
+              @click="downloadExcel('ut')"
+            />
+            <v-list-item
+              title="Задвижки и арматура"
+              prepend-icon="mdi-valve"
+              @click="downloadExcel('zd')"
+            />
+            <v-list-item
+              title="Байпасы"
+              prepend-icon="mdi-dip-switch"
+              @click="downloadExcel('bp')"
+            />
+            <v-list-item
+              title="Насосные агрегаты"
+              prepend-icon="mdi-water-pump"
+              @click="downloadExcel('ns')"
+            />
+            <v-list-item
+              title="Потребители"
+              prepend-icon="mdi-home-city"
+              @click="downloadExcel('pt')"
+            />
+            <v-list-item
+              title="Технические условия"
+              prepend-icon="mdi-file-certificate-outline"
+              @click="downloadExcel('tu')"
+            />
           </v-list>
         </v-menu>
       </nav>
@@ -147,13 +193,26 @@
             class="user-avatar-btn me-2"
             aria-label="Меню пользователя"
           >
-            <v-avatar size="34" color="primary">
-              <v-icon color="white" size="20">mdi-account</v-icon>
+            <v-avatar
+              size="34"
+              color="primary"
+            >
+              <v-icon
+                color="white"
+                size="20"
+              >mdi-account</v-icon>
             </v-avatar>
           </v-btn>
         </template>
-        <v-card min-width="240" rounded="lg" elevation="4">
-          <v-list density="compact" class="py-1">
+        <v-card
+          min-width="240"
+          rounded="lg"
+          elevation="4"
+        >
+          <v-list
+            density="compact"
+            class="py-1"
+          >
             <v-list-item
               v-if="authStore.isAuthenticated"
               :title="authStore.username"
@@ -166,8 +225,16 @@
               title="Войти"
               @click="showLogin = true"
             />
-            <v-list-item prepend-icon="mdi-account-outline" title="Профиль" disabled />
-            <v-list-item prepend-icon="mdi-cog-outline" title="Настройки" disabled />
+            <v-list-item
+              prepend-icon="mdi-account-outline"
+              title="Профиль"
+              disabled
+            />
+            <v-list-item
+              prepend-icon="mdi-cog-outline"
+              title="Настройки"
+              disabled
+            />
             <v-divider class="my-1" />
             <v-list-item
               prepend-icon="mdi-logout"
@@ -230,7 +297,13 @@
         >
           {{ notificationStore.action.label }}
         </v-btn>
-        <v-btn icon="mdi-close" variant="text" size="small" aria-label="Закрыть" @click="notificationStore.hide()" />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          aria-label="Закрыть"
+          @click="notificationStore.hide()"
+        />
       </template>
     </v-snackbar>
   </v-app>

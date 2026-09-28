@@ -1,9 +1,21 @@
 <template>
   <div class="norm-panel">
     <div class="norm-filters pa-3">
-      <v-btn-toggle v-model="losesType" mandatory density="compact" color="deep-orange-darken-3" variant="outlined">
-        <v-btn value="norm" size="small">Нормативные</v-btn>
-        <v-btn value="fact" size="small">Фактические</v-btn>
+      <v-btn-toggle
+        v-model="losesType"
+        mandatory
+        density="compact"
+        color="deep-orange-darken-3"
+        variant="outlined"
+      >
+        <v-btn
+          value="norm"
+          size="small"
+        >Нормативные</v-btn>
+        <v-btn
+          value="fact"
+          size="small"
+        >Фактические</v-btn>
       </v-btn-toggle>
       <v-select
         v-model="seasonId"
@@ -49,7 +61,10 @@
     </div>
 
     <div class="norm-body">
-      <section v-if="scope" class="mb-4">
+      <section
+        v-if="scope"
+        class="mb-4"
+      >
         <h4 class="section-title">
           Источники расчёта
           <span class="text-medium-emphasis">· готовы {{ readyCount }} из {{ scope.sources.length }}</span>
@@ -62,7 +77,10 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="src in scope.sources" :key="src.id">
+            <tr
+              v-for="src in scope.sources"
+              :key="src.id"
+            >
               <td>{{ src.id }}</td>
               <td>{{ src.name || src.sourcename || '—' }}</td>
               <td>{{ src.sections }}</td>
@@ -73,7 +91,10 @@
                 </v-icon>
               </td>
               <td>
-                <v-chip size="x-small" :color="src.has_months ? 'green' : 'orange'">
+                <v-chip
+                  size="x-small"
+                  :color="src.has_months ? 'green' : 'orange'"
+                >
                   {{ src.has_months ? 'заданы' : 'нет — источник не считается' }}
                 </v-chip>
               </td>
@@ -103,7 +124,13 @@
       <section class="mb-4">
         <h4 class="section-title">
           Расчёты
-          <v-btn size="x-small" variant="text" icon="mdi-refresh" aria-label="Обновить" @click="loadRuns" />
+          <v-btn
+            size="x-small"
+            variant="text"
+            icon="mdi-refresh"
+            aria-label="Обновить"
+            @click="loadRuns"
+          />
         </h4>
         <table class="norm-table">
           <thead>
@@ -125,7 +152,10 @@
               <td>{{ item.user_gid || '—' }}</td>
               <td>{{ fmt(item.params.totals?.year?.potall, 1) }}</td>
               <td>{{ fmt(item.params.totals?.year?.vall, 1) }}</td>
-              <td class="text-right" @click.stop>
+              <td
+                class="text-right"
+                @click.stop
+              >
                 <v-btn
                   size="x-small"
                   variant="text"
@@ -147,12 +177,21 @@
             </tr>
           </tbody>
         </table>
-        <div v-if="!runs.length" class="hint">Расчётов теплопотерь нет</div>
+        <div
+          v-if="!runs.length"
+          class="hint"
+        >Расчётов теплопотерь нет</div>
       </section>
 
       <section v-if="run">
         <h4 class="section-title">{{ run.name }}</h4>
-        <v-tabs v-model="view" density="compact" color="deep-orange-darken-3" class="mb-2" show-arrows>
+        <v-tabs
+          v-model="view"
+          density="compact"
+          color="deep-orange-darken-3"
+          class="mb-2"
+          show-arrows
+        >
           <v-tab value="totals">Итоги</v-tab>
           <v-tab value="avg_month_loses">МесПотери</v-tab>
           <v-tab value="avg_year_loses">ГодПотери</v-tab>
@@ -160,11 +199,18 @@
           <v-tab value="summer_norms">НормыЛето</v-tab>
           <v-tab value="material_characteristics">МатХар</v-tab>
           <v-tab value="month_temperatures">МесТемп</v-tab>
-          <v-tab v-for="t in WATER_TABS" :key="t.key" :value="t.key">{{ t.label }}</v-tab>
+          <v-tab
+            v-for="t in WATER_TABS"
+            :key="t.key"
+            :value="t.key"
+          >{{ t.label }}</v-tab>
           <v-tab value="sections">Участки</v-tab>
         </v-tabs>
 
-        <div v-if="view === 'totals'" class="table-scroll">
+        <div
+          v-if="view === 'totals'"
+          class="table-scroll"
+        >
           <table class="norm-table">
             <thead>
               <tr>
@@ -173,15 +219,31 @@
               </tr>
             </thead>
             <tbody>
-              <template v-for="(tot, hs) in run.source_totals" :key="hs">
-                <tr v-for="period in periods" :key="`${hs}-${period.key}`">
+              <template
+                v-for="(tot, hs) in run.source_totals"
+                :key="hs"
+              >
+                <tr
+                  v-for="period in periods"
+                  :key="`${hs}-${period.key}`"
+                >
                   <td>{{ sourceName(Number(hs)) }}: {{ period.label }}</td>
-                  <td v-for="k in lossKeys" :key="k">{{ fmt(tot[period.key][k], 2) }}</td>
+                  <td
+                    v-for="k in lossKeys"
+                    :key="k"
+                  >{{ fmt(tot[period.key][k], 2) }}</td>
                 </tr>
               </template>
-              <tr v-for="period in periods" :key="`all-${period.key}`" class="total-row">
+              <tr
+                v-for="period in periods"
+                :key="`all-${period.key}`"
+                class="total-row"
+              >
                 <td>ВСЕГО: {{ period.label }}</td>
-                <td v-for="k in lossKeys" :key="k">{{ fmt(run.totals?.[period.key]?.[k], 2) }}</td>
+                <td
+                  v-for="k in lossKeys"
+                  :key="k"
+                >{{ fmt(run.totals?.[period.key]?.[k], 2) }}</td>
               </tr>
             </tbody>
           </table>
@@ -217,7 +279,10 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="s in sections" :key="s.id">
+                <tr
+                  v-for="s in sections"
+                  :key="s.id"
+                >
                   <td>{{ s.lineid }}</td>
                   <td>{{ s.truba === 1 ? 'под.' : 'обр.' }}</td>
                   <td>{{ s.name_typ }}</td>
@@ -254,18 +319,30 @@
           />
         </div>
 
-        <div v-else class="table-scroll">
+        <div
+          v-else
+          class="table-scroll"
+        >
           <table class="norm-table">
             <thead>
               <tr>
                 <th>Источник</th>
-                <th v-for="col in sheetColumns" :key="col.key">{{ col.label }}</th>
+                <th
+                  v-for="col in sheetColumns"
+                  :key="col.key"
+                >{{ col.label }}</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, i) in sheetRows" :key="i">
+              <tr
+                v-for="(row, i) in sheetRows"
+                :key="i"
+              >
                 <td>{{ sourceName(Number(row.heatsourceid)) }}</td>
-                <td v-for="col in sheetColumns" :key="col.key">
+                <td
+                  v-for="col in sheetColumns"
+                  :key="col.key"
+                >
                   {{ typeof row[col.key] === 'number' ? fmt(row[col.key], col.digits ?? 3) : row[col.key] ?? '—' }}
                 </td>
               </tr>

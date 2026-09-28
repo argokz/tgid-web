@@ -1,22 +1,54 @@
 <template>
-  <v-dialog v-model="visible" :fullscreen="mobile" :max-width="mobile ? undefined : 1150" scrollable>
+  <v-dialog
+    v-model="visible"
+    :fullscreen="mobile"
+    :max-width="mobile ? undefined : 1150"
+    scrollable
+  >
     <v-card :rounded="mobile ? '0' : 'lg'">
       <v-card-title class="d-flex align-center ga-2 py-2">
         <v-icon>mdi-map-marker-path</v-icon>
         Участки ПТС
-        <v-btn-toggle v-model="kind" mandatory density="compact" color="primary" variant="outlined" class="ml-3">
+        <v-btn-toggle
+          v-model="kind"
+          mandatory
+          density="compact"
+          color="primary"
+          variant="outlined"
+          class="ml-3"
+        >
           <v-btn value="ms">МС</v-btn>
           <v-btn value="rs">РС</v-btn>
         </v-btn-toggle>
         <v-spacer />
-        <v-btn icon="mdi-close" variant="text" density="compact" aria-label="Закрыть" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          density="compact"
+          aria-label="Закрыть"
+          @click="visible = false"
+        />
       </v-card-title>
 
       <v-card-text class="pt-0">
-        <v-alert v-if="!canEditData" type="info" variant="tonal" density="compact" class="mb-2">
+        <v-alert
+          v-if="!canEditData"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mb-2"
+        >
           Просмотр участков и паспорта доступны всем; правка и привязка труб — редактору при включённой записи (MUTATIONS_ENABLED).
         </v-alert>
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-2" closable @click:close="error = ''">
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mb-2"
+          closable
+          @click:close="error = ''"
+        >
           {{ error }}
         </v-alert>
 
@@ -33,16 +65,38 @@
                 prepend-inner-icon="mdi-magnify"
                 label="Поиск участка"
               />
-              <v-btn v-if="canEditData" icon="mdi-plus" color="primary" variant="tonal" title="Новый участок" @click="startCreate" />
+              <v-btn
+                v-if="canEditData"
+                icon="mdi-plus"
+                color="primary"
+                variant="tonal"
+                title="Новый участок"
+                @click="startCreate"
+              />
             </div>
             <div class="text-caption text-medium-emphasis mb-1">
               Участков: {{ sites.length }} · с трубами: {{ sitesWithPipes }} · труб привязано: {{ pipesTotal }}
             </div>
-            <v-progress-linear v-if="loadingList" indeterminate color="primary" class="mb-1" />
-            <v-list density="compact" class="sites-list" nav>
-              <template v-for="group in groups" :key="group.key">
+            <v-progress-linear
+              v-if="loadingList"
+              indeterminate
+              color="primary"
+              class="mb-1"
+            />
+            <v-list
+              density="compact"
+              class="sites-list"
+              nav
+            >
+              <template
+                v-for="group in groups"
+                :key="group.key"
+              >
                 <v-list-subheader class="d-flex align-center">
-                  <v-icon size="small" class="mr-1">mdi-account-tie</v-icon>{{ group.title }}
+                  <v-icon
+                    size="small"
+                    class="mr-1"
+                  >mdi-account-tie</v-icon>{{ group.title }}
                 </v-list-subheader>
                 <v-list-item
                   v-for="item in group.items"
@@ -54,7 +108,11 @@
                   <v-list-item-title class="text-body-2">{{ siteTitle(item, kind) }}</v-list-item-title>
                   <v-list-item-subtitle v-if="item.magistral_name">{{ item.magistral_name }}</v-list-item-subtitle>
                   <template #append>
-                    <v-chip size="x-small" :color="item.pipes ? 'success' : undefined" variant="tonal">{{ item.pipes }}</v-chip>
+                    <v-chip
+                      size="x-small"
+                      :color="item.pipes ? 'success' : undefined"
+                      variant="tonal"
+                    >{{ item.pipes }}</v-chip>
                   </template>
                 </v-list-item>
               </template>
@@ -63,7 +121,10 @@
 
           <!-- Участок -->
           <div class="site-col">
-            <div v-if="!card && !creating" class="text-medium-emphasis pa-4">
+            <div
+              v-if="!card && !creating"
+              class="text-medium-emphasis pa-4"
+            >
               Выберите участок слева или создайте новый. Трубы привязываются выбором на карте или цепочкой узлов
               (как «Участок МС/РС» в свойствах трубы десктопа).
             </div>
@@ -72,14 +133,34 @@
               <div class="d-flex align-center flex-wrap ga-2 mb-2">
                 <div class="text-subtitle-1 font-weight-medium">{{ cardTitle }}</div>
                 <v-spacer />
-                <v-btn size="small" variant="tonal" prepend-icon="mdi-crosshairs-gps" :disabled="!card.stats.pipes" @click="showOnMap">
+                <v-btn
+                  size="small"
+                  variant="tonal"
+                  prepend-icon="mdi-crosshairs-gps"
+                  :disabled="!card.stats.pipes"
+                  @click="showOnMap"
+                >
                   На карте
                 </v-btn>
-                <v-btn size="small" variant="tonal" color="success" prepend-icon="mdi-file-excel-box" :loading="downloading"
-                       :disabled="!card.stats.pipes" @click="downloadPassport">
+                <v-btn
+                  size="small"
+                  variant="tonal"
+                  color="success"
+                  prepend-icon="mdi-file-excel-box"
+                  :loading="downloading"
+                  :disabled="!card.stats.pipes"
+                  @click="downloadPassport"
+                >
                   Паспорт
                 </v-btn>
-                <v-btn v-if="canEditData" size="small" variant="text" color="error" prepend-icon="mdi-delete" @click="removeSite">
+                <v-btn
+                  v-if="canEditData"
+                  size="small"
+                  variant="text"
+                  color="error"
+                  prepend-icon="mdi-delete"
+                  @click="removeSite"
+                >
                   Удалить
                 </v-btn>
               </div>
@@ -91,46 +172,109 @@
               <!-- Привязка труб -->
               <div class="text-subtitle-2 mb-1">Привязка труб</div>
               <div class="d-flex flex-wrap ga-2 mb-2">
-                <v-btn size="small" color="orange-darken-3" variant="tonal" prepend-icon="mdi-cursor-default-click-outline"
-                       :disabled="!canEditData" @click="pickLines('assign')">
+                <v-btn
+                  size="small"
+                  color="orange-darken-3"
+                  variant="tonal"
+                  prepend-icon="mdi-cursor-default-click-outline"
+                  :disabled="!canEditData"
+                  @click="pickLines('assign')"
+                >
                   Выбрать трубы на карте
                 </v-btn>
-                <v-btn size="small" color="orange-darken-3" variant="tonal" prepend-icon="mdi-source-branch"
-                       :disabled="!canEditData" @click="pickChain">
+                <v-btn
+                  size="small"
+                  color="orange-darken-3"
+                  variant="tonal"
+                  prepend-icon="mdi-source-branch"
+                  :disabled="!canEditData"
+                  @click="pickChain"
+                >
                   Цепочка узлов
                 </v-btn>
-                <v-btn size="small" variant="tonal" prepend-icon="mdi-link-variant-off"
-                       :disabled="!canEditData || !card.stats.pipes" @click="pickLines('unassign')">
+                <v-btn
+                  size="small"
+                  variant="tonal"
+                  prepend-icon="mdi-link-variant-off"
+                  :disabled="!canEditData || !card.stats.pipes"
+                  @click="pickLines('unassign')"
+                >
                   Снять с выбранных
                 </v-btn>
-                <v-btn size="small" variant="text" prepend-icon="mdi-link-variant-off"
-                       :disabled="!canEditData || !card.stats.pipes" @click="runPreview({ action: 'unassign', all_pipes: true })">
+                <v-btn
+                  size="small"
+                  variant="text"
+                  prepend-icon="mdi-link-variant-off"
+                  :disabled="!canEditData || !card.stats.pipes"
+                  @click="runPreview({ action: 'unassign', all_pipes: true })"
+                >
                   Снять со всех
                 </v-btn>
               </div>
 
-              <v-alert v-if="chainInfo" type="info" variant="tonal" density="compact" class="mb-2">
+              <v-alert
+                v-if="chainInfo"
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="mb-2"
+              >
                 Цепочка из {{ chainInfo.node_ids.length }} узлов: труб на пути {{ chainInfo.line_ids.length }}
                 <span v-if="chainInfo.other_lines">, прочих линейных объектов (арматура и т.п.) {{ chainInfo.other_lines }} — не привязываются</span>.
               </v-alert>
 
-              <v-card v-if="preview" variant="outlined" class="pa-2 mb-3">
+              <v-card
+                v-if="preview"
+                variant="outlined"
+                class="pa-2 mb-3"
+              >
                 <div class="text-body-2 mb-1">{{ previewText }}</div>
-                <div v-for="w in preview.warnings" :key="w" class="text-caption text-warning">{{ w }}</div>
-                <div v-if="preview.missing_ids.length" class="text-caption text-medium-emphasis">
+                <div
+                  v-for="w in preview.warnings"
+                  :key="w"
+                  class="text-caption text-warning"
+                >{{ w }}</div>
+                <div
+                  v-if="preview.missing_ids.length"
+                  class="text-caption text-medium-emphasis"
+                >
                   Не найдены (удалены или не трубы): {{ preview.missing_ids.slice(0, 20).join(', ') }}
                 </div>
                 <div class="d-flex ga-2 mt-2">
-                  <v-btn size="small" color="primary" variant="flat" :loading="applying" :disabled="!preview.changes" @click="applyPipes">
+                  <v-btn
+                    size="small"
+                    color="primary"
+                    variant="flat"
+                    :loading="applying"
+                    :disabled="!preview.changes"
+                    @click="applyPipes"
+                  >
                     Применить
                   </v-btn>
-                  <v-btn size="small" variant="text" @click="clearPreview">Отмена</v-btn>
+                  <v-btn
+                    size="small"
+                    variant="text"
+                    @click="clearPreview"
+                  >Отмена</v-btn>
                 </div>
               </v-card>
 
-              <v-alert v-if="lastResult" type="success" variant="tonal" density="compact" class="mb-3">
+              <v-alert
+                v-if="lastResult"
+                type="success"
+                variant="tonal"
+                density="compact"
+                class="mb-3"
+              >
                 Изменено строк: {{ lastResult.changed }}.
-                <v-btn v-if="!lastUndone" size="x-small" variant="text" prepend-icon="mdi-undo" :loading="undoing" @click="undoLast">
+                <v-btn
+                  v-if="!lastUndone"
+                  size="x-small"
+                  variant="text"
+                  prepend-icon="mdi-undo"
+                  :loading="undoing"
+                  @click="undoLast"
+                >
                   Отменить
                 </v-btn>
                 <span v-else>Отменено.</span>
@@ -140,9 +284,16 @@
             <!-- Характеристика -->
             <template v-if="card || creating">
               <div class="text-subtitle-2 mb-1">{{ creating ? `Новый ${kind === 'ms' ? 'участок МС' : 'участок РС'}` : 'Характеристика' }}</div>
-              <v-progress-linear v-if="loadingFields" indeterminate class="mb-2" />
+              <v-progress-linear
+                v-if="loadingFields"
+                indeterminate
+                class="mb-2"
+              />
               <div class="card-grid">
-                <template v-for="field in fields" :key="field.name">
+                <template
+                  v-for="field in fields"
+                  :key="field.name"
+                >
                   <v-autocomplete
                     v-if="field.ref"
                     v-model="form[field.name]"
@@ -178,12 +329,27 @@
                   />
                 </template>
               </div>
-              <div v-if="canEditData" class="d-flex ga-2 mt-2">
-                <v-btn color="primary" variant="flat" size="small" prepend-icon="mdi-content-save" :loading="saving"
-                       :disabled="!creating && !dirty" @click="saveCard">
+              <div
+                v-if="canEditData"
+                class="d-flex ga-2 mt-2"
+              >
+                <v-btn
+                  color="primary"
+                  variant="flat"
+                  size="small"
+                  prepend-icon="mdi-content-save"
+                  :loading="saving"
+                  :disabled="!creating && !dirty"
+                  @click="saveCard"
+                >
                   {{ creating ? 'Создать' : 'Сохранить' }}
                 </v-btn>
-                <v-btn v-if="creating" size="small" variant="text" @click="creating = false">Отмена</v-btn>
+                <v-btn
+                  v-if="creating"
+                  size="small"
+                  variant="text"
+                  @click="creating = false"
+                >Отмена</v-btn>
               </div>
             </template>
           </div>

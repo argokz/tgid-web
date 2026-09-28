@@ -1,10 +1,20 @@
 <template>
-  <v-dialog :model-value="modelValue" max-width="1240" @update:model-value="$emit('update:modelValue', $event)">
+  <v-dialog
+    :model-value="modelValue"
+    max-width="1240"
+    @update:model-value="$emit('update:modelValue', $event)"
+  >
     <v-card>
-      <v-toolbar color="primary" density="compact">
+      <v-toolbar
+        color="primary"
+        density="compact"
+      >
         <v-toolbar-title>Пьезометрический график</v-toolbar-title>
         <v-spacer />
-        <span v-if="!loading && !error && totalLength" class="text-caption me-3">
+        <span
+          v-if="!loading && !error && totalLength"
+          class="text-caption me-3"
+        >
           Длина маршрута: {{ formatLength(totalLength) }} · узлов: {{ pathData.length }}
         </span>
         <v-btn
@@ -16,21 +26,47 @@
           @click="showStatic = !showStatic"
         >
           <v-icon>mdi-arrow-collapse-horizontal</v-icon>
-          <v-tooltip activator="parent" location="bottom">
+          <v-tooltip
+            activator="parent"
+            location="bottom"
+          >
             Статика: {{ fmt(staticHead.value) }} м (max отметка + высота здания + {{ staticHead.reserve_m }} м)
           </v-tooltip>
         </v-btn>
-        <v-menu v-if="!loading && !error && pathData.length" :close-on-content-click="true" @update:model-value="onDoubleMenu">
+        <v-menu
+          v-if="!loading && !error && pathData.length"
+          :close-on-content-click="true"
+          @update:model-value="onDoubleMenu"
+        >
           <template #activator="{ props: menuProps }">
-            <v-btn v-bind="menuProps" icon size="small" :variant="calculationId2 ? 'tonal' : 'text'" aria-label="Двойной пьезометр">
+            <v-btn
+              v-bind="menuProps"
+              icon
+              size="small"
+              :variant="calculationId2 ? 'tonal' : 'text'"
+              aria-label="Двойной пьезометр"
+            >
               <v-icon>mdi-chart-multiple</v-icon>
-              <v-tooltip activator="parent" location="bottom">Двойной пьезометр: второй расчёт на том же графике</v-tooltip>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Двойной пьезометр: второй расчёт на том же графике</v-tooltip>
             </v-btn>
           </template>
-          <v-list density="compact" max-height="360">
+          <v-list
+            density="compact"
+            max-height="360"
+          >
             <v-list-subheader>Второй расчёт (последние 10 по фрагменту)</v-list-subheader>
-            <v-list-item v-if="calcListLoading" title="Загрузка…" />
-            <v-list-item v-else-if="!calcList.length" title="Нет других расчётов" disabled />
+            <v-list-item
+              v-if="calcListLoading"
+              title="Загрузка…"
+            />
+            <v-list-item
+              v-else-if="!calcList.length"
+              title="Нет других расчётов"
+              disabled
+            />
             <v-list-item
               v-for="c in calcList"
               :key="c.id"
@@ -40,7 +76,12 @@
               :subtitle="[c.calculated_at, c.user_gid].filter(Boolean).join(' · ')"
               @click="emit('double', c.id)"
             />
-            <v-list-item v-if="calculationId2" title="Выключить двойной пьезометр" prepend-icon="mdi-close" @click="emit('double', null)" />
+            <v-list-item
+              v-if="calculationId2"
+              title="Выключить двойной пьезометр"
+              prepend-icon="mdi-close"
+              @click="emit('double', null)"
+            />
           </v-list>
         </v-menu>
         <v-btn
@@ -51,7 +92,10 @@
           @click="exportCsv"
         >
           <v-icon>mdi-download</v-icon>
-          <v-tooltip activator="parent" location="bottom">Выгрузить CSV</v-tooltip>
+          <v-tooltip
+            activator="parent"
+            location="bottom"
+          >Выгрузить CSV</v-tooltip>
         </v-btn>
         <v-btn
           v-if="!loading && !error && pathData.length"
@@ -62,21 +106,41 @@
           @click="exportExcel"
         >
           <v-icon>mdi-file-excel</v-icon>
-          <v-tooltip activator="parent" location="bottom">Скачать официальный профиль (Excel)</v-tooltip>
+          <v-tooltip
+            activator="parent"
+            location="bottom"
+          >Скачать официальный профиль (Excel)</v-tooltip>
         </v-btn>
-        <v-btn icon size="small" aria-label="Закрыть" @click="$emit('update:modelValue', false)">
+        <v-btn
+          icon
+          size="small"
+          aria-label="Закрыть"
+          @click="$emit('update:modelValue', false)"
+        >
           <v-icon>mdi-close</v-icon>
         </v-btn>
       </v-toolbar>
 
       <v-card-text class="pa-0">
-        <div v-if="loading" class="d-flex justify-center align-center py-10">
-          <v-progress-circular indeterminate color="primary" />
+        <div
+          v-if="loading"
+          class="d-flex justify-center align-center py-10"
+        >
+          <v-progress-circular
+            indeterminate
+            color="primary"
+          />
           <span class="ml-3">Построение пути и графика…</span>
         </div>
 
-        <div v-else-if="error" class="d-flex justify-center align-center py-10 text-error">
-          <v-icon color="error" class="mr-2">mdi-alert</v-icon>
+        <div
+          v-else-if="error"
+          class="d-flex justify-center align-center py-10 text-error"
+        >
+          <v-icon
+            color="error"
+            class="mr-2"
+          >mdi-alert</v-icon>
           {{ error }}
         </div>
 
@@ -92,7 +156,11 @@
             Напоры и температуры появятся после выполнения гидравлического расчёта сети.
           </v-alert>
 
-          <v-tabs v-model="tab" density="compact" color="primary">
+          <v-tabs
+            v-model="tab"
+            density="compact"
+            color="primary"
+          >
             <v-tab value="chart">График</v-tab>
             <v-tab value="table">Таблица узлов</v-tab>
             <v-tab value="time">Время прохождения</v-tab>
@@ -102,13 +170,21 @@
           <v-window v-model="tab">
             <v-window-item value="chart">
               <div style="height: 560px; width: 100%;">
-                <v-chart class="chart" :option="chartOptions" autoresize @click="onChartClick" />
+                <v-chart
+                  class="chart"
+                  :option="chartOptions"
+                  autoresize
+                  @click="onChartClick"
+                />
               </div>
             </v-window-item>
 
             <v-window-item value="table">
               <div style="max-height: 560px; overflow-y: auto;">
-                <v-table density="compact" class="piezo-table">
+                <v-table
+                  density="compact"
+                  class="piezo-table"
+                >
                   <thead>
                     <tr>
                       <th>#</th>
@@ -152,24 +228,42 @@
 
             <v-window-item value="time">
               <div class="pa-3">
-                <div v-if="travelLoading" class="d-flex align-center py-6 justify-center">
-                  <v-progress-circular indeterminate color="primary" size="24" />
+                <div
+                  v-if="travelLoading"
+                  class="d-flex align-center py-6 justify-center"
+                >
+                  <v-progress-circular
+                    indeterminate
+                    color="primary"
+                    size="24"
+                  />
                   <span class="ml-3">Расчёт времени прохождения…</span>
                 </div>
-                <v-alert v-else-if="travelError" type="error" variant="tonal" density="compact">
+                <v-alert
+                  v-else-if="travelError"
+                  type="error"
+                  variant="tonal"
+                  density="compact"
+                >
                   {{ travelError }}
                 </v-alert>
                 <template v-else-if="travel">
                   <div class="d-flex flex-wrap ga-4 mb-2">
                     <div>
                       <div class="text-caption text-medium-emphasis">Подающий теплопровод</div>
-                      <div class="text-subtitle-1" :class="{ 'text-error': travel.supply.no_flow }">
+                      <div
+                        class="text-subtitle-1"
+                        :class="{ 'text-error': travel.supply.no_flow }"
+                      >
                         {{ travel.supply.text }}
                       </div>
                     </div>
                     <div>
                       <div class="text-caption text-medium-emphasis">Обратный теплопровод</div>
-                      <div class="text-subtitle-1" :class="{ 'text-error': travel.return.no_flow }">
+                      <div
+                        class="text-subtitle-1"
+                        :class="{ 'text-error': travel.return.no_flow }"
+                      >
                         {{ travel.return.text }}
                       </div>
                     </div>
@@ -179,19 +273,37 @@
                     со знаком ориентации линии; расход против принятого направления — «нет движения».
                     <template v-if="travel.calculation_ids.length"> Расчёт: {{ travel.calculation_ids.join(', ') }}.</template>
                   </p>
-                  <v-alert v-if="travel.note" type="warning" variant="tonal" density="compact" class="mb-2">
+                  <v-alert
+                    v-if="travel.note"
+                    type="warning"
+                    variant="tonal"
+                    density="compact"
+                    class="mb-2"
+                  >
                     {{ travel.note }}. Простая сумма времени участков:
                     подача {{ fmt(travel.supply.sum_segments_min) }} мин, обратка {{ fmt(travel.return.sum_segments_min) }} мин.
                   </v-alert>
                   <div style="max-height: 440px; overflow-y: auto;">
-                    <v-table density="compact" class="piezo-table">
+                    <v-table
+                      density="compact"
+                      class="piezo-table"
+                    >
                       <thead>
                         <tr>
                           <th rowspan="2">#</th>
                           <th rowspan="2">Участок</th>
-                          <th rowspan="2" class="text-right">L, м</th>
-                          <th colspan="3" class="text-center">Подача</th>
-                          <th colspan="3" class="text-center">Обратка</th>
+                          <th
+                            rowspan="2"
+                            class="text-right"
+                          >L, м</th>
+                          <th
+                            colspan="3"
+                            class="text-center"
+                          >Подача</th>
+                          <th
+                            colspan="3"
+                            class="text-center"
+                          >Обратка</th>
                         </tr>
                         <tr>
                           <th class="text-right">G, т/ч</th>

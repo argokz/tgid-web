@@ -8,7 +8,11 @@
     aria-label="Панель инструментов"
   >
     <div class="tools-panel__header px-4 py-3">
-      <v-icon size="20" color="primary" class="me-2">mdi-toolbox-outline</v-icon>
+      <v-icon
+        size="20"
+        color="primary"
+        class="me-2"
+      >mdi-toolbox-outline</v-icon>
       <span class="text-subtitle-1 font-weight-bold">Инструменты</span>
       <v-spacer />
       <v-btn
@@ -40,15 +44,26 @@
     <v-divider />
 
     <div class="tools-panel__body">
-      <div v-for="group in filteredGroups" :key="group.title" class="tools-panel__group">
+      <div
+        v-for="group in filteredGroups"
+        :key="group.title"
+        class="tools-panel__group"
+      >
         <div class="tools-panel__group-title px-4 pt-3 pb-1">
-          <v-icon size="14" :color="group.color" class="me-1">{{ group.icon }}</v-icon>
+          <v-icon
+            size="14"
+            :color="group.color"
+            class="me-1"
+          >{{ group.icon }}</v-icon>
           <span class="text-caption font-weight-bold text-uppercase">{{ group.title }}</span>
           <v-spacer />
           <span class="text-caption text-medium-emphasis">{{ group.items.length }}</span>
         </div>
 
-        <v-list density="compact" class="py-0">
+        <v-list
+          density="compact"
+          class="py-0"
+        >
           <v-list-item
             v-for="tool in group.items"
             :key="tool.event"
@@ -57,20 +72,36 @@
             @click="runTool(tool)"
           >
             <template #prepend>
-              <v-avatar size="32" :color="`${tool.color}`" variant="tonal">
-                <v-icon size="18" :color="tool.color">{{ tool.icon }}</v-icon>
+              <v-avatar
+                size="32"
+                :color="`${tool.color}`"
+                variant="tonal"
+              >
+                <v-icon
+                  size="18"
+                  :color="tool.color"
+                >{{ tool.icon }}</v-icon>
               </v-avatar>
             </template>
             <v-list-item-title class="text-body-2">{{ tool.label }}</v-list-item-title>
-            <v-list-item-subtitle v-if="tool.hint" class="text-caption">
+            <v-list-item-subtitle
+              v-if="tool.hint"
+              class="text-caption"
+            >
               {{ tool.hint }}
             </v-list-item-subtitle>
           </v-list-item>
         </v-list>
       </div>
 
-      <div v-if="!filteredGroups.length" class="pa-8 text-center text-medium-emphasis">
-        <v-icon size="36" class="mb-2">mdi-file-search-outline</v-icon>
+      <div
+        v-if="!filteredGroups.length"
+        class="pa-8 text-center text-medium-emphasis"
+      >
+        <v-icon
+          size="36"
+          class="mb-2"
+        >mdi-file-search-outline</v-icon>
         <div class="text-body-2">Ничего не найдено</div>
       </div>
     </div>

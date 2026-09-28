@@ -350,14 +350,38 @@
                   >
                     Стационарный
                   </v-btn>
-                  <v-btn v-if="mutationsEnabled && (!isEditing)" color="primary" variant="text" prepend-icon="mdi-pencil" @click="startEdit">Редактировать</v-btn>
-                  <div v-else class="d-flex ga-2">
-                    <v-btn v-if="mutationsEnabled" color="error" variant="text" @click="cancelEdit" :disabled="saving">Отмена</v-btn>
-                    <v-btn v-if="mutationsEnabled" color="primary" variant="flat" @click="saveInputs" :loading="saving">Сохранить</v-btn>
+                  <v-btn
+                    v-if="mutationsEnabled && (!isEditing)"
+                    color="primary"
+                    variant="text"
+                    prepend-icon="mdi-pencil"
+                    @click="startEdit"
+                  >Редактировать</v-btn>
+                  <div
+                    v-else
+                    class="d-flex ga-2"
+                  >
+                    <v-btn
+                      v-if="mutationsEnabled"
+                      color="error"
+                      variant="text"
+                      @click="cancelEdit"
+                      :disabled="saving"
+                    >Отмена</v-btn>
+                    <v-btn
+                      v-if="mutationsEnabled"
+                      color="primary"
+                      variant="flat"
+                      @click="saveInputs"
+                      :loading="saving"
+                    >Сохранить</v-btn>
                   </div>
                 </div>
               </v-card-title>
-              <v-card-text v-if="!isEditing" class="detail-grid input-grid">
+              <v-card-text
+                v-if="!isEditing"
+                class="detail-grid input-grid"
+              >
                 <DetailValue
                   v-for="field in inputFields"
                   :key="field.key"
@@ -365,11 +389,26 @@
                   :value="formatInput(recordValue(details.inputs, field.key), field.unit)"
                 />
               </v-card-text>
-              <v-card-text v-else class="input-grid">
+              <v-card-text
+                v-else
+                class="input-grid"
+              >
                 <v-row dense>
-                  <v-col v-for="field in inputFields" :key="field.key" cols="12" sm="6">
+                  <v-col
+                    v-for="field in inputFields"
+                    :key="field.key"
+                    cols="12"
+                    sm="6"
+                  >
                     <div class="detail-label mb-1">{{ field.label }}<span v-if="field.unit">, {{ field.unit }}</span></div>
-                    <v-text-field v-model="editFields[field.key]" type="number" density="compact" hide-details variant="outlined" clearable />
+                    <v-text-field
+                      v-model="editFields[field.key]"
+                      type="number"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      clearable
+                    />
                   </v-col>
                 </v-row>
               </v-card-text>
@@ -423,7 +462,10 @@
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="stationaryDialog" max-width="420">
+  <v-dialog
+    v-model="stationaryDialog"
+    max-width="420"
+  >
     <v-card rounded="lg">
       <v-card-title>Стационарный график</v-card-title>
       <v-card-text>
@@ -431,16 +473,54 @@
           Задаёт постоянные t1/t2/t3/tv на всех точках источника (как desktop «Стационарный»).
         </p>
         <v-row dense>
-          <v-col cols="6"><v-text-field v-model.number="stationary.t1" label="t1 подача" type="number" density="compact" variant="outlined" hide-details /></v-col>
-          <v-col cols="6"><v-text-field v-model.number="stationary.t2" label="t2 обратка" type="number" density="compact" variant="outlined" hide-details /></v-col>
-          <v-col cols="6"><v-text-field v-model.number="stationary.t3" label="t3 смешение" type="number" density="compact" variant="outlined" hide-details class="mt-2" /></v-col>
-          <v-col cols="6"><v-text-field v-model.number="stationary.tv" label="tv ветер" type="number" density="compact" variant="outlined" hide-details class="mt-2" /></v-col>
+          <v-col cols="6"><v-text-field
+            v-model.number="stationary.t1"
+            label="t1 подача"
+            type="number"
+            density="compact"
+            variant="outlined"
+            hide-details
+          /></v-col>
+          <v-col cols="6"><v-text-field
+            v-model.number="stationary.t2"
+            label="t2 обратка"
+            type="number"
+            density="compact"
+            variant="outlined"
+            hide-details
+          /></v-col>
+          <v-col cols="6"><v-text-field
+            v-model.number="stationary.t3"
+            label="t3 смешение"
+            type="number"
+            density="compact"
+            variant="outlined"
+            hide-details
+            class="mt-2"
+          /></v-col>
+          <v-col cols="6"><v-text-field
+            v-model.number="stationary.tv"
+            label="tv ветер"
+            type="number"
+            density="compact"
+            variant="outlined"
+            hide-details
+            class="mt-2"
+          /></v-col>
         </v-row>
       </v-card-text>
       <v-card-actions class="px-4 pb-4">
         <v-spacer />
-        <v-btn variant="text" @click="stationaryDialog = false">Отмена</v-btn>
-        <v-btn color="primary" variant="flat" :loading="applyingStationary" @click="applyStationary">Применить</v-btn>
+        <v-btn
+          variant="text"
+          @click="stationaryDialog = false"
+        >Отмена</v-btn>
+        <v-btn
+          color="primary"
+          variant="flat"
+          :loading="applyingStationary"
+          @click="applyStationary"
+        >Применить</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

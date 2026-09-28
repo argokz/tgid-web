@@ -1,17 +1,42 @@
 <template>
-  <v-dialog :model-value="modelValue" max-width="720" @update:model-value="$emit('update:modelValue', $event)">
+  <v-dialog
+    :model-value="modelValue"
+    max-width="720"
+    @update:model-value="$emit('update:modelValue', $event)"
+  >
     <v-card>
-      <v-toolbar color="primary" density="compact">
+      <v-toolbar
+        color="primary"
+        density="compact"
+      >
         <v-toolbar-title>Фрагменты: экспорт, импорт, слияние</v-toolbar-title>
         <v-spacer />
-        <v-btn icon size="small" aria-label="Закрыть" @click="$emit('update:modelValue', false)">
+        <v-btn
+          icon
+          size="small"
+          aria-label="Закрыть"
+          @click="$emit('update:modelValue', false)"
+        >
           <v-icon>mdi-close</v-icon>
         </v-btn>
       </v-toolbar>
-      <v-tabs v-model="tab" density="compact" color="primary">
-        <v-tab value="export" prepend-icon="mdi-file-export">Экспорт</v-tab>
-        <v-tab value="import" prepend-icon="mdi-file-import">Импорт</v-tab>
-        <v-tab value="merge" prepend-icon="mdi-source-merge">Слияние</v-tab>
+      <v-tabs
+        v-model="tab"
+        density="compact"
+        color="primary"
+      >
+        <v-tab
+          value="export"
+          prepend-icon="mdi-file-export"
+        >Экспорт</v-tab>
+        <v-tab
+          value="import"
+          prepend-icon="mdi-file-import"
+        >Импорт</v-tab>
+        <v-tab
+          value="merge"
+          prepend-icon="mdi-source-merge"
+        >Слияние</v-tab>
       </v-tabs>
       <v-divider />
       <v-card-text>
@@ -30,13 +55,25 @@
               density="compact"
               :loading="fragmentsLoading"
             />
-            <v-btn color="primary" :disabled="!exportId" :loading="busy" prepend-icon="mdi-download" @click="doExport">
+            <v-btn
+              color="primary"
+              :disabled="!exportId"
+              :loading="busy"
+              prepend-icon="mdi-download"
+              @click="doExport"
+            >
               Скачать .tgid
             </v-btn>
           </v-window-item>
 
           <v-window-item value="import">
-            <v-alert v-if="!canWrite" type="info" variant="tonal" density="compact" class="mb-2">
+            <v-alert
+              v-if="!canWrite"
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="mb-2"
+            >
               Импорт — редактор топологии (admin и включённая запись топологии на сервере).
             </v-alert>
             <v-file-input
@@ -48,17 +85,38 @@
               :disabled="!canWrite"
               @update:model-value="report = null"
             />
-            <v-text-field v-model="importName" label="Название нового фрагмента (необязательно)" density="compact" :disabled="!canWrite" />
+            <v-text-field
+              v-model="importName"
+              label="Название нового фрагмента (необязательно)"
+              density="compact"
+              :disabled="!canWrite"
+            />
             <div class="d-flex ga-2">
-              <v-btn variant="tonal" :disabled="!canWrite || !selectedFile" :loading="busy" @click="doImport(true)">Проверить</v-btn>
-              <v-btn color="primary" :disabled="!canWrite || !report?.dry_run || reportKind !== 'import'" :loading="busy" @click="doImport(false)">
+              <v-btn
+                variant="tonal"
+                :disabled="!canWrite || !selectedFile"
+                :loading="busy"
+                @click="doImport(true)"
+              >Проверить</v-btn>
+              <v-btn
+                color="primary"
+                :disabled="!canWrite || !report?.dry_run || reportKind !== 'import'"
+                :loading="busy"
+                @click="doImport(false)"
+              >
                 Импортировать
               </v-btn>
             </div>
           </v-window-item>
 
           <v-window-item value="merge">
-            <v-alert v-if="!canWrite" type="info" variant="tonal" density="compact" class="mb-2">
+            <v-alert
+              v-if="!canWrite"
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="mb-2"
+            >
               Слияние — редактор топологии (admin и включённая запись топологии на сервере).
             </v-alert>
             <v-autocomplete
@@ -72,7 +130,12 @@
               :disabled="!canWrite"
               @update:model-value="report = null"
             />
-            <v-text-field v-model="mergeName" label="Название объединённого фрагмента" density="compact" :disabled="!canWrite" />
+            <v-text-field
+              v-model="mergeName"
+              label="Название объединённого фрагмента"
+              density="compact"
+              :disabled="!canWrite"
+            />
             <v-checkbox
               v-model="unifyCodes"
               label="Свести коды с одинаковым названием в один (в десктопе не делается)"
@@ -81,18 +144,42 @@
               :disabled="!canWrite"
             />
             <div class="d-flex ga-2 mt-2">
-              <v-btn variant="tonal" :disabled="!canWrite || mergeIds.length < 2" :loading="busy" @click="doMerge(true)">Проверить</v-btn>
-              <v-btn color="primary" :disabled="!canWrite || !report?.dry_run || reportKind !== 'merge'" :loading="busy" @click="doMerge(false)">
+              <v-btn
+                variant="tonal"
+                :disabled="!canWrite || mergeIds.length < 2"
+                :loading="busy"
+                @click="doMerge(true)"
+              >Проверить</v-btn>
+              <v-btn
+                color="primary"
+                :disabled="!canWrite || !report?.dry_run || reportKind !== 'merge'"
+                :loading="busy"
+                @click="doMerge(false)"
+              >
                 Объединить
               </v-btn>
             </div>
           </v-window-item>
         </v-window>
 
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mt-3">{{ error }}</v-alert>
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mt-3"
+        >{{ error }}</v-alert>
 
-        <div v-if="report" class="mt-3">
-          <v-alert :type="report.dry_run ? 'info' : 'success'" variant="tonal" density="compact" class="mb-2">
+        <div
+          v-if="report"
+          class="mt-3"
+        >
+          <v-alert
+            :type="report.dry_run ? 'info' : 'success'"
+            variant="tonal"
+            density="compact"
+            class="mb-2"
+          >
             <template v-if="report.dry_run">Проверка (ничего не записано):</template>
             <template v-else>Готово: фрагмент {{ report.fileid }}<template v-if="report.name"> «{{ report.name }}»</template>.</template>
             узлов {{ report.created_nodes }}, участков {{ report.created_lines }}.
@@ -100,25 +187,56 @@
               Геометрия: узлов {{ report.geometry.nodes_with_shape }}, участков {{ report.geometry.lines_with_shape }}.
             </template>
           </v-alert>
-          <div v-if="!report.dry_run && report.operation_id" class="mb-2">
-            <v-btn size="small" variant="tonal" color="warning" prepend-icon="mdi-undo" :loading="busy" @click="doUndo">
+          <div
+            v-if="!report.dry_run && report.operation_id"
+            class="mb-2"
+          >
+            <v-btn
+              size="small"
+              variant="tonal"
+              color="warning"
+              prepend-icon="mdi-undo"
+              :loading="busy"
+              @click="doUndo"
+            >
               Отменить операцию
             </v-btn>
           </div>
-          <v-alert v-if="unresolvedText" type="warning" variant="tonal" density="compact" class="mb-2">
+          <v-alert
+            v-if="unresolvedText"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-2"
+          >
             Ссылки на объекты вне файла обнулены: {{ unresolvedText }}
           </v-alert>
-          <v-alert v-if="report.duplicate_external_codes?.length" type="warning" variant="tonal" density="compact" class="mb-2">
+          <v-alert
+            v-if="report.duplicate_external_codes?.length"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-2"
+          >
             Совпадающие коды: {{ report.duplicate_external_codes.map((d) => d.name).join(', ') }}
             <template v-if="report.unified_external_codes"> — сведено {{ report.unified_external_codes }}</template>
           </v-alert>
-          <v-alert v-if="report.coincident_node_positions" type="info" variant="tonal" density="compact" class="mb-2">
+          <v-alert
+            v-if="report.coincident_node_positions"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-2"
+          >
             Узлов в одинаковых координатах: {{ report.coincident_node_positions }} (стыки фрагментов не сливаются, как в десктопе).
           </v-alert>
           <v-table density="compact">
             <thead><tr><th>Таблица</th><th class="text-right">Строк</th></tr></thead>
             <tbody>
-              <tr v-for="(n, t) in report.tables" :key="t"><td>{{ t }}</td><td class="text-right">{{ n }}</td></tr>
+              <tr
+                v-for="(n, t) in report.tables"
+                :key="t"
+              ><td>{{ t }}</td><td class="text-right">{{ n }}</td></tr>
             </tbody>
           </v-table>
         </div>

@@ -1,21 +1,47 @@
 <template>
-  <v-dialog v-model="visible" :fullscreen="isMobile" max-width="1540" scrollable>
+  <v-dialog
+    v-model="visible"
+    :fullscreen="isMobile"
+    max-width="1540"
+    scrollable
+  >
     <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="teal-darken-4" density="compact">
+      <v-toolbar
+        color="teal-darken-4"
+        density="compact"
+      >
         <v-icon class="ml-3 mr-2">mdi-circle-slice-8</v-icon>
         <v-toolbar-title>Диафрагмы наружных теплопроводов</v-toolbar-title>
-        <v-chip class="mr-2" size="small" color="white" variant="outlined">
+        <v-chip
+          class="mr-2"
+          size="small"
+          color="white"
+          variant="outlined"
+        >
           {{ lookups.counts.ready || 0 }}/{{ lookups.counts.total || 0 }} готовы
         </v-chip>
-        <v-btn icon="mdi-close" aria-label="Закрыть" @click="visible = false" />
+        <v-btn
+          icon="mdi-close"
+          aria-label="Закрыть"
+          @click="visible = false"
+        />
       </v-toolbar>
 
       <div class="alerts pa-3 pb-0">
-        <v-alert type="warning" variant="tonal" density="compact">
+        <v-alert
+          type="warning"
+          variant="tonal"
+          density="compact"
+        >
           В текущей БД найдено {{ lookups.counts.total || 0 }} диафрагм, но их старые линии не имеют полной
           топологии и геометрии. Паспортные данные доступны, позиционирование на карте — только после восстановления связей.
         </v-alert>
-        <v-alert v-if="lookups.result_count === 0" type="info" variant="tonal" density="compact">
+        <v-alert
+          v-if="lookups.result_count === 0"
+          type="info"
+          variant="tonal"
+          density="compact"
+        >
           Таблицы <code>calculation</code> и <code>DRO_OUT</code> пусты. Расход, потери напора и сопротивление
           показаны как отсутствующие и не подменяются нулями.
         </v-alert>
@@ -33,133 +59,450 @@
         </v-chip>
       </div>
       <div class="metric-row pa-3 pb-0">
-        <v-chip color="blue" variant="tonal">Диаметр записан: {{ lookups.counts.diameter_available || 0 }}</v-chip>
-        <v-chip color="cyan-darken-3" variant="tonal">Ожидает расчёт: {{ lookups.counts.diameter_pending_calculation || 0 }}</v-chip>
-        <v-chip color="orange" variant="tonal">Диаметр недоступен: {{ lookups.counts.diameter_unavailable || 0 }}</v-chip>
-        <v-chip color="brown" variant="tonal">Некорректное количество: {{ lookups.counts.installed_count_invalid || 0 }}</v-chip>
-        <v-chip color="grey" variant="tonal">С координатой: {{ lookups.counts.locatable || 0 }}</v-chip>
+        <v-chip
+          color="blue"
+          variant="tonal"
+        >Диаметр записан: {{ lookups.counts.diameter_available || 0 }}</v-chip>
+        <v-chip
+          color="cyan-darken-3"
+          variant="tonal"
+        >Ожидает расчёт: {{ lookups.counts.diameter_pending_calculation || 0 }}</v-chip>
+        <v-chip
+          color="orange"
+          variant="tonal"
+        >Диаметр недоступен: {{ lookups.counts.diameter_unavailable || 0 }}</v-chip>
+        <v-chip
+          color="brown"
+          variant="tonal"
+        >Некорректное количество: {{ lookups.counts.installed_count_invalid || 0 }}</v-chip>
+        <v-chip
+          color="grey"
+          variant="tonal"
+        >С координатой: {{ lookups.counts.locatable || 0 }}</v-chip>
       </div>
 
       <div class="filters pa-3">
-        <v-text-field v-model="filters.search" label="ID, линия, узел, место или владелец" prepend-inner-icon="mdi-magnify" density="compact" variant="outlined" clearable hide-details @keyup.enter="reload" />
-        <v-select v-model="filters.quality_status" :items="qualityOptions" label="Качество данных" density="compact" variant="outlined" clearable hide-details />
-        <v-select v-model="filters.diameter_mode" :items="diameterOptions" label="Режим диаметра" density="compact" variant="outlined" clearable hide-details />
-        <v-select v-model="filters.installation_place" :items="lookups.locations" item-title="name" item-value="name" label="Место установки" density="compact" variant="outlined" clearable hide-details />
-        <v-select v-model="filters.state_id" :items="lookups.states" item-title="name" item-value="id" label="Состояние" density="compact" variant="outlined" clearable hide-details />
-        <v-select v-model="filters.external_sign_line_id" :items="lookups.external_signs" item-title="name" item-value="id" label="Признак линии" density="compact" variant="outlined" clearable hide-details />
-        <v-btn color="teal-darken-4" :loading="loading" @click="reload">Найти</v-btn>
+        <v-text-field
+          v-model="filters.search"
+          label="ID, линия, узел, место или владелец"
+          prepend-inner-icon="mdi-magnify"
+          density="compact"
+          variant="outlined"
+          clearable
+          hide-details
+          @keyup.enter="reload"
+        />
+        <v-select
+          v-model="filters.quality_status"
+          :items="qualityOptions"
+          label="Качество данных"
+          density="compact"
+          variant="outlined"
+          clearable
+          hide-details
+        />
+        <v-select
+          v-model="filters.diameter_mode"
+          :items="diameterOptions"
+          label="Режим диаметра"
+          density="compact"
+          variant="outlined"
+          clearable
+          hide-details
+        />
+        <v-select
+          v-model="filters.installation_place"
+          :items="lookups.locations"
+          item-title="name"
+          item-value="name"
+          label="Место установки"
+          density="compact"
+          variant="outlined"
+          clearable
+          hide-details
+        />
+        <v-select
+          v-model="filters.state_id"
+          :items="lookups.states"
+          item-title="name"
+          item-value="id"
+          label="Состояние"
+          density="compact"
+          variant="outlined"
+          clearable
+          hide-details
+        />
+        <v-select
+          v-model="filters.external_sign_line_id"
+          :items="lookups.external_signs"
+          item-title="name"
+          item-value="id"
+          label="Признак линии"
+          density="compact"
+          variant="outlined"
+          clearable
+          hide-details
+        />
+        <v-btn
+          color="teal-darken-4"
+          :loading="loading"
+          @click="reload"
+        >Найти</v-btn>
       </div>
 
-      <div v-if="error" class="journal-error">{{ error }}</div>
+      <div
+        v-if="error"
+        class="journal-error"
+      >{{ error }}</div>
       <div class="table-wrap">
         <table class="journal-table">
           <thead>
             <tr><th>ID</th><th>Место установки</th><th>Линия / узлы</th><th>Диаметр</th><th>Количество</th><th>Запись расчёта</th><th>Линия</th><th>Состояние</th><th>Качество</th><th /></tr>
           </thead>
           <tbody>
-            <tr v-for="item in items" :key="item.id" @click="openDetails(item.id)">
+            <tr
+              v-for="item in items"
+              :key="item.id"
+              @click="openDetails(item.id)"
+            >
               <td>{{ item.id }}</td>
               <td><strong>{{ item.installation_place || item.display_name }}</strong></td>
               <td>{{ item.line_id ?? '—' }}<div class="muted">{{ nodeLabel(item.node_code_1, item.node_name_1, item.node_id_1) }} → {{ nodeLabel(item.node_code_2, item.node_name_2, item.node_id_2) }}</div></td>
               <td>{{ diameterLabel(item) }}<div class="muted">{{ diameterModeLabel(item.diameter_mode) }}</div></td>
               <td>{{ item.installed_count ?? '—' }}</td>
-              <td><v-chip size="x-small" :color="item.calculation_writeback_allowed ? 'green' : 'grey'">{{ item.entry_mark || 'не разрешена' }}</v-chip></td>
+              <td><v-chip
+                size="x-small"
+                :color="item.calculation_writeback_allowed ? 'green' : 'grey'"
+              >{{ item.entry_mark || 'не разрешена' }}</v-chip></td>
               <td>{{ item.external_sign_line_name || '—' }}</td>
               <td>{{ item.state_name || '—' }}</td>
               <td>
-                <v-chip size="x-small" :color="qualityColor(item.quality_status)">{{ qualityLabel(item.quality_status) }}</v-chip>
-                <div v-if="!hasCoordinates(item)" class="muted">карта недоступна</div>
+                <v-chip
+                  size="x-small"
+                  :color="qualityColor(item.quality_status)"
+                >{{ qualityLabel(item.quality_status) }}</v-chip>
+                <div
+                  v-if="!hasCoordinates(item)"
+                  class="muted"
+                >карта недоступна</div>
               </td>
               <td>
-                <v-tooltip v-if="!hasCoordinates(item)" text="Нет координат: линия отсутствует или без узлов" location="left">
+                <v-tooltip
+                  v-if="!hasCoordinates(item)"
+                  text="Нет координат: линия отсутствует или без узлов"
+                  location="left"
+                >
                   <template #activator="{ props }">
-                    <v-btn v-bind="props" icon="mdi-map-marker-off" size="x-small" variant="text" disabled />
+                    <v-btn
+                      v-bind="props"
+                      icon="mdi-map-marker-off"
+                      size="x-small"
+                      variant="text"
+                      disabled
+                    />
                   </template>
                 </v-tooltip>
-                <v-btn v-else icon="mdi-map-marker" size="x-small" variant="text" aria-label="Показать диафрагму на карте" @click.stop="locate(item)" />
+                <v-btn
+                  v-else
+                  icon="mdi-map-marker"
+                  size="x-small"
+                  variant="text"
+                  aria-label="Показать диафрагму на карте"
+                  @click.stop="locate(item)"
+                />
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-if="!loading && !items.length" class="empty">Диафрагмы по выбранным условиям не найдены</div>
-        <v-progress-linear v-if="loading" indeterminate color="teal-darken-4" />
+        <div
+          v-if="!loading && !items.length"
+          class="empty"
+        >Диафрагмы по выбранным условиям не найдены</div>
+        <v-progress-linear
+          v-if="loading"
+          indeterminate
+          color="teal-darken-4"
+        />
       </div>
-      <v-pagination v-if="pages > 1" v-model="page" :length="pages" density="comfortable" @update:model-value="loadItems" />
+      <v-pagination
+        v-if="pages > 1"
+        v-model="page"
+        :length="pages"
+        density="comfortable"
+        @update:model-value="loadItems"
+      />
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="detailVisible" :fullscreen="isMobile" max-width="1180" scrollable>
+  <v-dialog
+    v-model="detailVisible"
+    :fullscreen="isMobile"
+    max-width="1180"
+    scrollable
+  >
     <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="teal-darken-4" density="compact">
-        <v-btn icon="mdi-arrow-left" aria-label="Вернуться к журналу" @click="detailVisible = false" />
+      <v-toolbar
+        color="teal-darken-4"
+        density="compact"
+      >
+        <v-btn
+          icon="mdi-arrow-left"
+          aria-label="Вернуться к журналу"
+          @click="detailVisible = false"
+        />
         <v-toolbar-title>{{ details?.display_name || 'Паспорт диафрагмы' }}</v-toolbar-title>
-        <v-btn icon="mdi-close" aria-label="Закрыть карточку" @click="detailVisible = false" />
+        <v-btn
+          icon="mdi-close"
+          aria-label="Закрыть карточку"
+          @click="detailVisible = false"
+        />
       </v-toolbar>
-      <v-progress-linear v-if="detailLoading" indeterminate color="teal-darken-4" />
+      <v-progress-linear
+        v-if="detailLoading"
+        indeterminate
+        color="teal-darken-4"
+      />
 
       <template v-if="details && !detailLoading">
         <div class="alerts pa-3 pb-0">
-          <v-alert v-if="details.quality_status !== 'ready'" :type="details.quality_status === 'line_missing' ? 'error' : 'warning'" variant="tonal" density="compact">
+          <v-alert
+            v-if="details.quality_status !== 'ready'"
+            :type="details.quality_status === 'line_missing' ? 'error' : 'warning'"
+            variant="tonal"
+            density="compact"
+          >
             {{ qualityDescription(details.quality_status) }}
           </v-alert>
-          <v-alert v-if="details.diameter_mode === 'pending_calculation'" type="info" variant="tonal" density="compact">
+          <v-alert
+            v-if="details.diameter_mode === 'pending_calculation'"
+            type="info"
+            variant="tonal"
+            density="compact"
+          >
             Нулевой диаметр является штатным: desktop разрешает расчёту подобрать и записать диаметр диафрагмы.
           </v-alert>
         </div>
         <v-card-text>
           <v-row>
-            <v-col cols="12" md="6"><v-card variant="outlined" class="h-100"><v-card-title class="text-subtitle-1">Сетевая привязка</v-card-title><v-card-text class="detail-grid">
-              <DetailValue label="Диафрагма / ID" :value="details.id" /><DetailValue label="Линия" :value="details.line_id" />
-              <DetailValue label="Начальный узел" :value="nodeLabel(details.node_code_1, details.node_name_1, details.node_id_1)" /><DetailValue label="Конечный узел" :value="nodeLabel(details.node_code_2, details.node_name_2, details.node_id_2)" />
-              <DetailValue label="Внутренний потребитель" :value="nodeLabel(details.internal_node_code, details.internal_node_name, details.internal_node_id)" /><DetailValue label="Фрагмент" :value="details.fragment_name || details.fragment_id" />
-              <DetailValue label="Признак линии" :value="details.external_sign_line_name" /><DetailValue label="Сопротивление линии" :value="formatNumber(details.line_hydraulic_resistance, 8)" />
+            <v-col
+              cols="12"
+              md="6"
+            ><v-card
+              variant="outlined"
+              class="h-100"
+            ><v-card-title class="text-subtitle-1">Сетевая привязка</v-card-title><v-card-text class="detail-grid">
+              <DetailValue
+                label="Диафрагма / ID"
+                :value="details.id"
+              /><DetailValue
+                label="Линия"
+                :value="details.line_id"
+              />
+              <DetailValue
+                label="Начальный узел"
+                :value="nodeLabel(details.node_code_1, details.node_name_1, details.node_id_1)"
+              /><DetailValue
+                label="Конечный узел"
+                :value="nodeLabel(details.node_code_2, details.node_name_2, details.node_id_2)"
+              />
+              <DetailValue
+                label="Внутренний потребитель"
+                :value="nodeLabel(details.internal_node_code, details.internal_node_name, details.internal_node_id)"
+              /><DetailValue
+                label="Фрагмент"
+                :value="details.fragment_name || details.fragment_id"
+              />
+              <DetailValue
+                label="Признак линии"
+                :value="details.external_sign_line_name"
+              /><DetailValue
+                label="Сопротивление линии"
+                :value="formatNumber(details.line_hydraulic_resistance, 8)"
+              />
             </v-card-text></v-card></v-col>
-            <v-col cols="12" md="6"><v-card variant="outlined" class="h-100">
+            <v-col
+              cols="12"
+              md="6"
+            ><v-card
+              variant="outlined"
+              class="h-100"
+            >
               <v-card-title class="text-subtitle-1">Паспорт диафрагмы</v-card-title>
-              <v-card-text class="detail-grid" v-if="!isEditing">
-                <DetailValue label="Место установки" :value="details.installation_place" /><DetailValue label="Состояние" :value="details.state_name" />
-                <DetailValue label="Внутренний диаметр" :value="diameterLabel(details)" /><DetailValue label="Режим диаметра" :value="diameterModeLabel(details.diameter_mode)" />
-                <DetailValue label="Количество последовательно" :value="details.installed_count" /><DetailValue label="Разрешение записи расчёта" :value="details.entry_mark || 'не разрешена'" />
+              <v-card-text
+                class="detail-grid"
+                v-if="!isEditing"
+              >
+                <DetailValue
+                  label="Место установки"
+                  :value="details.installation_place"
+                /><DetailValue
+                  label="Состояние"
+                  :value="details.state_name"
+                />
+                <DetailValue
+                  label="Внутренний диаметр"
+                  :value="diameterLabel(details)"
+                /><DetailValue
+                  label="Режим диаметра"
+                  :value="diameterModeLabel(details.diameter_mode)"
+                />
+                <DetailValue
+                  label="Количество последовательно"
+                  :value="details.installed_count"
+                /><DetailValue
+                  label="Разрешение записи расчёта"
+                  :value="details.entry_mark || 'не разрешена'"
+                />
               </v-card-text>
               <v-card-text v-else>
                 <v-row dense>
-                  <v-col v-for="field in buildFields()" :key="field.key" cols="12" sm="6">
+                  <v-col
+                    v-for="field in buildFields()"
+                    :key="field.key"
+                    cols="12"
+                    sm="6"
+                  >
                     <div class="detail-label mb-1">{{ field.label }}</div>
-                    <v-select v-if="field.type === 'select'" v-model="editFields[field.key]" :items="field.items" item-title="name" item-value="id" density="compact" hide-details variant="outlined" clearable />
-                    <v-text-field v-else v-model="editFields[field.key]" :type="field.type === 'number' ? 'number' : 'text'" density="compact" hide-details variant="outlined" clearable />
+                    <v-select
+                      v-if="field.type === 'select'"
+                      v-model="editFields[field.key]"
+                      :items="field.items"
+                      item-title="name"
+                      item-value="id"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      clearable
+                    />
+                    <v-text-field
+                      v-else
+                      v-model="editFields[field.key]"
+                      :type="field.type === 'number' ? 'number' : 'text'"
+                      density="compact"
+                      hide-details
+                      variant="outlined"
+                      clearable
+                    />
                   </v-col>
                 </v-row>
               </v-card-text>
             </v-card></v-col>
-            <v-col cols="12" md="6"><v-card variant="outlined" class="h-100"><v-card-title class="text-subtitle-1">Архивные реквизиты линии</v-card-title><v-card-text class="detail-grid">
-              <DetailValue label="Регистрационный номер" :value="details.registration_number" /><DetailValue label="Ввод в эксплуатацию" :value="formatDate(details.commissioned_at)" />
-              <DetailValue label="Последний ремонт" :value="formatDate(details.last_maintenance_at)" /><DetailValue label="Владелец" :value="details.organization_name" />
-              <DetailValue label="Оператор" :value="details.operator_name" />
+            <v-col
+              cols="12"
+              md="6"
+            ><v-card
+              variant="outlined"
+              class="h-100"
+            ><v-card-title class="text-subtitle-1">Архивные реквизиты линии</v-card-title><v-card-text class="detail-grid">
+              <DetailValue
+                label="Регистрационный номер"
+                :value="details.registration_number"
+              /><DetailValue
+                label="Ввод в эксплуатацию"
+                :value="formatDate(details.commissioned_at)"
+              />
+              <DetailValue
+                label="Последний ремонт"
+                :value="formatDate(details.last_maintenance_at)"
+              /><DetailValue
+                label="Владелец"
+                :value="details.organization_name"
+              />
+              <DetailValue
+                label="Оператор"
+                :value="details.operator_name"
+              />
             </v-card-text></v-card></v-col>
-            <v-col cols="12" md="6"><v-card variant="outlined" class="h-100"><v-card-title class="text-subtitle-1">Расчётный режим DRO_OUT</v-card-title>
-              <v-card-text v-if="details.latest_output" class="detail-grid">
-                <DetailValue label="Расход через диафрагму" :value="formatUnit(outputValue('flow'), 'т/ч')" /><DetailValue label="Потери напора" :value="formatUnit(outputValue('head_loss'), 'м')" />
-                <DetailValue label="Полное гидравлическое сопротивление" :value="formatNumber(outputValue('total_hydraulic_resistance'), 8)" /><DetailValue label="Располагаемый напор в конечном узле" :value="formatUnit(outputValue('available_head_end'), 'м')" />
-                <DetailValue label="Пьезометрический напор" :value="formatUnit(outputValue('piezometric_head_end'), 'м')" /><DetailValue label="Геодезическая отметка" :value="formatUnit(outputValue('geodetic_mark_end'), 'м')" />
-                <DetailValue label="Полный напор" :value="formatUnit(outputValue('total_head_end'), 'м')" /><DetailValue label="Источник тепла" :value="String(outputValue('heat_source_name') || outputValue('heat_source_id') || '—')" />
+            <v-col
+              cols="12"
+              md="6"
+            ><v-card
+              variant="outlined"
+              class="h-100"
+            ><v-card-title class="text-subtitle-1">Расчётный режим DRO_OUT</v-card-title>
+              <v-card-text
+                v-if="details.latest_output"
+                class="detail-grid"
+              >
+                <DetailValue
+                  label="Расход через диафрагму"
+                  :value="formatUnit(outputValue('flow'), 'т/ч')"
+                /><DetailValue
+                  label="Потери напора"
+                  :value="formatUnit(outputValue('head_loss'), 'м')"
+                />
+                <DetailValue
+                  label="Полное гидравлическое сопротивление"
+                  :value="formatNumber(outputValue('total_hydraulic_resistance'), 8)"
+                /><DetailValue
+                  label="Располагаемый напор в конечном узле"
+                  :value="formatUnit(outputValue('available_head_end'), 'м')"
+                />
+                <DetailValue
+                  label="Пьезометрический напор"
+                  :value="formatUnit(outputValue('piezometric_head_end'), 'м')"
+                /><DetailValue
+                  label="Геодезическая отметка"
+                  :value="formatUnit(outputValue('geodetic_mark_end'), 'м')"
+                />
+                <DetailValue
+                  label="Полный напор"
+                  :value="formatUnit(outputValue('total_head_end'), 'м')"
+                /><DetailValue
+                  label="Источник тепла"
+                  :value="String(outputValue('heat_source_name') || outputValue('heat_source_id') || '—')"
+                />
               </v-card-text>
-              <v-card-text v-else><v-alert type="info" variant="tonal" density="compact">Расчётный результат для этой диафрагмы отсутствует.</v-alert></v-card-text>
+              <v-card-text v-else><v-alert
+                type="info"
+                variant="tonal"
+                density="compact"
+              >Расчётный результат для этой диафрагмы отсутствует.</v-alert></v-card-text>
             </v-card></v-col>
             <v-col cols="12"><v-card variant="outlined"><v-card-title class="text-subtitle-1">Исходные поля diaphragms</v-card-title><v-card-text class="attribute-grid">
-              <DetailValue v-for="entry in attributeEntries" :key="entry[0]" :label="entry[0]" :value="formatAttribute(entry[1])" />
+              <DetailValue
+                v-for="entry in attributeEntries"
+                :key="entry[0]"
+                :label="entry[0]"
+                :value="formatAttribute(entry[1])"
+              />
             </v-card-text></v-card></v-col>
           </v-row>
         </v-card-text>
         <v-divider />
         <v-card-actions class="px-4 py-3 bg-grey-lighten-4">
           <v-spacer />
-          <v-btn v-if="!isEditing && hasCoordinates(details)" color="teal-darken-4" variant="text" prepend-icon="mdi-map-marker" @click="locate(details)">Показать на карте</v-btn>
+          <v-btn
+            v-if="!isEditing && hasCoordinates(details)"
+            color="teal-darken-4"
+            variant="text"
+            prepend-icon="mdi-map-marker"
+            @click="locate(details)"
+          >Показать на карте</v-btn>
           <template v-if="!isEditing">
-            <v-btn v-if="mutationsEnabled" color="primary" variant="flat" prepend-icon="mdi-pencil" @click="startEdit">Редактировать</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="primary"
+              variant="flat"
+              prepend-icon="mdi-pencil"
+              @click="startEdit"
+            >Редактировать</v-btn>
           </template>
           <template v-else>
-            <v-btn v-if="mutationsEnabled" color="error" variant="text" @click="cancelEdit" :disabled="saving">Отмена</v-btn>
-            <v-btn v-if="mutationsEnabled" color="primary" variant="flat" @click="saveChanges" :loading="saving">Сохранить</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="error"
+              variant="text"
+              @click="cancelEdit"
+              :disabled="saving"
+            >Отмена</v-btn>
+            <v-btn
+              v-if="mutationsEnabled"
+              color="primary"
+              variant="flat"
+              @click="saveChanges"
+              :loading="saving"
+            >Сохранить</v-btn>
           </template>
         </v-card-actions>
       </template>

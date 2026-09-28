@@ -1,103 +1,331 @@
 <template>
-  <v-dialog v-model="visible" :fullscreen="isMobile" max-width="1600" scrollable>
-    <v-card class="electrical-journal" :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="amber-darken-4" density="comfortable">
+  <v-dialog
+    v-model="visible"
+    :fullscreen="isMobile"
+    max-width="1600"
+    scrollable
+  >
+    <v-card
+      class="electrical-journal"
+      :rounded="isMobile ? 0 : 'lg'"
+    >
+      <v-toolbar
+        color="amber-darken-4"
+        density="comfortable"
+      >
         <v-icon class="ml-3">mdi-transmission-tower</v-icon>
         <v-toolbar-title>Электрическая сеть</v-toolbar-title>
-        <v-chip class="mr-2" size="small">{{ total.toLocaleString('ru-RU') }} объектов</v-chip>
-        <v-btn icon="mdi-close" @click="visible = false" />
+        <v-chip
+          class="mr-2"
+          size="small"
+        >{{ total.toLocaleString('ru-RU') }} объектов</v-chip>
+        <v-btn
+          icon="mdi-close"
+          @click="visible = false"
+        />
       </v-toolbar>
-      <v-tabs v-model="tab" color="amber-darken-4" density="compact">
+      <v-tabs
+        v-model="tab"
+        color="amber-darken-4"
+        density="compact"
+      >
         <v-tab value="journal">Журнал</v-tab>
         <v-tab value="reconciliation">Сверка и привязка</v-tab>
       </v-tabs>
 
-      <v-card-text v-if="tab === 'reconciliation'" class="pa-0">
-        <ElectricalReconciliationPanel @locate="locateReconciliation" @open-object="openReconciliationObject" />
+      <v-card-text
+        v-if="tab === 'reconciliation'"
+        class="pa-0"
+      >
+        <ElectricalReconciliationPanel
+          @locate="locateReconciliation"
+          @open-object="openReconciliationObject"
+        />
       </v-card-text>
       <template v-else>
-      <div class="pa-3 electrical-filters">
-        <v-row dense>
-          <v-col cols="12" md="3">
-            <v-text-field v-model="filters.search" label="Наименование, тип, владелец" density="compact" clearable hide-details prepend-inner-icon="mdi-magnify" @keyup.enter="reload" />
-          </v-col>
-          <v-col cols="6" md="2"><v-select v-model="filters.object_type" :items="objectTypes" label="Вид объекта" density="compact" clearable hide-details /></v-col>
-          <v-col cols="6" md="2"><v-select v-model="filters.owner_id" :items="lookups.owners" item-title="name" item-value="id" label="Владелец" density="compact" clearable hide-details /></v-col>
-          <v-col cols="6" md="2"><v-select v-model="filters.voltage_kv" :items="lookups.voltages" item-title="value" item-value="value" label="Напряжение, кВ" density="compact" clearable hide-details /></v-col>
-          <v-col cols="6" md="2"><v-text-field v-model.number="filters.parent_line_id" type="number" label="ID ЛЭП" density="compact" clearable hide-details /></v-col>
-          <v-col cols="12" md="2" class="d-flex ga-2"><v-btn color="amber-darken-4" prepend-icon="mdi-filter" @click="reload">Применить</v-btn><v-btn variant="text" icon="mdi-filter-remove" @click="resetFilters" /></v-col>
-        </v-row>
-        <div class="d-flex flex-wrap ga-2 mt-3">
-          <v-chip v-for="type in objectTypes" :key="type.value" size="small" :color="type.color" variant="tonal">{{ type.title }}: {{ lookupCount(type.value) }}</v-chip>
+        <div class="pa-3 electrical-filters">
+          <v-row dense>
+            <v-col
+              cols="12"
+              md="3"
+            >
+              <v-text-field
+                v-model="filters.search"
+                label="Наименование, тип, владелец"
+                density="compact"
+                clearable
+                hide-details
+                prepend-inner-icon="mdi-magnify"
+                @keyup.enter="reload"
+              />
+            </v-col>
+            <v-col
+              cols="6"
+              md="2"
+            ><v-select
+              v-model="filters.object_type"
+              :items="objectTypes"
+              label="Вид объекта"
+              density="compact"
+              clearable
+              hide-details
+            /></v-col>
+            <v-col
+              cols="6"
+              md="2"
+            ><v-select
+              v-model="filters.owner_id"
+              :items="lookups.owners"
+              item-title="name"
+              item-value="id"
+              label="Владелец"
+              density="compact"
+              clearable
+              hide-details
+            /></v-col>
+            <v-col
+              cols="6"
+              md="2"
+            ><v-select
+              v-model="filters.voltage_kv"
+              :items="lookups.voltages"
+              item-title="value"
+              item-value="value"
+              label="Напряжение, кВ"
+              density="compact"
+              clearable
+              hide-details
+            /></v-col>
+            <v-col
+              cols="6"
+              md="2"
+            ><v-text-field
+              v-model.number="filters.parent_line_id"
+              type="number"
+              label="ID ЛЭП"
+              density="compact"
+              clearable
+              hide-details
+            /></v-col>
+            <v-col
+              cols="12"
+              md="2"
+              class="d-flex ga-2"
+            ><v-btn
+              color="amber-darken-4"
+              prepend-icon="mdi-filter"
+              @click="reload"
+            >Применить</v-btn><v-btn
+              variant="text"
+              icon="mdi-filter-remove"
+              @click="resetFilters"
+            /></v-col>
+          </v-row>
+          <div class="d-flex flex-wrap ga-2 mt-3">
+            <v-chip
+              v-for="type in objectTypes"
+              :key="type.value"
+              size="small"
+              :color="type.color"
+              variant="tonal"
+            >{{ type.title }}: {{ lookupCount(type.value) }}</v-chip>
+          </div>
         </div>
-      </div>
 
-      <v-progress-linear v-if="loading" indeterminate color="amber-darken-4" />
-      <v-alert v-if="error" type="error" variant="tonal" class="ma-3">{{ error }}</v-alert>
-      <v-card-text class="pa-0 electrical-table-wrap">
-        <div v-if="!loading && !items.length" class="electrical-empty">
-          <v-icon size="64" color="grey-lighten-1">mdi-transmission-tower-off</v-icon>
-          <div class="text-h6 mt-3">Объекты электросети отсутствуют</div>
-          <div class="text-body-2 text-medium-emphasis mt-1">В текущей БД таблицы источников, ЛЭП, приёмников и оборудования пусты.</div>
-        </div>
-        <table v-else class="electrical-table">
-          <thead><tr><th>ID</th><th>Вид</th><th>Наименование</th><th>Тип</th><th>Владелец</th><th>ЛЭП</th><th>Напряжение</th><th>Мощность</th><th>Длина</th><th>Дата</th><th>Карта</th></tr></thead>
-          <tbody>
-            <tr v-for="item in items" :key="`${item.object_type}-${item.id}`" @click="openDetails(item.object_type, item.id)">
-              <td>{{ item.id }}</td><td><v-chip size="x-small" :color="typeMeta(item.object_type).color">{{ typeMeta(item.object_type).title }}</v-chip></td><td>{{ item.name || '—' }}</td><td>{{ item.type_name || '—' }}</td><td>{{ item.owner_name || '—' }}</td><td>{{ item.parent_line_id || '—' }}</td><td>{{ numeric(item.voltage_kv, ' кВ') }}</td><td>{{ numeric(item.capacity_kw, ' кВт') }}</td><td>{{ numeric(item.length_m, ' м') }}</td><td>{{ formatDate(item.installed_on) }}</td><td><v-icon :color="hasCoordinates(item) ? 'amber-darken-4' : 'grey'">mdi-map-marker</v-icon></td>
-            </tr>
-          </tbody>
-        </table>
-      </v-card-text>
-      <v-card-actions class="justify-center border-t-sm"><v-pagination v-model="page" :length="pages || 1" :total-visible="isMobile ? 4 : 8" density="comfortable" @update:model-value="loadPage" /></v-card-actions>
+        <v-progress-linear
+          v-if="loading"
+          indeterminate
+          color="amber-darken-4"
+        />
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          class="ma-3"
+        >{{ error }}</v-alert>
+        <v-card-text class="pa-0 electrical-table-wrap">
+          <div
+            v-if="!loading && !items.length"
+            class="electrical-empty"
+          >
+            <v-icon
+              size="64"
+              color="grey-lighten-1"
+            >mdi-transmission-tower-off</v-icon>
+            <div class="text-h6 mt-3">Объекты электросети отсутствуют</div>
+            <div class="text-body-2 text-medium-emphasis mt-1">В текущей БД таблицы источников, ЛЭП, приёмников и оборудования пусты.</div>
+          </div>
+          <table
+            v-else
+            class="electrical-table"
+          >
+            <thead><tr><th>ID</th><th>Вид</th><th>Наименование</th><th>Тип</th><th>Владелец</th><th>ЛЭП</th><th>Напряжение</th><th>Мощность</th><th>Длина</th><th>Дата</th><th>Карта</th></tr></thead>
+            <tbody>
+              <tr
+                v-for="item in items"
+                :key="`${item.object_type}-${item.id}`"
+                @click="openDetails(item.object_type, item.id)"
+              >
+                <td>{{ item.id }}</td><td><v-chip
+                  size="x-small"
+                  :color="typeMeta(item.object_type).color"
+                >{{ typeMeta(item.object_type).title }}</v-chip></td><td>{{ item.name || '—' }}</td><td>{{ item.type_name || '—' }}</td><td>{{ item.owner_name || '—' }}</td><td>{{ item.parent_line_id || '—' }}</td><td>{{ numeric(item.voltage_kv, ' кВ') }}</td><td>{{ numeric(item.capacity_kw, ' кВт') }}</td><td>{{ numeric(item.length_m, ' м') }}</td><td>{{ formatDate(item.installed_on) }}</td><td><v-icon :color="hasCoordinates(item) ? 'amber-darken-4' : 'grey'">mdi-map-marker</v-icon></td>
+              </tr>
+            </tbody>
+          </table>
+        </v-card-text>
+        <v-card-actions class="justify-center border-t-sm"><v-pagination
+          v-model="page"
+          :length="pages || 1"
+          :total-visible="isMobile ? 4 : 8"
+          density="comfortable"
+          @update:model-value="loadPage"
+        /></v-card-actions>
       </template>
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="detailsVisible" :fullscreen="isMobile" max-width="1050" scrollable>
-    <v-card v-if="selected" :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="amber-darken-4" density="comfortable">
+  <v-dialog
+    v-model="detailsVisible"
+    :fullscreen="isMobile"
+    max-width="1050"
+    scrollable
+  >
+    <v-card
+      v-if="selected"
+      :rounded="isMobile ? 0 : 'lg'"
+    >
+      <v-toolbar
+        color="amber-darken-4"
+        density="comfortable"
+      >
         <v-icon class="ml-3">{{ typeMeta(selected.object_type).icon }}</v-icon>
         <v-toolbar-title>{{ typeMeta(selected.object_type).title }} {{ selected.name || selected.id }}</v-toolbar-title>
-        <v-btn v-if="hasCoordinates(selected)" icon="mdi-crosshairs-gps" title="Показать на карте" @click="locateSelected" />
-        <v-btn icon="mdi-close" @click="detailsVisible = false" />
+        <v-btn
+          v-if="hasCoordinates(selected)"
+          icon="mdi-crosshairs-gps"
+          title="Показать на карте"
+          @click="locateSelected"
+        />
+        <v-btn
+          icon="mdi-close"
+          @click="detailsVisible = false"
+        />
       </v-toolbar>
-      <v-progress-linear v-if="detailsLoading" indeterminate />
+      <v-progress-linear
+        v-if="detailsLoading"
+        indeterminate
+      />
       <v-card-text>
         <section class="mb-5">
           <div class="text-subtitle-1 font-weight-bold mb-2">Основные данные</div>
           <div class="detail-grid">
-            <div v-for="entry in summaryDetails" :key="entry[0]" class="detail-cell"><div class="detail-label">{{ entry[0] }}</div><div>{{ formatValue(entry[1]) }}</div></div>
+            <div
+              v-for="entry in summaryDetails"
+              :key="entry[0]"
+              class="detail-cell"
+            ><div class="detail-label">{{ entry[0] }}</div><div>{{ formatValue(entry[1]) }}</div></div>
           </div>
         </section>
-        <section v-if="attributeDetails.length || isEditing" class="mb-5">
+        <section
+          v-if="attributeDetails.length || isEditing"
+          class="mb-5"
+        >
           <div class="d-flex justify-space-between align-center mb-2">
             <div class="text-subtitle-1 font-weight-bold">Паспортные поля</div>
             <div v-if="!isEditing">
-              <v-btn v-if="mutationsEnabled" color="primary" variant="text" density="compact" prepend-icon="mdi-pencil" @click="startEdit">Редактировать</v-btn>
+              <v-btn
+                v-if="mutationsEnabled"
+                color="primary"
+                variant="text"
+                density="compact"
+                prepend-icon="mdi-pencil"
+                @click="startEdit"
+              >Редактировать</v-btn>
             </div>
-            <div v-else class="d-flex ga-2">
-              <v-btn v-if="mutationsEnabled" color="error" variant="text" density="compact" @click="cancelEdit" :disabled="saving">Отмена</v-btn>
-              <v-btn v-if="mutationsEnabled" color="primary" variant="flat" density="compact" @click="saveChanges" :loading="saving">Сохранить</v-btn>
+            <div
+              v-else
+              class="d-flex ga-2"
+            >
+              <v-btn
+                v-if="mutationsEnabled"
+                color="error"
+                variant="text"
+                density="compact"
+                @click="cancelEdit"
+                :disabled="saving"
+              >Отмена</v-btn>
+              <v-btn
+                v-if="mutationsEnabled"
+                color="primary"
+                variant="flat"
+                density="compact"
+                @click="saveChanges"
+                :loading="saving"
+              >Сохранить</v-btn>
             </div>
           </div>
-          <div class="detail-grid" v-if="!isEditing">
-            <div v-for="entry in attributeDetails" :key="entry[0]" class="detail-cell"><div class="detail-label">{{ attributeLabel(entry[0]) }}</div><div>{{ formatValue(entry[1]) }}</div></div>
+          <div
+            class="detail-grid"
+            v-if="!isEditing"
+          >
+            <div
+              v-for="entry in attributeDetails"
+              :key="entry[0]"
+              class="detail-cell"
+            ><div class="detail-label">{{ attributeLabel(entry[0]) }}</div><div>{{ formatValue(entry[1]) }}</div></div>
           </div>
-          <v-card variant="outlined" class="pa-3" v-else>
+          <v-card
+            variant="outlined"
+            class="pa-3"
+            v-else
+          >
             <v-row dense>
-              <v-col v-for="field in buildFields()" :key="field.key" cols="12" sm="6">
+              <v-col
+                v-for="field in buildFields()"
+                :key="field.key"
+                cols="12"
+                sm="6"
+              >
                 <div class="detail-label mb-1">{{ field.label }}</div>
-                <v-select v-if="field.type === 'select'" v-model="editFields[field.key]" :items="field.items" item-title="name" item-value="id" density="compact" hide-details variant="outlined" clearable />
-                <v-text-field v-else v-model="editFields[field.key]" :type="field.type === 'number' ? 'number' : 'text'" density="compact" hide-details variant="outlined" clearable />
+                <v-select
+                  v-if="field.type === 'select'"
+                  v-model="editFields[field.key]"
+                  :items="field.items"
+                  item-title="name"
+                  item-value="id"
+                  density="compact"
+                  hide-details
+                  variant="outlined"
+                  clearable
+                />
+                <v-text-field
+                  v-else
+                  v-model="editFields[field.key]"
+                  :type="field.type === 'number' ? 'number' : 'text'"
+                  density="compact"
+                  hide-details
+                  variant="outlined"
+                  clearable
+                />
               </v-col>
             </v-row>
           </v-card>
         </section>
-        <section v-for="relation in relationGroups" :key="relation.key" class="mb-5">
+        <section
+          v-for="relation in relationGroups"
+          :key="relation.key"
+          class="mb-5"
+        >
           <div class="text-subtitle-1 font-weight-bold mb-2">{{ relation.title }} ({{ relation.rows.length }})</div>
           <div class="relation-list">
-            <button v-for="(row, index) in relation.rows" :key="String(row.id || index)" type="button" class="relation-row" @click="openRelation(row)">
+            <button
+              v-for="(row, index) in relation.rows"
+              :key="String(row.id || index)"
+              type="button"
+              class="relation-row"
+              @click="openRelation(row)"
+            >
               <strong>{{ row.id ? `ID ${row.id}` : '—' }}</strong><span>{{ relationText(row) }}</span>
             </button>
           </div>

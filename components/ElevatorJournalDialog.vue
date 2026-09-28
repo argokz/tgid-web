@@ -1,115 +1,345 @@
 <template>
   <div>
-  <v-dialog v-model="visible" :fullscreen="isMobile" max-width="1500" scrollable>
-    <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="blue-grey-darken-4" density="compact">
-        <v-icon class="ml-3 mr-2">mdi-elevator</v-icon>
-        <v-toolbar-title>Элеваторы</v-toolbar-title>
-        <v-chip class="mr-2" size="small" color="white" variant="outlined">
-          {{ lookups.counts.ready || 0 }}/{{ lookups.counts.total || 0 }} готовы
-        </v-chip>
-        <v-btn icon="mdi-close" aria-label="Закрыть" @click="visible = false" />
-      </v-toolbar>
-
-      <div class="metrics pa-3 pb-0">
-        <v-chip
-          v-for="metric in qualityMetrics"
-          :key="metric.value"
-          :color="metric.color"
-          :variant="filters.quality_status === metric.value ? 'flat' : 'tonal'"
-          @click="setQualityStatus(metric.value)"
+    <v-dialog
+      v-model="visible"
+      :fullscreen="isMobile"
+      max-width="1500"
+      scrollable
+    >
+      <v-card :rounded="isMobile ? 0 : 'lg'">
+        <v-toolbar
+          color="blue-grey-darken-4"
+          density="compact"
         >
-          {{ metric.label }}: {{ lookups.counts[metric.value] || 0 }}
-        </v-chip>
-      </div>
+          <v-icon class="ml-3 mr-2">mdi-elevator</v-icon>
+          <v-toolbar-title>Элеваторы</v-toolbar-title>
+          <v-chip
+            class="mr-2"
+            size="small"
+            color="white"
+            variant="outlined"
+          >
+            {{ lookups.counts.ready || 0 }}/{{ lookups.counts.total || 0 }} готовы
+          </v-chip>
+          <v-btn
+            icon="mdi-close"
+            aria-label="Закрыть"
+            @click="visible = false"
+          />
+        </v-toolbar>
 
-      <div class="filters pa-3">
-        <v-text-field v-model="filters.search" label="ID, линия, тип, номер или узел" prepend-inner-icon="mdi-magnify" density="compact" variant="outlined" clearable hide-details @keyup.enter="reload" />
-        <v-select v-model="filters.quality_status" :items="qualityOptions" label="Качество данных" density="compact" variant="outlined" clearable hide-details />
-        <v-select v-model="filters.state_id" :items="lookups.states" item-title="name" item-value="id" label="Состояние" density="compact" variant="outlined" clearable hide-details />
-        <v-select v-model="filters.fragment_id" :items="lookups.fragments" item-title="name" item-value="id" label="Фрагмент" density="compact" variant="outlined" clearable hide-details />
-        <v-btn color="blue-grey-darken-4" :loading="loading" @click="reload">Найти</v-btn>
-      </div>
+        <div class="metrics pa-3 pb-0">
+          <v-chip
+            v-for="metric in qualityMetrics"
+            :key="metric.value"
+            :color="metric.color"
+            :variant="filters.quality_status === metric.value ? 'flat' : 'tonal'"
+            @click="setQualityStatus(metric.value)"
+          >
+            {{ metric.label }}: {{ lookups.counts[metric.value] || 0 }}
+          </v-chip>
+        </div>
 
-      <div v-if="error" class="journal-error">{{ error }}</div>
-      <div class="table-wrap">
-        <table class="journal-table">
-          <thead>
-            <tr><th>ID</th><th>Тип / номер</th><th>Линия / узлы</th><th>Сопло</th><th>Камера</th><th>Материал</th><th>Состояние</th><th>Качество</th><th /></tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in items" :key="item.id" @click="openDetails(item.id)">
-              <td>{{ item.id }}</td>
-              <td><strong>{{ item.elevator_type || item.display_name }}</strong><div class="muted">{{ item.elevator_num_inst ?? '—' }}</div></td>
-              <td>{{ item.line_id ?? '—' }}<div class="muted">{{ nodeLabel(item.node_code_1, item.node_name_1, item.node_id_1) }} → {{ nodeLabel(item.node_code_2, item.node_name_2, item.node_id_2) }}</div></td>
-              <td>{{ formatUnit(item.diameter_nozzle, 'мм') }}</td>
-              <td>{{ formatUnit(item.diameter_chamber, 'мм') }}</td>
-              <td>{{ item.material || '—' }}</td>
-              <td>{{ item.state_name || '—' }}</td>
-              <td><v-chip size="x-small" :color="qualityColor(item.quality_status)">{{ qualityLabel(item.quality_status) }}</v-chip></td>
-              <td><v-btn v-if="hasCoordinates(item)" icon="mdi-map-marker" size="x-small" variant="text" aria-label="Показать элеватор на карте" @click.stop="locate(item)" /></td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-if="!loading && !items.length" class="empty">Элеваторы по выбранным условиям не найдены</div>
-        <v-progress-linear v-if="loading" indeterminate color="blue-grey-darken-4" />
-      </div>
-      <v-pagination v-if="pages > 1" v-model="page" :length="pages" density="comfortable" @update:model-value="loadItems" />
-    </v-card>
-  </v-dialog>
+        <div class="filters pa-3">
+          <v-text-field
+            v-model="filters.search"
+            label="ID, линия, тип, номер или узел"
+            prepend-inner-icon="mdi-magnify"
+            density="compact"
+            variant="outlined"
+            clearable
+            hide-details
+            @keyup.enter="reload"
+          />
+          <v-select
+            v-model="filters.quality_status"
+            :items="qualityOptions"
+            label="Качество данных"
+            density="compact"
+            variant="outlined"
+            clearable
+            hide-details
+          />
+          <v-select
+            v-model="filters.state_id"
+            :items="lookups.states"
+            item-title="name"
+            item-value="id"
+            label="Состояние"
+            density="compact"
+            variant="outlined"
+            clearable
+            hide-details
+          />
+          <v-select
+            v-model="filters.fragment_id"
+            :items="lookups.fragments"
+            item-title="name"
+            item-value="id"
+            label="Фрагмент"
+            density="compact"
+            variant="outlined"
+            clearable
+            hide-details
+          />
+          <v-btn
+            color="blue-grey-darken-4"
+            :loading="loading"
+            @click="reload"
+          >Найти</v-btn>
+        </div>
 
-  <v-dialog v-model="detailVisible" :fullscreen="isMobile" max-width="1120" scrollable>
-    <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar color="blue-grey-darken-4" density="compact">
-        <v-btn icon="mdi-arrow-left" aria-label="Вернуться к журналу" @click="detailVisible = false" />
-        <v-toolbar-title>{{ details?.display_name || 'Паспорт элеватора' }}</v-toolbar-title>
-        <v-btn icon="mdi-close" aria-label="Закрыть карточку" @click="detailVisible = false" />
-      </v-toolbar>
-      <v-progress-linear v-if="detailLoading" indeterminate color="blue-grey-darken-4" />
+        <div
+          v-if="error"
+          class="journal-error"
+        >{{ error }}</div>
+        <div class="table-wrap">
+          <table class="journal-table">
+            <thead>
+              <tr><th>ID</th><th>Тип / номер</th><th>Линия / узлы</th><th>Сопло</th><th>Камера</th><th>Материал</th><th>Состояние</th><th>Качество</th><th /></tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="item in items"
+                :key="item.id"
+                @click="openDetails(item.id)"
+              >
+                <td>{{ item.id }}</td>
+                <td><strong>{{ item.elevator_type || item.display_name }}</strong><div class="muted">{{ item.elevator_num_inst ?? '—' }}</div></td>
+                <td>{{ item.line_id ?? '—' }}<div class="muted">{{ nodeLabel(item.node_code_1, item.node_name_1, item.node_id_1) }} → {{ nodeLabel(item.node_code_2, item.node_name_2, item.node_id_2) }}</div></td>
+                <td>{{ formatUnit(item.diameter_nozzle, 'мм') }}</td>
+                <td>{{ formatUnit(item.diameter_chamber, 'мм') }}</td>
+                <td>{{ item.material || '—' }}</td>
+                <td>{{ item.state_name || '—' }}</td>
+                <td><v-chip
+                  size="x-small"
+                  :color="qualityColor(item.quality_status)"
+                >{{ qualityLabel(item.quality_status) }}</v-chip></td>
+                <td><v-btn
+                  v-if="hasCoordinates(item)"
+                  icon="mdi-map-marker"
+                  size="x-small"
+                  variant="text"
+                  aria-label="Показать элеватор на карте"
+                  @click.stop="locate(item)"
+                /></td>
+              </tr>
+            </tbody>
+          </table>
+          <div
+            v-if="!loading && !items.length"
+            class="empty"
+          >Элеваторы по выбранным условиям не найдены</div>
+          <v-progress-linear
+            v-if="loading"
+            indeterminate
+            color="blue-grey-darken-4"
+          />
+        </div>
+        <v-pagination
+          v-if="pages > 1"
+          v-model="page"
+          :length="pages"
+          density="comfortable"
+          @update:model-value="loadItems"
+        />
+      </v-card>
+    </v-dialog>
 
-      <template v-if="details && !detailLoading">
-        <v-alert v-if="details.quality_status !== 'ready'" class="ma-3 mb-0" type="warning" variant="tonal" density="compact">
-          {{ qualityDescription(details.quality_status) }}
-        </v-alert>
-        <v-card-text>
-          <v-row>
-            <v-col cols="12" md="6"><v-card variant="outlined" class="h-100"><v-card-title class="text-subtitle-1">Сетевая привязка</v-card-title><v-card-text class="detail-grid">
-              <DetailValue label="Элеватор / ID" :value="details.id" /><DetailValue label="Линия" :value="details.line_id" />
-              <DetailValue label="Начальный узел" :value="nodeLabel(details.node_code_1, details.node_name_1, details.node_id_1)" /><DetailValue label="Конечный узел" :value="nodeLabel(details.node_code_2, details.node_name_2, details.node_id_2)" />
-              <DetailValue label="Фрагмент" :value="details.fragment_name || details.fragment_id" /><DetailValue label="Признак линии" :value="details.external_sign_line_name" />
-            </v-card-text></v-card></v-col>
-            <v-col cols="12" md="6"><v-card variant="outlined" class="h-100"><v-card-title class="text-subtitle-1">Паспорт</v-card-title><v-card-text class="detail-grid">
-              <DetailValue label="Тип" :value="details.elevator_type" /><DetailValue label="Установленный номер" :value="details.elevator_num_inst" />
-              <DetailValue label="Диаметр сопла" :value="formatUnit(details.diameter_nozzle, 'мм')" /><DetailValue label="Диаметр камеры" :value="formatUnit(details.diameter_chamber, 'мм')" />
-              <DetailValue label="Длина корпуса" :value="formatUnit(details.length, 'мм')" /><DetailValue label="Входной фланец" :value="formatUnit(details.diameter_inlet_flange, 'мм')" />
-              <DetailValue label="Выходной фланец" :value="formatUnit(details.diameter_outlet_flange, 'мм')" /><DetailValue label="Патрубок подсоса" :value="formatUnit(details.diameter_suction_pipe, 'мм')" />
-              <DetailValue label="Материал" :value="details.material" /><DetailValue label="Состояние" :value="details.state_name" />
-              <DetailValue label="Признак расчёта" :value="details.entry_mark" />
-            </v-card-text></v-card></v-col>
-            <v-col cols="12" md="6"><v-card variant="outlined" class="h-100"><v-card-title class="text-subtitle-1">Архивные реквизиты линии</v-card-title><v-card-text class="detail-grid">
-              <DetailValue label="Регистрационный номер" :value="details.registration_number" /><DetailValue label="Ввод в эксплуатацию" :value="formatDate(details.commissioned_at)" />
-              <DetailValue label="Последнее обслуживание" :value="formatDate(details.last_maintenance_at)" /><DetailValue label="Владелец" :value="details.organization_name" />
-              <DetailValue label="Оператор" :value="details.operator_name" /><DetailValue label="Сопротивление линии" :value="formatNumber(details.line_hydraulic_resistance, 8)" />
-            </v-card-text></v-card></v-col>
-            <v-col cols="12" md="6"><v-card variant="outlined" class="h-100"><v-card-title class="text-subtitle-1">Последний ANY_OUT</v-card-title>
-              <v-card-text v-if="details.latest_output" class="attribute-grid">
-                <DetailValue v-for="entry in outputEntries" :key="entry[0]" :label="entry[0]" :value="formatAttribute(entry[1])" />
-              </v-card-text>
-              <v-card-text v-else><v-alert type="info" variant="tonal" density="compact">Расчётный результат для линии отсутствует.</v-alert></v-card-text>
-            </v-card></v-col>
-            <v-col cols="12"><v-card variant="outlined"><v-card-title class="text-subtitle-1">Исходные поля elevators</v-card-title><v-card-text class="attribute-grid">
-              <DetailValue v-for="entry in attributeEntries" :key="entry[0]" :label="entry[0]" :value="formatAttribute(entry[1])" />
-            </v-card-text></v-card></v-col>
-          </v-row>
-        </v-card-text>
-        <v-divider />
-        <v-card-actions class="px-4 py-3 bg-grey-lighten-4">
-          <v-spacer />
-          <v-btn v-if="hasCoordinates(details)" color="blue-grey-darken-4" variant="text" prepend-icon="mdi-map-marker" @click="locate(details)">Показать на карте</v-btn>
-        </v-card-actions>
-      </template>
-    </v-card>
-  </v-dialog>
+    <v-dialog
+      v-model="detailVisible"
+      :fullscreen="isMobile"
+      max-width="1120"
+      scrollable
+    >
+      <v-card :rounded="isMobile ? 0 : 'lg'">
+        <v-toolbar
+          color="blue-grey-darken-4"
+          density="compact"
+        >
+          <v-btn
+            icon="mdi-arrow-left"
+            aria-label="Вернуться к журналу"
+            @click="detailVisible = false"
+          />
+          <v-toolbar-title>{{ details?.display_name || 'Паспорт элеватора' }}</v-toolbar-title>
+          <v-btn
+            icon="mdi-close"
+            aria-label="Закрыть карточку"
+            @click="detailVisible = false"
+          />
+        </v-toolbar>
+        <v-progress-linear
+          v-if="detailLoading"
+          indeterminate
+          color="blue-grey-darken-4"
+        />
+
+        <template v-if="details && !detailLoading">
+          <v-alert
+            v-if="details.quality_status !== 'ready'"
+            class="ma-3 mb-0"
+            type="warning"
+            variant="tonal"
+            density="compact"
+          >
+            {{ qualityDescription(details.quality_status) }}
+          </v-alert>
+          <v-card-text>
+            <v-row>
+              <v-col
+                cols="12"
+                md="6"
+              ><v-card
+                variant="outlined"
+                class="h-100"
+              ><v-card-title class="text-subtitle-1">Сетевая привязка</v-card-title><v-card-text class="detail-grid">
+                <DetailValue
+                  label="Элеватор / ID"
+                  :value="details.id"
+                /><DetailValue
+                  label="Линия"
+                  :value="details.line_id"
+                />
+                <DetailValue
+                  label="Начальный узел"
+                  :value="nodeLabel(details.node_code_1, details.node_name_1, details.node_id_1)"
+                /><DetailValue
+                  label="Конечный узел"
+                  :value="nodeLabel(details.node_code_2, details.node_name_2, details.node_id_2)"
+                />
+                <DetailValue
+                  label="Фрагмент"
+                  :value="details.fragment_name || details.fragment_id"
+                /><DetailValue
+                  label="Признак линии"
+                  :value="details.external_sign_line_name"
+                />
+              </v-card-text></v-card></v-col>
+              <v-col
+                cols="12"
+                md="6"
+              ><v-card
+                variant="outlined"
+                class="h-100"
+              ><v-card-title class="text-subtitle-1">Паспорт</v-card-title><v-card-text class="detail-grid">
+                <DetailValue
+                  label="Тип"
+                  :value="details.elevator_type"
+                /><DetailValue
+                  label="Установленный номер"
+                  :value="details.elevator_num_inst"
+                />
+                <DetailValue
+                  label="Диаметр сопла"
+                  :value="formatUnit(details.diameter_nozzle, 'мм')"
+                /><DetailValue
+                  label="Диаметр камеры"
+                  :value="formatUnit(details.diameter_chamber, 'мм')"
+                />
+                <DetailValue
+                  label="Длина корпуса"
+                  :value="formatUnit(details.length, 'мм')"
+                /><DetailValue
+                  label="Входной фланец"
+                  :value="formatUnit(details.diameter_inlet_flange, 'мм')"
+                />
+                <DetailValue
+                  label="Выходной фланец"
+                  :value="formatUnit(details.diameter_outlet_flange, 'мм')"
+                /><DetailValue
+                  label="Патрубок подсоса"
+                  :value="formatUnit(details.diameter_suction_pipe, 'мм')"
+                />
+                <DetailValue
+                  label="Материал"
+                  :value="details.material"
+                /><DetailValue
+                  label="Состояние"
+                  :value="details.state_name"
+                />
+                <DetailValue
+                  label="Признак расчёта"
+                  :value="details.entry_mark"
+                />
+              </v-card-text></v-card></v-col>
+              <v-col
+                cols="12"
+                md="6"
+              ><v-card
+                variant="outlined"
+                class="h-100"
+              ><v-card-title class="text-subtitle-1">Архивные реквизиты линии</v-card-title><v-card-text class="detail-grid">
+                <DetailValue
+                  label="Регистрационный номер"
+                  :value="details.registration_number"
+                /><DetailValue
+                  label="Ввод в эксплуатацию"
+                  :value="formatDate(details.commissioned_at)"
+                />
+                <DetailValue
+                  label="Последнее обслуживание"
+                  :value="formatDate(details.last_maintenance_at)"
+                /><DetailValue
+                  label="Владелец"
+                  :value="details.organization_name"
+                />
+                <DetailValue
+                  label="Оператор"
+                  :value="details.operator_name"
+                /><DetailValue
+                  label="Сопротивление линии"
+                  :value="formatNumber(details.line_hydraulic_resistance, 8)"
+                />
+              </v-card-text></v-card></v-col>
+              <v-col
+                cols="12"
+                md="6"
+              ><v-card
+                variant="outlined"
+                class="h-100"
+              ><v-card-title class="text-subtitle-1">Последний ANY_OUT</v-card-title>
+                <v-card-text
+                  v-if="details.latest_output"
+                  class="attribute-grid"
+                >
+                  <DetailValue
+                    v-for="entry in outputEntries"
+                    :key="entry[0]"
+                    :label="entry[0]"
+                    :value="formatAttribute(entry[1])"
+                  />
+                </v-card-text>
+                <v-card-text v-else><v-alert
+                  type="info"
+                  variant="tonal"
+                  density="compact"
+                >Расчётный результат для линии отсутствует.</v-alert></v-card-text>
+              </v-card></v-col>
+              <v-col cols="12"><v-card variant="outlined"><v-card-title class="text-subtitle-1">Исходные поля elevators</v-card-title><v-card-text class="attribute-grid">
+                <DetailValue
+                  v-for="entry in attributeEntries"
+                  :key="entry[0]"
+                  :label="entry[0]"
+                  :value="formatAttribute(entry[1])"
+                />
+              </v-card-text></v-card></v-col>
+            </v-row>
+          </v-card-text>
+          <v-divider />
+          <v-card-actions class="px-4 py-3 bg-grey-lighten-4">
+            <v-spacer />
+            <v-btn
+              v-if="hasCoordinates(details)"
+              color="blue-grey-darken-4"
+              variant="text"
+              prepend-icon="mdi-map-marker"
+              @click="locate(details)"
+            >Показать на карте</v-btn>
+          </v-card-actions>
+        </template>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 

@@ -1,6 +1,11 @@
 <template>
   <Teleport to="body">
-    <v-dialog v-model="visible" :fullscreen="isMobile" max-width="980" scrollable>
+    <v-dialog
+      v-model="visible"
+      :fullscreen="isMobile"
+      max-width="980"
+      scrollable
+    >
       <v-card rounded="lg">
         <v-card-title class="d-flex align-center ga-2 px-4 py-3">
           <v-icon color="blue-darken-2">mdi-format-list-numbered</v-icon>
@@ -11,26 +16,66 @@
               <span v-if="tableName"> · таблица {{ tableName }}</span>
             </div>
           </div>
-          <v-btn icon variant="text" @click="visible = false"><v-icon>mdi-close</v-icon></v-btn>
+          <v-btn
+            icon
+            variant="text"
+            @click="visible = false"
+          ><v-icon>mdi-close</v-icon></v-btn>
         </v-card-title>
         <v-divider />
-        <v-alert v-if="note" type="info" variant="tonal" density="compact" class="ma-3">{{ note }}</v-alert>
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" class="ma-3">{{ error }}</v-alert>
-        <div class="pa-3" style="min-height: 280px; overflow: auto">
-          <v-progress-linear v-if="loading" indeterminate color="blue-darken-2" class="mb-3" />
-          <v-table v-else-if="items.length" density="compact" hover>
+        <v-alert
+          v-if="note"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="ma-3"
+        >{{ note }}</v-alert>
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="ma-3"
+        >{{ error }}</v-alert>
+        <div
+          class="pa-3"
+          style="min-height: 280px; overflow: auto"
+        >
+          <v-progress-linear
+            v-if="loading"
+            indeterminate
+            color="blue-darken-2"
+            class="mb-3"
+          />
+          <v-table
+            v-else-if="items.length"
+            density="compact"
+            hover
+          >
             <thead>
               <tr>
-                <th v-for="col in columns" :key="col">{{ col }}</th>
+                <th
+                  v-for="col in columns"
+                  :key="col"
+                >{{ col }}</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, idx) in items" :key="idx">
-                <td v-for="col in columns" :key="col">{{ formatCell(row[col]) }}</td>
+              <tr
+                v-for="(row, idx) in items"
+                :key="idx"
+              >
+                <td
+                  v-for="col in columns"
+                  :key="col"
+                >{{ formatCell(row[col]) }}</td>
               </tr>
             </tbody>
           </v-table>
-          <div v-else class="text-medium-emphasis text-center py-10">
+          <div
+            v-else
+            class="text-medium-emphasis text-center py-10"
+          >
             Нет данных очереди. Нужен дамп `ochered_opressovok` / `opressovki_uchastok_ocheredi`.
           </div>
         </div>

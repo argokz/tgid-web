@@ -1,17 +1,41 @@
 <template>
   <div class="alseko-rec pa-3">
-    <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-3" closable @click:close="error = ''">{{ error }}</v-alert>
+    <v-alert
+      v-if="error"
+      type="error"
+      variant="tonal"
+      density="compact"
+      class="mb-3"
+      closable
+      @click:close="error = ''"
+    >{{ error }}</v-alert>
 
     <!-- Сверка -->
     <div class="d-flex flex-wrap align-center ga-2 mb-2">
       <div class="text-subtitle-1 font-weight-bold">Сверка nagruzki ↔ здания</div>
-      <span v-if="summary" class="text-caption text-medium-emphasis">
+      <span
+        v-if="summary"
+        class="text-caption text-medium-emphasis"
+      >
         договоров {{ fmtInt(summary.totals.loads) }}, зданий с адресом АЛСЕКО {{ fmtInt(summary.totals.bound_buildings) }},
         с потребителем {{ fmtInt(summary.totals.buildings_with_consumer) }}
       </span>
       <v-spacer />
-      <v-btn size="small" variant="text" prepend-icon="mdi-refresh" :loading="loadingSummary" @click="loadSummary">Обновить</v-btn>
-      <v-btn size="small" color="green-darken-2" variant="tonal" prepend-icon="mdi-microsoft-excel" :loading="downloading" @click="downloadReport">Отчёт Excel</v-btn>
+      <v-btn
+        size="small"
+        variant="text"
+        prepend-icon="mdi-refresh"
+        :loading="loadingSummary"
+        @click="loadSummary"
+      >Обновить</v-btn>
+      <v-btn
+        size="small"
+        color="green-darken-2"
+        variant="tonal"
+        prepend-icon="mdi-microsoft-excel"
+        :loading="downloading"
+        @click="downloadReport"
+      >Отчёт Excel</v-btn>
     </div>
     <div class="d-flex flex-wrap ga-2 mb-3">
       <v-chip
@@ -26,19 +50,41 @@
         {{ k.label }}: {{ fmtInt(k.count) }}
       </v-chip>
     </div>
-    <div v-if="issues" class="rec-table-wrap mb-2">
+    <div
+      v-if="issues"
+      class="rec-table-wrap mb-2"
+    >
       <table class="rec-table">
-        <thead><tr><th v-for="c in issueColumns" :key="c">{{ columnTitle(c) }}</th></tr></thead>
+        <thead><tr><th
+          v-for="c in issueColumns"
+          :key="c"
+        >{{ columnTitle(c) }}</th></tr></thead>
         <tbody>
-          <tr v-for="(row, i) in issues.items" :key="i" @click="openIssue(row)">
-            <td v-for="c in issueColumns" :key="c">{{ cell(row[c]) }}</td>
+          <tr
+            v-for="(row, i) in issues.items"
+            :key="i"
+            @click="openIssue(row)"
+          >
+            <td
+              v-for="c in issueColumns"
+              :key="c"
+            >{{ cell(row[c]) }}</td>
           </tr>
           <tr v-if="!issues.items.length"><td :colspan="issueColumns.length || 1">Несоответствий нет</td></tr>
         </tbody>
       </table>
     </div>
-    <div v-if="issues && issuePages > 1" class="d-flex justify-center">
-      <v-pagination v-model="issuePage" :length="issuePages" density="compact" :total-visible="7" @update:model-value="loadIssues" />
+    <div
+      v-if="issues && issuePages > 1"
+      class="d-flex justify-center"
+    >
+      <v-pagination
+        v-model="issuePage"
+        :length="issuePages"
+        density="compact"
+        :total-visible="7"
+        @update:model-value="loadIssues"
+      />
     </div>
 
     <v-divider class="my-4" />
@@ -48,16 +94,58 @@
     <div class="text-caption text-medium-emphasis mb-2">
       В здание записываются адрес АЛСЕКО и суммы нагрузок адреса (Гкал/ч), как в десктопе. Сначала предпросмотр.
     </div>
-    <v-alert v-if="!canEdit" type="info" variant="tonal" density="compact" class="mb-2">Привязка доступна роли «Редактор» и выше.</v-alert>
+    <v-alert
+      v-if="!canEdit"
+      type="info"
+      variant="tonal"
+      density="compact"
+      class="mb-2"
+    >Привязка доступна роли «Редактор» и выше.</v-alert>
     <v-row dense>
-      <v-col cols="12" md="2"><v-text-field v-model.number="buildingId" type="number" label="ID здания" density="compact" hide-details /></v-col>
-      <v-col cols="12" md="6"><v-text-field v-model="addressQuery" label="Поиск адреса (улица, дом); пусто — по геоадресу здания" density="compact" hide-details clearable @keyup.enter="searchAddresses" /></v-col>
-      <v-col cols="12" md="4" class="d-flex ga-2">
-        <v-btn :loading="searching" prepend-icon="mdi-magnify" @click="searchAddresses">Найти</v-btn>
-        <v-btn :disabled="!canEdit || !buildingId" variant="text" color="red-darken-2" @click="previewAddress(true)">Снять привязку…</v-btn>
+      <v-col
+        cols="12"
+        md="2"
+      ><v-text-field
+        v-model.number="buildingId"
+        type="number"
+        label="ID здания"
+        density="compact"
+        hide-details
+      /></v-col>
+      <v-col
+        cols="12"
+        md="6"
+      ><v-text-field
+        v-model="addressQuery"
+        label="Поиск адреса (улица, дом); пусто — по геоадресу здания"
+        density="compact"
+        hide-details
+        clearable
+        @keyup.enter="searchAddresses"
+      /></v-col>
+      <v-col
+        cols="12"
+        md="4"
+        class="d-flex ga-2"
+      >
+        <v-btn
+          :loading="searching"
+          prepend-icon="mdi-magnify"
+          @click="searchAddresses"
+        >Найти</v-btn>
+        <v-btn
+          :disabled="!canEdit || !buildingId"
+          variant="text"
+          color="red-darken-2"
+          @click="previewAddress(true)"
+        >Снять привязку…</v-btn>
       </v-col>
     </v-row>
-    <v-list v-if="candidates.length" density="compact" class="candidate-list my-2">
+    <v-list
+      v-if="candidates.length"
+      density="compact"
+      class="candidate-list my-2"
+    >
       <v-list-item
         v-for="(c, i) in candidates"
         :key="i"
@@ -72,18 +160,48 @@
         </v-list-item-subtitle>
       </v-list-item>
     </v-list>
-    <div v-else-if="searched" class="text-caption text-medium-emphasis my-2">Адреса не найдены.</div>
+    <div
+      v-else-if="searched"
+      class="text-caption text-medium-emphasis my-2"
+    >Адреса не найдены.</div>
     <div class="d-flex ga-2 my-2">
-      <v-btn :disabled="!canEdit || !buildingId || !chosen" :loading="binding" color="indigo-darken-2" variant="tonal" @click="previewAddress(false)">Предпросмотр</v-btn>
-      <v-btn v-if="addressPreview?.dry_run && addressPreview.changes.length" :disabled="!canEditData" :loading="binding" color="indigo-darken-2" @click="applyAddress">Применить</v-btn>
+      <v-btn
+        :disabled="!canEdit || !buildingId || !chosen"
+        :loading="binding"
+        color="indigo-darken-2"
+        variant="tonal"
+        @click="previewAddress(false)"
+      >Предпросмотр</v-btn>
+      <v-btn
+        v-if="addressPreview?.dry_run && addressPreview.changes.length"
+        :disabled="!canEditData"
+        :loading="binding"
+        color="indigo-darken-2"
+        @click="applyAddress"
+      >Применить</v-btn>
     </div>
-    <div v-if="addressPreview" class="mb-2">
-      <v-alert v-if="addressPreview.other_buildings_with_address.length" type="warning" variant="tonal" density="compact" class="mb-2">
+    <div
+      v-if="addressPreview"
+      class="mb-2"
+    >
+      <v-alert
+        v-if="addressPreview.other_buildings_with_address.length"
+        type="warning"
+        variant="tonal"
+        density="compact"
+        class="mb-2"
+      >
         Этот адрес уже записан в здания: {{ addressPreview.other_buildings_with_address.join(', ') }} — адрес станет неоднозначным.
       </v-alert>
       <ChangesTable :changes="addressPreview.changes" />
-      <div v-if="!addressPreview.dry_run" class="text-caption text-green-darken-2">Записано, группа аудита {{ addressPreview.change_group_id || '—' }}.</div>
-      <div v-else-if="!canEditData && canEdit" class="text-caption text-medium-emphasis">Запись выключена на сервере (MUTATIONS_ENABLED).</div>
+      <div
+        v-if="!addressPreview.dry_run"
+        class="text-caption text-green-darken-2"
+      >Записано, группа аудита {{ addressPreview.change_group_id || '—' }}.</div>
+      <div
+        v-else-if="!canEditData && canEdit"
+        class="text-caption text-medium-emphasis"
+      >Запись выключена на сервере (MUTATIONS_ENABLED).</div>
     </div>
 
     <v-divider class="my-4" />
@@ -95,14 +213,50 @@
       Нагрузки в карточку потребителя переносятся вручную по сводке предпросмотра.
     </div>
     <v-row dense>
-      <v-col cols="12" md="2"><v-text-field v-model.number="consumerNodeId" type="number" label="ID узла потребителя" density="compact" hide-details /></v-col>
-      <v-col cols="12" md="6"><v-text-field v-model="consumerBuildings" label="ID зданий через запятую" density="compact" hide-details /></v-col>
-      <v-col cols="12" md="4" class="d-flex ga-2">
-        <v-btn :disabled="!canEdit || !consumerNodeId" :loading="consumerBinding" color="indigo-darken-2" variant="tonal" @click="previewConsumer">Предпросмотр</v-btn>
-        <v-btn v-if="consumerPreview?.dry_run && (consumerPreview.assign.length || consumerPreview.unassign.length)" :disabled="!canEditData" :loading="consumerBinding" color="indigo-darken-2" @click="applyConsumer">Применить</v-btn>
+      <v-col
+        cols="12"
+        md="2"
+      ><v-text-field
+        v-model.number="consumerNodeId"
+        type="number"
+        label="ID узла потребителя"
+        density="compact"
+        hide-details
+      /></v-col>
+      <v-col
+        cols="12"
+        md="6"
+      ><v-text-field
+        v-model="consumerBuildings"
+        label="ID зданий через запятую"
+        density="compact"
+        hide-details
+      /></v-col>
+      <v-col
+        cols="12"
+        md="4"
+        class="d-flex ga-2"
+      >
+        <v-btn
+          :disabled="!canEdit || !consumerNodeId"
+          :loading="consumerBinding"
+          color="indigo-darken-2"
+          variant="tonal"
+          @click="previewConsumer"
+        >Предпросмотр</v-btn>
+        <v-btn
+          v-if="consumerPreview?.dry_run && (consumerPreview.assign.length || consumerPreview.unassign.length)"
+          :disabled="!canEditData"
+          :loading="consumerBinding"
+          color="indigo-darken-2"
+          @click="applyConsumer"
+        >Применить</v-btn>
       </v-col>
     </v-row>
-    <div v-if="consumerPreview" class="mt-2 text-body-2">
+    <div
+      v-if="consumerPreview"
+      class="mt-2 text-body-2"
+    >
       <div><b>{{ consumerPreview.consumer.label }}</b> (узел {{ consumerPreview.consumer.node_id }})</div>
       <div>Привязать: {{ consumerPreview.assign.map(b => b.id).join(', ') || '—' }}; отвязать: {{ consumerPreview.unassign.map(b => b.id).join(', ') || '—' }}</div>
       <div class="text-caption">
@@ -110,8 +264,18 @@
         зав. безэлев. {{ fmt(consumerPreview.loads.heating_dependent_direct) }}, незав. {{ fmt(consumerPreview.loads.heating_independent) }};
         ГВС откр. подача {{ fmt(consumerPreview.loads.hot_water_open_supply) }}, вент. {{ fmt(consumerPreview.loads.ventilation) }}, сумма {{ fmt(consumerPreview.loads.total) }}
       </div>
-      <v-alert v-for="w in consumerPreview.warnings" :key="w" type="warning" variant="tonal" density="compact" class="mt-1">{{ w }}</v-alert>
-      <div v-if="!consumerPreview.dry_run" class="text-caption text-green-darken-2">Записано, группа аудита {{ consumerPreview.change_group_id || '—' }}.</div>
+      <v-alert
+        v-for="w in consumerPreview.warnings"
+        :key="w"
+        type="warning"
+        variant="tonal"
+        density="compact"
+        class="mt-1"
+      >{{ w }}</v-alert>
+      <div
+        v-if="!consumerPreview.dry_run"
+        class="text-caption text-green-darken-2"
+      >Записано, группа аудита {{ consumerPreview.change_group_id || '—' }}.</div>
     </div>
   </div>
 </template>

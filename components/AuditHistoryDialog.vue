@@ -162,7 +162,10 @@
           </template>
           <template #expanded-row="{ columns, item }">
             <tr>
-              <td :colspan="columns.length" class="py-2">
+              <td
+                :colspan="columns.length"
+                class="py-2"
+              >
                 <table
                   v-if="item.changes.length"
                   class="audit-diff"
