@@ -80,29 +80,32 @@
           Инструменты
         </v-btn>
 
-        <v-btn
-          prepend-icon="mdi-export"
-          class="nav-btn ms-1"
-          variant="text"
-          rounded="lg"
-          size="small"
-          @click="downloadShp"
-          :loading="exportingShp"
-        >
-          Экспорт SHP
-        </v-btn>
-
-        <v-btn
-          prepend-icon="mdi-vector-polyline"
-          class="nav-btn ms-1"
-          variant="text"
-          rounded="lg"
-          size="small"
-          @click="downloadDxf"
-          :loading="exportingDxf"
-        >
-          Экспорт DXF
-        </v-btn>
+        <v-menu offset-y>
+          <template v-slot:activator="{ props }">
+            <v-btn
+              v-bind="props"
+              prepend-icon="mdi-export"
+              class="nav-btn ms-1"
+              variant="text"
+              rounded="lg"
+              size="small"
+              :loading="exportingShp || exportingDxf || exportingGeoJson"
+            >
+              Экспорт
+            </v-btn>
+          </template>
+          <v-list density="compact">
+            <v-list-item title="SHP (узлы и участки, zip)" prepend-icon="mdi-export" @click="downloadShp" />
+            <v-list-item title="DXF (линии участков)" prepend-icon="mdi-vector-polyline" @click="downloadDxf" />
+            <v-list-item title="GeoJSON (геометрия и паспорт)" prepend-icon="mdi-code-json" @click="downloadGeoJson(false)" />
+            <v-list-item
+              title="GeoJSON с атрибутами (L, D, K_E)"
+              subtitle="Для ZuluGIS/QGIS: короткие имена полей"
+              prepend-icon="mdi-code-json"
+              @click="downloadGeoJson(true)"
+            />
+          </v-list>
+        </v-menu>
 
         <v-menu offset-y>
           <template v-slot:activator="{ props }">
@@ -258,6 +261,7 @@ const showCalculationModal = ref(false);
 const showProtocol = ref(false);
 const exportingShp = ref(false);
 const exportingDxf = ref(false);
+const exportingGeoJson = ref(false);
 const protocolRef = ref<{ addLog: (log: any) => void } | null>(null);
 
 onMounted(() => {
@@ -338,6 +342,33 @@ const downloadDxf = async () => {
     useNotificationStore().showError('Ошибка экспорта DXF: ' + err.message);
   } finally {
     exportingDxf.value = false;
+  }
+};
+
+const downloadGeoJson = async (withAttrs: boolean) => {
+  exportingGeoJson.value = true;
+  try {
+    const fragmentIds = resolveExportFragmentIds();
+    if (!fragmentIds?.length) {
+      useNotificationStore().showError('Выберите фрагмент на карте перед экспортом GeoJSON');
+      return;
+    }
+    const { blob, filename } = await fastApiService.downloadGeoJsonExport(fragmentIds, withAttrs);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    useNotificationStore().showSuccess(
+      `Экспорт GeoJSON${withAttrs ? ' с атрибутами' : ''} (фрагменты: ${fragmentIds.join(', ')})`
+    );
+  } catch (err: any) {
+    useNotificationStore().showError('Ошибка экспорта GeoJSON: ' + err.message);
+  } finally {
+    exportingGeoJson.value = false;
   }
 };
 

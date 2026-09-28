@@ -110,6 +110,9 @@ const OPERATION_LABELS: Record<string, string> = {
   MERGE: 'слияние узлов',
   REVERSE: 'разворот участка',
   GEOMETRY: 'правка вершин участка',
+  IMPORT_NODES: 'импорт узлов',
+  IMPORT_LINES: 'импорт участков',
+  IMPORT_COORDS: 'импорт координат узлов',
 };
 
 /** Подпись кнопки «Отменить»: «разрезание участка 17» */

@@ -206,6 +206,12 @@ import {
   mdiCropFree,
   mdiLayersOutline,
   mdiFilterOutline,
+  mdiCodeJson,
+  mdiDatabaseImport,
+  mdiFilePdfBox,
+  mdiImageOutline,
+  mdiPrinterOutline,
+  mdiFileUploadOutline,
 } from '@mdi/js'
 
 
@@ -410,6 +416,12 @@ const byExportName: Record<string, string> = {
   mdiCropFree,
   mdiLayersOutline,
   mdiFilterOutline,
+  mdiCodeJson,
+  mdiDatabaseImport,
+  mdiFilePdfBox,
+  mdiImageOutline,
+  mdiPrinterOutline,
+  mdiFileUploadOutline,
 }
 
 

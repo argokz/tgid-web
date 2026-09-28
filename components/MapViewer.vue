@@ -363,6 +363,17 @@
         ref="dictionariesRef"
       />
 
+      <!-- Этап 10: печать карты в макет (PNG/PDF) -->
+      <LazyPrintLayoutDialog
+        v-if="mountedDialogs.printLayout"
+        ref="printLayoutRef"
+      />
+      <!-- Этап 10: импорт SHP / Excel / координат узлов -->
+      <LazyNetworkImportDialog
+        v-if="mountedDialogs.networkImport"
+        ref="networkImportRef"
+      />
+
       <!-- Attribute properties panel dialog (лениво: монтируется при первом identify-клике) -->
       <LazyAttributePanel
         v-if="mountedDialogs.attributePanel"
@@ -844,6 +855,8 @@ const auditHistoryRef = ref<{ openDialog: (scope?: { table?: string; recordId?: 
 const groupSettersRef = ref<{ openDialog: () => void } | null>(null);
 const ptsSitesRef = ref<{ openDialog: () => void } | null>(null);
 const dictionariesRef = ref<{ openDialog: (scope?: { dictionary?: string }) => void } | null>(null);
+const printLayoutRef = ref<{ openDialog: () => void } | null>(null);
+const networkImportRef = ref<{ openDialog: () => void } | null>(null);
 
 /**
  * Ленивое монтирование диалогов: тяжёлые журналы не попадают в основной чанк карты,
@@ -885,7 +898,9 @@ type LazyDialogKey =
   | 'auditHistory'
   | 'groupSetters'
   | 'ptsSites'
-  | 'dictionaries';
+  | 'dictionaries'
+  | 'printLayout'
+  | 'networkImport';
 
 type LazyDialogInstance = { openDialog: (scope?: any) => void };
 
@@ -927,6 +942,8 @@ const lazyDialogRefs: Record<LazyDialogKey, Ref<LazyDialogInstance | null>> = {
   groupSetters: groupSettersRef,
   ptsSites: ptsSitesRef,
   dictionaries: dictionariesRef,
+  printLayout: printLayoutRef,
+  networkImport: networkImportRef,
 };
 
 /** Событие панели инструментов → ключ ленивого диалога */
@@ -965,6 +982,8 @@ const TOOL_EVENT_TO_DIALOG: Record<ToolEvent, LazyDialogKey> = {
   'open-group-setters': 'groupSetters',
   'open-pts-sites': 'ptsSites',
   'open-dictionaries': 'dictionaries',
+  'open-print-layout': 'printLayout',
+  'open-network-import': 'networkImport',
 };
 
 const onOpenTool = (event: ToolEvent) => {

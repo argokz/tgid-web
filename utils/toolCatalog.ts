@@ -41,6 +41,8 @@ export type ToolEvent =
   | 'open-group-setters'
   | 'open-pts-sites'
   | 'open-dictionaries'
+  | 'open-print-layout'
+  | 'open-network-import'
 
 export interface ToolDescriptor {
   label: string
@@ -113,6 +115,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     items: [
       { label: 'Отчёты и паспорта', hint: 'Паспорта участков в Excel', icon: 'mdi-file-tree', color: 'success', event: 'open-passport-dialog' },
       { label: 'Участки ПТС', hint: 'Участки МС/РС: характеристика, привязка труб (карта, цепочка узлов), паспорт', icon: 'mdi-map-marker-path', color: 'green-darken-2', event: 'open-pts-sites' },
+      { label: 'Печать карты', hint: 'Макет A4/A3: масштаб, легенда, штамп; PNG и PDF', icon: 'mdi-printer', color: 'blue-grey-darken-2', event: 'open-print-layout' },
       { label: 'Отчёты Excel', hint: 'Таблицы десктопа: участки, потребители, задвижки, результаты расчёта', icon: 'mdi-file-excel', color: 'green-darken-3', event: 'open-excel-reports' },
       { label: 'Технические условия', hint: 'Реестр ТУ и нагрузки', icon: 'mdi-file-certificate-outline', color: 'cyan-darken-3', event: 'open-technical-condition-journal' },
       { label: 'Объекты АЛСЕКО', hint: 'Договорные нагрузки и здания', icon: 'mdi-office-building-marker', color: 'indigo-darken-2', event: 'open-alseko-journal' },
@@ -125,6 +128,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     color: 'teal-darken-3',
     items: [
       { label: 'Групповые установщики', hint: 'Поле = значение для фрагмента, выделения или фильтра (aSet*)', icon: 'mdi-select-group', color: 'deep-orange-darken-2', event: 'open-group-setters', requires: 'editor' },
+      { label: 'Импорт SHP / Excel / координат', hint: 'Узлы, участки из SHP, координаты узлов: сопоставление полей, превью, отмена', icon: 'mdi-database-import', color: 'indigo-darken-2', event: 'open-network-import', requires: 'editor' },
       { label: 'Справочники', hint: 'Удельные расходы, Kv, температуры, ГВС, организации, районы', icon: 'mdi-book-open-page-variant-outline', color: 'teal-darken-3', event: 'open-dictionaries', requires: 'editor' },
     ],
   },

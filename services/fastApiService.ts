@@ -1,5 +1,11 @@
 import { reactive } from 'vue';
 import type { FeatureData, Fragment } from '~/types';
+import type {
+  NetworkImportInspect,
+  NetworkImportMode,
+  NetworkImportParams,
+  NetworkImportReport,
+} from '~/utils/networkImport';
 
 export interface ColumnTranslation {
   column: string;
@@ -2095,6 +2101,42 @@ export const fastApiService = {
       query: fragmentId ? { fragment_id: fragmentId } : undefined,
     });
     return { blob, filename: fragmentId ? `network_f${fragmentId}.dxf` : 'network.dxf' };
+  },
+
+  /**
+   * GeoJSON участков (WGS84). withAttrs — «GeoJSON с атрибутами» (Sys, L, D, K_E — короткие имена
+   * для загрузки в ZuluGIS/QGIS; раньше назывался «Zulu»-экспортом, API /api/export/zulugis — алиас).
+   */
+  async downloadGeoJsonExport(fragmentIds?: number[], withAttrs = false): Promise<{ blob: Blob; filename: string }> {
+    const data = await request<unknown>(withAttrs ? 'api/export/geojson-attrs' : 'api/export/geojson', {
+      query: fragmentIds?.length ? { fragments: fragmentIds.join(','), limit: 50000 } : { limit: 50000 },
+    });
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/geo+json' });
+    const suffix = fragmentIds?.length === 1 ? `_f${fragmentIds[0]}` : fragmentIds?.length ? '_frag' : '';
+    return { blob, filename: `network${withAttrs ? '_attrs' : ''}${suffix}.geojson` };
+  },
+
+  /** Импорт (этап 10): разбор файла — колонки, образец, поля назначения, предложенное сопоставление */
+  async inspectNetworkImport(
+    files: File[],
+    mode: NetworkImportMode,
+    opts: { encoding?: string; sheet?: string } = {}
+  ): Promise<NetworkImportInspect> {
+    const form = new FormData();
+    files.forEach((f) => form.append('files', f, f.name));
+    form.append('mode', mode);
+    if (opts.encoding) form.append('encoding', opts.encoding);
+    if (opts.sheet) form.append('sheet', opts.sheet);
+    return request<NetworkImportInspect>('api/v1/import/inspect', mutationOptions('POST', form));
+  },
+
+  /** Превью (dryRun) или применение импорта; 422 row_errors — отчёт в detail.report */
+  async runNetworkImport(files: File[], params: NetworkImportParams, dryRun: boolean): Promise<NetworkImportReport> {
+    const form = new FormData();
+    files.forEach((f) => form.append('files', f, f.name));
+    form.append('params', JSON.stringify(params));
+    form.append('dry_run', dryRun ? 'true' : 'false');
+    return request<NetworkImportReport>('api/v1/import/run', mutationOptions('POST', form));
   },
 
   async getNetworkQueryVolume(fragmentIds?: number[]): Promise<any> {
