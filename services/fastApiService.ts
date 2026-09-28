@@ -92,6 +92,28 @@ export interface AlsekoConsumerBindResult {
 
 export type AlsekoLookups = JournalLookups;
 
+export type ElectricalBindObjectType = 'line' | 'channel' | 'coupling' | 'support' | 'sleeve';
+export interface ElectricalReconciliationKind { kind: string; label: string; count: number }
+export interface ElectricalReconciliationItem {
+  object_type: ElectricalBindObjectType; id: number; name: string | null; issues: string[];
+  longitude: number | null; latitude: number | null; tolerance: number | null;
+  [key: string]: unknown;
+}
+export interface ElectricalReconciliation {
+  tolerance: number; tables_present: boolean; checked: Record<string, number>;
+  kinds: ElectricalReconciliationKind[]; total: number; items: ElectricalReconciliationItem[];
+}
+export interface ElectricalBindChange { field: string; old: unknown; new: unknown; distance: number | null }
+export interface ElectricalBindRecord {
+  object_type: ElectricalBindObjectType; table: string; id: number; name: string | null;
+  changes: ElectricalBindChange[]; longitude: number | null; latitude: number | null;
+}
+export interface ElectricalBindResult {
+  dry_run: boolean; tolerance: number; overwrite: boolean; snap_points: boolean;
+  records: ElectricalBindRecord[]; unresolved: { object_type: string; id: number; issues: string[] }[];
+  counts: { records: number; fields: number; unresolved: number }; applied: number; change_group_id: string | null;
+}
+
 export type ElectricalObjectType =
   | 'source'
   | 'receiver'
@@ -1722,6 +1744,24 @@ export const fastApiService = {
   },
   async getElectricalNetworkLookups(): Promise<ElectricalNetworkLookups> {
     return request('api/electrical-network/lookups');
+  },
+  /** Сверка привязки электросети: концы ЛЭП ↔ источник/приёмник, точечные объекты ↔ ЛЭП */
+  async getElectricalReconciliation(params: { tolerance?: number; kind?: string; object_type?: string; limit?: number; offset?: number } = {}): Promise<ElectricalReconciliation> {
+    return request('api/electrical-network/reconciliation', { query: params });
+  },
+  async downloadElectricalReconciliationReport(tolerance?: number): Promise<Blob> {
+    return request<Blob>('api/electrical-network/reconciliation/report.xlsx', {
+      ...mutationOptions('GET'),
+      query: tolerance ? { tolerance } : undefined,
+      responseType: 'blob',
+    });
+  },
+  /** Привязка по правилам десктопа (editor+, запись — MUTATIONS_ENABLED); dry_run — план «было → станет» */
+  async bindElectricalNetwork(body: {
+    tolerance?: number; overwrite?: boolean; snap_points?: boolean;
+    items?: { object_type: ElectricalBindObjectType; id: number }[] | null; dry_run: boolean
+  }): Promise<ElectricalBindResult> {
+    return request('api/electrical-network/binding', mutationOptions('POST', body));
   },
 
   async getHeatLossSeasons(

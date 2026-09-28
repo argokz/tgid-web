@@ -7,7 +7,15 @@
         <v-chip class="mr-2" size="small">{{ total.toLocaleString('ru-RU') }} объектов</v-chip>
         <v-btn icon="mdi-close" @click="visible = false" />
       </v-toolbar>
+      <v-tabs v-model="tab" color="amber-darken-4" density="compact">
+        <v-tab value="journal">Журнал</v-tab>
+        <v-tab value="reconciliation">Сверка и привязка</v-tab>
+      </v-tabs>
 
+      <v-card-text v-if="tab === 'reconciliation'" class="pa-0">
+        <ElectricalReconciliationPanel @locate="locateReconciliation" @open-object="openReconciliationObject" />
+      </v-card-text>
+      <template v-else>
       <div class="pa-3 electrical-filters">
         <v-row dense>
           <v-col cols="12" md="3">
@@ -42,6 +50,7 @@
         </table>
       </v-card-text>
       <v-card-actions class="justify-center border-t-sm"><v-pagination v-model="page" :length="pages || 1" :total-visible="isMobile ? 4 : 8" density="comfortable" @update:model-value="loadPage" /></v-card-actions>
+      </template>
     </v-card>
   </v-dialog>
 
@@ -104,6 +113,7 @@ import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
 const mutationsEnabled = useMutationsEnabled()
 import { computed, ref } from 'vue'
 import { useDisplay } from 'vuetify'
+import ElectricalReconciliationPanel from '~/components/ElectricalReconciliationPanel.vue'
 import { fastApiService, type ElectricalNetworkLookups, type ElectricalObjectDetails, type ElectricalObjectSummary, type ElectricalObjectType } from '~/services/fastApiService'
 
 export interface ElectricalNetworkJournalScope { objectType?: ElectricalObjectType; objectId?: number; parentLineId?: number }
@@ -114,6 +124,7 @@ const visible = ref(false), detailsVisible = ref(false), loading = ref(false), d
 const page = ref(1), pages = ref(0), total = ref(0), items = ref<ElectricalObjectSummary[]>([]), selected = ref<ElectricalObjectDetails | null>(null)
 const lookups = ref<ElectricalNetworkLookups>({ owners: [], source_types: [], receiver_types: [], line_types: [], cable_marks: [], voltages: [], counts: {} })
 const filters = ref({ search: '', object_type: undefined as ElectricalObjectType | undefined, owner_id: undefined as number | undefined, parent_line_id: undefined as number | undefined, voltage_kv: undefined as number | undefined })
+const tab = ref<'journal' | 'reconciliation'>('journal')
 const isEditing = ref(false), saving = ref(false), editFields = ref<Record<string, any>>({})
 const objectTypes = [
   { title: 'Источники', value: 'source' as const, color: 'red-darken-2', icon: 'mdi-power-plug-battery' },
@@ -147,6 +158,8 @@ async function reload() { page.value = 1; await loadPage() }
 async function resetFilters() { filters.value = { search: '', object_type: undefined, owner_id: undefined, parent_line_id: undefined, voltage_kv: undefined }; await reload() }
 async function openDetails(objectType: ElectricalObjectType, objectId: number) { detailsVisible.value = true; detailsLoading.value = true; isEditing.value = false; try { selected.value = await fastApiService.getElectricalObject(objectType, objectId) } finally { detailsLoading.value = false } }
 function openRelation(row: Record<string, unknown>) { const type = row.object_type as ElectricalObjectType | undefined; if (type && Number(row.id)) void openDetails(type, Number(row.id)); else if (selected.value?.object_type === 'source' || selected.value?.object_type === 'receiver') { if (Number(row.id)) void openDetails('line', Number(row.id)) } }
+function locateReconciliation(payload: { longitude: number; latitude: number; id: number; objectType: ElectricalObjectType; label: string }) { emit('locate-electrical-object', payload); visible.value = false }
+function openReconciliationObject(payload: { objectType: ElectricalObjectType; id: number }) { void openDetails(payload.objectType, payload.id) }
 function locateSelected() { if (!selected.value || !hasCoordinates(selected.value)) return; emit('locate-electrical-object', { longitude: Number(selected.value.longitude), latitude: Number(selected.value.latitude), id: selected.value.id, objectType: selected.value.object_type, label: `${typeMeta(selected.value.object_type).title}: ${selected.value.name || selected.value.id}` }); visible.value = false; detailsVisible.value = false }
 async function openDialog(scope: ElectricalNetworkJournalScope = {}) { visible.value = true; await loadLookups(); filters.value.object_type = scope.objectType; filters.value.parent_line_id = scope.parentLineId; await loadPage(); if (scope.objectType && scope.objectId) await openDetails(scope.objectType, scope.objectId) }
 
