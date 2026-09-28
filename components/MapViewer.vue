@@ -350,6 +350,10 @@
       />
 
       <!-- Исходные данные (этап 9): групповые установщики aSet* и справочники -->
+      <LazyPtsSitesDialog
+        v-if="mountedDialogs.ptsSites"
+        ref="ptsSitesRef"
+      />
       <LazyGroupSetterDialog
         v-if="mountedDialogs.groupSetters"
         ref="groupSettersRef"
@@ -838,6 +842,7 @@ const hydraulicThematicRef = ref<{ openDialog: (scope?: any) => void } | null>(n
 const usersAdminRef = ref<{ openDialog: () => void } | null>(null);
 const auditHistoryRef = ref<{ openDialog: (scope?: { table?: string; recordId?: number }) => void } | null>(null);
 const groupSettersRef = ref<{ openDialog: () => void } | null>(null);
+const ptsSitesRef = ref<{ openDialog: () => void } | null>(null);
 const dictionariesRef = ref<{ openDialog: (scope?: { dictionary?: string }) => void } | null>(null);
 
 /**
@@ -879,6 +884,7 @@ type LazyDialogKey =
   | 'usersAdmin'
   | 'auditHistory'
   | 'groupSetters'
+  | 'ptsSites'
   | 'dictionaries';
 
 type LazyDialogInstance = { openDialog: (scope?: any) => void };
@@ -919,6 +925,7 @@ const lazyDialogRefs: Record<LazyDialogKey, Ref<LazyDialogInstance | null>> = {
   usersAdmin: usersAdminRef,
   auditHistory: auditHistoryRef,
   groupSetters: groupSettersRef,
+  ptsSites: ptsSitesRef,
   dictionaries: dictionariesRef,
 };
 
@@ -956,6 +963,7 @@ const TOOL_EVENT_TO_DIALOG: Record<ToolEvent, LazyDialogKey> = {
   'open-users-admin': 'usersAdmin',
   'open-audit-history': 'auditHistory',
   'open-group-setters': 'groupSetters',
+  'open-pts-sites': 'ptsSites',
   'open-dictionaries': 'dictionaries',
 };
 
