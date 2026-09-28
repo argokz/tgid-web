@@ -11,9 +11,14 @@
       <v-tabs v-model="mode" color="indigo-darken-2" @update:model-value="changeMode">
         <v-tab value="loads">Договорные объекты</v-tab>
         <v-tab value="buildings">Здания без потребителя</v-tab>
+        <v-tab value="reconciliation">Сверка и привязка</v-tab>
       </v-tabs>
 
-      <div class="pa-3 alseko-filters">
+      <v-card-text v-if="mode === 'reconciliation'" class="pa-0 alseko-table-wrap">
+        <AlsekoReconciliationPanel :building-id="bindBuildingId" @open-building="openBuilding" @open-load="openLoad" />
+      </v-card-text>
+
+      <div v-show="mode !== 'reconciliation'" class="pa-3 alseko-filters">
         <v-row dense>
           <v-col cols="12" md="3">
             <v-text-field v-model="filters.search" label="Адрес, договор, владелец, объект" density="compact" clearable hide-details prepend-inner-icon="mdi-magnify" @keyup.enter="reload" />
@@ -42,7 +47,7 @@
       <v-progress-linear v-if="loading" indeterminate color="indigo" />
       <v-alert v-if="error" type="error" variant="tonal" class="ma-3">{{ error }}</v-alert>
 
-      <v-card-text class="pa-0 alseko-table-wrap">
+      <v-card-text v-show="mode !== 'reconciliation'" class="pa-0 alseko-table-wrap">
         <div v-if="!loading && !items.length" class="alseko-empty">
           <v-icon size="58" color="grey-lighten-1">mdi-database-search</v-icon>
           <div class="text-h6 mt-3">Записи не найдены</div>
@@ -72,7 +77,7 @@
         </table>
       </v-card-text>
 
-      <v-card-actions class="justify-center border-t-sm">
+      <v-card-actions v-show="mode !== 'reconciliation'" class="justify-center border-t-sm">
         <v-pagination v-model="page" :length="pages || 1" :total-visible="isMobile ? 4 : 8" density="comfortable" @update:model-value="loadItemsPage" />
         <span class="text-caption text-medium-emphasis ml-3">Всего: {{ total.toLocaleString('ru-RU') }}</span>
       </v-card-actions>
@@ -83,6 +88,7 @@
     <v-card v-if="selected" :rounded="isMobile ? 0 : 'lg'">
       <v-toolbar color="indigo-darken-2" density="comfortable">
         <v-toolbar-title>{{ selectedKind === 'load' ? `Объект АЛСЕКО ${selected.id}` : `Здание АЛСЕКО ${selected.id}` }}</v-toolbar-title>
+        <v-btn v-if="selectedKind === 'building'" icon="mdi-link-variant" title="Привязка к адресу АЛСЕКО" @click="bindSelectedBuilding" />
         <v-btn v-if="hasCoordinates(selected)" icon="mdi-crosshairs-gps" title="Показать на карте" @click="locateSelected" />
         <v-btn icon="mdi-close" @click="detailsVisible = false" />
       </v-toolbar>
@@ -109,6 +115,7 @@
 <script setup lang="ts">
 import { computed, defineComponent, h, ref } from 'vue'
 import { useDisplay } from 'vuetify'
+import AlsekoReconciliationPanel from '~/components/AlsekoReconciliationPanel.vue'
 import { fastApiService, type AlsekoBuildingDetails, type AlsekoBuildingSummary, type AlsekoLoadDetails, type AlsekoLoadSummary, type AlsekoLookups } from '~/services/fastApiService'
 
 export interface AlsekoJournalScope { loadId?: number; buildingId?: number }
@@ -128,7 +135,7 @@ const emit = defineEmits<{ 'locate-alseko': [payload: { longitude: number; latit
 const { mobile } = useDisplay()
 const isMobile = computed(() => mobile.value)
 const visible = ref(false), detailsVisible = ref(false), loading = ref(false), detailsLoading = ref(false)
-const error = ref(''), mode = ref<'loads' | 'buildings'>('loads'), page = ref(1), pages = ref(0), total = ref(0)
+const error = ref(''), mode = ref<'loads' | 'buildings' | 'reconciliation'>('loads'), page = ref(1), pages = ref(0), total = ref(0)
 const loadItems = ref<AlsekoLoadSummary[]>([]), buildingItems = ref<AlsekoBuildingSummary[]>([])
 const items = computed(() => mode.value === 'loads' ? loadItems.value : buildingItems.value)
 const selected = ref<AlsekoLoadDetails | AlsekoBuildingDetails | null>(null), selectedKind = ref<'load' | 'building'>('load')
@@ -154,7 +161,10 @@ function displayAddress(item: object) { const row = item as Record<string, unkno
 function hasCoordinates(item: object) { const row = item as Record<string, unknown>; return Number.isFinite(Number(row.longitude)) && Number.isFinite(Number(row.latitude)) }
 
 async function loadLookups() { if (!lookups.value.counts.length) lookups.value = await fastApiService.getAlsekoLookups() }
+const bindBuildingId = ref<number | null>(null)
+function bindSelectedBuilding() { if (!selected.value) return; bindBuildingId.value = Number(selected.value.id); detailsVisible.value = false; mode.value = 'reconciliation' }
 async function loadItemsPage() {
+  if (mode.value === 'reconciliation') return
   loading.value = true; error.value = ''
   try {
     if (mode.value === 'loads') {

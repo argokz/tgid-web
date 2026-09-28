@@ -67,6 +67,29 @@ export type AlsekoLoadSummary = JournalSummary;
 export type AlsekoLoadDetails = JournalDetails;
 export type AlsekoBuildingSummary = JournalSummary;
 export type AlsekoBuildingDetails = JournalDetails;
+export interface AlsekoReconciliationKind { kind: string; label: string; desktop_report: string | null; count: number }
+export interface AlsekoReconciliationSummary {
+  totals: { loads: number; bound_buildings: number; buildings_with_consumer: number };
+  kinds: AlsekoReconciliationKind[];
+}
+export interface AlsekoReconciliationIssues { kind: string; label: string; total: number; items: Record<string, unknown>[] }
+export interface AlsekoAddressCandidate {
+  microdistrict: string | null; street: string | null; house: string; load_count: number;
+  heating_load: number; hot_water_load: number; ventilation_load: number; steam_load: number; total_load: number;
+  building_count: number; building_ids: number[] | null;
+}
+export interface AlsekoAddressCandidates { building: Record<string, unknown> | null; query: string; items: AlsekoAddressCandidate[] }
+export interface AlsekoFieldChange { field: string; old: unknown; new: unknown }
+export interface AlsekoAddressBindResult {
+  building_id: number; dry_run: boolean; action: 'bind' | 'clear'; source: Record<string, unknown> | null;
+  changes: AlsekoFieldChange[]; other_buildings_with_address: number[]; change_group_id: string | null;
+}
+export interface AlsekoConsumerBindResult {
+  consumer: { node_id: number; code: string; node_name: string; label: string; consumer_id: number | null };
+  dry_run: boolean; assign: { id: number; potrebitel: string | null }[]; unassign: { id: number; potrebitel: string | null }[];
+  loads: Record<string, number | null>; warnings: string[]; change_group_id: string | null;
+}
+
 export type AlsekoLookups = JournalLookups;
 
 export type ElectricalObjectType =
@@ -1652,6 +1675,38 @@ export const fastApiService = {
     filters: JournalFilters = {}
   ): Promise<PaginatedResponse<AlsekoBuildingSummary>> {
     return request('api/alseko/buildings/unassigned', { query: filters });
+  },
+
+  /** Сверка АЛСЕКО: количество несоответствий по видам (десктоп nenaid1–3 и др.) */
+  async getAlsekoReconciliation(): Promise<AlsekoReconciliationSummary> {
+    return request('api/alseko/reconciliation');
+  },
+  async getAlsekoReconciliationIssues(kind: string, limit = 50, offset = 0): Promise<AlsekoReconciliationIssues> {
+    return request('api/alseko/reconciliation/issues', { query: { kind, limit, offset } });
+  },
+  async downloadAlsekoReconciliationReport(kinds?: string[]): Promise<Blob> {
+    return request<Blob>('api/alseko/reconciliation/report.xlsx', {
+      ...mutationOptions('GET'),
+      query: kinds?.length ? { kinds: kinds.join(',') } : undefined,
+      responseType: 'blob',
+    });
+  },
+  async getAlsekoAddresses(params: { q?: string; building_id?: number; limit?: number }): Promise<AlsekoAddressCandidates> {
+    return request('api/alseko/addresses', { query: params });
+  },
+  /** Привязка здания к адресу АЛСЕКО; house пустой — снять привязку; dry_run — предпросмотр */
+  async bindAlsekoBuildingAddress(
+    buildingId: number,
+    body: { microdistrict?: string | null; street?: string | null; house?: string | null; dry_run: boolean }
+  ): Promise<AlsekoAddressBindResult> {
+    return request(`api/alseko/buildings/${encodePath(buildingId)}/address`, mutationOptions('POST', body));
+  },
+  /** Назначить зданиям потребителя (zdaniya_2.potrebitel = «код узел») */
+  async bindAlsekoConsumerBuildings(
+    nodeId: number,
+    body: { building_ids: number[]; dry_run: boolean }
+  ): Promise<AlsekoConsumerBindResult> {
+    return request(`api/alseko/consumers/${encodePath(nodeId)}/buildings`, mutationOptions('POST', body));
   },
 
   async getElectricalObjects(
