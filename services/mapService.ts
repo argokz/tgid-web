@@ -68,7 +68,7 @@ export const mapService = {
         const element = new Image();
         element.crossOrigin = 'Anonymous';
         element.onload = () => resolve(element);
-        element.onerror = (e) => reject(new Error(`Unable to load style image: ${imageUrl}`));
+        element.onerror = () => reject(new Error(`Unable to load style image: ${imageUrl}`));
         element.src = imageUrl;
       });
       if (!map.hasImage(imageId)) map.addImage(imageId, image, { pixelRatio: 1 });
@@ -103,7 +103,7 @@ export const mapService = {
       for (const [id, info] of Object.entries(jsonRes)) {
         if (!map.hasImage(id)) {
           try {
-            const { x, y, width, height, pixelRatio } = info as any;
+            const { x, y, width, height } = info as any;
             canvas.width = width;
             canvas.height = height;
             ctx.clearRect(0, 0, width, height);
@@ -180,8 +180,6 @@ export const mapService = {
           const isLine = mbLayer.type === 'line' || (mbLayer.id && (mbLayer.id.toLowerCase().includes('line') || mbLayer.id.toLowerCase().includes('pipe')));
           const defaultLayout = isLine ? { 'line-join': 'round', 'line-cap': 'round' } : {};
 
-          const isSymbol = mbLayer.type === 'symbol' || (mbLayer.id && mbLayer.id.toLowerCase().includes('label'));
-          const hasText = mbLayer.layout && mbLayer.layout['text-field'];
           
           // Re-enable MVT labels as the user wants to use the server-side {name}\n{text} format
           // which is controlled by viewparams.

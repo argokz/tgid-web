@@ -7,9 +7,13 @@ export default tseslint.config(
   {
     ignores: [
       'node_modules/**',
-      '.nuxt/**',
-      '.output/**',
+      '**/.nuxt/**',
+      '**/.output/**',
+      // локальные сборки Nuxt с другим base/портом (см. .gitignore)
+      '127.0.0.1/**',
       '3007/**',
+      'test-results/**',
+      'playwright-report/**',
       'public/cesium/**',
       'dist/**',
       'coverage/**'
@@ -39,9 +43,19 @@ export default tseslint.config(
       'no-console': 'off',
       'no-undef': 'off',
       'prefer-const': 'off',
-      'vue/no-unused-vars': 'off',
-      'vue/no-parsing-error': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
+      'vue/no-unused-vars': ['error', { ignorePattern: '^_' }],
+      'vue/no-parsing-error': 'error',
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
+      ],
       '@typescript-eslint/no-require-imports': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
     },

@@ -551,7 +551,7 @@ const saveInputs = async () => {
     await openDetails(details.value.id)
     isEditing.value = false
     await loadSources()
-  } catch (cause) {
+  } catch {
     // We could handle errors globally or locally
   } finally {
     saving.value = false

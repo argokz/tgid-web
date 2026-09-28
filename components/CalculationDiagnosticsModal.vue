@@ -140,7 +140,7 @@ const toggleCalculation = async (id: number | null) => {
     if (id !== null) {
       notificationStore.showSuccess('Расчет #' + id + ' загружен на карту');
     }
-  } catch (err: any) {
+  } catch {
     notificationStore.showError('Ошибка загрузки расчета');
   } finally {
     loading.value = false;

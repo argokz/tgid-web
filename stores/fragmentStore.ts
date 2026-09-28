@@ -2,7 +2,6 @@ import { defineStore } from 'pinia';
 import { fastApiService } from '~/services/fastApiService';
 import type { Fragment } from '~/types';
 import { useLayerStore } from './layerStore';
-import { useMapStore } from './mapStore';
 
 export const useFragmentStore = defineStore('fragment', {
   state: () => ({

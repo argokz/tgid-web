@@ -186,7 +186,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { fastApiService, type CalculationSummaryItem, type CalculationGeoJsonResponse } from '~/services/fastApiService';
 import { useNotificationStore } from '~/stores/notificationStore';
 

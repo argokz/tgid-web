@@ -963,7 +963,6 @@ const toggle2D3D = () => {
 }
 
 
-const openPassportDialog = () => emit('open-passport-dialog')
 
 
 

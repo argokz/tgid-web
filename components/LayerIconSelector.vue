@@ -45,7 +45,7 @@
               <v-list-item-title>{{ item.raw.name }}</v-list-item-title>
             </v-list-item>
           </template>
-          <template #selection="{ item }">
+          <template #selection>
             <div class="d-flex align-center">
               <img
                 v-if="selectedIcon && selectedIcon.path"
@@ -227,8 +227,7 @@ const isLayerSupported = computed(() => {
     }
     
     // Get and cache the layer type
-    const layerType = getCurrentLayerType();
-    const metadata = getLayerMetadata();
+    getCurrentLayerType(); // обновляет кэш layerTypeInfo
     
     // Don't need to log here as getCurrentLayerType already logs
   } else {
@@ -307,7 +306,6 @@ function loadSavedSettings() {
     
     // Проверяем текущий тип слоя - используем кэш если возможно
     const currentType = layerTypeInfo.value?.type || getCurrentLayerType();
-    const metadata = layerTypeInfo.value?.metadata || getLayerMetadata();
 
     // Получаем стиль
     const style = layerStore.layerStyles[layerId];
@@ -447,7 +445,6 @@ async function applyIcon() {
     });
     
     const currentType = getCurrentLayerType();
-    const metadata = getLayerMetadata();
 
     // Ensure iconSize is converted to a number
     const numericIconSize = Number(iconSize.value);

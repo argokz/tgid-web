@@ -78,7 +78,7 @@ const retryLoad = async () => {
   loadError.value = null;
   try {
     await fragmentStore.loadFragments();
-  } catch (err: any) {
+  } catch {
     loadError.value = 'Ошибка загрузки фрагментов';
   } finally {
     loading.value = false;

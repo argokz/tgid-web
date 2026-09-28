@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import type { 
-  ExpressionSpecification, 
   LayerSpecification, 
   FilterSpecification 
 } from 'maplibre-gl';
@@ -97,9 +96,7 @@ export const useLabelStore = defineStore('label', {
           this.globalLabels = JSON.parse(savedGlobalLabels);
         }
 
-        const mapStore = useMapStore();
-        const layerStore = useLayerStore();
-        // if (mapStore.map) {
+        // if (useMapStore().map) {
         //   // Применяем метки к видимым слоям
         //   this.syncGlobalLabels();
         // }
@@ -132,7 +129,6 @@ export const useLabelStore = defineStore('label', {
       this.saveLayerLabels();
       
       // Находим слой по ID
-      const mapStore = useMapStore();
       const layerStore = useLayerStore();
       const layer = layerStore.geoServerLayers.find(l => l.layerId === layerId);
       if (layer) {

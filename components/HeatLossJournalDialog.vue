@@ -558,7 +558,7 @@ const saveSeason = async () => {
     await openSeason(seasonDetails.value.id)
     isEditingSeason.value = false
     await loadSeasons()
-  } catch (cause) {
+  } catch {
     // We could handle errors globally or locally
   } finally {
     saving.value = false

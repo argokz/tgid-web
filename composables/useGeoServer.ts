@@ -1,4 +1,3 @@
-import type { WorkspaceConfig } from '~/types'
 import { useSettings } from './useSettings'
 
 export interface GeoServerFragment {
@@ -196,7 +195,6 @@ export const useGeoServer = () => {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const contentType = response.headers.get('content-type')
       const text = await response.text()
       
       console.log('📄 GetFeatureInfo raw response:', text.substring(0, 500))

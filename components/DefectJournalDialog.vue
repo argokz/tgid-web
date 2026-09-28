@@ -47,7 +47,7 @@
                 :items="lookups.sources"
                 item-title="name"
                 item-value="id"
-                label="Источник"
+                label="Источник"
                 density="compact"
                 variant="outlined"
                 clearable
@@ -129,7 +129,7 @@
             <v-icon size="56" color="grey-lighten-1">mdi-clipboard-alert-outline</v-icon>
             <div class="text-subtitle-1 mt-3">Нарушения не найдены</div>
             <div class="text-body-2 text-medium-emphasis mt-1">
-              Измените фильтры или проверьте загрузку исторических данных TGID.
+              Измените фильтры или проверьте загрузку исторических данных TGID.
             </div>
           </div>
 
@@ -138,7 +138,7 @@
               <tr>
                 <th>ID</th>
                 <th>Дата</th>
-                <th>Источник</th>
+                <th>Источник</th>
                 <th>Состояние</th>
                 <th>Адрес / участок</th>
                 <th>Описание</th>
@@ -207,7 +207,7 @@
           <div class="flex-grow-1">
             <div class="text-subtitle-1 font-weight-bold">Нарушение {{ selected?.id || '' }}</div>
             <div class="text-caption text-medium-emphasis">
-              {{ selected?.source_name || 'Источник не указан' }} · {{ selected?.state_name || 'Состояние не указано' }}
+              {{ selected?.source_name || 'Источник не указан' }} · {{ selected?.state_name || 'Состояние не указано' }}
             </div>
           </div>
           <v-btn v-if="mutationsEnabled && selected" icon variant="text" aria-label="Удалить" color="error" class="mr-1" @click="deleteDefect(selected.id)" :loading="deleting" title="Удалить нарушение">

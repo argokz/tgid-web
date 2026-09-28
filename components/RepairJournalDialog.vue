@@ -90,7 +90,7 @@
             <v-icon size="56" color="grey-lighten-1">mdi-hammer-wrench</v-icon>
             <div class="text-subtitle-1 mt-3">Ремонты не найдены</div>
             <div class="text-body-2 text-medium-emphasis mt-1">
-              Измените фильтры или загрузите исторические данные TGID в таблицу remont2.
+              Измените фильтры или загрузите исторические данные TGID в таблицу remont2.
             </div>
           </div>
 

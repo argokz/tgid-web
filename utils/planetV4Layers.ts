@@ -63,7 +63,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'vegetation', label: 'Растительность', group: 'nature',
     defaultVisible: false, minzoom: 0, maxzoom: 9,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('vegetation'), type: 'fill', 'source-layer': 'vegetation',
       paint: { 'fill-color': '#c8e6a0', 'fill-opacity': 0.6 },
     }],
@@ -71,7 +71,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'scrub', label: 'Кустарники', group: 'nature',
     defaultVisible: false, minzoom: 0, maxzoom: 9,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('scrub'), type: 'fill', 'source-layer': 'scrub',
       paint: { 'fill-color': '#d2e4b0', 'fill-opacity': 0.6 },
     }],
@@ -79,7 +79,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'wood', label: 'Лес (wood)', group: 'nature',
     defaultVisible: false, minzoom: 0, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('wood'), type: 'fill', 'source-layer': 'wood',
       paint: { 'fill-color': '#a0d468', 'fill-opacity': 0.5 },
     }],
@@ -87,7 +87,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'forest', label: 'Лес (forest)', group: 'nature',
     defaultVisible: false, minzoom: 0, maxzoom: 9,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('forest'), type: 'fill', 'source-layer': 'forest',
       paint: { 'fill-color': '#8cc152', 'fill-opacity': 0.45 },
     }],
@@ -95,7 +95,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'grass', label: 'Трава / Газоны', group: 'nature',
     defaultVisible: false, minzoom: 7, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('grass'), type: 'fill', 'source-layer': 'grass', minzoom: 7,
       paint: { 'fill-color': '#cdebb0', 'fill-opacity': 0.6 },
     }],
@@ -103,7 +103,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'wetland', label: 'Болота', group: 'nature',
     defaultVisible: false, minzoom: 7, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('wetland'), type: 'fill', 'source-layer': 'wetland', minzoom: 7,
       paint: { 'fill-color': '#b8ddd0', 'fill-opacity': 0.5 },
     }],
@@ -111,7 +111,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'farmland', label: 'Сельхозугодья', group: 'nature',
     defaultVisible: false, minzoom: 8, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('farmland'), type: 'fill', 'source-layer': 'farmland', minzoom: 8,
       paint: { 'fill-color': '#eef0d5', 'fill-opacity': 0.6 },
     }],
@@ -119,7 +119,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'ice', label: 'Лёд / Ледники', group: 'nature',
     defaultVisible: false, minzoom: 0, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('ice'), type: 'fill', 'source-layer': 'ice',
       paint: { 'fill-color': '#e8f4fc' },
     }],
@@ -127,7 +127,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'rock', label: 'Скалы', group: 'nature',
     defaultVisible: false, minzoom: 7, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('rock'), type: 'fill', 'source-layer': 'rock', minzoom: 7,
       paint: { 'fill-color': '#d8d0c8', 'fill-opacity': 0.6 },
     }],
@@ -135,7 +135,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'sand', label: 'Песок / Пляжи', group: 'nature',
     defaultVisible: false, minzoom: 7, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('sand'), type: 'fill', 'source-layer': 'sand', minzoom: 7,
       paint: { 'fill-color': '#f5e8c8', 'fill-opacity': 0.7 },
     }],
@@ -145,7 +145,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'protected_area', label: 'Охраняемые территории', group: 'landuse',
     defaultVisible: false, minzoom: 4, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('protected_area'), type: 'fill', 'source-layer': 'protected_area', minzoom: 4,
       paint: { 'fill-color': '#b8e6a8', 'fill-opacity': 0.25 },
     }, {
@@ -156,7 +156,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'residential', label: 'Жилые зоны', group: 'landuse',
     defaultVisible: false, minzoom: 4, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('residential'), type: 'fill', 'source-layer': 'residential', minzoom: 4,
       paint: { 'fill-color': '#e8e0d8', 'fill-opacity': 0.5 },
     }],
@@ -164,7 +164,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'cemetery', label: 'Кладбища', group: 'landuse',
     defaultVisible: false, minzoom: 7, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('cemetery'), type: 'fill', 'source-layer': 'cemetery', minzoom: 7,
       paint: { 'fill-color': '#aacbaf', 'fill-opacity': 0.6 },
     }],
@@ -172,7 +172,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'commercial', label: 'Коммерческие зоны', group: 'landuse',
     defaultVisible: false, minzoom: 10, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('commercial'), type: 'fill', 'source-layer': 'commercial', minzoom: 10,
       paint: { 'fill-color': '#f0dece', 'fill-opacity': 0.5 },
     }],
@@ -180,7 +180,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'dam', label: 'Дамбы', group: 'landuse',
     defaultVisible: false, minzoom: 10, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('dam'), type: 'fill', 'source-layer': 'dam', minzoom: 10,
       paint: { 'fill-color': '#b8b8b8', 'fill-opacity': 0.6 },
     }],
@@ -188,7 +188,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'education', label: 'Образование', group: 'landuse',
     defaultVisible: false, minzoom: 10, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('education'), type: 'fill', 'source-layer': 'education', minzoom: 10,
       paint: { 'fill-color': '#e8d8f0', 'fill-opacity': 0.5 },
     }],
@@ -196,7 +196,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'hospital', label: 'Больницы', group: 'landuse',
     defaultVisible: false, minzoom: 10, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('hospital'), type: 'fill', 'source-layer': 'hospital', minzoom: 10,
       paint: { 'fill-color': '#fce0e0', 'fill-opacity': 0.5 },
     }],
@@ -204,7 +204,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'industrial', label: 'Промзоны', group: 'landuse',
     defaultVisible: false, minzoom: 8, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('industrial'), type: 'fill', 'source-layer': 'industrial', minzoom: 8,
       paint: { 'fill-color': '#e0d8e0', 'fill-opacity': 0.5 },
     }],
@@ -212,7 +212,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'leisure', label: 'Досуг / Отдых', group: 'landuse',
     defaultVisible: false, minzoom: 10, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('leisure'), type: 'fill', 'source-layer': 'leisure', minzoom: 10,
       paint: { 'fill-color': '#d0f0c0', 'fill-opacity': 0.5 },
     }],
@@ -220,7 +220,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'military', label: 'Военные объекты', group: 'landuse',
     defaultVisible: false, minzoom: 8, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('military'), type: 'fill', 'source-layer': 'military', minzoom: 8,
       paint: { 'fill-color': '#e0cece', 'fill-opacity': 0.4 },
     }],
@@ -228,7 +228,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'parking', label: 'Парковки', group: 'landuse',
     defaultVisible: false, minzoom: 15, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('parking'), type: 'fill', 'source-layer': 'parking', minzoom: 15,
       paint: { 'fill-color': '#eeeeee', 'fill-opacity': 0.7 },
     }],
@@ -236,7 +236,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'construction', label: 'Стройплощадки', group: 'landuse',
     defaultVisible: false, minzoom: 8, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('construction'), type: 'fill', 'source-layer': 'construction', minzoom: 8,
       paint: { 'fill-color': '#e0d8c0', 'fill-opacity': 0.45 },
     }],
@@ -246,7 +246,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'water', label: 'Водоёмы', group: 'water',
     defaultVisible: true, minzoom: 0, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('water'), type: 'fill', 'source-layer': 'water',
       paint: { 'fill-color': '#a0c8f0' },
     }],
@@ -254,7 +254,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'waterway', label: 'Водотоки', group: 'water',
     defaultVisible: false, minzoom: 3, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('waterway'), type: 'line', 'source-layer': 'waterway', minzoom: 3,
       paint: {
         'line-color': '#7bbce8',
@@ -265,7 +265,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'water_label', label: 'Подписи водоёмов', group: 'water',
     defaultVisible: false, minzoom: 0, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('water_label'), type: 'symbol', 'source-layer': 'water_label', minzoom: 3,
       layout: {
         'symbol-placement': 'line',
@@ -278,7 +278,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'water_centroid', label: 'Центроиды воды', group: 'water',
     defaultVisible: false, minzoom: 0, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('water_centroid'), type: 'symbol', 'source-layer': 'water_centroid', minzoom: 4,
       layout: {
         'text-field': nameField(), 'text-size': ['interpolate', ['linear'], ['zoom'], 4, 9, 12, 12],
@@ -292,7 +292,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'country_border', label: 'Границы стран', group: 'borders',
     defaultVisible: true, minzoom: 0, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('country_border'), type: 'line', 'source-layer': 'country_border',
       paint: {
         'line-color': '#8b7eaa', 'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.6, 4, 1.2, 10, 2],
@@ -302,7 +302,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'country_border_disputed', label: 'Спорные границы', group: 'borders',
     defaultVisible: false, minzoom: 0, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('country_border_disputed'), type: 'line', 'source-layer': 'country_border_disputed',
       paint: {
         'line-color': '#a08080', 'line-dasharray': [4, 2],
@@ -313,7 +313,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'sub_border', label: 'Региональные границы', group: 'borders',
     defaultVisible: false, minzoom: 2, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('sub_border'), type: 'line', 'source-layer': 'sub_border', minzoom: 2,
       paint: {
         'line-color': '#b2b2b2', 'line-dasharray': [3, 1],
@@ -326,7 +326,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'road', label: 'Дороги', group: 'transport',
     defaultVisible: true, minzoom: 4, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('road', 'casing'), type: 'line', 'source-layer': 'road', minzoom: 7,
       paint: {
         'line-color': '#c0b8a8',
@@ -359,7 +359,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'road_label', label: 'Подписи дорог', group: 'transport',
     defaultVisible: true, minzoom: 6, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('road_label'), type: 'symbol', 'source-layer': 'road_label', minzoom: 10,
       layout: {
         'symbol-placement': 'line', 'text-field': ['coalesce', ['get', 'name'], ['get', 'ref']],
@@ -372,7 +372,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'road_exit', label: 'Съезды', group: 'transport',
     defaultVisible: false, minzoom: 10, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('road_exit'), type: 'symbol', 'source-layer': 'road_exit', minzoom: 12,
       layout: {
         'text-field': ['get', 'ref'], 'text-size': 9, 'text-font': FONT_SEMIBOLD,
@@ -383,7 +383,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'railway', label: 'Железные дороги', group: 'transport',
     defaultVisible: false, minzoom: 6, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('railway'), type: 'line', 'source-layer': 'railway', minzoom: 6,
       paint: {
         'line-color': '#8c7e7e',
@@ -395,7 +395,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'railway_label', label: 'Подписи ж/д', group: 'transport',
     defaultVisible: false, minzoom: 10, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('railway_label'), type: 'symbol', 'source-layer': 'railway_label', minzoom: 12,
       layout: {
         'symbol-placement': 'line', 'text-field': nameField(), 'text-size': 9,
@@ -407,7 +407,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'aerialway', label: 'Канатные дороги', group: 'transport',
     defaultVisible: false, minzoom: 7, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('aerialway'), type: 'line', 'source-layer': 'aerialway', minzoom: 10,
       paint: { 'line-color': '#808080', 'line-width': 1.2, 'line-dasharray': [6, 2] },
     }],
@@ -415,7 +415,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'aerialway_label', label: 'Подписи канатных', group: 'transport',
     defaultVisible: false, minzoom: 7, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('aerialway_label'), type: 'symbol', 'source-layer': 'aerialway_label', minzoom: 12,
       layout: {
         'symbol-placement': 'line', 'text-field': nameField(), 'text-size': 9,
@@ -427,7 +427,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'aviation', label: 'Авиация (зоны)', group: 'transport',
     defaultVisible: false, minzoom: 7, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('aviation'), type: 'fill', 'source-layer': 'aviation', minzoom: 8,
       paint: { 'fill-color': '#e0daf0', 'fill-opacity': 0.4 },
     }],
@@ -435,7 +435,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'aviation_line', label: 'Авиация (ВПП)', group: 'transport',
     defaultVisible: false, minzoom: 8, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('aviation_line'), type: 'line', 'source-layer': 'aviation_line', minzoom: 8,
       paint: { 'line-color': '#9090a8', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 14, 4] },
     }],
@@ -443,7 +443,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'bridge', label: 'Мосты', group: 'transport',
     defaultVisible: false, minzoom: 8, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('bridge'), type: 'fill', 'source-layer': 'bridge', minzoom: 12,
       paint: { 'fill-color': '#d8d0c8', 'fill-opacity': 0.5 },
     }],
@@ -451,7 +451,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'bridge_label', label: 'Подписи мостов', group: 'transport',
     defaultVisible: false, minzoom: 10, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('bridge_label'), type: 'symbol', 'source-layer': 'bridge_label', minzoom: 13,
       layout: { 'text-field': nameField(), 'text-size': 10, 'text-font': FONT_REGULAR },
       paint: { 'text-color': '#606060', 'text-halo-color': '#ffffff', 'text-halo-width': 1 },
@@ -460,7 +460,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'ferry', label: 'Паромы', group: 'transport',
     defaultVisible: false, minzoom: 4, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('ferry'), type: 'line', 'source-layer': 'ferry', minzoom: 5,
       paint: { 'line-color': '#80a0c0', 'line-width': 1.2, 'line-dasharray': [6, 3] },
     }],
@@ -468,7 +468,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'ferry_label', label: 'Подписи паромов', group: 'transport',
     defaultVisible: false, minzoom: 4, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('ferry_label'), type: 'symbol', 'source-layer': 'ferry_label', minzoom: 8,
       layout: {
         'symbol-placement': 'line', 'text-field': nameField(), 'text-size': 10,
@@ -480,7 +480,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'pedestrian', label: 'Пешеходные зоны', group: 'transport',
     defaultVisible: false, minzoom: 12, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('pedestrian'), type: 'fill', 'source-layer': 'pedestrian', minzoom: 13,
       paint: { 'fill-color': '#f0e8d8', 'fill-opacity': 0.6 },
     }],
@@ -488,7 +488,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'pedestrian_label', label: 'Подписи пешеходных', group: 'transport',
     defaultVisible: false, minzoom: 12, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('pedestrian_label'), type: 'symbol', 'source-layer': 'pedestrian_label', minzoom: 14,
       layout: { 'text-field': nameField(), 'text-size': 9, 'text-font': FONT_REGULAR },
       paint: { 'text-color': '#7a6a58', 'text-halo-color': '#ffffff', 'text-halo-width': 1 },
@@ -497,7 +497,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'pathway', label: 'Тропинки', group: 'transport',
     defaultVisible: false, minzoom: 12, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('pathway'), type: 'line', 'source-layer': 'pathway', minzoom: 13,
       paint: { 'line-color': '#c0b098', 'line-width': 0.8, 'line-dasharray': [4, 2] },
     }],
@@ -505,7 +505,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'pathway_label', label: 'Подписи тропинок', group: 'transport',
     defaultVisible: false, minzoom: 12, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('pathway_label'), type: 'symbol', 'source-layer': 'pathway_label', minzoom: 14,
       layout: {
         'symbol-placement': 'line', 'text-field': nameField(), 'text-size': 9,
@@ -517,7 +517,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'pier', label: 'Причалы', group: 'transport',
     defaultVisible: false, minzoom: 9, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('pier'), type: 'fill', 'source-layer': 'pier', minzoom: 11,
       paint: { 'fill-color': '#d8d0c0', 'fill-opacity': 0.7 },
     }],
@@ -525,7 +525,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'traffic_control', label: 'Ограждения / барьеры', group: 'transport',
     defaultVisible: false, minzoom: 15, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('traffic_control'), type: 'line', 'source-layer': 'traffic_control', minzoom: 15,
       paint: { 'line-color': '#a0a0a0', 'line-width': 0.8 },
     }],
@@ -535,7 +535,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'building', label: 'Здания', group: 'buildings',
     defaultVisible: true, minzoom: 12, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('building'), type: 'fill', 'source-layer': 'building', minzoom: 13,
       paint: { 'fill-color': '#d4ccc4', 'fill-outline-color': '#bab2aa', 'fill-opacity': 0.75 },
     }],
@@ -543,7 +543,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'building_number', label: 'Номера домов', group: 'buildings',
     defaultVisible: false, minzoom: 15, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('building_number'), type: 'symbol', 'source-layer': 'building_number', minzoom: 15,
       layout: {
         'text-field': ['get', 'number'], 'text-size': 9, 'text-font': FONT_REGULAR,
@@ -556,7 +556,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'poi_accommodation', label: 'Гостиницы', group: 'poi',
     defaultVisible: false, minzoom: 15, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('poi_accommodation'), type: 'circle', 'source-layer': 'poi_accommodation', minzoom: 15,
       paint: { 'circle-radius': 3.5, 'circle-color': '#0070b8', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff' },
     }, {
@@ -571,7 +571,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'poi_culture', label: 'Культура', group: 'poi',
     defaultVisible: false, minzoom: 13, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('poi_culture'), type: 'circle', 'source-layer': 'poi_culture', minzoom: 14,
       paint: { 'circle-radius': 3.5, 'circle-color': '#9c27b0', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff' },
     }, {
@@ -586,7 +586,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'poi_education', label: 'Образование (POI)', group: 'poi',
     defaultVisible: false, minzoom: 12, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('poi_education'), type: 'circle', 'source-layer': 'poi_education', minzoom: 14,
       paint: { 'circle-radius': 3.5, 'circle-color': '#7b1fa2', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff' },
     }, {
@@ -601,7 +601,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'poi_food', label: 'Еда и напитки', group: 'poi',
     defaultVisible: false, minzoom: 15, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('poi_food'), type: 'circle', 'source-layer': 'poi_food', minzoom: 15,
       paint: { 'circle-radius': 3.5, 'circle-color': '#e65100', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff' },
     }, {
@@ -616,7 +616,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'poi_healthcare', label: 'Медицина', group: 'poi',
     defaultVisible: false, minzoom: 12, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('poi_healthcare'), type: 'circle', 'source-layer': 'poi_healthcare', minzoom: 14,
       paint: { 'circle-radius': 3.5, 'circle-color': '#d32f2f', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff' },
     }, {
@@ -631,7 +631,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'poi_public', label: 'Общественные объекты', group: 'poi',
     defaultVisible: false, minzoom: 13, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('poi_public'), type: 'circle', 'source-layer': 'poi_public', minzoom: 14,
       paint: { 'circle-radius': 3.5, 'circle-color': '#455a64', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff' },
     }, {
@@ -646,7 +646,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'poi_shopping', label: 'Магазины', group: 'poi',
     defaultVisible: false, minzoom: 12, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('poi_shopping'), type: 'circle', 'source-layer': 'poi_shopping', minzoom: 14,
       paint: { 'circle-radius': 3.5, 'circle-color': '#bf360c', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff' },
     }, {
@@ -661,7 +661,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'poi_sport', label: 'Спорт', group: 'poi',
     defaultVisible: false, minzoom: 12, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('poi_sport'), type: 'circle', 'source-layer': 'poi_sport', minzoom: 14,
       paint: { 'circle-radius': 3.5, 'circle-color': '#00897b', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff' },
     }, {
@@ -676,7 +676,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'poi_station', label: 'Станции / Вокзалы', group: 'poi',
     defaultVisible: false, minzoom: 5, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('poi_station'), type: 'circle', 'source-layer': 'poi_station', minzoom: 10,
       paint: { 'circle-radius': 3, 'circle-color': '#1565c0', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff' },
     }, {
@@ -691,7 +691,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'poi_tourism', label: 'Туризм', group: 'poi',
     defaultVisible: false, minzoom: 12, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('poi_tourism'), type: 'circle', 'source-layer': 'poi_tourism', minzoom: 14,
       paint: { 'circle-radius': 3.5, 'circle-color': '#2e7d32', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff' },
     }, {
@@ -706,7 +706,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'poi_transport', label: 'Транспорт (POI)', group: 'poi',
     defaultVisible: false, minzoom: 13, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('poi_transport'), type: 'circle', 'source-layer': 'poi_transport', minzoom: 14,
       paint: { 'circle-radius': 3, 'circle-color': '#546e7a', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff' },
     }, {
@@ -721,7 +721,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'street_furniture', label: 'Уличная мебель', group: 'poi',
     defaultVisible: false, minzoom: 15, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('street_furniture'), type: 'circle', 'source-layer': 'street_furniture', minzoom: 15,
       paint: { 'circle-radius': 2, 'circle-color': '#9e9e9e' },
     }],
@@ -729,7 +729,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'tree', label: 'Деревья', group: 'poi',
     defaultVisible: false, minzoom: 15, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('tree'), type: 'circle', 'source-layer': 'tree', minzoom: 15,
       paint: { 'circle-radius': 2.5, 'circle-color': '#66bb6a', 'circle-opacity': 0.7 },
     }],
@@ -739,7 +739,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'place_label', label: 'Населённые пункты', group: 'labels',
     defaultVisible: false, minzoom: 9, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('place_label'), type: 'symbol', 'source-layer': 'place_label', minzoom: 9,
       layout: {
         'text-field': nameField(),
@@ -752,7 +752,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'town_label', label: 'Города (малые)', group: 'labels',
     defaultVisible: true, minzoom: 5, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('town_label'), type: 'symbol', 'source-layer': 'town_label', minzoom: 5,
       layout: {
         'text-field': nameField(),
@@ -765,7 +765,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'city_label', label: 'Города (крупные)', group: 'labels',
     defaultVisible: true, minzoom: 3, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('city_label'), type: 'symbol', 'source-layer': 'city_label', minzoom: 3,
       layout: {
         'text-field': nameField(),
@@ -778,7 +778,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'island_label', label: 'Острова', group: 'labels',
     defaultVisible: false, minzoom: 5, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('island_label'), type: 'symbol', 'source-layer': 'island_label', minzoom: 5,
       layout: {
         'text-field': nameField(), 'text-size': 11, 'text-font': FONT_REGULAR,
@@ -789,7 +789,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'archipelago_label', label: 'Архипелаги', group: 'labels',
     defaultVisible: false, minzoom: 3, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('archipelago_label'), type: 'symbol', 'source-layer': 'archipelago_label', minzoom: 3,
       layout: {
         'symbol-placement': 'line', 'text-field': nameField(), 'text-size': 11,
@@ -801,7 +801,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'protected_area_major_label', label: 'Крупные заповедники', group: 'labels',
     defaultVisible: false, minzoom: 4, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('protected_area_major_label'), type: 'symbol', 'source-layer': 'protected_area_major_label', minzoom: 6,
       layout: {
         'symbol-placement': 'line', 'text-field': nameField(), 'text-size': 11,
@@ -813,7 +813,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'protected_area_minor_label', label: 'Малые заповедники', group: 'labels',
     defaultVisible: false, minzoom: 4, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('protected_area_minor_label'), type: 'symbol', 'source-layer': 'protected_area_minor_label', minzoom: 8,
       layout: {
         'text-field': nameField(), 'text-size': 10, 'text-font': FONT_REGULAR,
@@ -824,7 +824,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'state_label', label: 'Регионы / Области', group: 'labels',
     defaultVisible: false, minzoom: 2, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('state_label'), type: 'symbol', 'source-layer': 'state_label', minzoom: 4,
       layout: {
         'text-field': nameField(),
@@ -837,7 +837,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'country_disputed_label', label: 'Спорные территории', group: 'labels',
     defaultVisible: false, minzoom: 3, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('country_disputed_label'), type: 'symbol', 'source-layer': 'country_disputed_label', minzoom: 3,
       layout: {
         'text-field': nameField(), 'text-size': 11, 'text-font': FONT_REGULAR,
@@ -848,7 +848,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'country_label', label: 'Страны', group: 'labels',
     defaultVisible: true, minzoom: 0, maxzoom: 15,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('country_label'), type: 'symbol', 'source-layer': 'country_label',
       layout: {
         'text-field': nameField(),
@@ -861,7 +861,7 @@ export const PLANET_V4_LAYERS: PlanetLayerDef[] = [
   {
     sourceLayer: 'continent_label', label: 'Континенты', group: 'labels',
     defaultVisible: false, minzoom: 0, maxzoom: 3,
-    buildLayers: (s) => [{
+    buildLayers: () => [{
       id: planetLayerId('continent_label'), type: 'symbol', 'source-layer': 'continent_label',
       maxzoom: 4,
       layout: {

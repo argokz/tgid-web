@@ -1,4 +1,3 @@
-/* eslint-env node */
 /**
  * Performance budget по клиентскому JS.
  *

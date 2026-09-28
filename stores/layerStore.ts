@@ -1,10 +1,8 @@
 import { defineStore } from 'pinia';
 import { mapService, isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 import type { LayerConfig, ExtendedLayerConfig, WmsLayerConfig } from '~/types';
-import type { FilterSpecification } from 'maplibre-gl';
 import { useMapStore } from './mapStore';
 import { useLabelStore } from './labelStore';
-import { getLayerType, layerTypes } from '~/server/config/layer-types';
 import { useFragmentStore } from './fragmentStore';
 import { useWmsLayer } from '~/composables/useWmsLayer';
 import { useSettingsStore } from './settingsStore';
@@ -277,12 +275,8 @@ export const useLayerStore = defineStore('layer', {
       try {
         if (!layer.renderFormat || layer.renderFormat === 'mvt') {
           // Construct MVT URL with viewparams
-          const labelStore = useLabelStore();
-          const fragmentStore = useFragmentStore();
-          
           let mvtUrl = layer.mvtUrl;
           if (mvtUrl && mapStore.map) {
-            const labelStore = useLabelStore();
             const fragmentStore = useFragmentStore();
             
             const fragmentsS = fragmentStore.visibleFragments.length > 0 
@@ -1157,7 +1151,6 @@ export const useLayerStore = defineStore('layer', {
       // Build fragment filter using MapLibre legacy syntax for MVT: ["in", "propertyName", v0, v1, ...]
       const fileIdVariants = ['fileID', 'fileid', 'fileId', 'FILEID', 'FileId', 'file_id', 'FILE_ID'];
       let fragmentFilter: any[] | null = null;
-      let cqlFilterStr: string | undefined = undefined;
       
       if (fragmentStore.visibleFragments.length > 0) {
         // Include both number and string versions of each fragment ID
@@ -1169,9 +1162,6 @@ export const useLayerStore = defineStore('layer', {
         fragmentFilter = ['any', ...fileIdVariants.map(variant => [
           'in', variant, ...allIds
         ])];
-        
-        // Build CQL string: only use "fileid" since GeoServer throws errors for nonexistent columns
-        cqlFilterStr = `"fileid" IN (${allIds.map(id => `'${id}'`).join(',')})`;
       }
 
       const { updateWmsLayer } = useWmsLayer();
@@ -1184,7 +1174,6 @@ export const useLayerStore = defineStore('layer', {
           const mapLayerId = layer.layerId;
           
           if (mapStore.map.getSource(sourceId)) {
-            const labelStore = useLabelStore();
             const fragmentStore = useFragmentStore();
             
             const fragmentsS = fragmentStore.visibleFragments.length > 0 
@@ -1214,7 +1203,6 @@ export const useLayerStore = defineStore('layer', {
              // In MapLibre, we must update the 'tiles' property. 
              // Simplest way is to remove and re-add the layer/source, but loadLayer already handles checking exists.
              // We'll update the Tile source if possible, or trigger reload.
-             const labelStore = useLabelStore();
              const fragmentStore = useFragmentStore();
              
              const fragmentsS = fragmentStore.visibleFragments.length > 0 

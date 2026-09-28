@@ -1,15 +1,13 @@
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import type {
-  Map as MapLibreMap,
   StyleSpecification,
-  PopupOptions,
   MapMouseEvent,
   LngLat,
   MapGeoJSONFeature,
 } from 'maplibre-gl';
 import { getMaplibreDefault } from '~/utils/maplibreLoader';
-import type { LayerConfig, FeatureData, ExtendedLayerConfig } from '~/types';
+import type { FeatureData } from '~/types';
 import { fastApiService } from '~/services/fastApiService';
 
 import { useGeoServer } from '~/composables/useGeoServer';
@@ -17,7 +15,6 @@ import { useLayerStore } from '~/stores/layerStore';
 import { useLabelStore, TECHNICAL_LABELS } from '~/stores/labelStore';
 import { usePopupStore } from '~/stores/popupStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
-import { getDefaultPaint } from '~/server/config/layer-types';
 import { escapeHtml } from '~/utils/escapeHtml';
 import {
   getMapTilerGlyphsUrl,
