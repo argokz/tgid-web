@@ -144,14 +144,14 @@
       <LazyDefectJournalDialog
         v-if="mountedDialogs.defect"
         ref="defectJournalRef"
-        @locate-defect="onLocateDefect"
+        @locate-defect="locate.defect"
       />
 
       <!-- Desktop TGID shurf journal -->
       <LazyShurfJournalDialog
         v-if="mountedDialogs.shurf"
         ref="shurfJournalRef"
-        @locate-shurf="onLocateShurf"
+        @locate-shurf="locate.shurf"
         @open-defect="openLazyDialog('defect', { defectId: $event })"
       />
 
@@ -159,7 +159,7 @@
       <LazyInspectionJournalDialog
         v-if="mountedDialogs.inspection"
         ref="inspectionJournalRef"
-        @locate-inspection="onLocateInspection"
+        @locate-inspection="locate.inspection"
         @open-defect="openLazyDialog('defect', { defectId: $event })"
       />
 
@@ -167,7 +167,7 @@
       <LazyRepairJournalDialog
         v-if="mountedDialogs.repair"
         ref="repairJournalRef"
-        @locate-repair="onLocateRepair"
+        @locate-repair="locate.repair"
         @open-defect="openLazyDialog('defect', { defectId: $event })"
       />
 
@@ -175,7 +175,7 @@
       <LazyPressureTestJournalDialog
         v-if="mountedDialogs.pressureTest"
         ref="pressureTestJournalRef"
-        @locate-pressure-test="onLocatePressureTest"
+        @locate-pressure-test="locate.pressureTest"
         @open-defect="openLazyDialog('defect', { defectId: $event })"
       />
 
@@ -188,104 +188,104 @@
       <LazyTechnicalConditionJournalDialog
         v-if="mountedDialogs.technicalCondition"
         ref="technicalConditionJournalRef"
-        @locate-technical-condition="onLocateTechnicalCondition"
+        @locate-technical-condition="locate.technicalCondition"
       />
 
       <!-- Desktop TGID corrosion indicator journal -->
       <LazyCorrosionIndicatorJournalDialog
         v-if="mountedDialogs.corrosionIndicator"
         ref="corrosionIndicatorJournalRef"
-        @locate-corrosion-indicator="onLocateCorrosionIndicator"
+        @locate-corrosion-indicator="locate.corrosionIndicator"
       />
 
       <!-- Desktop TGID ALSEKO contractual load registry -->
       <LazyAlsekoJournalDialog
         v-if="mountedDialogs.alseko"
         ref="alsekoJournalRef"
-        @locate-alseko="onLocateAlseko"
+        @locate-alseko="locate.alseko"
       />
 
       <!-- Desktop TGID electrical network inventory -->
       <LazyElectricalNetworkJournalDialog
         v-if="mountedDialogs.electricalNetwork"
         ref="electricalNetworkJournalRef"
-        @locate-electrical-object="onLocateElectricalObject"
+        @locate-electrical-object="locate.electricalNetwork"
       />
 
       <!-- Desktop TGID heat-loss seasons and source readiness -->
       <LazyHeatLossJournalDialog
         v-if="mountedDialogs.heatLoss"
         ref="heatLossJournalRef"
-        @locate-heat-source="onLocateHeatSource"
+        @locate-heat-source="locate.heatSource"
       />
 
       <!-- Desktop TGID temperature graphs and source operating conditions -->
       <LazyTemperatureGraphJournalDialog
         v-if="mountedDialogs.temperatureGraph"
         ref="temperatureGraphJournalRef"
-        @locate-source="onLocateHeatSource"
+        @locate-source="locate.heatSource"
       />
 
       <!-- Desktop TGID consumer load diagnostics -->
       <LazyConsumerLoadDiagnosticsDialog
         v-if="mountedDialogs.consumerLoad"
         ref="consumerLoadDiagnosticsRef"
-        @locate-consumer="onLocateConsumer"
+        @locate-consumer="locate.consumer"
       />
 
       <!-- Desktop TGID pump inventory, catalog and characteristic curves -->
       <LazyPumpEquipmentJournalDialog
         v-if="mountedDialogs.pumpEquipment"
         ref="pumpEquipmentJournalRef"
-        @locate-pump="onLocatePump"
+        @locate-pump="locate.pump"
       />
 
       <!-- Desktop TGID network dampers and regulating armatures -->
       <LazyNetworkArmatureJournalDialog
         v-if="mountedDialogs.networkArmature"
         ref="networkArmatureJournalRef"
-        @locate-armature="onLocateArmature"
+        @locate-armature="locate.armature"
       />
 
       <!-- Desktop TGID pressure, flow and differential-pressure regulators -->
       <LazyNetworkRegulatorJournalDialog
         v-if="mountedDialogs.networkRegulator"
         ref="networkRegulatorJournalRef"
-        @locate-regulator="onLocateRegulator"
+        @locate-regulator="locate.regulator"
       />
 
       <!-- Desktop TGID bypasses on external heat pipelines -->
       <LazyNetworkBypassJournalDialog
         v-if="mountedDialogs.networkBypass"
         ref="networkBypassJournalRef"
-        @locate-bypass="onLocateBypass"
+        @locate-bypass="locate.bypass"
       />
 
       <!-- Desktop TGID diaphragms on external heat pipelines -->
       <LazyNetworkDiaphragmJournalDialog
         v-if="mountedDialogs.networkDiaphragm"
         ref="networkDiaphragmJournalRef"
-        @locate-diaphragm="onLocateDiaphragm"
+        @locate-diaphragm="locate.diaphragm"
       />
 
       <!-- Desktop TGID elevator inventory -->
       <LazyElevatorJournalDialog
         v-if="mountedDialogs.elevator"
         ref="elevatorJournalRef"
-        @locate-elevator="onLocateElevator"
+        @locate-elevator="locate.elevator"
       />
 
       <LazyNetworkQueriesDialog
         v-if="mountedDialogs.networkQueries"
         ref="networkQueriesRef"
-        @locate="handleLocateFault"
+        @locate="locate.fault"
       />
 
       <!-- Desktop TGID «Анализ»: режим, допустимость, гидростатические зоны -->
       <LazyRegimeAnalysisDialog
         v-if="mountedDialogs.regimeAnalysis"
         ref="regimeAnalysisRef"
-        @locate="handleLocateFault"
+        @locate="locate.fault"
       />
 
       <!-- Desktop TGID «Excel»: отчёты по шаблонам gid6 excel2 и сводные ведомости -->
@@ -322,7 +322,7 @@
       <LazyTopologyDiagnosticsModal
         v-if="mountedDialogs.topologyDiagnostics"
         ref="topologyDiagnosticsRef"
-        @locate-fault="handleLocateFault"
+        @locate-fault="locate.fault"
       />
 
       <!-- Fault diagnostics modal -->
@@ -639,6 +639,8 @@ import type { MergeNodesReport, PiezometerRouteResponse, SplitReviewDecision, To
 import maplibregl from 'maplibre-gl';
 import { useLineVertexEditor } from '~/composables/useLineVertexEditor';
 import { useJournalContourLayer } from '~/composables/useJournalContourLayer';
+import { useLocateMarkers } from '~/composables/useLocateMarkers';
+import type { LocatePoint } from '~/composables/useLocateMarkers';
 import { pickNetworkSnap } from '~/utils/networkSnap';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
 
@@ -796,7 +798,6 @@ const waitForMapContainer = async (attempts = 20, delayMs = 50): Promise<boolean
 
 const attributePanelRef = ref<{ show: (props: Record<string, any>) => void; close: () => void } | null>(null);
 const nodeSearchRef = ref<{ openDialog: () => void; removeMarker: () => void } | null>(null);
-const nodeSearchMarker = ref<maplibregl.Marker | null>(null);
 const topologyDiagnosticsRef = ref<{ openDialog: () => void } | null>(null);
 const faultDiagnosticsRef = ref<{ openDialog: () => void } | null>(null);
 const calculationDiagnosticsRef = ref<{ openDialog: () => void } | null>(null);
@@ -1019,326 +1020,47 @@ const openLazyDialog = (key: LazyDialogKey, scope?: unknown) => {
   });
 };
 
-let defectLocateMarker: maplibregl.Marker | null = null;
-let shurfLocateMarker: maplibregl.Marker | null = null;
-let inspectionLocateMarker: maplibregl.Marker | null = null;
-let repairLocateMarker: maplibregl.Marker | null = null;
-let pressureTestLocateMarker: maplibregl.Marker | null = null;
-let technicalConditionLocateMarker: maplibregl.Marker | null = null;
-let corrosionIndicatorLocateMarker: maplibregl.Marker | null = null;
-let alsekoLocateMarker: maplibregl.Marker | null = null;
-let electricalNetworkLocateMarker: maplibregl.Marker | null = null;
-let heatLossLocateMarker: maplibregl.Marker | null = null;
-let consumerLoadLocateMarker: maplibregl.Marker | null = null;
-let pumpLocateMarker: maplibregl.Marker | null = null;
-let armatureLocateMarker: maplibregl.Marker | null = null;
-let regulatorLocateMarker: maplibregl.Marker | null = null;
-let bypassLocateMarker: maplibregl.Marker | null = null;
-let diaphragmLocateMarker: maplibregl.Marker | null = null;
-let elevatorLocateMarker: maplibregl.Marker | null = null;
+// === «Показать на карте»: маркер + перелёт, один слот на источник ===
+const locateMarkers = useLocateMarkers(() => mapStore.map, {
+  onSync: (selection) => cesiumStore.setSyncedSelection(selection),
+});
 
-const onLocateDefect = (coordinates: { longitude: number; latitude: number; id: number }) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 18, duration: 1400, essential: true });
-  defectLocateMarker?.remove();
-  defectLocateMarker = new maplibregl.Marker({ color: '#e65100' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(`Нарушение ${coordinates.id}`))
-    .addTo(mapStore.map);
-  defectLocateMarker.togglePopup();
+/** Пульсирующая точка диагностик и анализа (раньше — маркер nodeSearch) */
+const faultMarkerElement = () => {
+  const el = document.createElement('div');
+  el.className = 'fault-marker';
+  el.style.width = '24px';
+  el.style.height = '24px';
+  el.style.backgroundColor = 'rgba(255, 0, 0, 0.5)';
+  el.style.border = '2px solid red';
+  el.style.borderRadius = '50%';
+  el.style.animation = 'pulse 1.5s infinite';
+  return el;
 };
 
-const onLocateShurf = (coordinates: { longitude: number; latitude: number; id: number }) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 18, duration: 1400, essential: true });
-  shurfLocateMarker?.remove();
-  shurfLocateMarker = new maplibregl.Marker({ color: '#795548' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(`Шурф ${coordinates.id}`))
-    .addTo(mapStore.map);
-  shurfLocateMarker.togglePopup();
-};
+const labelOr = (fallback: string) => (p: LocatePoint) => p.label || `${fallback}${p.id}`;
 
-const onLocateInspection = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 16, duration: 1400, essential: true });
-  inspectionLocateMarker?.remove();
-  inspectionLocateMarker = new maplibregl.Marker({ color: '#00796b' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `Осмотр ${coordinates.id}`))
-    .addTo(mapStore.map);
-  inspectionLocateMarker.togglePopup();
-};
-
-const onLocateRepair = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 16, duration: 1400, essential: true });
-  repairLocateMarker?.remove();
-  repairLocateMarker = new maplibregl.Marker({ color: '#5e35b1' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `Ремонт ${coordinates.id}`))
-    .addTo(mapStore.map);
-  repairLocateMarker.togglePopup();
-};
-
-const onLocatePressureTest = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 16, duration: 1400, essential: true });
-  pressureTestLocateMarker?.remove();
-  pressureTestLocateMarker = new maplibregl.Marker({ color: '#1565c0' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `Опрессовка ${coordinates.id}`))
-    .addTo(mapStore.map);
-  pressureTestLocateMarker.togglePopup();
-};
-
-const onLocateTechnicalCondition = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 18, duration: 1400, essential: true });
-  technicalConditionLocateMarker?.remove();
-  technicalConditionLocateMarker = new maplibregl.Marker({ color: '#00838f' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `ТУ ${coordinates.id}`))
-    .addTo(mapStore.map);
-  technicalConditionLocateMarker.togglePopup();
-};
-
-const onLocateCorrosionIndicator = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 18, duration: 1400, essential: true });
-  corrosionIndicatorLocateMarker?.remove();
-  corrosionIndicatorLocateMarker = new maplibregl.Marker({ color: '#ef6c00' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `Индикатор ${coordinates.id}`))
-    .addTo(mapStore.map);
-  corrosionIndicatorLocateMarker.togglePopup();
-};
-
-const onLocateAlseko = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  kind: 'load' | 'building'
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 18, duration: 1400, essential: true });
-  alsekoLocateMarker?.remove();
-  alsekoLocateMarker = new maplibregl.Marker({ color: '#3949ab' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `АЛСЕКО ${coordinates.id}`))
-    .addTo(mapStore.map);
-  alsekoLocateMarker.togglePopup();
-};
-
-const onLocateElectricalObject = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  objectType: string
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 18, duration: 1400, essential: true });
-  electricalNetworkLocateMarker?.remove();
-  electricalNetworkLocateMarker = new maplibregl.Marker({ color: '#ff8f00' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `Объект электросети ${coordinates.id}`))
-    .addTo(mapStore.map);
-  electricalNetworkLocateMarker.togglePopup();
-};
-
-const onLocateHeatSource = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  nodeId: number
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 18, duration: 1400, essential: true });
-  heatLossLocateMarker?.remove();
-  heatLossLocateMarker = new maplibregl.Marker({ color: '#d84315' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `Источник №${coordinates.id}`))
-    .addTo(mapStore.map);
-  heatLossLocateMarker.togglePopup();
-};
-
-const onLocateConsumer = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  nodeId: number
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 18, duration: 1400, essential: true });
-  consumerLoadLocateMarker?.remove();
-  consumerLoadLocateMarker = new maplibregl.Marker({ color: '#00796b' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `Потребитель №${coordinates.id}`))
-    .addTo(mapStore.map);
-  consumerLoadLocateMarker.togglePopup();
-};
-
-const onLocatePump = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  lineId: number | null
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 19, duration: 1400, essential: true });
-  pumpLocateMarker?.remove();
-  pumpLocateMarker = new maplibregl.Marker({ color: '#37474f' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `Насос №${coordinates.id}`))
-    .addTo(mapStore.map);
-  pumpLocateMarker.togglePopup();
-};
-
-const onLocateArmature = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  lineId: number | null
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 19, duration: 1400, essential: true });
-  armatureLocateMarker?.remove();
-  armatureLocateMarker = new maplibregl.Marker({ color: '#4527a0' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `Арматура №${coordinates.id}`))
-    .addTo(mapStore.map);
-  armatureLocateMarker.togglePopup();
-};
-
-const onLocateRegulator = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  lineId: number | null
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 19, duration: 1400, essential: true });
-  regulatorLocateMarker?.remove();
-  regulatorLocateMarker = new maplibregl.Marker({ color: '#283593' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `Регулятор №${coordinates.id}`))
-    .addTo(mapStore.map);
-  regulatorLocateMarker.togglePopup();
-};
-
-const onLocateBypass = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  lineId: number | null
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  mapStore.map.flyTo({ center: lngLat, zoom: 19, duration: 1400, essential: true });
-  bypassLocateMarker?.remove();
-  bypassLocateMarker = new maplibregl.Marker({ color: '#006064' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `Байпас №${coordinates.id}`))
-    .addTo(mapStore.map);
-  bypassLocateMarker.togglePopup();
-};
-
-const onLocateDiaphragm = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  lineId: number | null
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  cesiumStore.setSyncedSelection({
-    id: coordinates.id,
-    longitude: coordinates.longitude,
-    latitude: coordinates.latitude,
-    label: coordinates.label,
-    layerId: 'diaphragms',
-  });
-  mapStore.map.flyTo({ center: lngLat, zoom: 19, duration: 1400, essential: true });
-  diaphragmLocateMarker?.remove();
-  diaphragmLocateMarker = new maplibregl.Marker({ color: '#004d40' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `Диафрагма №${coordinates.id}`))
-    .addTo(mapStore.map);
-  diaphragmLocateMarker.togglePopup();
-};
-
-const onLocateElevator = (coordinates: {
-  longitude: number
-  latitude: number
-  id: number
-  lineId: number | null
-  label: string
-}) => {
-  if (!mapStore.map) return;
-  const lngLat: [number, number] = [coordinates.longitude, coordinates.latitude];
-  cesiumStore.setSyncedSelection({
-    id: coordinates.id,
-    longitude: coordinates.longitude,
-    latitude: coordinates.latitude,
-    label: coordinates.label,
-    layerId: 'elevators',
-  });
-  mapStore.map.flyTo({ center: lngLat, zoom: 19, duration: 1400, essential: true });
-  elevatorLocateMarker?.remove();
-  elevatorLocateMarker = new maplibregl.Marker({ color: '#263238' })
-    .setLngLat(lngLat)
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(coordinates.label || `Элеватор №${coordinates.id}`))
-    .addTo(mapStore.map);
-  elevatorLocateMarker.togglePopup();
-};
+const locate = locateMarkers.handlers({
+  defect: { zoom: 18, color: '#e65100', popupText: (p) => `Нарушение ${p.id}` },
+  shurf: { zoom: 18, color: '#795548', popupText: (p) => `Шурф ${p.id}` },
+  inspection: { zoom: 16, color: '#00796b', popupText: labelOr('Осмотр ') },
+  repair: { zoom: 16, color: '#5e35b1', popupText: labelOr('Ремонт ') },
+  pressureTest: { zoom: 16, color: '#1565c0', popupText: labelOr('Опрессовка ') },
+  technicalCondition: { zoom: 18, color: '#00838f', popupText: labelOr('ТУ ') },
+  corrosionIndicator: { zoom: 18, color: '#ef6c00', popupText: labelOr('Индикатор ') },
+  alseko: { zoom: 18, color: '#3949ab', popupText: labelOr('АЛСЕКО ') },
+  electricalNetwork: { zoom: 18, color: '#ff8f00', popupText: labelOr('Объект электросети ') },
+  heatSource: { zoom: 18, color: '#d84315', popupText: labelOr('Источник №') },
+  consumer: { zoom: 18, color: '#00796b', popupText: labelOr('Потребитель №') },
+  pump: { zoom: 19, color: '#37474f', popupText: labelOr('Насос №') },
+  armature: { zoom: 19, color: '#4527a0', popupText: labelOr('Арматура №') },
+  regulator: { zoom: 19, color: '#283593', popupText: labelOr('Регулятор №') },
+  bypass: { zoom: 19, color: '#006064', popupText: labelOr('Байпас №') },
+  diaphragm: { zoom: 19, color: '#004d40', popupText: labelOr('Диафрагма №'), syncLayerId: 'diaphragms' },
+  elevator: { zoom: 19, color: '#263238', popupText: labelOr('Элеватор №'), syncLayerId: 'elevators' },
+  // Диагностики топологии, запросы по сети, анализ режима: { lat, lng } без подсказки
+  fault: { zoom: 18, element: faultMarkerElement },
+});
 
 // === Outage Simulation Map Visualization ===
 const onShowOutageOnMap = (res: any) => {
@@ -2457,32 +2179,6 @@ const onBaseLayerChange = (_layerId: string) => {
   // Смена подложки касается только MapLibre; Cesium синхронизируется через собственный store
 }
 
-const handleLocateFault = (fault: { lat: number, lng: number }) => {
-  if (fault.lat != null && fault.lng != null) {
-    mapStore.map?.flyTo({ center: [fault.lng, fault.lat], zoom: 18, duration: 1400, essential: true })
-    
-    // Подсветка проблемной точки с использованием маркера nodeSearch
-    if (mapStore.map) {
-      if (nodeSearchMarker.value) {
-        nodeSearchMarker.value.remove()
-      }
-      
-      const el = document.createElement('div')
-      el.className = 'fault-marker'
-      el.style.width = '24px'
-      el.style.height = '24px'
-      el.style.backgroundColor = 'rgba(255, 0, 0, 0.5)'
-      el.style.border = '2px solid red'
-      el.style.borderRadius = '50%'
-      el.style.animation = 'pulse 1.5s infinite'
-
-      nodeSearchMarker.value = new maplibregl.Marker({ element: el })
-        .setLngLat([fault.lng, fault.lat])
-        .addTo(mapStore.map)
-    }
-  }
-}
-
 const onIdentifyModeChange = (enabled: boolean) => {
   mapStore.setIdentifyMode(enabled);
   if (process.client) {
@@ -2555,19 +2251,6 @@ onBeforeUnmount(() => {
   journalContourLayer.detach(mapStore.map);
   if (draggedNodeMarker) draggedNodeMarker.remove();
   clearRouteHighlight();
-  if (defectLocateMarker) defectLocateMarker.remove();
-  if (shurfLocateMarker) shurfLocateMarker.remove();
-  if (inspectionLocateMarker) inspectionLocateMarker.remove();
-  if (repairLocateMarker) repairLocateMarker.remove();
-  if (pressureTestLocateMarker) pressureTestLocateMarker.remove();
-  if (technicalConditionLocateMarker) technicalConditionLocateMarker.remove();
-  if (corrosionIndicatorLocateMarker) corrosionIndicatorLocateMarker.remove();
-  if (alsekoLocateMarker) alsekoLocateMarker.remove();
-  if (electricalNetworkLocateMarker) electricalNetworkLocateMarker.remove();
-  if (heatLossLocateMarker) heatLossLocateMarker.remove();
-  if (consumerLoadLocateMarker) consumerLoadLocateMarker.remove();
-  if (pumpLocateMarker) pumpLocateMarker.remove();
-  if (armatureLocateMarker) armatureLocateMarker.remove();
   cesiumStore.cleanup();
 });
 
