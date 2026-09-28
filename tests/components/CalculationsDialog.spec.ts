@@ -43,6 +43,12 @@ describe('CalculationsDialog', () => {
     w.unmount();
   });
 
+  it('при открытии список запрашивается один раз (watch + update:options таблицы)', async () => {
+    const w = await openDialog({ auth_disabled: true, mutations_enabled: true });
+    expect(api.listCalculations).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
   it('удаление: подтверждение → DELETE → событие deleted и перезагрузка списка', async () => {
     api.deleteCalculation.mockResolvedValue({ deleted_rows: { ut_out: 10, us_out: 5 } });
     const w = await openDialog({ auth_disabled: true, mutations_enabled: true });

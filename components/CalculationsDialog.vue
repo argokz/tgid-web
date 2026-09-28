@@ -278,26 +278,43 @@ const deleteHint = (item: CalculationListItem) => {
   return 'Удалить расчёт и его результаты';
 };
 
-const load = async () => {
-  loading.value = true;
-  error.value = '';
-  try {
-    const res = await fastApiService.listCalculations({
-      file_id: filter.file_id,
-      mode: filter.mode,
-      author: filter.author?.trim() || null,
-      date_from: filter.date_from ? `${filter.date_from}T00:00:00` : null,
-      date_to: filter.date_to ? `${filter.date_to}T23:59:59` : null,
-      limit: itemsPerPage.value,
-      offset: (page.value - 1) * itemsPerPage.value,
-    });
-    items.value = res.items;
-    total.value = res.total;
-  } catch (e: any) {
-    error.value = e?.userMessage || e?.message || 'Не удалось загрузить список расчётов';
-  } finally {
-    loading.value = false;
-  }
+// При открытии список запрашивают и watch(isOpen), и v-data-table-server (update:options при
+// монтировании); смена фильтра — watch + update:options при сбросе страницы. Одинаковый запрос,
+// который уже в полёте, не повторяем.
+let inflight: { key: string; promise: Promise<void> } | null = null;
+
+const load = (): Promise<void> => {
+  const query = {
+    file_id: filter.file_id,
+    mode: filter.mode,
+    author: filter.author?.trim() || null,
+    date_from: filter.date_from ? `${filter.date_from}T00:00:00` : null,
+    date_to: filter.date_to ? `${filter.date_to}T23:59:59` : null,
+    limit: itemsPerPage.value,
+    offset: (page.value - 1) * itemsPerPage.value,
+  };
+  const key = JSON.stringify(query);
+  if (inflight?.key === key) return inflight.promise;
+  const promise = (async () => {
+    loading.value = true;
+    error.value = '';
+    try {
+      const res = await fastApiService.listCalculations(query);
+      if (inflight?.key !== key) return; // ответ устарел: уже запрошены другие фильтры/страница
+      items.value = res.items;
+      total.value = res.total;
+    } catch (e: any) {
+      if (inflight?.key !== key) return;
+      error.value = e?.userMessage || e?.message || 'Не удалось загрузить список расчётов';
+    } finally {
+      if (inflight?.key === key) {
+        inflight = null;
+        loading.value = false;
+      }
+    }
+  })();
+  inflight = { key, promise };
+  return promise;
 };
 
 const askDelete = (item: CalculationListItem) => {
