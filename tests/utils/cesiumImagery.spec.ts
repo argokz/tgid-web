@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildNetworkWmsOverlays, resolve3dBaseImagery } from '~/utils/cesiumImagery'
+import { buildNetworkWmsOverlays, buildWmsProbeUrl, probeWmsOverlay, resolve3dBaseImagery } from '~/utils/cesiumImagery'
 
 const layers = [
   { id: 'stadia', url: 'https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=K', maxZoom: 22 },
@@ -42,5 +42,29 @@ describe('buildNetworkWmsOverlays', () => {
     const res = buildNetworkWmsOverlays(all, ['pipes'], [74, 75], () => 'https://g')
     expect(res[0].cqlFilter).toBe(`"fileid" IN ('74','75')`)
     expect(res[0].key).toContain('74')
+  })
+})
+
+describe('probeWmsOverlay', () => {
+  const overlay = { key: 'k', url: 'https://g/AlmatyGIS/wms', layers: 'AlmatyGIS:realconsumers', cqlFilter: `"fileid" IN ('74')` }
+  const respond = (status: number, type: string) =>
+    (async () => new Response('x', { status, headers: { 'content-type': type } })) as unknown as typeof fetch
+
+  it('в пробный GetMap попадают слой и CQL-фильтр', () => {
+    const url = buildWmsProbeUrl(overlay)
+    expect(url.startsWith('https://g/AlmatyGIS/wms?SERVICE=WMS')).toBe(true)
+    expect(url).toContain('LAYERS=AlmatyGIS%3Arealconsumers')
+    expect(url).toContain('CQL_FILTER=')
+  })
+
+  it('картинка — слой рабочий; XML-ошибка GeoServer (200) и 404 — нет', async () => {
+    expect(await probeWmsOverlay(overlay, respond(200, 'image/png'))).toBe(true)
+    expect(await probeWmsOverlay(overlay, respond(200, 'application/vnd.ogc.se_xml;charset=UTF-8'))).toBe(false)
+    expect(await probeWmsOverlay(overlay, respond(404, 'text/html'))).toBe(false)
+  })
+
+  it('сетевая ошибка не выкидывает слой', async () => {
+    const failing = (async () => { throw new TypeError('network') }) as unknown as typeof fetch
+    expect(await probeWmsOverlay(overlay, failing)).toBe(true)
   })
 })

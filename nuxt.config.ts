@@ -70,6 +70,12 @@ export default defineNuxtConfig({
         process.env.NUXT_PUBLIC_CESIUM_ION_TOKEN ||
         env.NUXT_PUBLIC_CESIUM_ION_TOKEN ||
         '',
+      // Фотореалистичные 3D Tiles в ion (2275207 — Google Photorealistic 3D Tiles; 0 — выключить кнопку)
+      cesiumPhotorealisticAssetId: Number(
+        process.env.NUXT_PUBLIC_CESIUM_PHOTOREALISTIC_ASSET_ID ||
+        env.NUXT_PUBLIC_CESIUM_PHOTOREALISTIC_ASSET_ID ||
+        2275207
+      ),
       // Кнопки записи, расчётов и топологии показываются по роли и флагам сервера
       // (/auth/config: mutations_enabled, topology_mutations_enabled) — см. utils/permissions.ts.
       networkTilesetUrl:

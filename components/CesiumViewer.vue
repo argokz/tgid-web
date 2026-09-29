@@ -45,8 +45,17 @@ watch(baseImagery, (imagery) => {
   if (cesiumStore.isInitialized) cesiumStore.setBaseImagery(imagery)
 })
 watch(networkOverlays, (overlays) => {
-  if (cesiumStore.isInitialized) cesiumStore.setNetworkOverlays(overlays)
+  if (cesiumStore.isInitialized) void cesiumStore.setNetworkOverlays(overlays)
 })
+
+// Фотореалистичные здания (Google через Cesium ion): нужен ion-токен и id ассета
+const photorealisticAssetId = computed(() => Number((runtimeConfig.public as any).cesiumPhotorealisticAssetId || 0))
+const photorealisticAvailable = computed(() =>
+  Boolean(runtimeConfig.public.cesiumIonToken) && photorealisticAssetId.value > 0
+)
+const togglePhotorealistic = () => {
+  void cesiumStore.setPhotorealistic(!cesiumStore.photorealistic, photorealisticAssetId.value)
+}
 
 onMounted(async () => {
   if (!cesiumContainer.value) return
@@ -60,7 +69,10 @@ onMounted(async () => {
       String(runtimeConfig.public.cesiumIonToken || ''),
       baseImagery.value
     )
-    cesiumStore.setNetworkOverlays(networkOverlays.value)
+    void cesiumStore.setNetworkOverlays(networkOverlays.value)
+    if (photorealisticAvailable.value && cesiumStore.loadSavedPhotorealistic()) {
+      void cesiumStore.setPhotorealistic(true, photorealisticAssetId.value)
+    }
     emit('ready')
   } catch (error: any) {
     console.error('Cesium init error:', error)
@@ -77,6 +89,28 @@ onMounted(async () => {
       ref="cesiumContainer"
       class="cesium-canvas"
     />
+    <v-btn
+      v-if="photorealisticAvailable && !loading && !errorMessage"
+      class="cesium-photo-toggle"
+      size="small"
+      elevation="4"
+      prepend-icon="mdi-office-building"
+      :color="cesiumStore.photorealistic ? 'primary' : 'white'"
+      :loading="cesiumStore.photorealisticStatus === 'loading'"
+      :title="cesiumStore.photorealistic ? 'Вернуть рельеф с подложкой' : 'Фотореалистичные здания и рельеф (Google 3D Tiles)'"
+      @click="togglePhotorealistic"
+    >
+      Здания 3D
+    </v-btn>
+    <v-alert
+      v-if="cesiumStore.photorealisticStatus === 'error'"
+      class="cesium-tileset-notice"
+      type="warning"
+      variant="tonal"
+      density="compact"
+    >
+      Фотореалистичные 3D Tiles не загрузились: {{ cesiumStore.photorealisticError }}
+    </v-alert>
     <div
       v-if="loading"
       class="cesium-status"
@@ -116,6 +150,13 @@ onMounted(async () => {
   left: 12px;
   right: 12px;
   max-width: 560px;
+  z-index: 2;
+}
+
+.cesium-photo-toggle {
+  position: absolute;
+  top: 12px;
+  right: 88px;
   z-index: 2;
 }
 

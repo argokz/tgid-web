@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { markRaw } from 'vue'
-import type { ImageryLayer, TerrainProvider, Viewer } from 'cesium'
+import type { Cesium3DTileset, ImageryLayer, ImageryLayerCollection, TerrainProvider, Viewer } from 'cesium'
 import { describeTilesetError, type TilesetStatus } from '~/utils/cesiumTileset'
 
-import type { Cesium3dBaseImagery, Cesium3dWmsOverlay } from '~/utils/cesiumImagery'
+import { probeWmsOverlay, type Cesium3dBaseImagery, type Cesium3dWmsOverlay } from '~/utils/cesiumImagery'
 
 type CesiumModule = typeof import('cesium')
 
@@ -12,6 +12,17 @@ let baseImageryLayer: ImageryLayer | null = null
 let baseImageryUrl = ''
 let overlayLayers = new Map<string, ImageryLayer>()
 let hasNaturalEarth = false
+let lastOverlays: Cesium3dWmsOverlay[] = []
+let overlayGeneration = 0
+// Результат проверки слоя GeoServer (url|layers|cql) — один запрос на слой за сессию
+const overlayProbe = new Map<string, Promise<boolean>>()
+// Фотореалистичные 3D Tiles (Google через Cesium ion); оверлеи сети в этом режиме драпируются на них
+let photoTileset: Cesium3DTileset | null = null
+let photoAssetId = 0
+
+const PHOTOREALISTIC_KEY = 'cesiumPhotorealistic'
+
+export type PhotorealisticStatus = 'off' | 'loading' | 'ready' | 'error'
 
 export type SyncedSelection = {
   id: string | number
@@ -35,7 +46,11 @@ export const useCesiumStore = defineStore('cesium', {
     networkTilesetStatus: 'disabled' as TilesetStatus,
     networkTilesetError: '' as string,
     /** Тайлы, которые не загрузились после успешного tileset.json (частичная деградация). */
-    networkTileFailures: 0
+    networkTileFailures: 0,
+    /** Фотореалистичные здания и рельеф (Cesium ion, по умолчанию Google Photorealistic 3D Tiles) */
+    photorealistic: false,
+    photorealisticStatus: 'off' as PhotorealisticStatus,
+    photorealisticError: '' as string
   }),
 
   actions: {
@@ -122,18 +137,38 @@ export const useCesiumStore = defineStore('cesium', {
       this.viewer.scene.requestRender()
     },
 
-    /** Слои сети в 3D: WMS GeoServer поверх рельефа; лишние снимаются, новые добавляются сверху */
-    setNetworkOverlays(overlays: Cesium3dWmsOverlay[]) {
+    /**
+     * Слои сети в 3D: WMS GeoServer поверх рельефа; лишние снимаются, новые добавляются сверху.
+     * Слои, на которые GeoServer отвечает ошибкой, пропускаются (см. probeWmsOverlay).
+     */
+    async setNetworkOverlays(overlays: Cesium3dWmsOverlay[]) {
       const Cesium = this.cesium as CesiumModule | null
+      lastOverlays = overlays
       if (!this.viewer || !Cesium) return
+      const generation = ++overlayGeneration
       const wanted = new Set(overlays.map((o) => o.key))
       for (const [key, layer] of overlayLayers) {
         if (!wanted.has(key)) {
-          this.viewer.imageryLayers.remove(layer, true)
+          this.overlayCollection().remove(layer, true)
           overlayLayers.delete(key)
         }
       }
-      for (const overlay of overlays) {
+      const usable = await Promise.all(overlays.map((overlay) => {
+        const probeKey = `${overlay.url}|${overlay.layers}|${overlay.cqlFilter || ''}`
+        let probe = overlayProbe.get(probeKey)
+        if (!probe) {
+          probe = probeWmsOverlay(overlay)
+          overlayProbe.set(probeKey, probe)
+        }
+        return probe
+      }))
+      // Пока шла проверка, набор слоёв или режим сменились — применит следующий вызов
+      if (generation !== overlayGeneration || !this.viewer) return
+      const collection = this.overlayCollection()
+      overlays.forEach((overlay, index) => {
+        if (!usable[index]) console.warn('3D: слой GeoServer недоступен, пропущен:', overlay.layers)
+      })
+      for (const overlay of overlays.filter((_, index) => usable[index])) {
         let layer = overlayLayers.get(overlay.key)
         if (!layer) {
           const parameters: Record<string, string> = { format: 'image/png', transparent: 'true' }
@@ -144,13 +179,82 @@ export const useCesiumStore = defineStore('cesium', {
             parameters,
             tilingScheme: new Cesium.WebMercatorTilingScheme()
           })
-          layer = this.viewer.imageryLayers.addImageryProvider(provider)
+          layer = collection.addImageryProvider(provider)
           overlayLayers.set(overlay.key, layer)
         }
         // Порядок как в списке (снизу вверх)
-        this.viewer.imageryLayers.raiseToTop(layer)
+        collection.raiseToTop(layer)
       }
       this.viewer.scene.requestRender()
+    },
+
+    /** Куда кладутся оверлеи сети: на глобус или на фотореалистичный tileset (глобус тогда скрыт) */
+    overlayCollection(): ImageryLayerCollection {
+      return this.photorealistic && photoTileset ? photoTileset.imageryLayers : this.viewer!.imageryLayers
+    },
+
+    /** Переносит оверлеи сети в текущую коллекцию (после включения/выключения фотореализма) */
+    moveOverlays(from: ImageryLayerCollection) {
+      for (const layer of overlayLayers.values()) from.remove(layer, true)
+      overlayLayers = new Map()
+      void this.setNetworkOverlays(lastOverlays)
+    },
+
+    /**
+     * Фотореалистичные 3D Tiles из Cesium ion (ассет Google Photorealistic 3D Tiles — 2275207).
+     * В этом режиме глобус (рельеф + подложка) скрыт: здания и рельеф уже есть в тайлах.
+     */
+    async setPhotorealistic(enabled: boolean, assetId = photoAssetId) {
+      const Cesium = this.cesium as CesiumModule | null
+      if (typeof window !== 'undefined') {
+        try { localStorage.setItem(PHOTOREALISTIC_KEY, enabled ? '1' : '0') } catch { /* private mode */ }
+      }
+      if (assetId) photoAssetId = assetId
+      if (!this.viewer || !Cesium) {
+        this.photorealistic = enabled
+        return
+      }
+      const before = this.overlayCollection()
+      if (!enabled) {
+        this.photorealistic = false
+        this.photorealisticStatus = 'off'
+        if (photoTileset) photoTileset.show = false
+        this.viewer.scene.globe.show = true
+        this.moveOverlays(before)
+        this.viewer.scene.requestRender()
+        return
+      }
+      if (!photoAssetId) return
+      this.photorealisticError = ''
+      if (!photoTileset) {
+        this.photorealisticStatus = 'loading'
+        try {
+          const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(photoAssetId, {
+            // Google требует показывать атрибуцию на экране
+            showCreditsOnScreen: true
+          })
+          if (!this.viewer) return
+          photoTileset = markRaw(tileset)
+          this.viewer.scene.primitives.add(tileset)
+        } catch (error) {
+          this.photorealistic = false
+          this.photorealisticStatus = 'error'
+          this.photorealisticError = describeTilesetError(error)
+          console.warn('Фотореалистичные 3D Tiles не загрузились:', error)
+          return
+        }
+      }
+      photoTileset.show = true
+      this.photorealistic = true
+      this.photorealisticStatus = 'ready'
+      this.viewer.scene.globe.show = false
+      this.moveOverlays(before)
+      this.viewer.scene.requestRender()
+    },
+
+    loadSavedPhotorealistic(): boolean {
+      if (typeof window === 'undefined') return false
+      try { return localStorage.getItem(PHOTOREALISTIC_KEY) === '1' } catch { return false }
     },
 
     setSyncedSelection(selection: SyncedSelection) {
@@ -283,6 +387,8 @@ export const useCesiumStore = defineStore('cesium', {
       baseImageryLayer = null
       baseImageryUrl = ''
       overlayLayers = new Map()
+      photoTileset = null
+      this.photorealisticStatus = 'off'
       this.isInitialized = false
       this.cesium = null
       this.networkTilesetLoaded = false

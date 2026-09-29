@@ -74,3 +74,30 @@ export function buildNetworkWmsOverlays(
       return { key: `${l.layerId}|${cqlFilter || ''}`, url: `${base}/${ws}/wms`, layers: name, cqlFilter }
     })
 }
+
+/** Маленький GetMap по центру Алматы: отличает рабочий слой (картинка) от ошибки GeoServer (XML) */
+export function buildWmsProbeUrl(overlay: Cesium3dWmsOverlay): string {
+  const params = [
+    'SERVICE=WMS', 'VERSION=1.1.1', 'REQUEST=GetMap', `LAYERS=${encodeURIComponent(overlay.layers)}`, 'STYLES=',
+    'SRS=EPSG:4326', 'BBOX=76.90,43.20,76.96,43.26', 'WIDTH=8', 'HEIGHT=8', 'FORMAT=image/png', 'TRANSPARENT=true'
+  ]
+  if (overlay.cqlFilter) params.push(`CQL_FILTER=${encodeURIComponent(overlay.cqlFilter)}`)
+  return `${overlay.url}?${params.join('&')}`
+}
+
+/**
+ * Слой, на который GeoServer отвечает ошибкой (LayerNotDefined и т.п. приходят как 200 + XML), в 3D не добавляется:
+ * на фотореалистичных тайлах такой слой не даёт тайлам догрузиться, на глобусе — сыплет ошибками декодирования.
+ */
+export async function probeWmsOverlay(
+  overlay: Cesium3dWmsOverlay,
+  fetchFn: typeof fetch = fetch
+): Promise<boolean> {
+  try {
+    const res = await fetchFn(buildWmsProbeUrl(overlay))
+    return res.ok && (res.headers.get('content-type') || '').startsWith('image/')
+  } catch {
+    // Сеть/CORS: не отбрасываем слой, пусть Cesium попробует сам
+    return true
+  }
+}
