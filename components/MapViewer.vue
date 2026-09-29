@@ -1386,8 +1386,9 @@ const retryMapInit = () => {
   initMap();
 };
 
-const onBaseLayerChange = (_layerId: string) => {
-  // Смена подложки касается только MapLibre; Cesium синхронизируется через собственный store
+const onBaseLayerChange = (layerId: string) => {
+  // MapLibre меняет подложку сразу; 3D берёт её из mapStore.selectedBaseLayer (CesiumViewer)
+  void mapStore.updateBaseLayer(layerId);
 }
 
 const onIdentifyModeChange = (enabled: boolean) => {

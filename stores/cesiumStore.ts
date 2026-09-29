@@ -3,7 +3,15 @@ import { markRaw } from 'vue'
 import type { ImageryLayer, TerrainProvider, Viewer } from 'cesium'
 import { describeTilesetError, type TilesetStatus } from '~/utils/cesiumTileset'
 
+import type { Cesium3dBaseImagery, Cesium3dWmsOverlay } from '~/utils/cesiumImagery'
+
 type CesiumModule = typeof import('cesium')
+
+// Слои Cesium вне реактивного state: подложка 2D и WMS-оверлеи сети
+let baseImageryLayer: ImageryLayer | null = null
+let baseImageryUrl = ''
+let overlayLayers = new Map<string, ImageryLayer>()
+let hasNaturalEarth = false
 
 export type SyncedSelection = {
   id: string | number
@@ -31,7 +39,7 @@ export const useCesiumStore = defineStore('cesium', {
   }),
 
   actions: {
-    async initializeViewer(container: HTMLElement, ionToken = '') {
+    async initializeViewer(container: HTMLElement, ionToken = '', baseImagery?: Cesium3dBaseImagery) {
       if (import.meta.server) {
         throw new Error('Cesium Viewer can only be initialized in the browser')
       }
@@ -80,6 +88,10 @@ export const useCesiumStore = defineStore('cesium', {
       }))
 
       this.isInitialized = true
+      hasNaturalEarth = baseLayer !== false
+      if (baseImagery) {
+        this.setBaseImagery(baseImagery)
+      }
 
       if (this.syncedSelection) {
         this.flyToSelection(this.syncedSelection)
@@ -89,6 +101,56 @@ export const useCesiumStore = defineStore('cesium', {
       } else {
         this.networkTilesetStatus = 'disabled'
       }
+    },
+
+    /** Подложка 3D = растр подложки 2D; NaturalEarthII остаётся под ней на случай отказа тайлов */
+    setBaseImagery(imagery: Cesium3dBaseImagery) {
+      const Cesium = this.cesium as CesiumModule | null
+      if (!this.viewer || !Cesium || imagery.url === baseImageryUrl) return
+      if (baseImageryLayer) {
+        this.viewer.imageryLayers.remove(baseImageryLayer, true)
+        baseImageryLayer = null
+      }
+      const provider = new Cesium.UrlTemplateImageryProvider({
+        url: imagery.url,
+        maximumLevel: imagery.maximumLevel
+      })
+      baseImageryLayer = new Cesium.ImageryLayer(provider)
+      // Сразу над NaturalEarthII (если он есть), под оверлеями сети
+      this.viewer.imageryLayers.add(baseImageryLayer, hasNaturalEarth ? 1 : 0)
+      baseImageryUrl = imagery.url
+      this.viewer.scene.requestRender()
+    },
+
+    /** Слои сети в 3D: WMS GeoServer поверх рельефа; лишние снимаются, новые добавляются сверху */
+    setNetworkOverlays(overlays: Cesium3dWmsOverlay[]) {
+      const Cesium = this.cesium as CesiumModule | null
+      if (!this.viewer || !Cesium) return
+      const wanted = new Set(overlays.map((o) => o.key))
+      for (const [key, layer] of overlayLayers) {
+        if (!wanted.has(key)) {
+          this.viewer.imageryLayers.remove(layer, true)
+          overlayLayers.delete(key)
+        }
+      }
+      for (const overlay of overlays) {
+        let layer = overlayLayers.get(overlay.key)
+        if (!layer) {
+          const parameters: Record<string, string> = { format: 'image/png', transparent: 'true' }
+          if (overlay.cqlFilter) parameters.CQL_FILTER = overlay.cqlFilter
+          const provider = new Cesium.WebMapServiceImageryProvider({
+            url: overlay.url,
+            layers: overlay.layers,
+            parameters,
+            tilingScheme: new Cesium.WebMercatorTilingScheme()
+          })
+          layer = this.viewer.imageryLayers.addImageryProvider(provider)
+          overlayLayers.set(overlay.key, layer)
+        }
+        // Порядок как в списке (снизу вверх)
+        this.viewer.imageryLayers.raiseToTop(layer)
+      }
+      this.viewer.scene.requestRender()
     },
 
     setSyncedSelection(selection: SyncedSelection) {
@@ -218,6 +280,9 @@ export const useCesiumStore = defineStore('cesium', {
         this.viewer.destroy()
         this.viewer = null
       }
+      baseImageryLayer = null
+      baseImageryUrl = ''
+      overlayLayers = new Map()
       this.isInitialized = false
       this.cesium = null
       this.networkTilesetLoaded = false

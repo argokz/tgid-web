@@ -409,11 +409,9 @@
 
             elevation="4"
 
-            color="white"
+            :color="cesiumStore.viewMode === '3D' ? 'primary' : 'white'"
 
             class="control-btn font-weight-bold"
-
-            :class="{'bg-primary text-white': cesiumStore.viewMode === '3D'}"
 
             aria-label="Переключить 2D/3D"
 

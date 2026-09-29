@@ -1,7 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useCesiumStore } from '~/stores/cesiumStore'
+import { useMapStore } from '~/stores/mapStore'
+import { useLayerStore } from '~/stores/layerStore'
+import { useFragmentStore } from '~/stores/fragmentStore'
+import { useSettingsStore } from '~/stores/settingsStore'
+import { useBaseLayers } from '~/composables/useBaseLayers'
 import { resolveTilesetUrl } from '~/utils/cesiumTileset'
+import { buildNetworkWmsOverlays, resolve3dBaseImagery } from '~/utils/cesiumImagery'
 
 const cesiumContainer = ref<HTMLElement | null>(null)
 const loading = ref(true)
@@ -10,6 +16,37 @@ const cesiumStore = useCesiumStore()
 const runtimeConfig = useRuntimeConfig()
 const emit = defineEmits<{ ready: [] }>()
 const tilesetNoticeClosed = ref(false)
+const mapStore = useMapStore()
+const layerStore = useLayerStore()
+const fragmentStore = useFragmentStore()
+const settingsStore = useSettingsStore()
+const { layers: baseLayers } = useBaseLayers()
+
+// Подложка 3D — та же, что выбрана в 2D (растровый вариант)
+const baseImagery = computed(() => resolve3dBaseImagery(
+  mapStore.selectedBaseLayer,
+  baseLayers,
+  String((runtimeConfig.public as any).maptilerKey || '')
+))
+
+// Сеть в 3D — видимые слои панели через WMS GeoServer, с фильтром фрагментов
+const networkOverlays = computed(() => buildNetworkWmsOverlays(
+  layerStore.geoServerLayers,
+  layerStore.visibleGeoServerLayers,
+  fragmentStore.visibleFragments,
+  (ws, layer) =>
+    layer.workspaceBaseUrl ||
+    settingsStore.workspaces.find((w) => w.workspace === ws)?.url ||
+    (runtimeConfig.public as any).geoserver?.url ||
+    'https://itwin.kz/geoserver'
+))
+
+watch(baseImagery, (imagery) => {
+  if (cesiumStore.isInitialized) cesiumStore.setBaseImagery(imagery)
+})
+watch(networkOverlays, (overlays) => {
+  if (cesiumStore.isInitialized) cesiumStore.setNetworkOverlays(overlays)
+})
 
 onMounted(async () => {
   if (!cesiumContainer.value) return
@@ -20,8 +57,10 @@ onMounted(async () => {
     }
     await cesiumStore.initializeViewer(
       cesiumContainer.value,
-      String(runtimeConfig.public.cesiumIonToken || '')
+      String(runtimeConfig.public.cesiumIonToken || ''),
+      baseImagery.value
     )
+    cesiumStore.setNetworkOverlays(networkOverlays.value)
     emit('ready')
   } catch (error: any) {
     console.error('Cesium init error:', error)
