@@ -308,15 +308,28 @@ export interface PassportHierarchyGroup {
 }
 
 export interface TopologyDiagnosticFault {
-  lat: number;
-  lng: number;
-  [key: string]: any;
+  type: string;
+  title?: string;
+  object_type: 'node' | 'line';
+  object_id: number;
+  description: string;
+  related_ids?: number[];
+  lat: number | null;
+  lng: number | null;
 }
 
+/** GET api/v1/topology/diagnostics: counts — полные числа, faults — не больше limit на тип */
 export interface TopologyDiagnosticsResponse {
+  fragment_id: number;
+  fragment_name: string | null;
+  nodes: number;
+  lines: number;
+  counts: Record<string, number>;
+  total: number;
+  limit: number;
+  truncated: boolean;
+  types: Record<string, string>;
   faults: TopologyDiagnosticFault[];
-  total?: number;
-  [key: string]: any;
 }
 
 export interface PiezometerPathNode {
@@ -1099,8 +1112,12 @@ export class ApiError extends Error {
   readonly userMessage: string;
   /** Структурированный detail ответа (например, {code, conflicts} у 409), если он был объектом */
   readonly data: any;
+  /** Сервер ответил своим текстом detail (не FastAPI «Not Found») — маршрут существует */
+  readonly hasServerDetail: boolean;
 
-  constructor(params: { status: number; detail: string; path: string; userMessage: string; data?: any }) {
+  constructor(params: {
+    status: number; detail: string; path: string; userMessage: string; data?: any; hasServerDetail?: boolean;
+  }) {
     super(params.userMessage);
     this.name = 'ApiError';
     this.status = params.status;
@@ -1108,6 +1125,7 @@ export class ApiError extends Error {
     this.path = params.path;
     this.userMessage = params.userMessage;
     this.data = params.data ?? null;
+    this.hasServerDetail = params.hasServerDetail ?? false;
   }
 
   /** 409: объект изменён/удалён другим пользователем после того, как его прочитали */
@@ -1116,9 +1134,10 @@ export class ApiError extends Error {
   }
 
   /** Маршрута нет на сервере — обычно развёрнута устаревшая версия API.
-   *  404 с кодом в detail (например, nothing_to_undo) — ответ существующего маршрута. */
+   *  404 с кодом или своим текстом в detail (nothing_to_undo, «Фрагмент не найден») —
+   *  ответ существующего маршрута. */
   get isRouteMissing(): boolean {
-    return this.status === 404 && !this.data?.code && !this.path.match(/\/\d+$/);
+    return this.status === 404 && !this.data?.code && !this.hasServerDetail && !this.path.match(/\/\d+$/);
   }
 
   /** Сеть/сервер недоступны */
@@ -1230,22 +1249,32 @@ export const apiHealth = reactive({
   lastError: '' as string,
 });
 
+/** Итог последнего /health: устаревший API или Redis — баннер держится, пока health не скажет иначе */
+const healthState = { outdated: false, note: '' };
+
+/** Успешный ответ: снять «недоступен» и разовое «маршрут отсутствует», вернуть текст health (QA F76) */
+const markApiResponded = () => {
+  apiHealth.reachable = true;
+  apiHealth.outdatedRoutes = healthState.outdated;
+  apiHealth.lastError = healthState.note;
+};
+
 export const refreshApiHealth = async () => {
   try {
     const health = await fastApiService.getHealth();
-    apiHealth.reachable = true;
-    apiHealth.outdatedRoutes = (health.routes || 0) < 80;
+    healthState.outdated = (health.routes || 0) < 80;
     apiHealth.redisOk = health.redis?.ok !== false;
-    if (apiHealth.outdatedRoutes) {
-      apiHealth.lastError =
+    if (healthState.outdated) {
+      healthState.note =
         `На сервере устаревший API (${health.routes} маршрутов). Нужен деплой актуального itwin-api.`;
     } else if (!apiHealth.redisOk) {
-      apiHealth.lastError =
+      healthState.note =
         health.redis?.note ||
         'Redis недоступен: расчёт sety и запуск теплопотерь не будут работать.';
     } else {
-      apiHealth.lastError = '';
+      healthState.note = '';
     }
+    markApiResponded();
   } catch (e: any) {
     apiHealth.reachable = false;
     apiHealth.lastError = e?.message || 'API недоступен';
@@ -1286,8 +1315,7 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
         ...(options || {}),
         headers,
       });
-      apiHealth.reachable = true;
-      apiHealth.lastError = '';
+      markApiResponded();
       return result;
     } catch (error: any) {
       lastError = error;
@@ -1303,12 +1331,14 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
 
       const detail = extractDetail(error);
       const rawDetail = (error?.data ?? error?.response?._data)?.detail;
+      const hasServerDetail = typeof rawDetail === 'string' && rawDetail !== '' && rawDetail !== 'Not Found';
       const apiError = new ApiError({
         status,
         detail,
         path,
-        userMessage: userMessageFor(status, detail, path),
+        userMessage: status === 404 && hasServerDetail ? detail : userMessageFor(status, detail, path),
         data: rawDetail && typeof rawDetail === 'object' ? rawDetail : null,
+        hasServerDetail,
       });
 
       if (apiError.isUnavailable) {
@@ -2465,8 +2495,8 @@ export const fastApiService = {
     return request('api/corrosion-indicators/geojson');
   },
 
-  async getTopologyDiagnostics(limit = 100): Promise<TopologyDiagnosticsResponse> {
-    return request('api/topology/diagnostics', { query: { limit } });
+  async getTopologyDiagnostics(fragmentId: number, limit = 200): Promise<TopologyDiagnosticsResponse> {
+    return request('api/v1/topology/diagnostics', { query: { fragment_id: fragmentId, limit } });
   },
 
   getFormReportUrl(formId: string, search?: string): string {

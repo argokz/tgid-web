@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, fastApiService, formatVersionConflict } from '../../services/fastApiService'
+import { ApiError, apiHealth, fastApiService, formatVersionConflict } from '../../services/fastApiService'
 
 describe('fastApiService topology contracts', () => {
   const fetchMock = vi.fn()
@@ -1006,5 +1006,50 @@ describe('fastApiService optimistic locking and topology previews', () => {
   it('formats conflict timestamps', () => {
     const text = formatVersionConflict({ conflicts: { 'line:3': { removed: false, changed_at: '2026-09-27T15:51:45' } } })
     expect(text.startsWith('Объект изменён другим пользователем: участок 3 изменён ')).toBe(true)
+  })
+})
+
+describe('fastApiService topology diagnostics and API health banner (QA F35, F76)', () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('$fetch', fetchMock)
+    vi.stubGlobal('useRuntimeConfig', () => ({
+      public: { mapApiBaseUrl: 'https://api.example.test/' }
+    }))
+    apiHealth.reachable = true
+    apiHealth.outdatedRoutes = false
+    apiHealth.lastError = ''
+  })
+
+  it('asks diagnostics for one fragment', async () => {
+    fetchMock.mockResolvedValueOnce({ counts: {}, total: 0, faults: [] })
+    await fastApiService.getTopologyDiagnostics(74)
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/api/v1/topology/diagnostics',
+      expect.objectContaining({ query: { fragment_id: 74, limit: 200 } })
+    )
+  })
+
+  it('404 with a server detail is an answer, not a missing route', async () => {
+    fetchMock.mockRejectedValue({ statusCode: 404, data: { detail: 'Фрагмент 5 не найден' } })
+    const err = await fastApiService.getTopologyDiagnostics(5).catch((e) => e)
+    expect(err.isRouteMissing).toBe(false)
+    expect(err.userMessage).toBe('Фрагмент 5 не найден')
+    expect(apiHealth.outdatedRoutes).toBe(false)
+  })
+
+  it('missing-route banner has text and is cleared by the next successful response', async () => {
+    fetchMock.mockRejectedValueOnce({ statusCode: 404, data: { detail: 'Not Found' } })
+    const err = await fastApiService.getTopologyDiagnostics(74).catch((e) => e)
+    expect(err.isRouteMissing).toBe(true)
+    expect(apiHealth.outdatedRoutes).toBe(true)
+    expect(apiHealth.lastError).toMatch('Маршрут отсутствует')
+
+    fetchMock.mockResolvedValueOnce({ counts: {}, total: 0, faults: [] })
+    await fastApiService.getTopologyDiagnostics(74)
+    expect(apiHealth.outdatedRoutes).toBe(false)
+    expect(apiHealth.lastError).toBe('')
   })
 })
