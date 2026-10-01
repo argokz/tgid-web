@@ -313,7 +313,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useMobile } from '~/composables/useMobile';
-import { apiHealth, fastApiService, refreshApiHealth } from '~/services/fastApiService';
+import { apiHealth, describeExcelReportTruncation, fastApiService, refreshApiHealth } from '~/services/fastApiService';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { useAuthStore } from '~/stores/authStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
@@ -408,7 +408,7 @@ const downloadDxf = async () => {
       useNotificationStore().showError('Выберите фрагмент на карте перед экспортом DXF');
       return;
     }
-    const { blob, filename } = await fastApiService.downloadDxfExport(fragmentIds[0]);
+    const { blob, filename } = await fastApiService.downloadDxfExport(fragmentIds);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -417,7 +417,7 @@ const downloadDxf = async () => {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    useNotificationStore().showSuccess(`Экспорт DXF (фрагмент ${fragmentIds[0]})`);
+    useNotificationStore().showSuccess(`Экспорт DXF (фрагменты: ${fragmentIds.join(', ')})`);
   } catch (err: any) {
     useNotificationStore().showError('Ошибка экспорта DXF: ' + err.message);
   } finally {
@@ -452,9 +452,11 @@ const downloadGeoJson = async (withAttrs: boolean) => {
   }
 };
 
+// Ведомость по выбранным фрагментам (как экспорт SHP/GeoJSON); без выбора — по всей сети
 const downloadExcel = async (docType: string) => {
   try {
-    const { blob, filename } = await fastApiService.downloadExcelReport(docType);
+    const fragmentIds = resolveExportFragmentIds();
+    const { blob, filename, meta } = await fastApiService.downloadExcelReport(docType, undefined, {}, fragmentIds);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -463,7 +465,10 @@ const downloadExcel = async (docType: string) => {
     link.click();
     link.remove();
     URL.revokeObjectURL(url)
-    useNotificationStore().showSuccess('Ведомость ' + docType.toUpperCase() + ' успешно скачана');
+    const scope = fragmentIds?.length ? ` (фрагменты: ${fragmentIds.join(', ')})` : ' (вся сеть)';
+    const truncation = describeExcelReportTruncation(meta);
+    if (truncation) useNotificationStore().showWarning(`Ведомость ${docType.toUpperCase()}${scope}: ${truncation}`);
+    else useNotificationStore().showSuccess(`Ведомость ${docType.toUpperCase()}${scope} скачана`);
   } catch (err: any) {
     useNotificationStore().showError('Ошибка скачивания ведомости: ' + err.message);
   }

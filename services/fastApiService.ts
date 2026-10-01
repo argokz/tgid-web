@@ -1403,16 +1403,47 @@ const filenameFromDisposition = (header: string | null | undefined): string | nu
   return plain ? plain[1].trim() : null;
 };
 
+/** Полнота сводной ведомости Excel (заголовки X-Report-Rows/Total/Truncated/Fragments, QA F14) */
+export interface ExcelReportMeta {
+  rows: number;
+  total: number;
+  truncated: boolean;
+  fragments: number[];
+}
+
+type HeaderGetter = (name: string) => string | null | undefined;
+
+export const parseExcelReportMeta = (get: HeaderGetter): ExcelReportMeta | undefined => {
+  const rows = Number(get('x-report-rows'));
+  const totalRaw = get('x-report-total');
+  if (totalRaw == null || totalRaw === '' || !Number.isFinite(rows)) return undefined;
+  const total = Number(totalRaw);
+  if (!Number.isFinite(total)) return undefined;
+  const fragments = String(get('x-report-fragments') || '')
+    .split(',')
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  return { rows, total, truncated: get('x-report-truncated') === '1' || total > rows, fragments };
+};
+
+/** Текст предупреждения о неполной ведомости или null, если выгружено всё */
+export const describeExcelReportTruncation = (meta: ExcelReportMeta | undefined): string | null =>
+  meta?.truncated
+    ? `Ведомость неполная: выгружено ${meta.rows} из ${meta.total} строк. ` +
+      (meta.fragments.length ? 'Сузьте выбор фрагментов.' : 'Выберите фрагмент на карте, чтобы выгрузить её полностью.')
+    : null;
+
 /**
  * Единый путь тяжёлых выгрузок: задача Celery → опрос статуса → скачивание файла из Redis.
  * Если фоновые файлы недоступны (старый API, нет Redis, воркер не берёт задачу) — вызывается
- * `fallback` (синхронный эндпоинт того же файла).
+ * `fallback` (синхронный эндпоинт того же файла). `onHeaders` получает заголовки ответа со скачанным файлом.
  */
 const runFileJob = async (
   kind: FileJobKind,
   params: Record<string, unknown>,
   fallback: (() => Promise<{ blob: Blob; filename: string }>) | null,
   options: FileJobOptions = {},
+  onHeaders?: (get: HeaderGetter) => void,
 ): Promise<{ blob: Blob; filename: string }> => {
   const started = Date.now();
   const report = (phase: FileJobProgress['phase'], message: string) =>
@@ -1465,6 +1496,7 @@ const runFileJob = async (
       headers: authHeaders(),
       onResponse({ response }: any) {
         disposition = response?.headers?.get?.('content-disposition') ?? null;
+        if (onHeaders && response?.headers?.get) onHeaders((name) => response.headers.get(name));
       },
     });
     return { blob, filename: filenameFromDisposition(disposition) || status.filename || `${kind}.xlsx` };
@@ -2462,12 +2494,13 @@ export const fastApiService = {
     return { blob, filename: `network_export${suffix}.zip` };
   },
 
-  async downloadDxfExport(fragmentId?: number): Promise<{ blob: Blob; filename: string }> {
+  async downloadDxfExport(fragmentIds?: number[]): Promise<{ blob: Blob; filename: string }> {
     const blob = await request<Blob>('api/export/dxf', {
       responseType: 'blob',
-      query: fragmentId ? { fragment_id: fragmentId } : undefined,
+      query: fragmentIds?.length ? { fragments: fragmentIds.join(',') } : undefined,
     });
-    return { blob, filename: fragmentId ? `network_f${fragmentId}.dxf` : 'network.dxf' };
+    const suffix = fragmentIds?.length === 1 ? `_f${fragmentIds[0]}` : fragmentIds?.length ? '_frag' : '';
+    return { blob, filename: `network${suffix}.dxf` };
   },
 
   /**
@@ -2572,23 +2605,39 @@ export const fastApiService = {
     });
   },
 
+  /**
+   * Сводная ведомость Excel. fragmentIds — отбор по фрагментам (как экспорт SHP/GeoJSON; пусто —
+   * вся сеть). meta — полнота выгрузки из заголовков X-Report-* (ведомость не режется молча, QA F14).
+   */
   async downloadExcelReport(
     docType: string,
     query?: Record<string, string | number | boolean | undefined | null>,
     options: FileJobOptions = {},
-  ): Promise<{ blob: Blob; filename: string }> {
+    fragmentIds?: number[],
+  ): Promise<{ blob: Blob; filename: string; meta?: ExcelReportMeta }> {
     const year = query?.year;
-    const suffix = year != null && year !== '' ? `_${year}` : '';
+    const frags = [...new Set((fragmentIds || []).filter((id) => Number.isInteger(id) && id > 0))].sort((a, b) => a - b);
+    let suffix = year != null && year !== '' ? `_${year}` : '';
+    if (frags.length) suffix += frags.length === 1 ? `_f${frags[0]}` : '_frag';
+    let meta: ExcelReportMeta | undefined;
+    const onHeaders = (get: HeaderGetter) => {
+      meta = parseExcelReportMeta(get);
+    };
     const sync = async () => ({
       blob: await request<Blob>(`api/reports/excel/${encodePath(docType)}`, {
         responseType: 'blob',
-        query,
+        query: frags.length ? { ...(query || {}), fragments: frags.join(',') } : query,
         timeout: REPORT_TIMEOUT_MS,
+        onResponse({ response }: any) {
+          if (response?.headers?.get) onHeaders((name) => response.headers.get(name));
+        },
       }),
       filename: `report_${docType}${suffix}.xlsx`,
     });
-    const params = { doc_type: docType, year: year != null && year !== '' ? Number(year) : null };
-    return runFileJob('report_excel', params, sync, options);
+    const params: Record<string, unknown> = { doc_type: docType, year: year != null && year !== '' ? Number(year) : null };
+    if (frags.length) params.fragments = frags;
+    const result = await runFileJob('report_excel', params, sync, options, onHeaders);
+    return meta ? { ...result, meta } : result;
   },
 
   /** Каталог Excel-отчётов: отчёты десктопа gid6 (excel2) и сводные ведомости веба */

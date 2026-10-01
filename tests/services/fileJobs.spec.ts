@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { describeFileJobProgress, fastApiService } from '../../services/fastApiService'
+import {
+  describeExcelReportTruncation,
+  describeFileJobProgress,
+  fastApiService,
+  parseExcelReportMeta,
+} from '../../services/fastApiService'
 
 const BASE = 'https://api.example.test/'
 
@@ -70,6 +75,74 @@ describe('fastApiService: фоновые файлы (задача → стату
     })
     const res = await fastApiService.downloadAlsekoReconciliationReport(undefined, { pollMs: 0, pendingFallbackMs: -1 })
     expect(res).toBe(blob)
+  })
+
+  it('ведомость по фрагментам: фрагменты уходят в задачу, полнота — из заголовков X-Report-* (QA F14)', async () => {
+    const blob = new Blob(['PK'])
+    fetchMock.mockImplementation(async (url: string, opts: any) => {
+      if (url === `${BASE}api/v1/file-jobs`) return { task_id: 't5' }
+      if (url === `${BASE}api/v1/file-jobs/t5`) return { task_id: 't5', state: 'SUCCESS', ready: true, success: true, message: null }
+      if (url === `${BASE}api/v1/file-jobs/t5/download`) {
+        opts.onResponse({ response: { headers: new Headers({
+          'content-disposition': 'attachment; filename="report_ut_frag.xlsx"',
+          'x-report-rows': '4018', 'x-report-total': '4018', 'x-report-truncated': '0', 'x-report-fragments': '74,99',
+        }) } })
+        return blob
+      }
+      throw new Error(`unexpected ${url}`)
+    })
+    const res = await fastApiService.downloadExcelReport('ut', undefined, { pollMs: 0 }, [99, 74, 74])
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ body: { kind: 'report_excel', params: { doc_type: 'ut', fragments: [74, 99] } } })
+    expect(res.filename).toBe('report_ut_frag.xlsx')
+    expect(res.meta).toEqual({ rows: 4018, total: 4018, truncated: false, fragments: [74, 99] })
+    expect(describeExcelReportTruncation(res.meta)).toBeNull()
+  })
+
+  it('ведомость всей сети через синхронный эндпоинт: неполнота не теряется', async () => {
+    const blob = new Blob(['x'])
+    fetchMock.mockImplementation(async (url: string, opts: any) => {
+      if (url.endsWith('api/v1/file-jobs')) throw Object.assign(new Error('nf'), { status: 404, response: { status: 404 } })
+      if (url.endsWith('api/reports/excel/ut')) {
+        expect(opts.query).toBeUndefined()
+        opts.onResponse({ response: { headers: new Headers({
+          'x-report-rows': '200000', 'x-report-total': '250000', 'x-report-truncated': '1', 'x-report-fragments': '',
+        }) } })
+        return blob
+      }
+      throw new Error(`unexpected ${url}`)
+    })
+    const res = await fastApiService.downloadExcelReport('ut', undefined, { pollMs: 0 })
+    expect(res.filename).toBe('report_ut.xlsx')
+    expect(res.meta).toEqual({ rows: 200000, total: 250000, truncated: true, fragments: [] })
+    expect(describeExcelReportTruncation(res.meta)).toContain('выгружено 200000 из 250000')
+    expect(describeExcelReportTruncation(res.meta)).toContain('Выберите фрагмент')
+  })
+
+  it('синхронная ведомость по фрагменту передаёт fragments в запрос', async () => {
+    fetchMock.mockImplementation(async (url: string, opts: any) => {
+      if (url.endsWith('api/v1/file-jobs')) throw Object.assign(new Error('nf'), { status: 404, response: { status: 404 } })
+      if (url.endsWith('api/reports/excel/zd')) return new Blob([JSON.stringify(opts.query)])
+      throw new Error(`unexpected ${url}`)
+    })
+    const res = await fastApiService.downloadExcelReport('zd', undefined, { pollMs: 0 }, [74])
+    expect(JSON.parse(await res.blob.text())).toEqual({ fragments: '74' })
+    expect(res.filename).toBe('report_zd_f74.xlsx')
+    expect(res.meta).toBeUndefined()
+  })
+
+  it('заголовки без X-Report-Total (отчёты каталога) не дают сведений о полноте', () => {
+    const headers = new Headers({ 'x-report-rows': '3,5' })
+    expect(parseExcelReportMeta((n) => headers.get(n))).toBeUndefined()
+  })
+
+  it('DXF по нескольким фрагментам — fragments в запросе', async () => {
+    fetchMock.mockImplementation(async (url: string, opts: any) => {
+      if (url.endsWith('api/export/dxf')) return new Blob([JSON.stringify(opts.query)])
+      throw new Error(`unexpected ${url}`)
+    })
+    const res = await fastApiService.downloadDxfExport([74, 99])
+    expect(JSON.parse(await res.blob.text())).toEqual({ fragments: '74,99' })
+    expect(res.filename).toBe('network_frag.dxf')
   })
 
   it('текст прогресса', () => {
