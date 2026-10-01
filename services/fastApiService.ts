@@ -929,6 +929,11 @@ export interface SetyRunResponse {
   params: string;
 }
 
+export interface CalculationTemperatureRange {
+  t_or: number | null;
+  t_vnew: number | null;
+}
+
 export interface CalculationListItem {
   id: number;
   fileid: number | null;
@@ -2387,6 +2392,11 @@ export const fastApiService = {
   /** Расчёт в режиме десктопа: плановый / аварийный, один фрагмент или по списку */
   async runSetyMode(body: SetyRunRequest): Promise<SetyRunResponse> {
     return request<SetyRunResponse>('api/v1/calculations/run', mutationOptions('POST', body));
+  },
+
+  /** Допустимая Tн расчёта (heatSystem: t_or … t_vnew); вне диапазона sety откажет */
+  async getCalculationTemperatureRange(): Promise<CalculationTemperatureRange> {
+    return request<CalculationTemperatureRange>('api/v1/calculations/temperature-range');
   },
 
   async listCalculations(filter: CalculationListFilter = {}): Promise<CalculationListResponse> {

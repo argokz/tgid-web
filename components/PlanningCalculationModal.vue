@@ -246,7 +246,10 @@
                   class="flex-grow-1"
                   style="min-width: 120px;"
                   :error="tnError"
-                  hide-details
+                  :hint="tnHint"
+                  :persistent-hint="!!tnHint"
+                  :hide-details="!tnHint"
+                  @update:model-value="tnError = false"
                 />
                 <v-checkbox
                   v-if="calcMode === 'plan'"
@@ -407,6 +410,7 @@ import { requestSavesPo } from '~/utils/permissions';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { useLayerStore } from '~/stores/layerStore';
 import { fastApiService, type SetyCalcMode, type SetyRunRequest } from '~/services/fastApiService';
+import { tnRangeHint, tnValidationError, type TnRange } from '~/utils/calcTemperature';
 
 type RunKind = 'normal' | 'list' | 'emergency';
 
@@ -478,9 +482,27 @@ function defaultCalculationName() {
 
 const calculationName = ref(defaultCalculationName());
 
+/** Диапазон Tн из «Системы теплоснабжения»: умолчание формы = t_or (у Алматы -25, а не -32) */
+const tnRange = ref<TnRange | null>(null);
+const tnHint = computed(() => (summerActive.value ? '' : tnRangeHint(tnRange.value)));
+let tnAutoValue = '-32';
+const loadTnRange = async () => {
+  try {
+    const range = await fastApiService.getCalculationTemperatureRange();
+    tnRange.value = range;
+    if (range.t_or !== null && outdoorTemperature.value === tnAutoValue) {
+      tnAutoValue = String(range.t_or);
+      outdoorTemperature.value = tnAutoValue;
+    }
+  } catch {
+    tnRange.value = null; // проверит сервер при запуске
+  }
+};
+
 watch(isOpen, (val) => {
   if (!val) return;
   calculationName.value = defaultCalculationName();
+  void loadTnRange();
   if (!fragments.value.length) void fragmentStore.loadFragments();
   if (selectedFragmentId.value === null && fragmentStore.selectedFragmentId !== null) {
     selectedFragmentId.value = fragmentStore.selectedFragmentId;
@@ -513,6 +535,8 @@ const outdoorTemperature = ref('-32');
 const networkQuantitativeCharacteristics = ref(false);
 const mainFragment = ref(false);
 const considerVariationCoefficients = ref(true);
+
+const summerActive = computed(() => calcMode.value === 'emergency' && summerMode.value);
 
 const isTemperatureMode = computed(() => consumptionType.value === 'temperature');
 
@@ -645,11 +669,12 @@ const calculate = async () => {
     : (selectedFragmentId.value !== null ? [selectedFragmentId.value] : []);
   fragmentError.value = runKind.value === 'list' ? fragmentIds.length < 2 : fragmentIds.length === 0;
   const tn = Number(outdoorTemperature.value);
-  tnError.value = outdoorTemperature.value === '' || !Number.isFinite(tn) || tn < -60 || tn > 50;
-  if (fragmentError.value || tnError.value) {
+  const tnMessage = tnValidationError(outdoorTemperature.value, tnRange.value, summerActive.value);
+  tnError.value = tnMessage !== null;
+  if (fragmentError.value || tnMessage) {
     addProtocolLog(fragmentError.value
       ? 'Ошибка: необходимо выбрать фрагмент(ы) для расчета'
-      : 'Ошибка: температура наружного воздуха должна быть от -60 до 50 °C', 'error');
+      : `Ошибка: ${tnMessage}`, 'error');
     return;
   }
 
