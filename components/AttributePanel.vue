@@ -78,7 +78,7 @@
 
             <v-btn
 
-              v-if="propsData.id && (isLineObject || propsData.gistable === 'nodes')"
+              v-if="passportTarget"
 
               icon
 
@@ -1109,7 +1109,7 @@ import { useMobile } from '~/composables/useMobile'
 import { useAttributeTabs, type TabData } from '~/composables/useAttributeTabs'
 
 import { ApiError, fastApiService, type ReverseLineReport } from '~/services/fastApiService'
-import { getCardLineId, getSectionRowId } from '~/utils/networkFeature'
+import { getSectionRowId, resolveCardObject, type CardObject } from '~/utils/networkFeature'
 import { useAuthStore } from '~/stores/authStore'
 import { useNotificationStore } from '~/stores/notificationStore'
 
@@ -1207,13 +1207,10 @@ const objectNamesData = ref<Record<string, string> | null>(null)
 
 const isEditTopologyMode = computed(() => componentProps.isEditTopologyMode)
 
-// Слои GeoServer не несут gistable: участок узнаём по полям записи linesobj
-const isNodeObject = computed(() => {
-  const p = propsData.value
-  const table = String(p.gistable || '').toLowerCase()
-  if (table) return table === 'nodes'
-  return 'nodetypeid' in p && !('nodeid1' in p)
-})
+// Вид объекта карточки (QA F11): слои GeoServer не несут gistable — таблицу узнаём по
+// query-слою, `tab` слоя узлов и полям записи (utils/networkFeature.resolveCardObject)
+const cardObject = computed<CardObject>(() => resolveCardObject(propsData.value))
+const isNodeObject = computed(() => cardObject.value.network === 'node')
 
 // Версия узла/участка на момент открытия карточки (оптимистичная блокировка):
 // удаление и разворот применятся, только если объект с тех пор не меняли.
@@ -1233,277 +1230,131 @@ const loadCardVersion = async () => {
 }
 watch(() => [propsData.value.id, isEditTopologyMode.value], () => { void loadCardVersion() })
 
-const isLineObject = computed(() => {
-  const p = propsData.value
-  const table = String(p.gistable || '').toLowerCase()
-  if (table) return table === 'linesobj'
-  return 'externalsignlineid' in p || ('nodeid1' in p && 'nodeid2' in p)
-})
+const isLineObject = computed(() => cardObject.value.network === 'line')
 
 // id участка — linesobj.id (не heatpipesections.id из query-слоя GeoServer, QA F12/F54);
 // null — участок не определён, действия по нему недоступны
-const cardLineId = computed<number | null>(() => (isLineObject.value ? getCardLineId(propsData.value) : null))
+const cardLineId = computed<number | null>(() => (isLineObject.value ? cardObject.value.networkId : null))
 // heatpipesections.id карточки: сервер сверяет его с участком перед удалением/разворотом
 const cardSectionId = computed<number | null>(() => getSectionRowId(propsData.value))
 // Вид объекта для удаления из карточки: участок или узел (потребитель/источник/насосная — узел)
-const cardObjectKind = computed<'line' | 'node' | null>(() => {
-  if (isLineObject.value) return 'line'
-  const queryTable = String(propsData.value.query_table || '').toLowerCase()
-  if (isNodeObject.value || ['generalizedconsumers', 'realconsumers', 'heatsources', 'pumpstations'].includes(queryTable)) return 'node'
-  return null
-})
-const cardObjectId = computed<number | null>(() => {
-  if (cardObjectKind.value === 'line') return cardLineId.value
-  if (cardObjectKind.value !== 'node') return null
-  const id = Number(propsData.value.id)
-  return Number.isInteger(id) && id > 0 ? id : null
-})
+const cardObjectKind = computed<'line' | 'node' | null>(() => cardObject.value.network)
+// linesobj.id / nodes.id объекта сети карточки
+const cardObjectId = computed<number | null>(() => cardObject.value.networkId)
+// nodes.id узла карточки (в т.ч. потребителя/источника/насосной)
+const cardNodeId = computed<number | null>(() => (isNodeObject.value ? cardObject.value.networkId : null))
+// id строки в таблице карточки (журналы дефектов, оборудование, справочники…)
+const cardRowId = computed<number | null>(() => cardObject.value.rowId)
 /** «История»: записи audit_log этой таблицы и этого id (триггеры пишут table_name в lower case) */
 const authStore = useAuthStore()
 const historyTarget = computed<{ table: string; recordId: number } | null>(() => {
-  const recordId = isLineObject.value ? Number(cardLineId.value) : Number(propsData.value.id)
-  if (!Number.isInteger(recordId) || recordId <= 0) return null
-  const table = String(propsData.value.gistable || '').toLowerCase() || (isLineObject.value ? 'linesobj' : '')
-  return table ? { table, recordId } : null
+  const { table, network, networkId, rowId } = cardObject.value
+  // потребитель/источник с карты: история узла (строка роли может быть не определена)
+  const target = network && table !== 'linesobj' && table !== 'nodes' && !rowId
+    ? { table: 'nodes', recordId: networkId }
+    : { table, recordId: rowId }
+  return target.table && target.recordId ? { table: target.table, recordId: target.recordId } : null
 })
 
-const canOpenDefectJournal = computed(() => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (
-
-    table === 'linesobj'
-
-    || table === 'nodes'
-
-    || table.includes('defect')
-
-  )
-
+/** «Паспорт Excel»: участок (linesobj.id) или узел (nodes.id), в т.ч. потребитель/источник/насосная */
+const passportTarget = computed<{ table: 'linesobj' | 'nodes'; id: number } | null>(() => {
+  const { network, networkId } = cardObject.value
+  if (!network || !networkId) return null
+  return { table: network === 'line' ? 'linesobj' : 'nodes', id: networkId }
 })
 
-const canOpenShurfJournal = computed(() => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (
-
-    table === 'linesobj'
-
-    || table === 'nodes'
-
-    || table.includes('shurf')
-
-  )
-
+/** Журналы по объекту сети (дефекты, шурфы, осмотры, ремонты, опрессовки, индикаторы коррозии) */
+const networkJournalScope = computed<{ lineId: number } | { nodeId: number } | null>(() => {
+  if (cardLineId.value) return { lineId: cardLineId.value }
+  if (cardNodeId.value) return { nodeId: cardNodeId.value }
+  return null
 })
 
-const canOpenInspectionJournal = computed(() => {
+const cardTable = computed(() => cardObject.value.table)
 
-  const table = String(propsData.value.gistable || '').toLowerCase()
+const canOpenDefectJournal = computed(() => Boolean(networkJournalScope.value) || (Boolean(cardRowId.value) && cardTable.value.includes('defect')))
 
-  return Boolean(propsData.value.id) && (
+const canOpenShurfJournal = computed(() => Boolean(networkJournalScope.value) || (Boolean(cardRowId.value) && cardTable.value.includes('shurf')))
 
-    table === 'linesobj'
+const canOpenInspectionJournal = computed(() => Boolean(networkJournalScope.value) || (
+  Boolean(cardRowId.value) && (cardTable.value.includes('osmotr') || cardTable.value.includes('inspection'))
+))
 
-    || table === 'nodes'
+const canOpenRepairJournal = computed(() => Boolean(networkJournalScope.value) || (
+  Boolean(cardRowId.value) && (cardTable.value.includes('remont') || cardTable.value.includes('repair'))
+))
 
-    || table.includes('osmotr')
-
-    || table.includes('inspection')
-
-  )
-
-})
-
-const canOpenRepairJournal = computed(() => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (
-
-    table === 'linesobj'
-
-    || table === 'nodes'
-
-    || table.includes('remont')
-
-    || table.includes('repair')
-
-  )
-
-})
-
-const canOpenPressureTestJournal = computed(() => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (
-
-    table === 'linesobj'
-
-    || table === 'nodes'
-
-    || table.includes('opres')
-
-    || table.includes('pressure')
-
-  )
-
-})
+const canOpenPressureTestJournal = computed(() => Boolean(networkJournalScope.value) || (
+  Boolean(cardRowId.value) && (cardTable.value.includes('opres') || cardTable.value.includes('pressure'))
+))
 
 const canOpenTechnicalConditionJournal = computed(() => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (
-
-    table === 'zdaniya_tu'
-
-    || table === 'tehnicheskie_usloviya'
-
-    || table.includes('technical_condition')
-
+  const table = cardTable.value
+  return Boolean(cardRowId.value) && (
+    table === 'zdaniya_tu' || table === 'tehnicheskie_usloviya' || table.includes('technical_condition')
   )
-
 })
 
-const canOpenCorrosionIndicatorJournal = computed(() => {
+const canOpenCorrosionIndicatorJournal = computed(() => Boolean(networkJournalScope.value) || (
+  Boolean(cardRowId.value) && (cardTable.value === 'indikator_korrozii' || cardTable.value === 'corrosionindicators')
+))
 
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (
-
-    table === 'linesobj'
-
-    || table === 'nodes'
-
-    || table === 'indikator_korrozii'
-
-    || table === 'corrosionindicators'
-
-  )
-
-})
-
-const canOpenAlsekoJournal = computed(() => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (table === 'zdaniya_2' || table === 'nagruzki')
-
-})
+const canOpenAlsekoJournal = computed(() => Boolean(cardRowId.value) && (cardTable.value === 'zdaniya_2' || cardTable.value === 'nagruzki'))
 
 const electricalTableTypes = {
-
   istochnik_elektrosnabzheniya: 'source', liniya_elektroperedach: 'line',
-
   priemnik_elektrosnabzheniya: 'receiver', kabelnyy_kanal_es: 'channel',
-
   mufta: 'coupling', opora_es: 'support', gilza_es: 'sleeve'
-
 } as const
 
-const canOpenElectricalNetworkJournal = computed(() => {
+const canOpenElectricalNetworkJournal = computed(() => Boolean(cardRowId.value) && cardTable.value in electricalTableTypes)
 
-  const table = String(propsData.value.gistable || '').toLowerCase()
+/** Источник тепла: heatsources.id (с карты — строка query-слоя), без неё журнал теплопотерь недоступен */
+const cardHeatSourceId = computed<number | null>(() => (cardTable.value === 'heatsources' ? cardRowId.value : null))
 
-  return Boolean(propsData.value.id) && table in electricalTableTypes
-
-})
-
-const canOpenHeatLossJournal = computed(() => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (table === 'heatsources' || table === 'heatlosesmain')
-
-})
+const canOpenHeatLossJournal = computed(() => Boolean(cardHeatSourceId.value) || (Boolean(cardRowId.value) && cardTable.value === 'heatlosesmain'))
 
 const canOpenTemperatureGraphJournal = computed(() => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (table === 'heatsources' || table === 'nodes')
-
+  if (cardHeatSourceId.value) return true
+  // узел или источник без строки heatsources — поиск источника по узлу
+  return Boolean(cardNodeId.value) && (cardTable.value === 'nodes' || cardTable.value === 'heatsources')
 })
 
-const canOpenConsumerLoadDiagnostics = computed(() => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (
-
-    table === 'generalizedconsumers' || table === 'realconsumers' || table === 'nodes'
-
-  )
-
+/** Диагностика нагрузки: потребитель (строка своей таблицы) или поиск по узлу */
+const consumerLoadScope = computed<{ consumerType: 'generalized' | 'real'; consumerId: number } | { nodeId: number } | null>(() => {
+  const table = cardTable.value
+  if (table !== 'generalizedconsumers' && table !== 'realconsumers' && table !== 'nodes') return null
+  if (table !== 'nodes' && cardRowId.value) {
+    return { consumerType: table === 'generalizedconsumers' ? 'generalized' : 'real', consumerId: cardRowId.value }
+  }
+  return cardNodeId.value ? { nodeId: cardNodeId.value } : null
 })
 
-const canOpenPumpEquipment = computed(() => {
+const canOpenConsumerLoadDiagnostics = computed(() => Boolean(consumerLoadScope.value))
 
-  const table = String(propsData.value.gistable || '').toLowerCase()
+const canOpenPumpEquipment = computed(() => Boolean(cardLineId.value) || (
+  Boolean(cardRowId.value) && (cardTable.value === 'pumps' || cardTable.value === 'standardpumps')
+))
 
-  return Boolean(propsData.value.id) && (
+const canOpenNetworkArmatures = computed(() => Boolean(cardLineId.value) || (
+  Boolean(cardRowId.value) && ['dampers', 'regularmatures', 'standarddampers'].includes(cardTable.value)
+))
 
-    table === 'pumps' || table === 'standardpumps' || table === 'linesobj'
+const regulatorTables = {
+  pressregulators: { regulatorType: 'pressure' }, consumptregulators: { regulatorType: 'flow' },
+  pressdropregulators: { regulatorType: 'differential' }, standardpressregulators: { catalogType: 'pressure' },
+  standardconsregulators: { catalogType: 'flow' }, standardpressdropregulators: { catalogType: 'differential' }
+} as const
 
-  )
+const canOpenNetworkRegulators = computed(() => Boolean(cardLineId.value) || (
+  Boolean(cardRowId.value) && cardTable.value in regulatorTables
+))
 
-})
+const canOpenNetworkBypasses = computed(() => Boolean(cardLineId.value) || (
+  Boolean(cardRowId.value) && (cardTable.value === 'bypass' || cardTable.value === 'standardtubes')
+))
 
-const canOpenNetworkArmatures = computed(() => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (
-
-    table === 'dampers' || table === 'regularmatures' || table === 'standarddampers' || table === 'linesobj'
-
-  )
-
-})
-
-const canOpenNetworkRegulators = computed(() => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (
-
-    table === 'pressregulators' || table === 'consumptregulators' || table === 'pressdropregulators'
-
-    || table === 'standardpressregulators' || table === 'standardconsregulators'
-
-    || table === 'standardpressdropregulators' || table === 'linesobj'
-
-  )
-
-})
-
-const canOpenNetworkBypasses = computed(() => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (
-
-    table === 'bypass' || table === 'standardtubes' || table === 'linesobj'
-
-  )
-
-})
-
-const canOpenNetworkDiaphragms = computed(() => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  return Boolean(propsData.value.id) && (
-
-    table === 'diaphragms' || table === 'linesobj'
-
-  )
-
-})
+const canOpenNetworkDiaphragms = computed(() => Boolean(cardLineId.value) || (Boolean(cardRowId.value) && cardTable.value === 'diaphragms'))
 
 
 const hasTabsStructure = computed(() => objectTabsData.value !== null && tabsData.value.length > 0)
@@ -1845,15 +1696,13 @@ const saveBlob = (blob: Blob, filename: string) => {
 
 const downloadPassport = async () => {
 
-  const table = String(propsData.value.gistable || '') || (isLineObject.value ? 'linesobj' : '')
+  const target = passportTarget.value
 
-  const id = isLineObject.value ? Number(cardLineId.value) : Number(propsData.value.id)
-
-  if (!table || !Number.isFinite(id) || id <= 0) return
+  if (!target) return
 
   try {
 
-    const { blob, filename } = await fastApiService.downloadObjectPassport(table, id)
+    const { blob, filename } = await fastApiService.downloadObjectPassport(target.table, target.id)
 
     saveBlob(blob, filename)
 
@@ -1969,317 +1818,153 @@ const downloadWordReport = async () => {
 
 
 const openDefectJournal = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'linesobj') emit('open-defect-journal', { lineId: id })
-
-  else if (table === 'nodes') emit('open-defect-journal', { nodeId: id })
-
-  else if (table.includes('defect')) {
-
-    emit('open-defect-journal', { defectId: Number(propsData.value.defectid || id) })
-
+  const scope = networkJournalScope.value
+  if (scope) emit('open-defect-journal', scope)
+  else if (cardRowId.value && cardTable.value.includes('defect')) {
+    emit('open-defect-journal', { defectId: Number(propsData.value.defectid || cardRowId.value) })
   }
-
 }
 
 
 const openShurfJournal = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'linesobj') emit('open-shurf-journal', { lineId: id })
-
-  else if (table === 'nodes') emit('open-shurf-journal', { nodeId: id })
-
-  else if (table.includes('shurf')) {
-
-    emit('open-shurf-journal', { shurfId: Number(propsData.value.shurfid || id) })
-
+  const scope = networkJournalScope.value
+  if (scope) emit('open-shurf-journal', scope)
+  else if (cardRowId.value && cardTable.value.includes('shurf')) {
+    emit('open-shurf-journal', { shurfId: Number(propsData.value.shurfid || cardRowId.value) })
   }
-
 }
 
 
 const openInspectionJournal = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'linesobj') emit('open-inspection-journal', { lineId: id })
-
-  else if (table === 'nodes') emit('open-inspection-journal', { nodeId: id })
-
-  else if (table.includes('osmotr') || table.includes('inspection')) {
-
-    emit('open-inspection-journal', { inspectionId: Number(propsData.value.osmotrid || id) })
-
+  const scope = networkJournalScope.value
+  const table = cardTable.value
+  if (scope) emit('open-inspection-journal', scope)
+  else if (cardRowId.value && (table.includes('osmotr') || table.includes('inspection'))) {
+    emit('open-inspection-journal', { inspectionId: Number(propsData.value.osmotrid || cardRowId.value) })
   }
-
 }
 
 
 const openRepairJournal = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'linesobj') emit('open-repair-journal', { lineId: id })
-
-  else if (table === 'nodes') emit('open-repair-journal', { nodeId: id })
-
-  else if (table.includes('remont') || table.includes('repair')) {
-
-    emit('open-repair-journal', { repairId: Number(propsData.value.remontid || id) })
-
+  const scope = networkJournalScope.value
+  const table = cardTable.value
+  if (scope) emit('open-repair-journal', scope)
+  else if (cardRowId.value && (table.includes('remont') || table.includes('repair'))) {
+    emit('open-repair-journal', { repairId: Number(propsData.value.remontid || cardRowId.value) })
   }
-
 }
 
 
 const openPressureTestJournal = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'linesobj') emit('open-pressure-test-journal', { lineId: id })
-
-  else if (table === 'nodes') emit('open-pressure-test-journal', { nodeId: id })
-
-  else if (table.includes('opres') || table.includes('pressure')) {
-
-    emit('open-pressure-test-journal', { testId: Number(propsData.value.opresid || id) })
-
+  const scope = networkJournalScope.value
+  const table = cardTable.value
+  if (scope) emit('open-pressure-test-journal', scope)
+  else if (cardRowId.value && (table.includes('opres') || table.includes('pressure'))) {
+    emit('open-pressure-test-journal', { testId: Number(propsData.value.opresid || cardRowId.value) })
   }
-
 }
 
 
 const openTechnicalConditionJournal = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
+  const table = cardTable.value
+  const id = cardRowId.value
+  if (!id) return
   if (table === 'zdaniya_tu') emit('open-technical-condition-journal', { buildingId: id })
-
   else if (table === 'tehnicheskie_usloviya' || table.includes('technical_condition')) {
-
     emit('open-technical-condition-journal', { conditionId: id })
-
   }
-
 }
 
 
 const openCorrosionIndicatorJournal = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'linesobj') emit('open-corrosion-indicator-journal', { lineId: id })
-
-  else if (table === 'nodes') emit('open-corrosion-indicator-journal', { nodeId: id })
-
-  else if (table === 'indikator_korrozii' || table === 'corrosionindicators') {
-
-    emit('open-corrosion-indicator-journal', { indicatorId: id })
-
+  const scope = networkJournalScope.value
+  const table = cardTable.value
+  if (scope) emit('open-corrosion-indicator-journal', scope)
+  else if (cardRowId.value && (table === 'indikator_korrozii' || table === 'corrosionindicators')) {
+    emit('open-corrosion-indicator-journal', { indicatorId: cardRowId.value })
   }
-
 }
 
 
 const openAlsekoJournal = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
+  const table = cardTable.value
+  const id = cardRowId.value
+  if (!id) return
   if (table === 'zdaniya_2') emit('open-alseko-journal', { buildingId: id })
-
   else if (table === 'nagruzki') emit('open-alseko-journal', { loadId: id })
-
 }
 
 
 const openElectricalNetworkJournal = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase() as keyof typeof electricalTableTypes
-
-  const id = Number(propsData.value.id)
-
-  const objectType = electricalTableTypes[table]
-
-  if (!objectType || !Number.isFinite(id)) return
-
+  const objectType = electricalTableTypes[cardTable.value as keyof typeof electricalTableTypes]
+  const id = cardRowId.value
+  if (!objectType || !id) return
   emit('open-electrical-network-journal', { objectType, objectId: id })
-
 }
 
 
 const openHeatLossJournal = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'heatsources') emit('open-heat-loss-journal', { sourceId: id })
-
-  else if (table === 'heatlosesmain') emit('open-heat-loss-journal', { seasonId: id })
-
+  if (cardHeatSourceId.value) emit('open-heat-loss-journal', { sourceId: cardHeatSourceId.value })
+  else if (cardRowId.value && cardTable.value === 'heatlosesmain') emit('open-heat-loss-journal', { seasonId: cardRowId.value })
 }
 
 
 const openTemperatureGraphJournal = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'heatsources') emit('open-temperature-graph-journal', { sourceId: id })
-
-  else if (table === 'nodes') emit('open-temperature-graph-journal', { nodeId: id })
-
+  if (cardHeatSourceId.value) emit('open-temperature-graph-journal', { sourceId: cardHeatSourceId.value })
+  else if (cardNodeId.value) emit('open-temperature-graph-journal', { nodeId: cardNodeId.value })
 }
 
 
 const openConsumerLoadDiagnostics = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'generalizedconsumers') emit('open-consumer-load-diagnostics', { consumerType: 'generalized', consumerId: id })
-
-  else if (table === 'realconsumers') emit('open-consumer-load-diagnostics', { consumerType: 'real', consumerId: id })
-
-  else if (table === 'nodes') emit('open-consumer-load-diagnostics', { nodeId: id })
-
+  const scope = consumerLoadScope.value
+  if (scope) emit('open-consumer-load-diagnostics', scope)
 }
 
 
 const openPumpEquipment = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'pumps') emit('open-pump-equipment', { pumpId: id })
-
+  const table = cardTable.value
+  const id = cardRowId.value
+  if (cardLineId.value) emit('open-pump-equipment', { lineId: cardLineId.value })
+  else if (!id) return
+  else if (table === 'pumps') emit('open-pump-equipment', { pumpId: id })
   else if (table === 'standardpumps') emit('open-pump-equipment', { standardPumpId: id })
-
-  else if (table === 'linesobj') emit('open-pump-equipment', { lineId: id })
-
 }
 
 
 const openNetworkArmatures = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'dampers') emit('open-network-armatures', { equipmentType: 'damper', armatureId: id })
-
+  const table = cardTable.value
+  const id = cardRowId.value
+  if (cardLineId.value) emit('open-network-armatures', { lineId: cardLineId.value })
+  else if (!id) return
+  else if (table === 'dampers') emit('open-network-armatures', { equipmentType: 'damper', armatureId: id })
   else if (table === 'regularmatures') emit('open-network-armatures', { equipmentType: 'regulating', armatureId: id })
-
   else if (table === 'standarddampers') emit('open-network-armatures', { standardId: id })
-
-  else if (table === 'linesobj') emit('open-network-armatures', { lineId: id })
-
 }
 
 
 const openNetworkRegulators = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'pressregulators') emit('open-network-regulators', { regulatorType: 'pressure', regulatorId: id })
-
-  else if (table === 'consumptregulators') emit('open-network-regulators', { regulatorType: 'flow', regulatorId: id })
-
-  else if (table === 'pressdropregulators') emit('open-network-regulators', { regulatorType: 'differential', regulatorId: id })
-
-  else if (table === 'standardpressregulators') emit('open-network-regulators', { catalogType: 'pressure', catalogId: id })
-
-  else if (table === 'standardconsregulators') emit('open-network-regulators', { catalogType: 'flow', catalogId: id })
-
-  else if (table === 'standardpressdropregulators') emit('open-network-regulators', { catalogType: 'differential', catalogId: id })
-
-  else if (table === 'linesobj') emit('open-network-regulators', { lineId: id })
-
+  const id = cardRowId.value
+  if (cardLineId.value) return emit('open-network-regulators', { lineId: cardLineId.value })
+  const kind = regulatorTables[cardTable.value as keyof typeof regulatorTables]
+  if (!kind || !id) return
+  if ('regulatorType' in kind) emit('open-network-regulators', { regulatorType: kind.regulatorType, regulatorId: id })
+  else emit('open-network-regulators', { catalogType: kind.catalogType, catalogId: id })
 }
 
 
 const openNetworkBypasses = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'bypass') emit('open-network-bypasses', { bypassId: id })
-
+  const table = cardTable.value
+  const id = cardRowId.value
+  if (cardLineId.value) emit('open-network-bypasses', { lineId: cardLineId.value })
+  else if (!id) return
+  else if (table === 'bypass') emit('open-network-bypasses', { bypassId: id })
   else if (table === 'standardtubes') emit('open-network-bypasses', { standardTubeId: id })
-
-  else if (table === 'linesobj') emit('open-network-bypasses', { lineId: id })
-
 }
 
 
 const openNetworkDiaphragms = () => {
-
-  const table = String(propsData.value.gistable || '').toLowerCase()
-
-  const id = Number(propsData.value.id)
-
-  if (!Number.isFinite(id)) return
-
-  if (table === 'diaphragms') emit('open-network-diaphragms', { diaphragmId: id })
-
-  else if (table === 'linesobj') emit('open-network-diaphragms', { lineId: id })
-
+  if (cardLineId.value) emit('open-network-diaphragms', { lineId: cardLineId.value })
+  else if (cardRowId.value && cardTable.value === 'diaphragms') emit('open-network-diaphragms', { diaphragmId: cardRowId.value })
 }
 
 

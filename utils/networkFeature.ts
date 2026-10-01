@@ -119,3 +119,80 @@ export const getCardLineId = (properties: any): number | null => {
   if (String(properties?.query_table || '').toLowerCase() === 'heatpipesections') return null;
   return toPositiveId(properties?.id);
 };
+
+/**
+ * Таблицы «ролей» узла: потребитель, источник, насосная лежат в своей таблице, но на карте
+ * (MVT `uzel`, свойство `tab`) это узел nodes.id. Журналы и паспорт работают по узлу,
+ * диагностика нагрузки / журналы источника — по строке своей таблицы.
+ */
+export const NODE_ROLE_TABLES = ['generalizedconsumers', 'realconsumers', 'heatsources', 'pumpstations'] as const;
+export type NodeRoleTable = typeof NODE_ROLE_TABLES[number];
+const isNodeRoleTable = (table: string): table is NodeRoleTable =>
+  (NODE_ROLE_TABLES as readonly string[]).includes(table);
+
+/** Коды слоёв GeoServer (MVT `code`): участок — UT; узлы — US, потребители PO/PR/EL/NZ, NS, IS */
+const LINE_CODES = new Set(['ut']);
+const NODE_CODES = new Set(['us', 'po', 'pr', 'el', 'nz', 'ns', 'is']);
+
+export interface CardObject {
+  /**
+   * Таблица объекта карточки (смысл `gistable`): linesobj, nodes, generalizedconsumers, …,
+   * либо прочая (zdaniya_tu, defects…); '' — не определена.
+   */
+  table: string;
+  /** Объект сети: участок (linesobj), узел (nodes, в т.ч. потребитель/источник/насосная) или не сеть */
+  network: 'line' | 'node' | null;
+  /** linesobj.id участка или nodes.id узла; null — не определён */
+  networkId: number | null;
+  /** id строки в `table` (для linesobj/nodes = networkId); null — не определён */
+  rowId: number | null;
+}
+
+const lower = (value: unknown): string => String(value ?? '').trim().toLowerCase();
+
+/** Таблица по имени слоя/таблицы GeoServer (`tab`, `query_table`) */
+const tableFromLayerName = (name: string): string => {
+  if (!name) return '';
+  if (name === 'heatpipesections' || name === 'linesobj') return 'linesobj';
+  if (name === 'nodes' || name === 'uzel') return 'nodes';
+  return name;
+};
+
+/**
+ * Вид объекта карточки (QA F11). Слои GeoServer не несут `gistable` (в nodes колонка пуста),
+ * поэтому порядок признаков: явный `gistable` → `query_table` (карточка дополнена query-слоем
+ * `id_<table>`) → `tab` (MVT `uzel`: nodes / generalizedconsumers / realconsumers / heatsources /
+ * pumpstations) → поля записи (externalsignlineid, nodeid1+nodeid2 — участок; nodetypeid — узел)
+ * → код слоя (`code`: UT — участок, US/PO/PR/EL/NZ/NS/IS — узел).
+ */
+export const resolveCardObject = (properties: any): CardObject => {
+  const p = properties || {};
+  const gistable = lower(p.gistable);
+  const queryTable = lower(p.query_table);
+  let table = gistable || tableFromLayerName(queryTable) || tableFromLayerName(lower(p.tab));
+  if (!table) {
+    const code = lower(p.code);
+    if ('externalsignlineid' in p || ('nodeid1' in p && 'nodeid2' in p) || LINE_CODES.has(code)) table = 'linesobj';
+    else if (('nodetypeid' in p && !('nodeid1' in p)) || NODE_CODES.has(code)) table = 'nodes';
+  }
+
+  if (table === 'linesobj') {
+    const lineId = getCardLineId(p);
+    return { table, network: 'line', networkId: lineId, rowId: lineId };
+  }
+  if (table === 'nodes') {
+    const nodeId = toPositiveId(p.id);
+    return { table, network: 'node', networkId: nodeId, rowId: nodeId };
+  }
+  if (isNodeRoleTable(table)) {
+    // С карты: id/nodeid — nodes.id, строка роли — query_row_id. Явный gistable: id — строка роли,
+    // nodeid — её узел. Только `tab` без query-слоя: происхождение id неизвестно — строку не берём.
+    const fromQueryLayer = queryTable === table;
+    const nodeId = toPositiveId(p.nodeid ?? p.nodeId ?? (fromQueryLayer ? p.id : null));
+    const rowId = fromQueryLayer
+      ? toPositiveId(p.query_row_id)
+      : gistable === table ? toPositiveId(p.id) : null;
+    return { table, network: 'node', networkId: nodeId, rowId };
+  }
+  return { table, network: null, networkId: null, rowId: toPositiveId(p.id) };
+};

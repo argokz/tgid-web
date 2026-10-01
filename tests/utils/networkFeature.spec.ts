@@ -4,6 +4,7 @@ import {
   getFeatureId,
   getSectionRowId,
   mergeQueryLayerProperties,
+  resolveCardObject,
 } from '../../utils/networkFeature'
 
 // QA F12/F54: участок 324386 (linesobj.id), его паспорт трубы — heatpipesections.id 141949;
@@ -84,5 +85,64 @@ describe('getCardLineId', () => {
   it('refuses a section card whose line id is unknown', () => {
     expect(getCardLineId({ id: SECTION, query_table: 'heatpipesections', query_row_id: SECTION })).toBeNull()
     expect(getCardLineId({ id: null, query_table: 'heatpipesections' })).toBeNull()
+  })
+})
+
+// QA F11: свойства реальных фич фрагмента 74 (MVT AlmatyGIS:uzel / heatpipesections + WFS id_<table>).
+// gistable в слоях нет (nodes.gistable пуст) — вид объекта определяется по query_table / tab / полям.
+const uzelMvt = (id: number, tab: string, code: string, code2: string) => ({
+  loc: 1, code2, code, full_name: `М1 ${id}`, tab, name: String(id), text: '', externalnodename: String(id), fileid: 74,
+})
+const pipeMvt = { loc: 2, code2: 'Участок', code: 'UT', org: false, mag: false, geot1: 0, geot2: 0, zakr: false, name: 'РС1 - РС1', nadz: false, text: '', fileid: 74 }
+
+describe('resolveCardObject', () => {
+  it('section from MVT + WFS id_heatpipesections: linesobj by lineid', () => {
+    const props = mergeQueryLayerProperties(pipeMvt, { id: 144805, externalsignlineid: 'подающий' }, 'heatpipesections', 327446)
+    expect(resolveCardObject(props)).toEqual({ table: 'linesobj', network: 'line', networkId: 327446, rowId: 327446 })
+  })
+
+  it('section from MVT without WFS answer: line kind by layer code, id unknown', () => {
+    expect(resolveCardObject(pipeMvt)).toEqual({ table: 'linesobj', network: 'line', networkId: null, rowId: null })
+    expect(resolveCardObject({ id: null, query_table: 'heatpipesections', query_row_id: 144805 }).networkId).toBeNull()
+  })
+
+  it('plain node (tab=nodes) + WFS id_nodes', () => {
+    const props = mergeQueryLayerProperties(
+      uzelMvt(534700, 'nodes', 'US', 'Узел'),
+      { id: 534700, nodetypeid: null, externalsignid: 'общий', fileid: 'Маг. сети для расчета НС' },
+      'nodes',
+      534700
+    )
+    expect(resolveCardObject(props)).toEqual({ table: 'nodes', network: 'node', networkId: 534700, rowId: 534700 })
+  })
+
+  it.each([
+    ['generalizedconsumers', 'PO', 'Потребитель обобщенныйs', 535810, 22723],
+    ['realconsumers', 'PR', 'Потребитель реальный', 536296, 22104],
+    ['heatsources', 'IS', 'Источник', 535304, 177],
+    ['pumpstations', 'NS', 'Насосная станция', 535305, 176],
+  ])('%s from map: node nodes.id, row of own table', (tab, code, code2, nodeId, rowId) => {
+    const props = mergeQueryLayerProperties(uzelMvt(nodeId, tab, code, code2), { id: rowId, name: '' }, tab, nodeId)
+    expect(resolveCardObject(props)).toEqual({ table: tab, network: 'node', networkId: nodeId, rowId })
+  })
+
+  it('consumer by tab only (WFS failed): node kind, ids unknown', () => {
+    expect(resolveCardObject(uzelMvt(535810, 'generalizedconsumers', 'PO', 'Потребитель обобщенныйs')))
+      .toEqual({ table: 'generalizedconsumers', network: 'node', networkId: null, rowId: null })
+  })
+
+  it('explicit gistable keeps priority', () => {
+    expect(resolveCardObject({ gistable: 'linesobj', id: 5, tab: 'nodes' })).toEqual({ table: 'linesobj', network: 'line', networkId: 5, rowId: 5 })
+    expect(resolveCardObject({ gistable: 'NODES', id: 7 })).toEqual({ table: 'nodes', network: 'node', networkId: 7, rowId: 7 })
+    expect(resolveCardObject({ gistable: 'generalizedconsumers', id: 22723, nodeid: 535810 }))
+      .toEqual({ table: 'generalizedconsumers', network: 'node', networkId: 535810, rowId: 22723 })
+    expect(resolveCardObject({ gistable: 'zdaniya_tu', id: 3 })).toEqual({ table: 'zdaniya_tu', network: null, networkId: null, rowId: 3 })
+    expect(resolveCardObject({ gistable: 'defects', id: 9, defectid: 9 }).network).toBeNull()
+  })
+
+  it('record fields without layer hints', () => {
+    expect(resolveCardObject({ id: 11, nodeid1: 1, nodeid2: 2 }).network).toBe('line')
+    expect(resolveCardObject({ id: 12, nodetypeid: 9 }).network).toBe('node')
+    expect(resolveCardObject({ id: 13 })).toEqual({ table: '', network: null, networkId: null, rowId: 13 })
   })
 })
