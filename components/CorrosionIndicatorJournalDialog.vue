@@ -328,7 +328,7 @@
             type="error"
             variant="tonal"
           >{{ detailsError }}</v-alert>
-          <template v-else-if="selected">
+          <template v-else-if="selected || isEditing">
             <v-expansion-panels
               multiple
               variant="accordion"
@@ -449,7 +449,7 @@
             @click="locateSelected"
           >На карте</v-btn>
           <v-btn
-            v-if="mutationsEnabled && (!isEditing)"
+            v-if="mutationsEnabled && !isEditing && selected"
             variant="text"
             prepend-icon="mdi-pencil"
             @click="startEdit"
@@ -492,6 +492,8 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useNotificationStore } from '~/stores/notificationStore'
+import { CORROSION_COLUMN_BY_KEY, changedColumns, corrosionEditableKey, filledColumns } from '~/utils/registryEdit'
 import {
   fastApiService,
   type CorrosionIndicatorDetails,
@@ -570,6 +572,9 @@ const loadIndicators = async () => {
   } finally { loading.value = false }
 }
 const openDetails = async (id: number) => {
+  // карточка существующей записи всегда открывается на просмотр (QA F46: после неудачного
+  // создания флаги isNew/isEditing оставались, и сохранение слало POST create — дубль)
+  isEditing.value = false; isNew.value = false
   detailsVisible.value = true; detailsLoading.value = true; detailsError.value = ''; selected.value = null
   try { selected.value = await fastApiService.getCorrosionIndicator(id) }
   catch (loadError: any) { detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку индикатора' }
@@ -594,33 +599,38 @@ const locateSelected = () => {
   detailsVisible.value = false; visible.value = false
 }
 
+/** Ключ поля для правки: только колонки indikator_korrozii; поля сезона — если нет истории */
+const editKey = (key: string) => isNew.value
+  ? (key in CORROSION_COLUMN_BY_KEY ? key : undefined)
+  : corrosionEditableKey(key, Number(selected.value?.history_count || 0))
 const detailGroups = computed(() => {
   const item = isEditing.value ? editFields.value : selected.value
   if (!item && !isNew.value) return []
+  const k = editKey
   return [
     { title: 'Размещение и сеть', fields: buildFields([
-      ['Номер индикатора', item?.number, 'number', 'text'], ['Этап', item?.phase_name, 'phase_id', 'select', lookups.phases], ['Место установки', item?.installation_place, 'installation_place', 'textarea'], ['Адрес', item?.address, 'address', 'textarea'],
-      ['Линия', item?.line_id, 'line_id', 'number'], ['Узел', item?.node_id, 'node_id', 'number'], ['Узлы линии', !isEditing.value ? nodeRange(item as CorrosionIndicatorSummary) : undefined], ['Диаметр, мм', item?.diameter, 'diameter', 'number'],
-      ['Признак трубопровода', item?.pipeline_sign_name, 'pipeline_sign_id', 'select', lookups.pipeline_signs], ['Теплоноситель', item?.coolant_type_name, 'coolant_type_id', 'select', lookups.coolant_types], ['Источник тепла', item?.heat_source_name, 'heat_source_id', 'select'],
-      ['Участок эксплуатации', item?.operation_site_name, 'operation_site_id', 'select'], ['Сеть', item?.network_name, 'network_id', 'select'], ['Начальник участка', item?.site_manager_name, 'site_manager_id', 'select']
+      ['Номер индикатора', item?.number, k('number'), 'text'], ['Этап', item?.phase_name, k('phase_id'), 'select', lookups.phases], ['Место установки', item?.installation_place, k('installation_place'), 'textarea'], ['Адрес', item?.address],
+      ['Линия', item?.line_id, k('line_id'), 'number'], ['Узел', item?.node_id, k('node_id'), 'number'], ['Узлы линии', !isEditing.value ? nodeRange(item as CorrosionIndicatorSummary) : undefined], ['Диаметр, мм', item?.diameter],
+      ['Признак трубопровода', item?.pipeline_sign_name, k('pipeline_sign_id'), 'select', lookups.pipeline_signs], ['Теплоноситель', item?.coolant_type_name, k('coolant_type_id'), 'select', lookups.coolant_types], ['Источник тепла', item?.heat_source_name, k('heat_source_name'), 'text'],
+      ['Участок эксплуатации', item?.operation_site_name, k('operation_site_name'), 'text'], ['Сеть', item?.network_name, k('network_name'), 'text'], ['Начальник участка', item?.site_manager_name, k('site_manager_name'), 'text']
     ]) },
     { title: 'План и экспозиция', fields: buildFields([
-      ['Дата планирования', item?.planned_on, 'planned_on', 'date'], ['Дата установки', item?.installed_on, 'installed_on', 'date'], ['Дата извлечения', item?.extracted_on, 'extracted_on', 'date'],
-      ['Состояние стержня', item?.rod_state_name, 'rod_state_id', 'select', lookups.rod_states], ['Ответственный', item?.responsible_name, 'responsible_id', 'select', lookups.responsible_people], ['Должность', item?.position_name, 'position_id', 'select'],
-      ['Количество пластин', item?.plate_count, 'plate_count', 'number'], ['Начальный средний вес, г', item?.initial_plate_weight, 'initial_plate_weight', 'number'],
-      ['Радиус пластины, мм', item?.plate_radius, 'plate_radius', 'number'], ['Радиус втулки, мм', item?.bush_radius, 'bush_radius', 'number'], ['Толщина пластины, мм', item?.plate_thickness, 'plate_thickness', 'number']
+      ['Дата планирования', item?.planned_on, k('planned_on'), 'date'], ['Дата установки', item?.installed_on, k('installed_on'), 'date'], ['Дата извлечения', item?.extracted_on, k('extracted_on'), 'date'],
+      ['Состояние стержня', item?.rod_state_name, k('rod_state_id'), 'select', lookups.rod_states], ['Ответственный', item?.responsible_name, k('responsible_id'), 'select', lookups.responsible_people], ['Должность', item?.position_name],
+      ['Количество пластин', item?.plate_count, k('plate_count'), 'number'], ['Начальный средний вес, г', item?.initial_plate_weight, k('initial_plate_weight'), 'number'],
+      ['Радиус пластины, мм', item?.plate_radius, k('plate_radius'), 'number'], ['Радиус втулки, мм', item?.bush_radius, k('bush_radius'), 'number'], ['Толщина пластины, мм', item?.plate_thickness, k('plate_thickness'), 'number']
     ]) },
     { title: 'Результаты обработки', fields: buildFields([
-      ['Конечный средний вес, г', item?.final_plate_weight, 'final_plate_weight', 'number'], ['Потеря массы при кислотной обработке, г', item?.acid_treatment_mass_loss, 'acid_treatment_mass_loss', 'number'],
-      ['Средняя скорость коррозии, мм/год', item?.corrosion_rate, 'corrosion_rate', 'number'], ['Оценка коррозионного процесса', item?.process_mark_name, 'process_mark_id', 'select', lookups.process_marks],
-      ['Агрессивность сетевой воды', item?.water_aggressiveness_name, 'water_aggressiveness_id', 'select', lookups.water_aggressiveness], ['Внешний вид пластин', item?.plate_external_view, 'plate_external_view', 'textarea'], ['Примечание', item?.note, 'note', 'textarea']
+      ['Конечный средний вес, г', item?.final_plate_weight, k('final_plate_weight'), 'number'], ['Потеря массы при кислотной обработке, г', item?.acid_treatment_mass_loss, k('acid_treatment_mass_loss'), 'number'],
+      ['Средняя скорость коррозии, мм/год', item?.corrosion_rate, k('corrosion_rate'), 'number'], ['Оценка коррозионного процесса', item?.process_mark_name, k('process_mark_id'), 'select', lookups.process_marks],
+      ['Агрессивность сетевой воды', item?.water_aggressiveness_name, k('water_aggressiveness_id'), 'select', lookups.water_aggressiveness], ['Внешний вид пластин', item?.plate_external_view, k('plate_external_view'), 'textarea'], ['Примечание', item?.note, k('note'), 'textarea']
     ]) },
     { title: 'Камеры и характеристики участка', fields: buildFields([
-      ['Начальная камера', item?.start_chamber_name, 'start_chamber_id', 'select'], ['Код начальной камеры', item?.start_chamber_code, 'start_chamber_code', 'text'],
-      ['Конечная камера', item?.end_chamber_name, 'end_chamber_id', 'select'], ['Код конечной камеры', item?.end_chamber_code, 'end_chamber_code', 'text'],
-      ['Ближайшая камера', item?.nearest_chamber_name, 'nearest_chamber_id', 'select'], ['Код ближайшей камеры', item?.nearest_chamber_code, 'nearest_chamber_code', 'text'],
-      ['Расстояние до камеры, м', item?.chamber_distance, 'chamber_distance', 'number'], ['Ввод в эксплуатацию', item?.commissioned_on, 'commissioned_on', 'date'],
-      ['Вид прокладки', item?.tubing_type_name, 'tubing_type_id', 'select'], ['Диаметр подачи, мм', item?.flow_diameter, 'flow_diameter', 'number'], ['Диаметр обратки, мм', item?.return_diameter, 'return_diameter', 'number']
+      ['Начальная камера', item?.start_chamber_name, k('start_chamber_name'), 'text'], ['Код начальной камеры', item?.start_chamber_code, k('start_chamber_code'), 'text'],
+      ['Конечная камера', item?.end_chamber_name, k('end_chamber_name'), 'text'], ['Код конечной камеры', item?.end_chamber_code, k('end_chamber_code'), 'text'],
+      ['Ближайшая камера', item?.nearest_chamber_name, k('nearest_chamber_name'), 'text'], ['Код ближайшей камеры', item?.nearest_chamber_code, k('nearest_chamber_code'), 'text'],
+      ['Расстояние до камеры, м', item?.chamber_distance, k('chamber_distance'), 'number'], ['Ввод в эксплуатацию', item?.commissioned_on, k('commissioned_on'), 'date'],
+      ['Вид прокладки', item?.tubing_type_name], ['Диаметр подачи, мм', item?.flow_diameter, k('flow_diameter'), 'number'], ['Диаметр обратки, мм', item?.return_diameter, k('return_diameter'), 'number']
     ]) }
   ].filter(group => group.fields.length)
 })
@@ -649,32 +659,44 @@ const createIndicator = async () => {
   detailsVisible.value = true
 }
 
+const notifications = useNotificationStore()
+/** Колонки, которые правятся в этой карточке (с учётом истории сезонов) */
+const editableColumns = () => Object.fromEntries(
+  Object.entries(CORROSION_COLUMN_BY_KEY).filter(([key]) => editKey(key))
+)
+
 const saveChanges = async () => {
   saving.value = true
   try {
     if (isNew.value) {
-      const result = await fastApiService.createObject('indikator_korrozii', editFields.value)
-      if (result && result.id) {
-        isEditing.value = false
+      // универсальный CRUD пишет колонки таблицы, а не ключи API карточки (QA F42)
+      const fields = filledColumns(editFields.value, CORROSION_COLUMN_BY_KEY)
+      if (!Object.keys(fields).length) {
+        notifications.showError('Заполните хотя бы одно поле индикатора')
+        return
+      }
+      const result = await fastApiService.createObject('indikator_korrozii', fields)
+      if (result?.id) {
+        notifications.showSuccess(`Индикатор ${result.id} создан`)
         await loadIndicators()
         await openDetails(result.id)
       }
     } else if (selected.value) {
-      const changes: Record<string, any> = {}
-      for (const [k, v] of Object.entries(editFields.value)) {
-        if (v !== selected.value[k as keyof CorrosionIndicatorDetails]) {
-          changes[k] = v
-        }
+      const id = selected.value.id
+      const changes = changedColumns(selected.value, editFields.value, editableColumns())
+      if (!Object.keys(changes).length) {
+        notifications.showInfo('Изменений нет')
+        isEditing.value = false
+        return
       }
-      if (Object.keys(changes).length > 0) {
-        await fastApiService.updateObjectAttributes('indikator_korrozii', selected.value.id.toString(), changes)
-      }
-      isEditing.value = false
+      await fastApiService.updateObjectAttributes('indikator_korrozii', String(id), changes)
+      notifications.showSuccess('Изменения индикатора сохранены')
       await loadIndicators()
-      await openDetails(selected.value.id)
+      await openDetails(id)
     }
   } catch (e: any) {
-    detailsError.value = 'Ошибка при сохранении: ' + (e?.message || '')
+    // форма остаётся открытой с введёнными значениями
+    notifications.showError('Ошибка при сохранении: ' + (e?.userMessage || e?.message || ''))
   } finally {
     saving.value = false
   }
@@ -685,10 +707,11 @@ const deleteIndicator = async (id: number) => {
   try {
     deleting.value = true
     await fastApiService.deleteObject('indikator_korrozii', id)
+    notifications.showSuccess(`Индикатор ${id} удалён`)
     detailsVisible.value = false
     await loadIndicators()
   } catch (e: any) {
-    detailsError.value = 'Ошибка при удалении: ' + (e?.message || '')
+    notifications.showError('Ошибка при удалении: ' + (e?.userMessage || e?.message || ''))
   } finally {
     deleting.value = false
   }

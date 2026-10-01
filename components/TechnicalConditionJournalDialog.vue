@@ -352,14 +352,14 @@
             type="error"
             variant="tonal"
           >{{ detailsError }}</v-alert>
-          <template v-else-if="selected">
+          <template v-else-if="selected || isEditing">
             <v-alert
-              v-if="selected.building_id && !selected.building_link_valid"
+              v-if="selected?.building_id && !selected?.building_link_valid"
               type="warning"
               variant="tonal"
               class="mb-4"
             >
-              В исходной базе ссылка на здание {{ selected.building_id }} не найдена. Карточка ТУ доступна, позиционирование на карте — нет.
+              В исходной базе ссылка на здание {{ selected?.building_id }} не найдена. Карточка ТУ доступна, позиционирование на карте — нет.
             </v-alert>
             <v-expansion-panels
               multiple
@@ -565,6 +565,8 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useNotificationStore } from '~/stores/notificationStore'
+import { changedColumns, filledColumns, identityColumns } from '~/utils/registryEdit'
 import {
   fastApiService,
   type TechnicalConditionDetails,
@@ -638,6 +640,9 @@ const loadConditions = async () => {
   } finally { loading.value = false }
 }
 const openDetails = async (id: number) => {
+  // карточка существующей записи всегда открывается на просмотр (после неудачного создания
+  // флаги isNew/isEditing не должны превращать сохранение в повторный POST)
+  isEditing.value = false; isNew.value = false
   detailsVisible.value = true; detailsLoading.value = true; detailsError.value = ''; selected.value = null
   try { selected.value = await fastApiService.getTechnicalCondition(id) }
   catch (loadError: any) { detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку технических условий' }
@@ -661,14 +666,16 @@ const locateSelected = () => {
   detailsVisible.value = false; visible.value = false
 }
 
+/** Справочник названий (источник, район) для v-select с item-value="id" */
+const nameItems = (items: Array<{ name: string }>) => items.map(entry => ({ id: entry.name, name: entry.name }))
 const detailGroups = computed(() => {
   const item = isEditing.value ? editFields.value : selected.value
   if (!item && !isNew.value) return []
   return [
     { title: 'Основные сведения', fields: buildFields([
       ['Номер ТУ', item?.number, 'number', 'text'], ['Дата выдачи', item?.issued_on, 'issued_on', 'date'], ['Состояние', item?.state_name, 'state_id', 'select', lookups.states], ['Дата аннулирования', item?.annulled_on, 'annulled_on', 'date'],
-      ['Организация-заявитель', item?.organization_name, 'organization_name', 'text'], ['Объект', item?.object_name, 'object_name', 'text'], ['Адрес', item?.address, 'address', 'textarea'], ['Источник', item?.heat_source_name, 'heat_source_id', 'select', lookups.heat_sources],
-      ['Район эксплуатации', item?.district_name, 'district_id', 'select', lookups.districts], ['Камера', item?.connection_chamber, 'connection_chamber', 'text'], ['Срок действия', item?.validity_period, 'validity_period', 'text']
+      ['Организация-заявитель', item?.organization_name, 'organization_name', 'text'], ['Объект', item?.object_name, 'object_name', 'text'], ['Адрес', item?.address, 'address', 'textarea'], ['Источник', item?.heat_source_name, 'heat_source_name', 'select', nameItems(lookups.heat_sources)],
+      ['Район эксплуатации', item?.district_name, 'district_name', 'select', nameItems(lookups.districts)], ['Камера', item?.connection_chamber, 'connection_chamber', 'text'], ['Срок действия', item?.validity_period, 'validity_period', 'text']
     ]) },
     { title: 'Тепловые нагрузки', fields: buildFields([
       ['Общая, Гкал/ч', item?.total_heat_load, 'total_heat_load', 'number'], ['Отопление', item?.heating_load, 'heating_load', 'number'], ['Вентиляция', item?.ventilation_load, 'ventilation_load', 'number'],
@@ -689,9 +696,9 @@ const detailGroups = computed(() => {
       ['Договор №', item?.contract_number, 'contract_number', 'text'], ['Дата договора', item?.contract_date, 'contract_date', 'date']
     ]) },
     { title: 'Привязка к объекту', fields: buildFields([
-      ['Здание', item?.building_id, 'building_id', 'number'], ['Адрес здания', item?.building_address, 'building_address', 'textarea'], ['Город', item?.building_city, 'building_city', 'text'], ['Микрорайон', item?.building_microdistrict, 'building_microdistrict', 'text'],
-      ['Улица', item?.building_street, 'building_street', 'text'], ['Дом', item?.building_house, 'building_house', 'text'], ['Код узла присоединения', item?.building_connection_code, 'building_connection_code', 'text'],
-      ['Узел присоединения', item?.building_connection_node, 'building_connection_node', 'text'], ['Трубопровод', item?.pipe_id, 'pipe_id', 'number'], ['Комментарий', item?.building_note, 'building_note', 'textarea']
+      ['Здание', item?.building_id, 'building_id', 'number'], ['Адрес здания', item?.building_address], ['Город', item?.building_city], ['Микрорайон', item?.building_microdistrict],
+      ['Улица', item?.building_street], ['Дом', item?.building_house], ['Код узла присоединения', item?.building_connection_code],
+      ['Узел присоединения', item?.building_connection_node], ['Трубопровод', item?.pipe_id, 'pipe_id', 'number'], ['Комментарий', item?.building_note]
     ]) }
   ].filter(group => group.fields.length)
 })
@@ -722,32 +729,43 @@ const createTechnicalCondition = async () => {
   detailsVisible.value = true
 }
 
+const notifications = useNotificationStore()
+/** Ключи API, которые правит форма (сервер переводит их в колонки tehnicheskie_usloviya) */
+const editableColumns = () => identityColumns(
+  detailGroups.value.flatMap(group => group.fields.map(field => field.key).filter((key): key is string => !!key))
+)
+
 const saveChanges = async () => {
   saving.value = true
   try {
     if (isNew.value) {
-      const result = await fastApiService.createTechnicalCondition(editFields.value)
-      if (result && result.id) {
-        isEditing.value = false
+      const fields = filledColumns(editFields.value, editableColumns())
+      if (!Object.keys(fields).length) {
+        notifications.showError('Заполните хотя бы одно поле ТУ')
+        return
+      }
+      const result = await fastApiService.createTechnicalCondition(fields)
+      if (result?.id) {
+        notifications.showSuccess(`ТУ ${result.id} созданы`)
         await loadConditions()
         await openDetails(result.id)
       }
     } else if (selected.value) {
-      const changes: Record<string, any> = {}
-      for (const [k, v] of Object.entries(editFields.value)) {
-        if (v !== selected.value[k as keyof TechnicalConditionDetails]) {
-          changes[k] = v
-        }
+      const id = selected.value.id
+      const changes = changedColumns(selected.value, editFields.value, editableColumns())
+      if (!Object.keys(changes).length) {
+        notifications.showInfo('Изменений нет')
+        isEditing.value = false
+        return
       }
-      if (Object.keys(changes).length > 0) {
-        await fastApiService.updateTechnicalCondition(selected.value.id, changes)
-      }
-      isEditing.value = false
+      await fastApiService.updateTechnicalCondition(id, changes)
+      notifications.showSuccess('Изменения ТУ сохранены')
       await loadConditions()
-      await openDetails(selected.value.id)
+      await openDetails(id)
     }
   } catch (e: any) {
-    detailsError.value = 'Ошибка при сохранении: ' + (e?.message || '')
+    // форма остаётся открытой с введёнными значениями
+    notifications.showError('Ошибка при сохранении: ' + (e?.userMessage || e?.message || ''))
   } finally {
     saving.value = false
   }
@@ -786,10 +804,11 @@ const deleteTechnicalCondition = async (id: number) => {
   try {
     deleting.value = true
     await fastApiService.deleteTechnicalCondition(id)
+    notifications.showSuccess(`ТУ ${id} удалены`)
     detailsVisible.value = false
     await loadConditions()
   } catch (e: any) {
-    detailsError.value = 'Ошибка при удалении: ' + (e?.message || '')
+    notifications.showError('Ошибка при удалении: ' + (e?.userMessage || e?.message || ''))
   } finally {
     deleting.value = false
   }

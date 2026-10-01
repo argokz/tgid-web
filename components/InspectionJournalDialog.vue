@@ -355,7 +355,7 @@
             type="error"
             variant="tonal"
           >{{ detailsError }}</v-alert>
-          <template v-else-if="selected">
+          <template v-else-if="selected || isEditing">
             <v-expansion-panels
               multiple
               variant="accordion"
@@ -877,10 +877,10 @@ const detailGroups = computed(() => {
       ['Восстановление прокладки', item?.restoration_measures, 'restoration_measures', 'textarea'], ['Примечание', item?.note, 'note', 'textarea']
     ]) },
     { title: 'Утверждение и комиссия', fields: buildFields([
-      ['ФИО утверждающего', item?.approver_name, 'approver_name', 'text'], ['Должность утверждающего', item?.approver_position, 'approver_position_id', 'select', positions],
-      ['Служба утверждающего', item?.approver_service, 'approver_service_id', 'select', subdivisions], ['Член комиссии 1', item?.commission_member_1, 'commission_member_1', 'text'],
-      ['Должность члена комиссии 1', item?.commission_position_1, 'commission_position_1_id', 'select', positions], ['Член комиссии 2', item?.commission_member_2, 'commission_member_2', 'text'],
-      ['Должность члена комиссии 2', item?.commission_position_2, 'commission_position_2_id', 'select', positions],
+      ['ФИО утверждающего', item?.approver_name, 'approver_name', 'text'], ['Должность утверждающего', item?.approver_position, 'approver_position_id', 'select', positions.value],
+      ['Служба утверждающего', item?.approver_service, 'approver_service_id', 'select', subdivisions.value], ['Член комиссии 1', item?.commission_member_1, 'commission_member_1', 'text'],
+      ['Должность члена комиссии 1', item?.commission_position_1, 'commission_position_1_id', 'select', positions.value], ['Член комиссии 2', item?.commission_member_2, 'commission_member_2', 'text'],
+      ['Должность члена комиссии 2', item?.commission_position_2, 'commission_position_2_id', 'select', positions.value],
       ['Не участвовавшие трубопроводы', item?.excluded_pipes, 'excluded_pipes', 'textarea'],
       ['Не предупреждённые потребители', item?.unnotified_consumers, 'unnotified_consumers', 'textarea']
     ]) }

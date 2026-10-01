@@ -355,7 +355,7 @@
             type="error"
             variant="tonal"
           >{{ detailsError }}</v-alert>
-          <template v-else-if="selected">
+          <template v-else-if="selected || isEditing">
             <v-expansion-panels
               multiple
               variant="accordion"

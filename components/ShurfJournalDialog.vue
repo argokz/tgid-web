@@ -356,7 +356,7 @@
             type="error"
             variant="tonal"
           >{{ detailsError }}</v-alert>
-          <template v-else-if="selected">
+          <template v-else-if="selected || isEditing">
             <v-btn-toggle
               v-if="isNew"
               v-model="createMode"
