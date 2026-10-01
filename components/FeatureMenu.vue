@@ -91,7 +91,7 @@
                     <v-list-item
                       :key="item._key"
                       class="menu-item"
-                      @click.stop="selectFeature(item.feature)"
+                      @click.stop="selectFeature(item.feature, item.index)"
                     >
                       <template #prepend>
                         <v-avatar
@@ -152,9 +152,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import type { CSSProperties } from 'vue'
 import { useMapStore } from '~/stores/mapStore'
+import { describeMenuFeature } from '~/utils/networkFeature'
 
 const mapStore = useMapStore()
 
@@ -285,11 +286,8 @@ const formatFeatureName = (feature: any) => {
 
 const formatFeatureDetails = (feature: any) => {
   const p = feature.properties || {}
-  const parts: string[] = []
-  
-  const { tableName, id } = parseFeatureId(feature.id || '')
-  if (tableName) parts.push(`Таблица: ${tableName}`)
-  if (id && !isNaN(id)) parts.push(`ID: ${id}`)
+  // фрагмент и id объекта сети: копии участка в разных фрагментах иначе неразличимы (QA F69)
+  const parts: string[] = describeMenuFeature(feature)
   if (p.code2 && !formatFeatureName(feature).includes(p.code2)) {
     parts.push(`Код: ${p.code2}`)
   }
@@ -315,9 +313,19 @@ const getFeatureIcon = (feature: any) => {
   return 'mdi-shape'
 }
 
-const selectFeature = (feature: any) => {
+/** Меню открыто инструментом (редактор, пьезометр) — выбор уходит ему, карточка не открывается */
+const selectFeature = (feature: any, index: number) => {
+  if (mapStore.hasPendingFeatureChoice()) {
+    mapStore.resolveFeatureChoice(index)
+    return
+  }
   mapStore.selectFeature(feature)
 }
+
+// Меню закрыто без выбора («Закрыть», новый identify) — инструмент получает отказ
+watch(() => mapStore.featureMenuVisible, (visible) => {
+  if (!visible) mapStore.cancelFeatureChoice()
+})
 </script>
 
 <style scoped>

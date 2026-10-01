@@ -59,6 +59,12 @@ interface LayerStyle {
   dynamicStyles?: Record<string, any>;
 }
 
+/**
+ * Ожидающий выбор в меню «Выберите объект» для инструмента (редактор топологии, пьезометр):
+ * resolve(индекс в potentialFeatures | null). Вне state: функция не сериализуется.
+ */
+let pendingFeatureChoice: ((index: number | null) => void) | null = null;
+
 export const useMapStore = defineStore('map', {
   state: () => ({
     map: null as any,
@@ -733,6 +739,38 @@ export const useMapStore = defineStore('map', {
         this.popup.remove();
         this.popup = null;
       }
+    },
+
+    /**
+     * Меню «Выберите объект» для инструмента: под курсором несколько подходящих объектов
+     * (например, копии участка в разных фрагментах). Возвращает индекс выбранного или null
+     * (меню закрыто). Карточку объекта не открывает.
+     */
+    chooseFeature(features: any[], point: { x: number; y: number }): Promise<number | null> {
+      this.cancelFeatureChoice();
+      this.potentialFeatures = features.map((f) => this.normalizeFeatureForState(f));
+      this.featureMenuPosition = { x: point.x, y: point.y };
+      this.featureMenuVisible = true;
+      return new Promise((resolve) => {
+        pendingFeatureChoice = resolve;
+      });
+    },
+
+    /** Есть ли ожидающий выбор инструмента (меню не должно открывать карточку) */
+    hasPendingFeatureChoice(): boolean {
+      return pendingFeatureChoice !== null;
+    },
+
+    /** Завершить выбор инструмента: index — позиция в potentialFeatures, null — отмена */
+    resolveFeatureChoice(index: number | null) {
+      const resolve = pendingFeatureChoice;
+      pendingFeatureChoice = null;
+      this.featureMenuVisible = false;
+      resolve?.(index);
+    },
+
+    cancelFeatureChoice() {
+      if (pendingFeatureChoice) this.resolveFeatureChoice(null);
     },
 
     async handleMapClick(e: MapMouseEvent) {

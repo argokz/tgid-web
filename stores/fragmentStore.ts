@@ -14,6 +14,14 @@ export const useFragmentStore = defineStore('fragment', {
     getFragments: (state) => state.fragments,
     getSelectedFragmentId: (state) => state.selectedFragmentId,
     getVisibleFragments: (state) => state.visibleFragments,
+    /**
+     * Фрагменты текущей работы: выбранный фрагмент, иначе видимые на карте (фильтр слоёв).
+     * Пусто — показаны все фрагменты, контекста нет.
+     */
+    activeFragmentIds: (state): number[] =>
+      (state.selectedFragmentId != null ? [state.selectedFragmentId] : state.visibleFragments)
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0),
   },
 
   actions: {

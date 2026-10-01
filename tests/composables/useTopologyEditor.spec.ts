@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, ref } from 'vue';
 
-const { api, notify, vertex } = vi.hoisted(() => ({
+const { api, notify, vertex, markers } = vi.hoisted(() => ({
+  markers: [] as any[],
   api: {
     getTopologyVersions: vi.fn(),
     getLastTopologyOperation: vi.fn(),
@@ -54,7 +55,7 @@ vi.mock('~/composables/useLineVertexEditor', async () => {
 vi.mock('maplibre-gl', () => {
   class Marker {
     lngLat: any;
-    constructor(public opts: any) {}
+    constructor(public opts: any) { markers.push(this); }
     setLngLat(v: any) { this.lngLat = Array.isArray(v) ? { lng: v[0], lat: v[1] } : v; return this; }
     getLngLat() { return this.lngLat; }
     addTo() { return this; }
@@ -73,7 +74,17 @@ const lineFeature = (id: number) => ({
   layer: { id: 'tgid-lines' }, properties: { id }, geometry: { type: 'LineString', coordinates: [] },
 });
 
-const setup = () => {
+// Копии объекта в разных фрагментах (MVT uzel / heatpipesections), QA F53
+const uzel = (id: number, fileid: number) => ({
+  id, layer: { id: 'mvt__AlmatyGIS__uzel-6-rule-7-point-1' }, sourceLayer: 'uzel',
+  properties: { fileid, tab: 'generalizedconsumers' }, geometry: { type: 'Point', coordinates: [76.89, 43.23] },
+});
+const pipe = (id: number, fileid: number) => ({
+  id, layer: { id: 'mvt__AlmatyGIS__heatpipesections-2' }, sourceLayer: 'heatpipesections',
+  properties: { fileid, code: 'UT' }, geometry: { type: 'LineString', coordinates: [] },
+});
+
+const setup = (extra: Record<string, any> = {}) => {
   let features: any[] = [];
   const map = {
     queryRenderedFeatures: vi.fn(() => features),
@@ -91,6 +102,7 @@ const setup = () => {
     refreshLayers: vi.fn(),
     getSelectedFeature: vi.fn(() => ({ layerId: 'tgid-nodes' })),
     closeCard: vi.fn(),
+    ...extra,
   };
   const editor = useTopologyEditor(opts);
   const click = (lng = 76.95, lat = 43.25) => editor.onMapClickForTopology({ point: { x: 10, y: 10 }, lngLat: { lng, lat } });
@@ -232,6 +244,86 @@ describe('useTopologyEditor', () => {
     expect(api.deleteNode).toHaveBeenCalledWith(11, 'ver');
     expect(opts.closeCard).toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+
+  it('QA F52: клик по узлу (mousedown → mouseup → click) выбирает его, маркер не создаётся', async () => {
+    const { editor, setFeatures, map } = setup();
+    editor.toggleEditTopologyMode();
+    api.createLine.mockResolvedValue({});
+    markers.length = 0;
+    const press = async (id: number) => {
+      setFeatures([nodeFeature(id)]);
+      editor.onMapMouseDownForTopology({ point: { x: 10, y: 10 }, lngLat: { lng: 76.9, lat: 43.2 }, preventDefault: vi.fn() });
+      editor.onMapMouseMoveForTopology({ point: { x: 11, y: 10 }, lngLat: { lng: 76.9, lat: 43.2 } }); // дрожь < порога
+      await editor.onNodeDragEnd();
+      await editor.onMapClickForTopology({ point: { x: 10, y: 10 }, lngLat: { lng: 76.9, lat: 43.2 } });
+    };
+    await press(1);
+    expect(markers).toHaveLength(0);
+    expect(api.moveNode).not.toHaveBeenCalled();
+    expect(map.dragPan.enable).toHaveBeenCalled();
+    expect(editor.topologyStartNode.value).toBe(1);
+    await press(2);
+    expect(api.createLine).toHaveBeenCalledWith(1, 2, { nodeid1: 'v1', nodeid2: 'v2' });
+  });
+
+  it('QA F53: разрезание и выбор узла — объекты активного фрагмента, а не первые под курсором', async () => {
+    const { editor, click, setFeatures } = setup({ getActiveFragmentIds: () => [74] });
+    editor.toggleEditTopologyMode();
+    api.previewSplitLine.mockResolvedValue({ transferred: {}, versions: {} });
+    setFeatures([pipe(381, 1), pipe(324388, 74), pipe(370367, 89)]);
+    await click(76.1, 43.1);
+    expect(api.previewSplitLine).toHaveBeenCalledWith(324388, 76.1, 43.1);
+
+    setFeatures([uzel(13402, 4), uzel(535475, 74), uzel(888, 1)]);
+    await click();
+    expect(editor.topologyStartNode.value).toBe(535475);
+  });
+
+  it('QA F53: несколько кандидатов — меню выбора; отказ в меню ничего не делает', async () => {
+    const chooseCandidate = vi.fn(async (c: any[]) => c.find((x) => x.fragmentId === 74));
+    const { editor, click, setFeatures } = setup({ chooseCandidate });
+    editor.toggleEditTopologyMode();
+    api.previewSplitLine.mockResolvedValue({ transferred: {}, versions: {} });
+    setFeatures([pipe(381, 1), pipe(324388, 74)]);
+    await click(76.1, 43.1);
+    expect(chooseCandidate.mock.calls[0][0].map((c: any) => c.id)).toEqual([381, 324388]);
+    expect(api.previewSplitLine).toHaveBeenCalledWith(324388, 76.1, 43.1);
+
+    chooseCandidate.mockResolvedValueOnce(undefined as any);
+    setFeatures([uzel(888, 1), uzel(535475, 74)]);
+    await click();
+    expect(editor.topologyStartNode.value).toBeNull();
+    expect(api.createNode).not.toHaveBeenCalled();
+  });
+
+  it('QA F53: второй узел участка — только из фрагмента первого; чужой — отказ, без нового узла', async () => {
+    const { editor, click, setFeatures } = setup();
+    editor.toggleEditTopologyMode();
+    setFeatures([uzel(535475, 74)]);
+    await click();
+    setFeatures([uzel(888, 1)]);
+    await click();
+    expect(api.createLine).not.toHaveBeenCalled();
+    expect(api.createNode).not.toHaveBeenCalled();
+    expect(notify.showWarning).toHaveBeenCalledWith(expect.stringContaining('фрагмента 74'));
+    expect(editor.topologyStartNode.value).toBe(535475);
+
+    api.createLine.mockResolvedValue({});
+    setFeatures([uzel(889, 1), uzel(535476, 74)]); // копии: берётся узел фрагмента 74 без меню
+    await click();
+    expect(api.createLine).toHaveBeenCalledWith(535475, 535476, expect.any(Object));
+  });
+
+  it('QA F53: копии узла в нескольких фрагментах не перетаскиваются', async () => {
+    const { editor, setFeatures, map } = setup();
+    editor.toggleEditTopologyMode();
+    setFeatures([uzel(888, 1), uzel(535475, 74)]);
+    editor.onMapMouseDownForTopology({ point: { x: 0, y: 0 }, lngLat: { lng: 1, lat: 1 }, preventDefault: vi.fn() });
+    expect(map.dragPan.disable).not.toHaveBeenCalled();
+    editor.onMapMouseMoveForTopology({ point: { x: 40, y: 0 }, lngLat: { lng: 2, lat: 2 } });
+    await editor.onNodeDragEnd();
+    expect(api.moveNode).not.toHaveBeenCalled();
   });
 
   it('attach/detach подписывают и снимают обработчики карты', () => {

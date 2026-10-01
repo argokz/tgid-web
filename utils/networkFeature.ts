@@ -196,3 +196,137 @@ export const resolveCardObject = (properties: any): CardObject => {
   }
   return { table, network: null, networkId: null, rowId: toPositiveId(p.id) };
 };
+
+
+/** Фрагмент (fileid) отрисованного объекта; null — не указан */
+export const getFeatureFragmentId = (feature: any): number | null => {
+  const p = feature?.properties || {};
+  return toPositiveId(p.fileid ?? p.fileID ?? p.fileId ?? p.FILEID ?? p.file_id);
+};
+
+/** Оверлеи редактора, рисования, трассировки — не объекты сети */
+const PICK_OVERLAY_PREFIXES = ['draw-', 'topology-vertex-', 'trace-', 'route-', 'piezo-', 'outage-', 'hydraulic-', 'measure-'];
+const NODE_LAYER_RE = /uzel|node|узел|узл/;
+const LINE_LAYER_RE = /heatpipesection|linesobj|line|pipe|труб|участ/;
+
+/**
+ * Вид объекта сети для операций редактора/пьезометра — только по слою сети (MVT `uzel`,
+ * `heatpipesections`, слои с node/line в имени) и типу геометрии. Точки и линии прочих
+ * слоёв (Almaty2, здания, оверлеи) объектами сети не считаются (QA F53).
+ */
+export const getNetworkFeatureKind = (feature: any): 'node' | 'line' | null => {
+  const layerId = lower(feature?.layer?.id);
+  if (PICK_OVERLAY_PREFIXES.some((prefix) => layerId.startsWith(prefix))) return null;
+  const signature = [layerId, feature?.sourceLayer, feature?.layer?.['source-layer'], feature?.properties?.table]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  // Без геометрии (identify хранит feature без неё) — по типу стилевого слоя
+  const layerType = lower(feature?.layer?.type);
+  const type = feature?.geometry?.type
+    ?? (layerType === 'line' ? 'LineString' : layerType === 'circle' || layerType === 'symbol' ? 'Point' : undefined);
+  if ((type === 'Point' || type === 'MultiPoint') && NODE_LAYER_RE.test(signature)) return 'node';
+  if ((type === 'LineString' || type === 'MultiLineString') && LINE_LAYER_RE.test(signature)) return 'line';
+  return null;
+};
+
+export interface PickCandidate {
+  /** Первый отрисованный feature объекта (геометрия, свойства) */
+  feature: any;
+  kind: 'node' | 'line';
+  /** nodes.id / linesobj.id */
+  id: number;
+  /** fileid; null — не указан */
+  fragmentId: number | null;
+  /** Роль узла по MVT `tab` (nodes, generalizedconsumers, …); '' — нет */
+  tab: string;
+}
+
+export interface PickOptions {
+  kind: 'node' | 'line';
+  /**
+   * Фрагменты контекста (активный/выбранный фрагмент, фрагмент начального узла операции):
+   * если под курсором есть их объекты, остальные отбрасываются.
+   */
+  fragmentIds?: readonly number[] | null;
+  /** Объекты вне fragmentIds не брать вовсе (деструктивные операции): лучше отказ, чем чужой объект */
+  strictFragment?: boolean;
+  /** Узлы с этими ролями (`tab`) не кандидаты (например, обобщённые потребители) */
+  excludeTabs?: readonly string[];
+}
+
+export type PickResult =
+  | { status: 'single'; candidate: PickCandidate; candidates: PickCandidate[] }
+  | { status: 'ambiguous'; candidate: null; candidates: PickCandidate[] }
+  /** reason: 'empty' — объектов нужного вида нет; 'other-fragment' — есть, но только чужих фрагментов */
+  | { status: 'none'; candidate: null; candidates: PickCandidate[]; reason: 'empty' | 'other-fragment'; others: PickCandidate[] };
+
+/**
+ * Объекты сети нужного вида под курсором — по одному на объект (MVT рисует объект
+ * несколькими слоями: точка, подпись), в порядке отрисовки. Feature без id сети
+ * (query-слои `id_*`, оверлеи) не кандидаты.
+ */
+export const collectNetworkCandidates = (
+  features: readonly any[] | null | undefined,
+  kind: 'node' | 'line',
+): PickCandidate[] => {
+  const seen = new Set<number>();
+  const out: PickCandidate[] = [];
+  for (const feature of features || []) {
+    if (getNetworkFeatureKind(feature) !== kind) continue;
+    const id = getFeatureId(feature);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ feature, kind, id, fragmentId: getFeatureFragmentId(feature), tab: lower(feature?.properties?.tab) });
+  }
+  return out;
+};
+
+/**
+ * Единый выбор объекта сети под курсором с учётом контекста (QA F53, F28). Участки и узлы
+ * фрагментов лежат друг на друге (копии сети в 1/74/89/99), поэтому «первый под курсором»
+ * — случайный фрагмент. Порядок: вид объекта → роль узла → фрагменты контекста.
+ * Один кандидат — single; несколько — ambiguous (спросить пользователя); ни одного — none.
+ */
+export const pickNetworkFeature = (features: readonly any[] | null | undefined, options: PickOptions): PickResult => {
+  const exclude = new Set((options.excludeTabs || []).map((tab) => lower(tab)));
+  let candidates = collectNetworkCandidates(features, options.kind).filter((c) => !exclude.has(c.tab));
+  if (!candidates.length) return { status: 'none', candidate: null, candidates: [], reason: 'empty', others: [] };
+
+  const context = (options.fragmentIds || []).filter((id) => Number.isInteger(id) && id > 0);
+  if (context.length) {
+    const inContext = candidates.filter((c) => c.fragmentId !== null && context.includes(c.fragmentId));
+    if (inContext.length) candidates = inContext;
+    else if (options.strictFragment) {
+      return { status: 'none', candidate: null, candidates: [], reason: 'other-fragment', others: candidates };
+    }
+  }
+  if (candidates.length === 1) return { status: 'single', candidate: candidates[0], candidates };
+  return { status: 'ambiguous', candidate: null, candidates };
+};
+
+/**
+ * Подзаголовок объекта в меню «Выберите объект» (QA F69): копии участка в разных фрагментах
+ * различаются фрагментом и id сети. Для MVT id объекта — исходный id тайла (`_sourceId`), а не
+ * `id` нормализованного feature (там fileid). WMS/query-слои (`таблица.id`) — «Таблица: … • ID: …».
+ */
+export const describeMenuFeature = (feature: any): string[] => {
+  const parts: string[] = [];
+  const fragment = getFeatureFragmentId(feature);
+  if (fragment) parts.push(`Фрагмент ${fragment}`);
+  const raw = String(feature?._sourceId ?? feature?.id ?? '');
+  const dot = raw.indexOf('.');
+  const tableName = dot > 0 ? raw.slice(0, dot) : '';
+  const id = toPositiveId(dot > 0 ? raw.slice(dot + 1) : raw);
+  const kind = tableName ? null : getNetworkFeatureKind(feature);
+  if (kind === 'line') {
+    const lineId = getExplicitLineId(feature?.properties) ?? id;
+    if (lineId) parts.push(`участок ${lineId}`);
+  } else if (kind === 'node' && id) {
+    parts.push(`узел ${id}`);
+  } else {
+    if (tableName) parts.push(`Таблица: ${tableName}`);
+    if (id) parts.push(`ID: ${id}`);
+  }
+  return parts;
+};

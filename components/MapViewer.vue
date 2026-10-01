@@ -520,7 +520,9 @@ import { useJournalContourLayer } from '~/composables/useJournalContourLayer';
 import { useOverlayLayer } from '~/composables/useOverlayLayer';
 import { useLocateMarkers } from '~/composables/useLocateMarkers';
 import type { LocatePoint } from '~/composables/useLocateMarkers';
-import { getFeatureId, getFeatureKind } from '~/utils/networkFeature';
+import { getFeatureId, getFeatureKind, pickNetworkFeature } from '~/utils/networkFeature';
+import type { PickCandidate } from '~/utils/networkFeature';
+import { useFragmentStore } from '~/stores/fragmentStore';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
 import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 
@@ -534,6 +536,7 @@ defineEmits<{ (e: 'retry-layers'): void }>();
 const mapStore = useMapStore();
 const popupStore = usePopupStore();
 const layerStore = useLayerStore();
+const fragmentStore = useFragmentStore();
 const cesiumStore = useCesiumStore();
 const uiStore = useUiStore();
 /** Панель инструментов остаётся смонтированной после первого открытия (сохраняет поиск/скролл) */
@@ -1004,6 +1007,8 @@ const onUpdateHydraulicThematicSettings = (payload: {
 // направления в десктопе: путь строится через все выбранные точки по порядку.
 const isTraceMode = ref(false);
 const traceNodes = ref<number[]>([]);
+/** Фрагменты узлов маршрута (параллельно traceNodes; null — неизвестен): следующий узел ищется в том же */
+let traceNodeFragments: Array<number | null> = [];
 const piezometerModalOpen = ref(false);
 /** Модал с ECharts монтируется лениво — только после первого открытия */
 const piezometerActivated = ref(false);
@@ -1116,10 +1121,12 @@ const addRouteLayers = (
 
 const undoTraceNode = () => {
   traceNodes.value = traceNodes.value.slice(0, -1);
+  traceNodeFragments = traceNodeFragments.slice(0, traceNodes.value.length);
 };
 
 const clearTrace = () => {
   traceNodes.value = [];
+  traceNodeFragments = [];
   piezometerCalc2.value = null;
   clearRouteHighlight();
 };
@@ -1153,6 +1160,7 @@ const onPiezometerDirectionLoad = (nodes: number[]) => {
   clearTrace();
   if (!isTraceMode.value) toggleTraceMode();
   traceNodes.value = [...nodes];
+  traceNodeFragments = nodes.map(() => null);
   buildPiezometerRoute();
 };
 
@@ -1162,27 +1170,43 @@ const onPiezometerNodeHover = (nodeId: number) => {
   mapStore.map.flyTo({ center: [node.lng, node.lat], zoom: 18, duration: 600, essential: true });
 };
 
-const onMapClickForTrace = (e: any) => {
+/** Меню «Выберите объект» для инструментов: несколько объектов сети под курсором (QA F53) */
+const chooseNetworkCandidate = async (
+  candidates: PickCandidate[],
+  point: { x: number; y: number }
+): Promise<PickCandidate | null> => {
+  const index = await mapStore.chooseFeature(candidates.map((c) => c.feature), point);
+  return index === null ? null : candidates[index] ?? null;
+};
+
+const onMapClickForTrace = async (e: any) => {
   if (!isTraceMode.value) return;
-  const features = mapStore.map?.queryRenderedFeatures(e.point);
-  const nodeFeature = features?.find((feature: any) => getFeatureKind(feature) === 'node');
-  if (!nodeFeature || !nodeFeature.properties) {
+  // Узлы фрагментов лежат друг на друге: берём узел фрагмента предыдущей точки маршрута,
+  // иначе активного фрагмента; несколько — меню выбора (QA F28)
+  const prevFragment = traceNodeFragments[traceNodeFragments.length - 1] ?? null;
+  const res = pickNetworkFeature(mapStore.map?.queryRenderedFeatures(e.point), {
+    kind: 'node',
+    fragmentIds: prevFragment ? [prevFragment] : fragmentStore.activeFragmentIds,
+  });
+  if (res.status === 'none') {
     useNotificationStore().showWarning('Кликните точнее по узлу сети.');
     return;
   }
-  const id = nodeFeature.properties.id || nodeFeature.properties.Id || nodeFeature.id;
-  if (!id) return;
-  const nodeId = Number(id);
+  const node = res.status === 'single' ? res.candidate : await chooseNetworkCandidate(res.candidates, e.point);
+  if (!node || !isTraceMode.value) return;
+  const nodeId = node.id;
   // Не добавляем тот же узел дважды подряд
   if (traceNodes.value[traceNodes.value.length - 1] === nodeId) return;
   traceNodes.value = [...traceNodes.value, nodeId];
+  traceNodeFragments = [...traceNodeFragments, node.fragmentId];
 
-  // Маркер выбранной точки
+  // Маркер выбранной точки — на узле, а не в точке клика
   if (mapStore.map) {
+    const coords = node.feature?.geometry?.type === 'Point' ? node.feature.geometry.coordinates : null;
     const marker = new maplibregl.Marker({
       color: traceNodes.value.length === 1 ? '#2e7d32' : '#1976d2',
     })
-      .setLngLat(e.lngLat)
+      .setLngLat(Array.isArray(coords) ? [Number(coords[0]), Number(coords[1])] : e.lngLat)
       .addTo(mapStore.map);
     traceNodeMarkers.push(marker);
   }
@@ -1198,6 +1222,8 @@ const topologyEditor = useTopologyEditor({
   refreshLayers: () => layerStore.refreshVisibleDataLayers(),
   getSelectedFeature: () => mapStore.potentialFeatures?.[0],
   closeCard: () => attributePanelRef.value?.close(),
+  getActiveFragmentIds: () => fragmentStore.activeFragmentIds,
+  chooseCandidate: chooseNetworkCandidate,
 });
 const {
   isEditTopologyMode,

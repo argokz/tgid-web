@@ -10,7 +10,8 @@ import type {
 } from '~/services/fastApiService';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { useLineVertexEditor } from '~/composables/useLineVertexEditor';
-import { getFeatureId, getFeatureKind } from '~/utils/networkFeature';
+import { pickNetworkFeature } from '~/utils/networkFeature';
+import type { PickCandidate, PickOptions } from '~/utils/networkFeature';
 import { pickNetworkSnap } from '~/utils/networkSnap';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
 
@@ -29,6 +30,13 @@ export interface TopologyEditorOptions {
   getSelectedFeature: () => { layerId?: string; layerName?: string } | undefined | null;
   /** Закрыть карточку объекта */
   closeCard: () => void;
+  /** Фрагменты текущей работы (выбранный/видимые); пусто — показаны все, контекста нет */
+  getActiveFragmentIds?: () => readonly number[];
+  /**
+   * Меню выбора, когда под курсором несколько подходящих объектов (копии в разных фрагментах);
+   * null — пользователь отказался. Без него неоднозначный клик отклоняется.
+   */
+  chooseCandidate?: (candidates: PickCandidate[], point: { x: number; y: number }) => Promise<PickCandidate | null>;
 }
 
 /**
@@ -39,6 +47,7 @@ export interface TopologyEditorOptions {
  */
 export function useTopologyEditor(options: TopologyEditorOptions) {
   const { getMap, enabled, isTraceMode, isDrawActive, setIdentifyMode, refreshLayers, getSelectedFeature, closeCard } = options;
+  const activeFragments = (): readonly number[] => options.getActiveFragmentIds?.() ?? [];
 
   // === Состояние режима ===
   const isEditTopologyMode = ref(false);
@@ -47,10 +56,14 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     if (!on) isEditTopologyMode.value = false;
   });
   const topologyStartNode = ref<number | null>(null);
+  // Фрагмент начального узла: второй узел участка ищется в нём же (QA F53)
+  let topologyStartNodeFragment: number | null = null;
   // Версия начального узла нового участка — запрашивается при его выборе
   let topologyStartNodeVersion: Promise<string | undefined> | null = null;
   let draggedNodeMarker: maplibregl.Marker | null = null;
   let draggedNodeId: number | null = null;
+  // Положение захваченного узла: маркер создаётся, только когда начался сдвиг (QA F52)
+  let draggedNodeCoords: [number, number] | null = null;
   // Версия перетаскиваемого узла, запрошенная в момент захвата (mousedown)
   let draggedNodeVersion: Promise<string | undefined> | null = null;
   let suppressTopologyClickUntil = 0;
@@ -62,6 +75,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   const isMergeMode = ref(false);
   const mergeTargetNodeId = ref<number | null>(null);
   const mergeSourceNodeId = ref<number | null>(null);
+  // Фрагмент целевого узла слияния: узел-источник ищется в нём же
+  let mergeTargetFragment: number | null = null;
   const mergeConfirmDialogOpen = ref(false);
   const mergeLoading = ref(false);
   const mergePreviewReport = ref<MergeNodesReport | null>(null);
@@ -313,15 +328,43 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       useNotificationStore().showSuccess('Режим редактирования сети включен. Клик по пустому месту — создать узел. Перетаскивание узла — переместить. Клик по двум узлам — создать участок.');
     } else {
       setIdentifyMode(true);
-      if (draggedNodeMarker) {
-        draggedNodeMarker.remove();
-        draggedNodeMarker = null;
-      }
-      draggedNodeId = null;
+      resetNodeDrag();
       isMergeMode.value = false;
       mergeTargetNodeId.value = null;
       mergeSourceNodeId.value = null;
     }
+  };
+
+  /**
+   * Объект сети под курсором (QA F53): единый выбор с учётом фрагмента. Один кандидат — он;
+   * несколько — меню выбора (chooseCandidate); только объекты чужих фрагментов — отказ.
+   * present — под курсором есть объекты этого вида (тогда клик не идёт дальше: ни разрезания,
+   * ни нового узла поверх существующего).
+   */
+  const pickUnderCursor = async (
+    e: any,
+    pick: PickOptions,
+  ): Promise<{ candidate: PickCandidate | null; present: boolean }> => {
+    const res = pickNetworkFeature(getMap()?.queryRenderedFeatures(e.point), pick);
+    if (res.status === 'single') return { candidate: res.candidate, present: true };
+    const what = pick.kind === 'node' ? 'узлов' : 'участков';
+    if (res.status === 'ambiguous') {
+      if (!options.chooseCandidate) {
+        useNotificationStore().showWarning(`Под курсором несколько ${what} — оставьте на карте один фрагмент.`);
+        return { candidate: null, present: true };
+      }
+      const chosen = await options.chooseCandidate(res.candidates, e.point);
+      // пока меню было открыто, режим могли выключить — выбор устарел
+      return { candidate: isEditTopologyMode.value ? chosen : null, present: true };
+    }
+    if (res.reason === 'other-fragment') {
+      const fragments = [...new Set(res.others.map((c) => c.fragmentId ?? '—'))].join(', ');
+      useNotificationStore().showWarning(
+        `Под курсором нет ${what} фрагмента ${(pick.fragmentIds || []).join(', ')} (есть только фрагмента ${fragments}) — операция не выполнена.`
+      );
+      return { candidate: null, present: true };
+    }
+    return { candidate: null, present: false };
   };
 
   const onMapMouseDownForTopology = (e: any) => {
@@ -333,34 +376,30 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     }
     // В режиме слияния узлы только выбираются кликом
     if (isMergeMode.value) return;
-    const features = getMap()?.queryRenderedFeatures(e.point);
-    const nodeFeature = features?.find((feature: any) => getFeatureKind(feature) === 'node');
-    
-    if (nodeFeature && nodeFeature.properties) {
-      const id = getFeatureId(nodeFeature);
-      if (!id) return;
-      
-      // Prevent default panning
-      e.preventDefault();
-      getMap()?.dragPan.disable();
-      
-      draggedNodeId = id;
-      draggedNodeVersion = fetchTopologyVersion('nodes', id);
-      dragStartPoint = { x: e.point.x, y: e.point.y };
-      dragMoved = false;
-      const pointCoordinates = nodeFeature.geometry?.type === 'Point'
-        ? nodeFeature.geometry.coordinates
-        : null;
-      const coords = Array.isArray(pointCoordinates)
-        ? { lng: Number(pointCoordinates[0]), lat: Number(pointCoordinates[1]) }
-        : e.lngLat;
-      
-      // Create marker
-      if (draggedNodeMarker) draggedNodeMarker.remove();
-      draggedNodeMarker = new maplibregl.Marker({ color: 'red' })
-        .setLngLat([coords.lng, coords.lat])
-        .addTo(getMap()!);
-    }
+    // Тянуть можно только однозначный узел активного фрагмента; копии в нескольких
+    // фрагментах — без перетаскивания (клик откроет меню выбора)
+    const res = pickNetworkFeature(getMap()?.queryRenderedFeatures(e.point), {
+      kind: 'node',
+      fragmentIds: activeFragments(),
+      strictFragment: true,
+    });
+    if (res.status !== 'single') return;
+    const { id, feature } = res.candidate;
+
+    // Prevent default panning
+    e.preventDefault();
+    getMap()?.dragPan.disable();
+
+    draggedNodeId = id;
+    draggedNodeVersion = fetchTopologyVersion('nodes', id);
+    dragStartPoint = { x: e.point.x, y: e.point.y };
+    dragMoved = false;
+    const pointCoordinates = feature.geometry?.type === 'Point' ? feature.geometry.coordinates : null;
+    draggedNodeCoords = Array.isArray(pointCoordinates)
+      ? [Number(pointCoordinates[0]), Number(pointCoordinates[1])]
+      : [e.lngLat.lng, e.lngLat.lat];
+    // Маркер не создаётся до начала сдвига: элемент под курсором между mousedown и mouseup
+    // (и его удаление на mouseup) съедал click, и узел не выбирался (QA F52)
   };
 
   /** Привязка в редакторе — только к объектам сети (utils/networkSnap), кроме самого узла */
@@ -382,141 +421,169 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       vertexEditor.onMouseMove(e);
       return;
     }
-    if (!draggedNodeMarker || draggedNodeId === null) return;
+    if (draggedNodeId === null) return;
     if (!dragMoved && dragStartPoint) {
       const dx = e.point.x - dragStartPoint.x;
       const dy = e.point.y - dragStartPoint.y;
       if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
       dragMoved = true;
     }
+    if (!draggedNodeMarker) {
+      const map = getMap();
+      if (!map) return;
+      draggedNodeMarker = new maplibregl.Marker({ color: 'red' })
+        .setLngLat(draggedNodeCoords ?? [e.lngLat.lng, e.lngLat.lat])
+        .addTo(map);
+    }
     draggedNodeMarker.setLngLat(snapToNetwork(e, draggedNodeId));
+  };
+
+  const resetNodeDrag = () => {
+    getMap()?.dragPan.enable();
+    draggedNodeMarker?.remove();
+    draggedNodeMarker = null;
+    draggedNodeId = null;
+    draggedNodeCoords = null;
+    draggedNodeVersion = null;
+    dragStartPoint = null;
+    dragMoved = false;
   };
 
   const onNodeDragEnd = async () => {
     if (vertexEditor.onMouseUp()) return;
-    if (!draggedNodeMarker || !draggedNodeId) return;
-    if (!dragMoved) {
-      // Сдвига не было: это клик — пусть его обработает onMapClickForTopology
-      getMap()?.dragPan.enable();
-      draggedNodeMarker.remove();
-      draggedNodeMarker = null;
-      draggedNodeId = null;
-      dragStartPoint = null;
+    if (draggedNodeId === null) return;
+    if (!dragMoved || !draggedNodeMarker) {
+      // Сдвига не было: это клик — его обработает onMapClickForTopology (выбор узла)
+      resetNodeDrag();
       return;
     }
-    
+
     const lngLat = draggedNodeMarker.getLngLat();
     const id = draggedNodeId;
-    
+    const versionPromise = draggedNodeVersion;
+
     try {
       useNotificationStore().showInfo('Сохранение новой позиции...');
-      const expectedVersion = draggedNodeVersion ? await draggedNodeVersion : undefined;
+      const expectedVersion = versionPromise ? await versionPromise : undefined;
       await fastApiService.moveNode(id, lngLat.lng, lngLat.lat, expectedVersion);
       useNotificationStore().showSuccess('Узел успешно перемещен');
       afterTopologyChange();
     } catch (err: any) {
       reportTopologyError(err, 'Ошибка перемещения узла');
     } finally {
-      getMap()?.dragPan.enable();
-      draggedNodeMarker.remove();
-      draggedNodeMarker = null;
-      draggedNodeId = null;
-      draggedNodeVersion = null;
-      dragStartPoint = null;
-      dragMoved = false;
+      resetNodeDrag();
       suppressTopologyClickUntil = Date.now() + 250;
     }
+  };
+
+  /** Клик по узлу: выбор для слияния или концов нового участка */
+  const onNodeClick = async (node: PickCandidate) => {
+    const id = node.id;
+    if (isMergeMode.value) {
+      if (!mergeTargetNodeId.value) {
+        mergeTargetNodeId.value = id;
+        mergeTargetFragment = node.fragmentId;
+        useNotificationStore().showInfo(`Целевой узел ${id} выбран. Теперь кликните узел, который будет слит в него.`);
+      } else {
+        if (mergeTargetNodeId.value === id) {
+          useNotificationStore().showWarning('Нельзя слить узел с самим собой.');
+          return;
+        }
+        mergeSourceNodeId.value = id;
+        await openMergePreview();
+      }
+      return;
+    }
+
+    // Line creation logic
+    if (!topologyStartNode.value) {
+      topologyStartNode.value = id;
+      topologyStartNodeFragment = node.fragmentId;
+      topologyStartNodeVersion = fetchTopologyVersion('nodes', id);
+      useNotificationStore().showSuccess(
+        `Узел ${id}${node.fragmentId ? ` (фрагмент ${node.fragmentId})` : ''} выбран. Кликните по другому узлу для создания участка.`
+      );
+      return;
+    }
+    if (topologyStartNode.value === id) {
+      topologyStartNode.value = null; // deselect
+      useNotificationStore().showInfo('Выбор узла отменен.');
+      return;
+    }
+    // Create line
+    const startId = topologyStartNode.value;
+    try {
+      const [startVersion, endVersion] = await Promise.all([
+        topologyStartNodeVersion ?? Promise.resolve(undefined),
+        fetchTopologyVersion('nodes', id),
+      ]);
+      const created = await fastApiService.createLine(startId, id, { nodeid1: startVersion, nodeid2: endVersion });
+      // Паспорт трубы (диаметр, конструктив) сервер берёт от смежного/ближайшего участка
+      const templateLine = created?.passport?.template_line_id;
+      const passportNote = templateLine
+        ? `; паспорт трубы скопирован с участка ${templateLine}`
+        : '; паспорт трубы по умолчанию — проверьте диаметр';
+      useNotificationStore().showSuccess(`Участок между ${startId} и ${id} создан${passportNote}`);
+      afterTopologyChange();
+    } catch (err: any) {
+      reportTopologyError(err, 'Ошибка создания участка');
+    } finally {
+      topologyStartNode.value = null;
+    }
+  };
+
+  /** Фрагмент, в котором ищется следующий узел: второй конец участка / источник слияния — как первый */
+  const nodeContextFragments = (): readonly number[] => {
+    const anchor = isMergeMode.value
+      ? (mergeTargetNodeId.value ? mergeTargetFragment : null)
+      : (topologyStartNode.value ? topologyStartNodeFragment : null);
+    return anchor ? [anchor] : activeFragments();
   };
 
   const onMapClickForTopology = async (e: any) => {
     if (!isEditTopologyMode.value || isDrawActive()) return;
     if (draggedNodeId !== null || Date.now() < suppressTopologyClickUntil) return;
-    
-    const features = getMap()?.queryRenderedFeatures(e.point);
-    const nodeFeature = features?.find((feature: any) => getFeatureKind(feature) === 'node');
-    const lineFeature = features?.find((feature: any) => getFeatureKind(feature) === 'line');
 
     // Режим вершин: клик по участку выбирает его для правки (пока правка не закрыта)
     if (isVertexMode.value) {
       if (vertexEditor.active.value) return;
-      const lineId = lineFeature ? getFeatureId(lineFeature) : null;
-      if (!lineId) {
-        useNotificationStore().showInfo('Кликните по участку сети.');
+      const { candidate, present } = await pickUnderCursor(e, {
+        kind: 'line',
+        fragmentIds: activeFragments(),
+        strictFragment: true,
+      });
+      if (!candidate) {
+        if (!present) useNotificationStore().showInfo('Кликните по участку сети.');
         return;
       }
       try {
-        await vertexEditor.load(lineId);
+        await vertexEditor.load(candidate.id);
       } catch (err: any) {
         reportTopologyError(err, 'Не удалось загрузить геометрию участка');
       }
       return;
     }
-    
-    if (nodeFeature && nodeFeature.properties) {
-      const id = getFeatureId(nodeFeature);
-      if (!id) return;
-      
-      if (isMergeMode.value) {
-        if (!mergeTargetNodeId.value) {
-          mergeTargetNodeId.value = id;
-          useNotificationStore().showInfo(`Целевой узел ${id} выбран. Теперь кликните узел, который будет слит в него.`);
-        } else {
-          if (mergeTargetNodeId.value === id) {
-            useNotificationStore().showWarning('Нельзя слить узел с самим собой.');
-            return;
-          }
-          mergeSourceNodeId.value = id;
-          await openMergePreview();
-        }
-        return;
-      }
-      
-      // Line creation logic
-      if (!topologyStartNode.value) {
-        topologyStartNode.value = id;
-        topologyStartNodeVersion = fetchTopologyVersion('nodes', id);
-        useNotificationStore().showSuccess(`Узел ${id} выбран. Кликните по другому узлу для создания участка.`);
-      } else {
-        if (topologyStartNode.value === id) {
-          topologyStartNode.value = null; // deselect
-          useNotificationStore().showInfo('Выбор узла отменен.');
-          return;
-        }
-        // Create line
-        try {
-          const [startVersion, endVersion] = await Promise.all([
-            topologyStartNodeVersion ?? Promise.resolve(undefined),
-            fetchTopologyVersion('nodes', id),
-          ]);
-          const created = await fastApiService.createLine(topologyStartNode.value, id, { nodeid1: startVersion, nodeid2: endVersion });
-          // Паспорт трубы (диаметр, конструктив) сервер берёт от смежного/ближайшего участка
-          const templateLine = created?.passport?.template_line_id;
-          const passportNote = templateLine
-            ? `; паспорт трубы скопирован с участка ${templateLine}`
-            : '; паспорт трубы по умолчанию — проверьте диаметр';
-          useNotificationStore().showSuccess(`Участок между ${topologyStartNode.value} и ${id} создан${passportNote}`);
-          afterTopologyChange();
-        } catch (err: any) {
-          reportTopologyError(err, 'Ошибка создания участка');
-        } finally {
-          topologyStartNode.value = null;
-        }
-      }
+
+    const node = await pickUnderCursor(e, { kind: 'node', fragmentIds: nodeContextFragments(), strictFragment: true });
+    if (node.candidate) {
+      await onNodeClick(node.candidate);
       return;
     }
+    // Под курсором узлы, но выбор не сделан (чужой фрагмент, отказ в меню) — ничего не делаем
+    if (node.present) return;
 
     if (isMergeMode.value) {
       useNotificationStore().showInfo('Режим слияния: кликните по узлу.');
       return;
     }
 
-    if (lineFeature && lineFeature.properties) {
-      const lineId = getFeatureId(lineFeature);
-      if (!lineId) return;
+    const line = await pickUnderCursor(e, { kind: 'line', fragmentIds: activeFragments(), strictFragment: true });
+    if (line.candidate) {
       // Сначала превью (dry-run): показываем, что перенесётся, до записи
-      await openSplitPreview(lineId, e.lngLat.lng, e.lngLat.lat);
+      await openSplitPreview(line.candidate.id, e.lngLat.lng, e.lngLat.lat);
       return;
     }
+    if (line.present) return;
 
     try {
       // Фрагмент, код и признак подачи/обратки сервер берёт у ближайшего узла сети —
