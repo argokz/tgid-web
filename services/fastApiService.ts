@@ -1314,6 +1314,8 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
         timeout: DEFAULT_TIMEOUT_MS,
         ...(options || {}),
         headers,
+        // ofetch сам повторяет GET на 5xx; мутации — никогда (ретраи только по maxAttempts выше)
+        ...(isMutation ? { retry: 0 } : {}),
       });
       markApiResponded();
       return result;
@@ -1375,10 +1377,17 @@ const mutationWithFallback = async <T>(
 ): Promise<T> => {
   try {
     return await request<T>(primaryPath, options);
-  } catch {
+  } catch (error) {
+    // Старый маршрут без /api/v1 — только если нового маршрута нет (404/405 без ответа сервера).
+    // Ответ 4xx/5xx сервера не повторяется: повтор POST мог бы задвоить запись (QA F44).
+    if (!isMissingRoute(error)) throw error;
     return request<T>(fallbackPath, options);
   }
 };
+
+/** Маршрута нет на сервере (старый API): 404 без detail сервера или 405 */
+const isMissingRoute = (error: unknown): boolean =>
+  error instanceof ApiError && (error.status === 405 || (error.status === 404 && !error.hasServerDetail && !error.data));
 
 /** Виды фоновых файлов API (database/file_jobs.py) */
 export type FileJobKind =

@@ -1053,3 +1053,48 @@ describe('fastApiService topology diagnostics and API health banner (QA F35, F76
     expect(apiHealth.lastError).toBe('')
   })
 })
+
+describe('fastApiService: мутации не повторяются (QA F44)', () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('$fetch', fetchMock)
+    vi.stubGlobal('useRuntimeConfig', () => ({
+      public: { mapApiBaseUrl: 'https://api.example.test/' }
+    }))
+  })
+
+  it.each([
+    [400, { detail: 'No fields provided' }],
+    [422, { detail: { code: 'bad_value', message: 'ожидается дата' } }],
+    [500, { detail: 'Ошибка при создании' }],
+  ])('create на %s — один запрос, без повтора на старый маршрут', async (statusCode, data) => {
+    fetchMock.mockRejectedValue({ statusCode, data })
+    await expect(fastApiService.createObject('indikator_korrozii', {})).rejects.toBeInstanceOf(ApiError)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.example.test/api/v1/create/indikator_korrozii')
+    expect(fetchMock.mock.calls[0][1]).toEqual(expect.objectContaining({ method: 'POST', retry: 0 }))
+  })
+
+  it('старый маршрут — только если нового нет (404 без detail сервера)', async () => {
+    fetchMock.mockRejectedValueOnce({ statusCode: 404, data: { detail: 'Not Found' } })
+    fetchMock.mockResolvedValueOnce({ success: true, id: 5 })
+    await expect(fastApiService.updateObjectAttributes('indikator_korrozii', 5, { primechanie: 'x' })).resolves.toEqual({ success: true, id: 5 })
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      'https://api.example.test/api/v1/update/indikator_korrozii/5',
+      'https://api.example.test/update/indikator_korrozii/5',
+    ])
+  })
+
+  it('GET по-прежнему повторяется на 5xx', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockRejectedValueOnce({ statusCode: 503 })
+    fetchMock.mockResolvedValueOnce({ items: [], total: 0, page: 1, page_size: 50, pages: 0 })
+    const pending = fastApiService.getCorrosionIndicators({})
+    await vi.runAllTimersAsync()
+    await pending
+    vi.useRealTimers()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
