@@ -101,12 +101,12 @@
             </v-btn>
 
             <v-btn
-              v-if="propsData.id && isLineObject"
+              v-if="cardLineId && isLineObject"
               icon
               variant="text"
               size="small"
               color="error"
-              @click="emit('open-outage-simulation', { lineId: Number(propsData.id) })"
+              @click="emit('open-outage-simulation', { lineId: cardLineId })"
             >
               <v-icon size="18">mdi-valve-closed</v-icon>
               <v-tooltip
@@ -117,7 +117,7 @@
 
             <!-- Разворот меняет топологию: только в режиме редактирования сети -->
             <v-btn
-              v-if="propsData.id && isLineObject && isEditTopologyMode"
+              v-if="cardLineId && isLineObject && isEditTopologyMode"
               icon
               variant="text"
               size="small"
@@ -617,7 +617,8 @@
 
               color="error"
 
-              @click="$emit('delete-feature', propsData.id, cardVersion)"
+              :disabled="!cardObjectId"
+              @click="$emit('delete-feature', cardObjectId!, cardVersion, { kind: cardObjectKind!, expectedSectionId: cardSectionId })"
             >
 
               <v-icon size="18">mdi-delete</v-icon>
@@ -1108,6 +1109,7 @@ import { useMobile } from '~/composables/useMobile'
 import { useAttributeTabs, type TabData } from '~/composables/useAttributeTabs'
 
 import { ApiError, fastApiService, type ReverseLineReport } from '~/services/fastApiService'
+import { getCardLineId, getSectionRowId } from '~/utils/networkFeature'
 import { useAuthStore } from '~/stores/authStore'
 import { useNotificationStore } from '~/stores/notificationStore'
 
@@ -1125,7 +1127,7 @@ const componentProps = withDefaults(defineProps<{
 
 const emit = defineEmits<{
 
-  'delete-feature': [featureId: string | number, version?: string]
+  'delete-feature': [featureId: string | number, version?: string, meta?: { kind: 'line' | 'node'; expectedSectionId?: number | null }]
   'open-audit-history': [scope: { table: string; recordId: number }]
 
   'open-defect-journal': [scope: { lineId?: number; nodeId?: number; defectId?: number }]
@@ -1218,13 +1220,13 @@ const isNodeObject = computed(() => {
 const cardVersion = ref<string | undefined>(undefined)
 const loadCardVersion = async () => {
   cardVersion.value = undefined
-  const id = Number(propsData.value.id)
-  if (!isEditTopologyMode.value || !Number.isFinite(id)) return
-  const kind = isLineObject.value ? 'lines' : isNodeObject.value ? 'nodes' : null
+  const id = cardObjectId.value
+  if (!isEditTopologyMode.value || !id) return
+  const kind = cardObjectKind.value === 'line' ? 'lines' : cardObjectKind.value === 'node' ? 'nodes' : null
   if (!kind) return
   try {
     const res = await fastApiService.getTopologyVersions({ [kind]: [id] })
-    if (Number(propsData.value.id) === id) cardVersion.value = res[kind]?.[String(id)]?.version
+    if (cardObjectId.value === id) cardVersion.value = res[kind]?.[String(id)]?.version
   } catch {
     // без версии сервер не проверяет конфликт — операция всё равно идёт под FOR UPDATE
   }
@@ -1237,10 +1239,29 @@ const isLineObject = computed(() => {
   if (table) return table === 'linesobj'
   return 'externalsignlineid' in p || ('nodeid1' in p && 'nodeid2' in p)
 })
+
+// id участка — linesobj.id (не heatpipesections.id из query-слоя GeoServer, QA F12/F54);
+// null — участок не определён, действия по нему недоступны
+const cardLineId = computed<number | null>(() => (isLineObject.value ? getCardLineId(propsData.value) : null))
+// heatpipesections.id карточки: сервер сверяет его с участком перед удалением/разворотом
+const cardSectionId = computed<number | null>(() => getSectionRowId(propsData.value))
+// Вид объекта для удаления из карточки: участок или узел (потребитель/источник/насосная — узел)
+const cardObjectKind = computed<'line' | 'node' | null>(() => {
+  if (isLineObject.value) return 'line'
+  const queryTable = String(propsData.value.query_table || '').toLowerCase()
+  if (isNodeObject.value || ['generalizedconsumers', 'realconsumers', 'heatsources', 'pumpstations'].includes(queryTable)) return 'node'
+  return null
+})
+const cardObjectId = computed<number | null>(() => {
+  if (cardObjectKind.value === 'line') return cardLineId.value
+  if (cardObjectKind.value !== 'node') return null
+  const id = Number(propsData.value.id)
+  return Number.isInteger(id) && id > 0 ? id : null
+})
 /** «История»: записи audit_log этой таблицы и этого id (триггеры пишут table_name в lower case) */
 const authStore = useAuthStore()
 const historyTarget = computed<{ table: string; recordId: number } | null>(() => {
-  const recordId = Number(propsData.value.id)
+  const recordId = isLineObject.value ? Number(cardLineId.value) : Number(propsData.value.id)
   if (!Number.isInteger(recordId) || recordId <= 0) return null
   const table = String(propsData.value.gistable || '').toLowerCase() || (isLineObject.value ? 'linesobj' : '')
   return table ? { table, recordId } : null
@@ -1824,11 +1845,11 @@ const saveBlob = (blob: Blob, filename: string) => {
 
 const downloadPassport = async () => {
 
-  const table = String(propsData.value.gistable || '')
+  const table = String(propsData.value.gistable || '') || (isLineObject.value ? 'linesobj' : '')
 
-  const id = Number(propsData.value.id)
+  const id = isLineObject.value ? Number(cardLineId.value) : Number(propsData.value.id)
 
-  if (!table || !Number.isFinite(id)) return
+  if (!table || !Number.isFinite(id) || id <= 0) return
 
   try {
 
@@ -1857,18 +1878,20 @@ const reversePreviewLoading = ref(false)
 const reversePreviewError = ref<string | null>(null)
 const reversePreviewReport = ref<ReverseLineReport | null>(null)
 const reversePreviewLineId = ref<number | null>(null)
+const reversePreviewSectionId = ref<number | null>(null)
 
 /** Превью разворота: узлы, геометрия, оборудование; версия — та, что видела карточка */
 const reverseLineDirection = async () => {
-  const lineId = Number(propsData.value.id)
-  if (!Number.isFinite(lineId)) return
+  const lineId = cardLineId.value
+  if (!lineId) return
   reversePreviewLineId.value = lineId
+  reversePreviewSectionId.value = cardSectionId.value
   reversePreviewReport.value = null
   reversePreviewError.value = null
   reversePreviewLoading.value = true
   reversePreviewOpen.value = true
   try {
-    reversePreviewReport.value = await fastApiService.previewReverseLine(lineId)
+    reversePreviewReport.value = await fastApiService.previewReverseLine(lineId, reversePreviewSectionId.value)
   } catch (error: any) {
     reversePreviewError.value = error?.userMessage || error?.message || 'Не удалось получить превью'
   } finally {
@@ -1890,6 +1913,7 @@ const confirmReverse = async ({ acceptDirectionChange, includePair }: { acceptDi
       includePair,
       pairLineId: pairId,
       pairVersion: pairId ? reversePreviewReport.value?.versions?.[`line:${pairId}`] : undefined,
+      expectedSectionId: reversePreviewSectionId.value,
     })
     propsData.value = { ...propsData.value, nodeid1: res.nodeid1, nodeid2: res.nodeid2 }
     cardVersion.value = res.versions?.[`line:${lineId}`]

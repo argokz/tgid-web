@@ -536,21 +536,36 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     vertexEditor.onContextMenu(e);
   };
 
-  /** Удаление из карточки: version — версия объекта, запомненная при открытии карточки */
-  const onDeleteFeature = async (featureId: string | number, version?: string) => {
-    if (!confirm('Вы уверены, что хотите удалить объект?')) return;
-    try {
+  /**
+   * Удаление из карточки: version — версия объекта, запомненная при открытии карточки;
+   * meta.kind — вид объекта по карточке (участок/узел), meta.expectedSectionId —
+   * heatpipesections.id карточки участка: сервер сверит его с участком (QA F54).
+   */
+  const onDeleteFeature = async (
+    featureId: string | number,
+    version?: string,
+    meta?: { kind: 'line' | 'node'; expectedSectionId?: number | null }
+  ) => {
+    const id = Number(featureId);
+    if (!Number.isInteger(id) || id <= 0) {
+      useNotificationStore().showWarning('Не удалось определить id объекта — удаление отменено.');
+      return;
+    }
+    let kind = meta?.kind;
+    if (!kind) {
       const selected = getSelectedFeature();
       if (!selected) return;
-      
-      // We try to figure out if it's a node or line based on layer
-      const isNode = selected.layerId?.includes('node') || selected.layerName?.includes('node');
-      
-      if (isNode) {
-        await fastApiService.deleteNode(Number(featureId), version);
+      // старый вызов без вида объекта: по имени слоя
+      kind = selected.layerId?.includes('node') || selected.layerName?.includes('node') ? 'node' : 'line';
+    }
+    const what = kind === 'node' ? `узел ${id}` : `участок ${id}`;
+    if (!confirm(`Вы уверены, что хотите удалить ${what}?`)) return;
+    try {
+      if (kind === 'node') {
+        await fastApiService.deleteNode(id, version);
         useNotificationStore().showSuccess('Узел и прилегающие участки удалены');
       } else {
-        await fastApiService.deleteLine(Number(featureId), version);
+        await fastApiService.deleteLine(id, version, meta?.expectedSectionId);
         useNotificationStore().showSuccess('Участок удален');
       }
       closeCard();

@@ -511,6 +511,16 @@ export interface TopologyVersionsResponse {
   lines: Record<string, TopologyObjectVersion>;
 }
 
+/** Участок (linesobj.id) и его паспорт трубы (heatpipesections.id) — GET /topology/line-ref */
+export interface LineRef {
+  line_id: number;
+  section_id: number | null;
+  fileid: number | null;
+  nodeid1: number | null;
+  nodeid2: number | null;
+  removed: boolean;
+}
+
 /** Превью/результат слияния узлов (dry-run → подтверждение) */
 export interface MergeNodesReport {
   dry_run?: boolean;
@@ -1630,10 +1640,22 @@ export const fastApiService = {
     });
   },
 
-  async deleteLine(lineId: number, expectedVersion?: string): Promise<any> {
+  /**
+   * Удаление участка. expectedSectionId — heatpipesections.id из карточки: сервер сверит,
+   * что это паспорт именно этого участка (иначе 409 object_mismatch, QA F54).
+   */
+  async deleteLine(lineId: number, expectedVersion?: string, expectedSectionId?: number | null): Promise<any> {
+    const query = compact({ expected_version: expectedVersion, expected_section_id: expectedSectionId ?? undefined });
     return request(`api/topology/line/${encodePath(lineId)}`, {
       method: 'DELETE',
-      ...(expectedVersion ? { query: { expected_version: expectedVersion } } : {}),
+      ...(Object.keys(query).length ? { query } : {}),
+    });
+  },
+
+  /** Ссылка участок ↔ паспорт: по linesobj.id (lineId) или heatpipesections.id (sectionId) */
+  async resolveLineRef(ref: { lineId?: number; sectionId?: number }): Promise<LineRef> {
+    return request<LineRef>('api/v1/topology/line-ref', {
+      query: compact({ line_id: ref.lineId, section_id: ref.sectionId }),
     });
   },
 
@@ -2704,10 +2726,10 @@ export const fastApiService = {
   },
 
   /** Превью разворота участка: узлы, геометрия, оборудование по классам, версия участка */
-  async previewReverseLine(lineId: number): Promise<ReverseLineReport> {
+  async previewReverseLine(lineId: number, expectedSectionId?: number | null): Promise<ReverseLineReport> {
     return request<ReverseLineReport>('api/topology/reverse-line', {
       method: 'POST',
-      body: { line_id: lineId, dry_run: true },
+      body: compact({ line_id: lineId, dry_run: true, expected_section_id: expectedSectionId ?? undefined }),
     });
   },
 
@@ -2724,6 +2746,8 @@ export const fastApiService = {
       pairLineId?: number | null;
       pairVersion?: string;
       includePair?: boolean;
+      /** heatpipesections.id карточки — сервер сверит участок и паспорт (409 object_mismatch) */
+      expectedSectionId?: number | null;
     } = {}
   ): Promise<ReverseLineReport> {
     return request('api/topology/reverse-line', {
@@ -2735,6 +2759,7 @@ export const fastApiService = {
         pair_line_id: options.pairLineId ?? undefined,
         pair_version: options.pairVersion,
         include_pair: options.includePair === false ? false : undefined,
+        expected_section_id: options.expectedSectionId ?? undefined,
       }),
     });
   },

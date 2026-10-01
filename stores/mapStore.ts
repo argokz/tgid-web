@@ -16,6 +16,7 @@ import { useLabelStore, TECHNICAL_LABELS } from '~/stores/labelStore';
 import { usePopupStore } from '~/stores/popupStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { escapeHtml } from '~/utils/escapeHtml';
+import { QUERY_LAYER_KEY_TABLE, mergeQueryLayerProperties } from '~/utils/networkFeature';
 import {
   getMapTilerGlyphsUrl,
   getMapTilerHybridTilesUrl,
@@ -944,6 +945,9 @@ export const useMapStore = defineStore('map', {
         // 2. Prefix of the feature ID (e.g. "heatpipesections" from "heatpipesections.13587")
         // 3. sourceLayer / layer-id keyword analysis (MVT fallback)
         let table = '';
+        // FID/слой query-слоя id_<table>: число — id строки этой таблицы, а не ключ объекта сети
+        let idFromQueryLayer = /^id_/i.test(String(rawSourceId ?? ''))
+          || /(^|:)id_/i.test(String(normalizedFeature.sourceLayer ?? ''));
 
         if (properties.tab && typeof properties.tab === 'string') {
           // Priority 1: server tells us the exact WFS layer name
@@ -955,7 +959,10 @@ export const useMapStore = defineStore('map', {
           if (idPrefixMatch) {
             table = idPrefixMatch[1].toLowerCase();
             // Ответ мог прийти из query-слоя id_* — таблица без префикса
-            if (table.startsWith('id_')) table = table.slice(3);
+            if (table.startsWith('id_')) {
+              table = table.slice(3);
+              idFromQueryLayer = true;
+            }
           } else {
             // Priority 3: sourceLayer keyword analysis (MVT tiles)
             const sourceLayer = String(
@@ -979,11 +986,33 @@ export const useMapStore = defineStore('map', {
 
         if (import.meta.dev) console.debug('[Select] table resolved:', table, '| sourceId:', rawSourceId, '| tab prop:', properties.tab);
 
+        // Ключ поиска query-слоя — id объекта сети (участок — linesobj.id, узел — nodes.id).
+        // Если на руках только id строки query-слоя (heatpipesections.id), переводим его
+        // в linesobj.id через API; иначе — не угадываем (QA F12, F54).
+        let lookupId: number | null = wfsId !== null && Number.isInteger(wfsId) && wfsId > 0 ? wfsId : null;
+        if (lookupId !== null && idFromQueryLayer && QUERY_LAYER_KEY_TABLE[table]) {
+          const rowId = lookupId;
+          lookupId = null;
+          if (table === 'heatpipesections') {
+            try {
+              lookupId = (await fastApiService.resolveLineRef({ sectionId: rowId }))?.line_id ?? null;
+            } catch (err) {
+              console.warn('[Select] heatpipesections.id → linesobj.id не разрешён', rowId, err);
+            }
+          }
+          if (lookupId !== null) {
+            properties = mergeQueryLayerProperties(properties, { id: rowId }, table, lookupId);
+          } else {
+            // карточка без id: действия по объекту недоступны, чужой объект не затронут
+            properties = { ...properties, id: null, query_table: table, query_row_id: rowId };
+          }
+        }
+
         // Fetch full payload via WFS if possible
-        if (table && wfsId !== null && !isNaN(wfsId) && wfsId > 0) {
-          const wfsData = await getFeatureById(table, wfsId);
+        if (table && lookupId !== null) {
+          const wfsData = await getFeatureById(table, lookupId);
           if (wfsData && wfsData.properties) {
-            properties = { ...properties, ...wfsData.properties };
+            properties = mergeQueryLayerProperties(properties, wfsData.properties, table, lookupId);
             if (import.meta.dev) console.debug('[Select] Augmented selection via WFS table:', table, 'id:', wfsId);
           }
         }

@@ -78,3 +78,38 @@ left join externalcodes ec2 on ec2.id=n2.externalcodeid
 `itwin-api/itwin-api/sql/fixes/20260927_nodes_without_externalcode.sql` (сначала выборка;
 на 27.09 — пусто) и миграцию журнала отмены
 `itwin-api/itwin-api/sql/migrations/20260927_topology_undo_log.sql`.
+
+## Шаг 4 (рекомендуется). Query-слой участков отдаёт `lineid` (QA F12, F54)
+
+Карточку объекта web дополняет свойствами query-слоя `id_<table>` (WFS, `viewparams=id:<ключ>`).
+У `AlmatyGIS:id_heatpipesections` ключ — участок (`WHERE L.id=%id%`, linesobj.id), а в `id`
+возвращается паспорт трубы `T.id` (heatpipesections.id; на проде ≠ lineid у 98 019 строк,
+20 435 таких id совпадают с другими живыми участками). Раньше этот `id` затирал id участка
+в карточке: «Анализ отключения» отвечал 400, «История» открывала чужой объект, а «Удалить»
+и «Развернуть» в режиме правки попали бы в **другую** трубу. Так же устроены
+`id_generalizedconsumers`, `id_realconsumers`, `id_heatsources`, `id_pumpstations`
+(`WHERE N.id=%id%`, в `id` — строка своей таблицы).
+
+**Web исправлен и без правки GeoServer** (`utils/networkFeature.ts`, `stores/mapStore.ts`):
+id карточки — ключ поиска (linesobj.id / nodes.id), id строки query-слоя хранится отдельно
+(`query_row_id`), участку проставляется `lineid`. Если на руках только heatpipesections.id
+(например, FID `id_heatpipesections.*`), он переводится в linesobj.id через
+`GET /api/v1/topology/line-ref?section_id=…`; не удалось — у карточки нет id, действия недоступны.
+Удаление и разворот из карточки передают `expected_section_id` (heatpipesections.id карточки):
+сервер сверяет его с паспортом участка и при расхождении отвечает 409 `object_mismatch`.
+
+Чтобы свойства слоя были однозначны и для других клиентов (QGIS, старые страницы),
+в SQL view `id_heatpipesections` во внутренний `SELECT` добавить ключ участка
+(остальной текст без изменений; `T.id` оставить — это паспорт трубы):
+
+```sql
+-- было
+SELECT
+T.id, ST_Transform(L.shape, 4326) as shape,
+-- стало
+SELECT
+T.id, L.id AS lineid, ST_Transform(L.shape, 4326) as shape,
+```
+
+Аналогично в `id_generalizedconsumers`, `id_realconsumers`, `id_heatsources`,
+`id_pumpstations`: `T.id, N.id AS nodeid, …`. Web берёт явный `lineid` в приоритете.
