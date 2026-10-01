@@ -185,7 +185,7 @@
             </p>
             <table class="nq-table">
               <thead>
-                <tr><th>Показатель, Гкал/ч</th><th>Задано</th><th>Получено</th></tr>
+                <tr><th>Параметры</th><th>Общие</th></tr>
               </thead>
               <tbody>
                 <tr
@@ -193,8 +193,7 @@
                   :key="row.key"
                 >
                   <td>{{ row.label }}</td>
-                  <td>{{ formatNum(row.given) }}</td>
-                  <td>{{ formatNum(row.received) }}</td>
+                  <td>{{ formatNum(row.value) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -241,6 +240,7 @@ import { computed, ref } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { fastApiService } from '~/services/fastApiService'
 import { useFragmentStore } from '~/stores/fragmentStore'
+import { heatConsumptionRows } from '~/utils/heatConsumption'
 
 const emit = defineEmits<{ (e: 'locate', point: { lat: number; lng: number }): void }>()
 const { isMobile } = useMobile()
@@ -270,20 +270,8 @@ const formatNum = (v: number | null | undefined) =>
     ? '—'
     : new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 3 }).format(Number(v))
 
-// Итоги теплопотребления: n_* — заданная нагрузка, q_* — полученная по расчёту (desktop ITOG)
-const HEAT_ROWS = [
-  { key: 'otz', label: 'Отопление, зависимые системы' },
-  { key: 'otn', label: 'Отопление, независимые системы' },
-  { key: 'vn', label: 'Вентиляция' },
-  { key: 'gvop', label: 'ГВС открытое из подачи' },
-  { key: 'gvoo', label: 'ГВС открытое из обратки' },
-  { key: 'rez', label: 'Рециркуляция открытого ГВС' },
-  { key: 'gvz', label: 'ГВС закрытое' },
-]
-const heatRows = computed(() => {
-  const totals = result.value?.totals || {}
-  return HEAT_ROWS.map((r) => ({ ...r, given: totals[`n_${r.key}`], received: totals[`q_${r.key}`] }))
-})
+// Итоги теплопотребления (desktop TeplopotrBox): n_* — полученная нагрузка, Гкал/ч; q_* — расход, т/ч
+const heatRows = computed(() => heatConsumptionRows(result.value?.totals))
 
 type QueryKind =
   | 'volume' | 'length' | 'diameter' | 'laying' | 'heat' | 'heat-closed' | 'heat-open' | 'closed-consumers'
