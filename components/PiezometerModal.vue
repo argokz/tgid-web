@@ -73,7 +73,7 @@
               :active="c.id === calculationId2"
               :disabled="c.id === calculationId"
               :title="`№${c.id} ${c.name || ''}`"
-              :subtitle="[c.calculated_at, c.user_gid].filter(Boolean).join(' · ')"
+              :subtitle="[formatCalcDate(c.calculated_at), c.user_gid].filter(Boolean).join(' · ')"
               @click="emit('double', c.id)"
             />
             <v-list-item
@@ -322,7 +322,7 @@
                           @click="$emit('node-hover', row.node2_id)"
                         >
                           <td>{{ row.index }}</td>
-                          <td>{{ row.node1_label }} → {{ row.node2_label }}</td>
+                          <td>{{ nodeLabel(row.node1_id, row.node1_label) }} → {{ nodeLabel(row.node2_id, row.node2_label) }}</td>
                           <td class="text-right">{{ fmt(row.supply?.length_m ?? row.return?.length_m) }}</td>
                           <td class="text-right">{{ fmt(row.supply?.q) }}</td>
                           <td class="text-right">{{ fmt(row.supply?.time_min) }}</td>
@@ -410,6 +410,18 @@ const isDouble = computed(() => !!props.calculationId2);
 // Двойной пьезометр: как CPjezo::onDouble — последние 10 расчётов фрагмента
 const calcList = ref<CalculationListItem[]>([]);
 const calcListLoading = ref(false);
+/** Дата расчёта в меню двойного пьезометра: ru-формат вместо ISO (QA F29) */
+const formatCalcDate = (value?: string | null): string =>
+  (value ? new Date(value).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : '');
+
+/** Подписи узлов «Времени прохождения» — те же, что на графике (имя узла, а не тип «М2») (QA F29) */
+const pathLabels = computed(() => {
+  const m = new Map<number, string>();
+  for (const d of props.pathData || []) if (d.label) m.set(Number(d.node_id), String(d.label));
+  return m;
+});
+const nodeLabel = (id: number, fallback: string): string => pathLabels.value.get(Number(id)) || fallback;
+
 const onDoubleMenu = async (open: boolean) => {
   if (!open || calcListLoading.value) return;
   const fileId = props.fragmentIds?.[0];
