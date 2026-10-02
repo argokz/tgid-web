@@ -1,4 +1,5 @@
 import { formatApiError, formatApiErrorWith } from '~/utils/apiError';
+import { confirmAction } from '~/composables/useConfirm';
 import maplibregl from 'maplibre-gl';
 import { getCurrentInstance, onBeforeUnmount, ref, watch } from 'vue';
 import type { Ref } from 'vue';
@@ -158,8 +159,11 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     onError: (err, reload) => reportTopologyError(err, 'Ошибка сохранения геометрии', reload),
   });
 
-  const toggleVertexMode = () => {
-    if (isVertexMode.value && vertexEditor.dirty.value && !confirm('Отказаться от несохранённых изменений вершин?')) return;
+  const confirmDiscardVertices = () =>
+    confirmAction({ text: 'Отказаться от несохранённых изменений вершин?', action: 'Отказаться' });
+
+  const toggleVertexMode = async () => {
+    if (isVertexMode.value && vertexEditor.dirty.value && !(await confirmDiscardVertices())) return;
     isVertexMode.value = !isVertexMode.value;
     vertexEditor.stop();
     if (isVertexMode.value) {
@@ -317,7 +321,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       useNotificationStore().showWarning('Сначала завершите рисование или измерение на панели рисования.');
       return;
     }
-    if (isEditTopologyMode.value && vertexEditor.dirty.value && !confirm('Отказаться от несохранённых изменений вершин?')) return;
+    if (isEditTopologyMode.value && vertexEditor.dirty.value && !(await confirmDiscardVertices())) return;
     isEditTopologyMode.value = !isEditTopologyMode.value;
     isVertexMode.value = false;
     vertexEditor.stop();
@@ -627,7 +631,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       kind = selected.layerId?.includes('node') || selected.layerName?.includes('node') ? 'node' : 'line';
     }
     const what = kind === 'node' ? `узел ${id}` : `участок ${id}`;
-    if (!confirm(`Вы уверены, что хотите удалить ${what}?`)) return;
+    const tail = kind === 'node' ? ' Прилегающие участки будут удалены вместе с ним.' : '';
+    if (!(await confirmAction({ text: `Удалить ${what}?${tail}`, action: 'Удалить' }))) return;
     try {
       if (kind === 'node') {
         await fastApiService.deleteNode(id, version);

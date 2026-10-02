@@ -7,6 +7,9 @@ import type { GroupSetterInfo } from '~/services/groupSettersService';
 import { mountWithVuetify, findButton, flushPromises, createTestPinia } from './mountHelper';
 
 const svc = vi.hoisted(() => ({ list: vi.fn(), preview: vi.fn(), apply: vi.fn(), undo: vi.fn() }));
+// QA F45: подтверждение своим диалогом (useConfirm), не window.confirm
+const confirmAction = vi.hoisted(() => vi.fn(async (_opts: { text: string }) => true));
+vi.mock('~/composables/useConfirm', () => ({ confirmAction }));
 vi.mock('~/services/groupSettersService', async (orig) => ({
   ...(await orig<typeof import('~/services/groupSettersService')>()),
   groupSettersService: svc,
@@ -58,14 +61,13 @@ describe('GroupSetterDialog: предпросмотр → применение',
   });
 
   it('применение после подтверждения передаёт ожидаемое число изменений', async () => {
-    const confirm = vi.fn((_text: string) => true);
-    vi.stubGlobal('confirm', confirm);
+    confirmAction.mockResolvedValueOnce(true);
     const w = await openDialog();
     await findButton(w, 'Предпросмотр').trigger('click');
     await flushPromises();
     await findButton(w, 'Применить').trigger('click');
     await flushPromises();
-    expect(confirm.mock.calls[0][0]).toContain('Будет изменено строк: 9');
+    expect(confirmAction.mock.calls.at(-1)?.[0].text).toContain('Будет изменено строк: 9');
     expect(svc.apply).toHaveBeenCalledWith('roughness', { mode: 'fragment', fragment_ids: [74] }, 0.5, 9);
     // превью израсходовано — повторно применить нельзя
     expect(findButton(w, 'Применить').attributes('disabled')).toBeDefined();
@@ -73,7 +75,7 @@ describe('GroupSetterDialog: предпросмотр → применение',
   });
 
   it('отказ в confirm не вызывает apply; смена значения делает превью устаревшим', async () => {
-    vi.stubGlobal('confirm', vi.fn(() => false));
+    confirmAction.mockResolvedValueOnce(false);
     const w = await openDialog();
     await findButton(w, 'Предпросмотр').trigger('click');
     await flushPromises();

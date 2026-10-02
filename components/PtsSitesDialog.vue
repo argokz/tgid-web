@@ -360,6 +360,7 @@
 </template>
 
 <script setup lang="ts">
+import { confirmAction } from '~/composables/useConfirm';
 import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
 import { useJournalMapBridge } from '~/composables/useJournalMapBridge';
@@ -536,9 +537,9 @@ const removeSite = async () => {
   if (!card.value) return;
   const pipes = card.value.stats.pipes;
   const text = pipes
-    ? `К участку привязано труб: ${pipes}. Снять привязку и удалить участок?`
-    : 'Удалить участок?';
-  if (!confirm(text)) return;
+    ? `К участку «${cardTitle.value}» привязано труб: ${pipes}. Снять привязку и удалить участок?`
+    : `Удалить участок «${cardTitle.value}»?`;
+  if (!(await confirmAction({ text, action: 'Удалить' }))) return;
   try {
     await ptsService.remove(kind.value, card.value.id, pipes > 0);
     card.value = null;

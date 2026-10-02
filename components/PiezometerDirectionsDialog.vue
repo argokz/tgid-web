@@ -126,6 +126,7 @@
 
 <script setup lang="ts">
 import { formatApiError, formatApiErrorWith } from '~/utils/apiError';
+import { confirmAction } from '~/composables/useConfirm';
 import { computed, ref, watch } from 'vue';
 import { fastApiService, type PiezometerDirection } from '~/services/fastApiService';
 import { useAuthStore } from '~/stores/authStore';
@@ -226,7 +227,7 @@ const save = async (replace: boolean) => {
 };
 
 const remove = async (d: PiezometerDirection) => {
-  if (!window.confirm(`Удалить направление «${d.name}»?`)) return;
+  if (!(await confirmAction({ text: `Удалить направление пьезометра «${d.name}»?`, action: 'Удалить' }))) return;
   try {
     await fastApiService.deletePiezometerDirection(d.id);
     await refresh();

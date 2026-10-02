@@ -563,6 +563,7 @@
 
 <script setup lang="ts">
 import { formatApiError, formatApiErrorWith } from '~/utils/apiError'
+import { confirmAction } from '~/composables/useConfirm'
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
@@ -801,7 +802,7 @@ const downloadBalance = async () => {
 }
 
 const deleteTechnicalCondition = async (id: number) => {
-  if (!confirm(`Вы действительно хотите удалить ТУ #${id}?`)) return
+  if (!(await confirmAction({ text: `Удалить технические условия №${id}? Действие необратимо.`, action: 'Удалить' }))) return
   try {
     deleting.value = true
     await fastApiService.deleteTechnicalCondition(id)

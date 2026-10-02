@@ -238,6 +238,7 @@
     </v-main>
 
     <LoginDialog v-model="showLogin" />
+    <ConfirmDialogHost />
 
     <!-- Модальное окно расчета -->
     <PlanningCalculationModal
@@ -294,6 +295,7 @@ import { useUiStore } from '~/stores/uiStore';
 import PlanningCalculationModal from '~/components/PlanningCalculationModal.vue';
 import CalculationProtocol from '~/components/CalculationProtocol.vue';
 import LoginDialog from '~/components/LoginDialog.vue';
+import ConfirmDialogHost from '~/components/ConfirmDialogHost.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { ROLE_LABELS, type Role } from '~/utils/permissions';
 import { buildHeaderMenu, isHeaderNavCollapsed, type HeaderMenuItem } from '~/utils/headerMenu';

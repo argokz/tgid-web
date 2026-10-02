@@ -1,3 +1,4 @@
+import { confirmAction } from '~/composables/useConfirm';
 /**
  * Создание/правка/удаление карточки журнала через /api/v1/journals/{journal}.
  * Отправляются только поля, которые сервер объявил записываемыми (schema.fields),
@@ -70,7 +71,8 @@ export function useJournalRecordForm(journal: JournalKey) {
   const remove = async (id: number, label: string): Promise<boolean> => {
     const current = await loadSchema();
     const extra = current?.has_contour ? ', его контур' : '';
-    if (!window.confirm(`Удалить «${label}» (№ ${id})${extra} и документы? Действие необратимо.`)) return false;
+    const text = `Удалить «${label}» (№ ${id})${extra} и документы? Действие необратимо.`;
+    if (!(await confirmAction({ title: current?.title || 'Удаление записи', text, action: 'Удалить' }))) return false;
     try {
       await journalWriteService.remove(journal, id);
       notifications.showSuccess(`${current?.title || 'Журнал'}: запись ${id} удалена`);

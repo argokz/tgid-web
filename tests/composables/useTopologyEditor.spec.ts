@@ -66,6 +66,7 @@ vi.mock('maplibre-gl', () => {
 
 import { ApiError } from '~/services/fastApiService';
 import { useTopologyEditor } from '~/composables/useTopologyEditor';
+import { confirmState, settleConfirm } from '~/composables/useConfirm';
 
 const nodeFeature = (id: number, coords = [76.9, 43.2]) => ({
   layer: { id: 'tgid-nodes' }, properties: { id }, geometry: { type: 'Point', coordinates: coords },
@@ -239,11 +240,15 @@ describe('useTopologyEditor', () => {
     await editor.undoLastTopologyOperation();
     expect(api.undoTopologyOperation).toHaveBeenCalledWith(42);
 
-    vi.stubGlobal('confirm', () => true);
-    await editor.onDeleteFeature(11, 'ver');
+    // QA F45: подтверждение своим диалогом, не window.confirm
+    const pending = editor.onDeleteFeature(11, 'ver');
+    await flush();
+    expect(confirmState.visible).toBe(true);
+    expect(confirmState.text).toContain('узел 11');
+    settleConfirm(true);
+    await pending;
     expect(api.deleteNode).toHaveBeenCalledWith(11, 'ver');
     expect(opts.closeCard).toHaveBeenCalled();
-    vi.unstubAllGlobals();
   });
 
   it('QA F52: клик по узлу (mousedown → mouseup → click) выбирает его, маркер не создаётся', async () => {

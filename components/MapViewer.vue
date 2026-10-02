@@ -1044,7 +1044,7 @@ const traceNodeMarkers: maplibregl.Marker[] = [];
 const toggleTraceMode = () => {
   isTraceMode.value = !isTraceMode.value;
   if (isTraceMode.value) {
-    if (isEditTopologyMode.value) toggleEditTopologyMode();
+    if (isEditTopologyMode.value) void toggleEditTopologyMode();
     clearTrace();
     mapStore.setIdentifyMode(false); // отключаем обычный identify-клик
     useNotificationStore().showSuccess('Режим трассировки: кликайте по узлам маршрута.');

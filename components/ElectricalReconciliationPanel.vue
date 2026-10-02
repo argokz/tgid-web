@@ -232,6 +232,8 @@
 
 <script setup lang="ts">
 import { formatApiError } from '~/utils/apiError'
+import { pluralRu } from '~/utils/pluralRu'
+import { confirmAction } from '~/composables/useConfirm'
 import { computed, onMounted, ref } from 'vue'
 import {
   fastApiService,
@@ -309,7 +311,9 @@ async function preview(items: ElectricalReconciliationItem[] | null) {
   } catch (cause) { fail(cause, 'Предпросмотр не удался') } finally { binding.value = false }
 }
 async function apply() {
-  if (!plan.value || !window.confirm(`Записать привязку для ${plan.value.counts.records} объектов?`)) return
+  if (!plan.value) return
+  const records = plan.value.counts.records
+  if (!(await confirmAction({ text: `Записать привязку для ${records} ${pluralRu(records, ['объекта', 'объектов', 'объектов'])}?`, action: 'Записать' }))) return
   binding.value = true
   try {
     plan.value = await fastApiService.bindElectricalNetwork({

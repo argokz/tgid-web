@@ -356,6 +356,7 @@
 
 <script setup lang="ts">
 import { formatApiError } from '~/utils/apiError'
+import { confirmAction } from '~/composables/useConfirm'
 import { useAuthStore } from '~/stores/authStore'
 import {
   fastApiService,
@@ -647,7 +648,7 @@ async function downloadExcel(id: number) {
 }
 
 async function removeRun(id: number) {
-  if (!window.confirm(`Удалить расчёт теплопотерь №${id}?`)) return
+  if (!(await confirmAction({ text: `Удалить расчёт теплопотерь №${id}?`, action: 'Удалить' }))) return
   try {
     await fastApiService.deleteCalculation(id)
     if (run.value?.id === id) run.value = null

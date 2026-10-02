@@ -195,6 +195,8 @@
 </template>
 
 <script setup lang="ts">
+import { pluralRu } from '~/utils/pluralRu';
+import { confirmAction } from '~/composables/useConfirm';
 import { computed, reactive, ref } from 'vue';
 import { journalWriteService, type ApproveResult, type JournalKey, type JournalSchema } from '~/services/journalWriteService';
 import { useNotificationStore } from '~/stores/notificationStore';
@@ -248,7 +250,13 @@ const toggleAll = () => {
 };
 
 const approve = async () => {
-  if (!window.confirm(`Утвердить ${selectedIds.value.length} план(ов) датой ${formatDate(approvedOn.value)}?`)) return;
+  const count = selectedIds.value.length;
+  const plans = pluralRu(count, ['план', 'плана', 'планов']);
+  if (!(await confirmAction({
+    title: 'Пакетное утверждение',
+    text: `Утвердить ${count} ${plans} датой ${formatDate(approvedOn.value)}?`,
+    action: 'Утвердить',
+  }))) return;
   approving.value = true;
   try {
     const cleanSigners = Object.fromEntries(Object.entries(signers).filter(([, v]) => v !== '' && v !== null && v !== undefined));

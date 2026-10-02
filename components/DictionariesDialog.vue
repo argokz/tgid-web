@@ -238,6 +238,7 @@
 </template>
 
 <script setup lang="ts">
+import { confirmAction } from '~/composables/useConfirm'
 import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
 import {
@@ -382,7 +383,7 @@ const save = async () => {
 const removeRow = async (row: DictRow) => {
   if (!info.value) return;
   const label = row[info.value.label_column] ?? row.id;
-  if (!confirm(`Удалить запись «${label}» из справочника «${info.value.label}»?`)) return;
+  if (!(await confirmAction({ text: `Удалить запись «${label}» из справочника «${info.value.label}»?`, action: 'Удалить' }))) return;
   error.value = '';
   errorUsage.value = null;
   try {

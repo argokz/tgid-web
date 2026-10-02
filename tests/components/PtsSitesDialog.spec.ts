@@ -7,6 +7,9 @@ const pts = vi.hoisted(() => ({
   sites: vi.fn(), fields: vi.fn(), site: vi.fn(), lookup: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(),
   pipes: vi.fn(), previewPipes: vi.fn(), applyPipes: vi.fn(), chain: vi.fn(),
 }));
+// QA F45: подтверждение своим диалогом (useConfirm), не window.confirm
+const confirmAction = vi.hoisted(() => vi.fn(async (_opts: { text: string }) => true));
+vi.mock('~/composables/useConfirm', () => ({ confirmAction }));
 vi.mock('~/services/ptsService', async (orig) => ({
   ...(await orig<typeof import('~/services/ptsService')>()),
   ptsService: pts,
@@ -81,11 +84,12 @@ describe('PtsSitesDialog', () => {
   });
 
   it('удаление участка с трубами — после confirm и с отвязкой труб', async () => {
-    vi.stubGlobal('confirm', vi.fn(() => true));
+    confirmAction.mockResolvedValueOnce(true);
     pts.remove.mockResolvedValue({});
     const w = await openAndSelect();
     await (w.vm as any).$.setupState.removeSite();
     await flushPromises();
+    expect(confirmAction.mock.calls.at(-1)?.[0].text).toMatch(/привязано труб: \d+/);
     expect(pts.remove).toHaveBeenCalledWith('ms', 3, true);
     expect(pts.sites).toHaveBeenCalledTimes(2);
     w.unmount();

@@ -360,6 +360,8 @@
 </template>
 
 <script setup lang="ts">
+import { pluralRu } from '~/utils/pluralRu'
+import { confirmAction } from '~/composables/useConfirm'
 import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
 import SetterValueInput from '~/components/SetterValueInput.vue';
@@ -512,7 +514,7 @@ const runApply = async () => {
   const text = `${setter.value.label}\n\nБудет изменено строк: ${p.changes} (объектов в наборе: ${p.objects}).`
     + (setter.value.affects_calc ? '\nПоле участвует в расчёте.' : '')
     + '\n\nПрименить?';
-  if (!confirm(text)) return;
+  if (!(await confirmAction({ title: 'Применить установщик', text, action: 'Применить' }))) return;
   applying.value = true;
   error.value = '';
   try {
@@ -537,7 +539,8 @@ const runUndo = async () => {
     const conflictText = dry.conflicts.length
       ? `\nСтрок, изменённых после операции (останутся как есть): ${dry.conflicts.length}.`
       : '';
-    if (!confirm(`Вернуть прежние значения для ${dry.restorable} строк?${conflictText}`)) return;
+    const rowsWord = pluralRu(dry.restorable, ['строки', 'строк', 'строк']);
+    if (!(await confirmAction({ text: `Вернуть прежние значения для ${dry.restorable} ${rowsWord}?${conflictText}`, action: 'Вернуть' }))) return;
     const res = await groupSettersService.undo(lastResult.value.change_group_id, false);
     lastUndone.value = true;
     useNotificationStore().showSuccess(`Восстановлено строк: ${res.restorable}`);

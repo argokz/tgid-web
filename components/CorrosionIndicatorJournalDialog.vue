@@ -490,6 +490,7 @@
 
 <script setup lang="ts">
 import { formatApiErrorWith } from '~/utils/apiError'
+import { confirmAction } from '~/composables/useConfirm'
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
@@ -704,7 +705,7 @@ const saveChanges = async () => {
 }
 
 const deleteIndicator = async (id: number) => {
-  if (!confirm(`Вы действительно хотите удалить Индикатор #${id}?`)) return
+  if (!(await confirmAction({ text: `Удалить индикатор коррозии №${id}? Действие необратимо.`, action: 'Удалить' }))) return
   try {
     deleting.value = true
     await fastApiService.deleteObject('indikator_korrozii', id)
