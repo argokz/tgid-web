@@ -12,6 +12,7 @@
         <v-btn
           icon="mdi-refresh"
           variant="text"
+          aria-label="Обновить"
           @click="fetchDiagnostics"
           :loading="loading"
           :disabled="fragmentId === null"
@@ -20,6 +21,7 @@
         <v-btn
           icon="mdi-close"
           variant="text"
+          aria-label="Закрыть"
           @click="dialog = false"
         />
       </v-card-title>
@@ -136,6 +138,7 @@
                   variant="text"
                   color="primary"
                   :disabled="fault.lat == null || fault.lng == null"
+                  aria-label="Показать на карте"
                   @click.stop="locateFault(fault)"
                 />
               </template>

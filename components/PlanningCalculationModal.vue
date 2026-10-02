@@ -28,6 +28,7 @@
         <v-btn
           icon
           density="compact"
+          aria-label="Закрыть"
           @click="close"
         >
           <v-icon>mdi-close</v-icon>

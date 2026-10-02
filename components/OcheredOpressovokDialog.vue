@@ -19,6 +19,7 @@
           <v-btn
             icon
             variant="text"
+            aria-label="Закрыть"
             @click="visible = false"
           ><v-icon>mdi-close</v-icon></v-btn>
         </v-card-title>

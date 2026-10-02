@@ -71,6 +71,7 @@
                 color="primary"
                 variant="tonal"
                 title="Новый участок"
+                aria-label="Новый участок"
                 @click="startCreate"
               />
             </div>

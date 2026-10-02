@@ -88,6 +88,8 @@
 
               color="success"
 
+              aria-label="Скачать паспорт (Excel)"
+
               @click="downloadPassport"
             >
 
@@ -106,6 +108,7 @@
               variant="text"
               size="small"
               color="error"
+              aria-label="Анализ отключения: какие задвижки закрыть"
               @click="emit('open-outage-simulation', { lineId: cardLineId })"
             >
               <v-icon size="18">mdi-valve-closed</v-icon>
@@ -123,6 +126,7 @@
               size="small"
               color="primary"
               :loading="reversingLine"
+              aria-label="Развернуть направление линии"
               @click="reverseLineDirection"
             >
               <v-icon size="18">mdi-swap-horizontal</v-icon>
@@ -143,6 +147,8 @@
               size="small"
 
               color="deep-orange-darken-2"
+
+              aria-label="Журнал нарушений объекта"
 
               @click="openDefectJournal"
             >
@@ -168,6 +174,8 @@
 
               color="brown-darken-2"
 
+              aria-label="Журнал шурфовок объекта"
+
               @click="openShurfJournal"
             >
 
@@ -191,6 +199,8 @@
               size="small"
 
               color="teal-darken-2"
+
+              aria-label="Журнал осмотров объекта"
 
               @click="openInspectionJournal"
             >
@@ -216,6 +226,8 @@
 
               color="deep-purple-darken-2"
 
+              aria-label="Журнал ремонтов объекта"
+
               @click="openRepairJournal"
             >
 
@@ -239,6 +251,8 @@
               size="small"
 
               color="blue-darken-2"
+
+              aria-label="Журнал опрессовок объекта"
 
               @click="openPressureTestJournal"
             >
@@ -264,6 +278,8 @@
 
               color="cyan-darken-3"
 
+              aria-label="Технические условия объекта"
+
               @click="openTechnicalConditionJournal"
             >
 
@@ -287,6 +303,8 @@
               size="small"
 
               color="orange-darken-3"
+
+              aria-label="Индикаторы коррозии объекта"
 
               @click="openCorrosionIndicatorJournal"
             >
@@ -312,6 +330,8 @@
 
               color="indigo-darken-2"
 
+              aria-label="Объекты АЛСЕКО по адресу"
+
               @click="openAlsekoJournal"
             >
 
@@ -335,6 +355,8 @@
               size="small"
 
               color="amber-darken-4"
+
+              aria-label="Карточка объекта электросети"
 
               @click="openElectricalNetworkJournal"
             >
@@ -360,6 +382,8 @@
 
               color="deep-orange-darken-3"
 
+              aria-label="Исходные данные тепловых потерь"
+
               @click="openHeatLossJournal"
             >
 
@@ -383,6 +407,8 @@
               size="small"
 
               color="purple-darken-3"
+
+              aria-label="Температурный график источника"
 
               @click="openTemperatureGraphJournal"
             >
@@ -408,6 +434,8 @@
 
               color="teal-darken-3"
 
+              aria-label="Диагностика нагрузки потребителя"
+
               @click="openConsumerLoadDiagnostics"
             >
 
@@ -431,6 +459,8 @@
               size="small"
 
               color="blue-grey-darken-3"
+
+              aria-label="Насосное оборудование и характеристики"
 
               @click="openPumpEquipment"
             >
@@ -456,6 +486,8 @@
 
               color="deep-purple-darken-3"
 
+              aria-label="Запорная и регулирующая арматура"
+
               @click="openNetworkArmatures"
             >
 
@@ -479,6 +511,8 @@
               size="small"
 
               color="indigo-darken-3"
+
+              aria-label="Сетевые регуляторы"
 
               @click="openNetworkRegulators"
             >
@@ -504,6 +538,8 @@
 
               color="cyan-darken-4"
 
+              aria-label="Байпасы наружных теплопроводов"
+
               @click="openNetworkBypasses"
             >
 
@@ -527,6 +563,8 @@
               size="small"
 
               color="teal-darken-4"
+
+              aria-label="Диафрагмы наружных теплопроводов"
 
               @click="openNetworkDiaphragms"
             >
@@ -552,6 +590,8 @@
 
               color="primary"
 
+              aria-label="Карта повреждаемости (Word)"
+
               @click="downloadWordReport"
             >
 
@@ -575,6 +615,8 @@
               color="grey-darken-1"
 
               :loading="copying"
+
+              aria-label="Копировать всё"
 
               @click="copyToClipboard"
             >
@@ -618,6 +660,7 @@
               color="error"
 
               :disabled="!cardObjectId"
+              aria-label="Удалить объект"
               @click="$emit('delete-feature', cardObjectId!, cardVersion, { kind: cardObjectKind!, expectedSectionId: cardSectionId })"
             >
 
@@ -635,6 +678,7 @@
               variant="text"
               size="small"
               color="grey-darken-1"
+              aria-label="Закрыть"
               @click="close"
             >
 
@@ -928,6 +972,8 @@
 
                               class="ap-copy-btn"
 
+                              aria-label="Копировать"
+
                               @click.stop="copyAttribute(field.key, field.value)"
                             >
 
@@ -1020,6 +1066,8 @@
                     color="grey"
 
                     class="ap-copy-btn"
+
+                    aria-label="Копировать"
 
                     @click.stop="copyAttribute(String(key), value)"
                   >

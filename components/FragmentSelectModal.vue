@@ -18,6 +18,7 @@
           icon="mdi-close"
           variant="text"
           density="compact"
+          aria-label="Закрыть"
           @click="close"
         />
       </v-card-title>

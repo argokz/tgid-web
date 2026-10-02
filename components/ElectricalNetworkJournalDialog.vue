@@ -21,6 +21,7 @@
         >{{ total.toLocaleString('ru-RU') }} объектов</v-chip>
         <v-btn
           icon="mdi-close"
+          aria-label="Закрыть"
           @click="visible = false"
         />
       </v-toolbar>
@@ -118,6 +119,7 @@
             >Применить</v-btn><v-btn
               variant="text"
               icon="mdi-filter-remove"
+              aria-label="Сбросить фильтры"
               @click="resetFilters"
             /></v-col>
           </v-row>
@@ -205,10 +207,12 @@
           v-if="hasCoordinates(selected)"
           icon="mdi-crosshairs-gps"
           title="Показать на карте"
+          aria-label="Показать на карте"
           @click="locateSelected"
         />
         <v-btn
           icon="mdi-close"
+          aria-label="Закрыть"
           @click="detailsVisible = false"
         />
       </v-toolbar>

@@ -12,6 +12,7 @@
         <v-btn
           icon="mdi-refresh"
           variant="text"
+          aria-label="Обновить"
           @click="fetchData"
           :loading="loading"
           class="mr-2"
@@ -19,6 +20,7 @@
         <v-btn
           icon="mdi-close"
           variant="text"
+          aria-label="Закрыть"
           @click="dialog = false"
         />
       </v-card-title>
@@ -99,6 +101,7 @@
                 variant="text"
                 class="mr-2"
                 title="Скачать Excel"
+                aria-label="Скачать Excel"
                 @click.stop="downloadCalcExcel(calc.id)"
               />
               <v-btn

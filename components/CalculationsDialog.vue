@@ -17,12 +17,14 @@
           variant="text"
           density="compact"
           :loading="loading"
+          aria-label="Обновить"
           @click="load"
         />
         <v-btn
           icon="mdi-close"
           variant="text"
           density="compact"
+          aria-label="Закрыть"
           @click="isOpen = false"
         />
       </v-card-title>
@@ -133,8 +135,9 @@
               color="error"
               :disabled="!canDelete(item)"
               :title="deleteHint(item)"
-              @click="askDelete(item)"
+              :aria-label="deleteHint(item)"
             />
+              @click="askDelete(item)"
           </template>
         </v-data-table-server>
         <p

@@ -199,6 +199,7 @@
                       size="x-small"
                       variant="text"
                       disabled
+                      aria-label="Нет координат: линия отсутствует или без узлов"
                     />
                   </template>
                 </v-tooltip>

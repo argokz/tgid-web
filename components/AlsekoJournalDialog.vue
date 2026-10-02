@@ -22,6 +22,7 @@
         >{{ counts.total.toLocaleString('ru-RU') }} объектов</v-chip>
         <v-btn
           icon="mdi-close"
+          aria-label="Закрыть"
           @click="visible = false"
         />
       </v-toolbar>
@@ -156,6 +157,7 @@
               variant="text"
               icon="mdi-filter-remove"
               title="Сбросить"
+              aria-label="Сбросить"
               @click="resetFilters"
             />
           </v-col>
@@ -280,16 +282,19 @@
           v-if="selectedKind === 'building'"
           icon="mdi-link-variant"
           title="Привязка к адресу АЛСЕКО"
+          aria-label="Привязка к адресу АЛСЕКО"
           @click="bindSelectedBuilding"
         />
         <v-btn
           v-if="hasCoordinates(selected)"
           icon="mdi-crosshairs-gps"
           title="Показать на карте"
+          aria-label="Показать на карте"
           @click="locateSelected"
         />
         <v-btn
           icon="mdi-close"
+          aria-label="Закрыть"
           @click="detailsVisible = false"
         />
       </v-toolbar>

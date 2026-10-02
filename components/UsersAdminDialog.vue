@@ -145,6 +145,7 @@
                   :color="item.is_active ? 'error' : 'green'"
                   :title="item.is_active ? 'Заблокировать' : 'Разблокировать'"
                   :loading="busyId === item.id"
+                  :aria-label="item.is_active ? 'Заблокировать' : 'Разблокировать'"
                   @click="toggleActive(item)"
                 />
                 <v-btn
@@ -152,6 +153,7 @@
                   variant="text"
                   size="small"
                   title="Сменить пароль"
+                  aria-label="Сменить пароль"
                   @click="askPassword(item)"
                 />
               </template>

@@ -20,6 +20,7 @@
           icon="mdi-close"
           variant="text"
           size="small"
+          aria-label="Закрыть"
           @click="visible = false"
         />
       </v-card-title>

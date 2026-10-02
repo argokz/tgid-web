@@ -20,6 +20,7 @@
           icon="mdi-close"
           variant="text"
           size="small"
+          aria-label="Закрыть"
           @click="visible = false"
         />
       </v-card-title>
@@ -371,6 +372,7 @@
                         variant="text"
                         color="primary"
                         icon="mdi-crosshairs-gps"
+                        aria-label="Показать на карте"
                         @click="focusCoords(c.longitude, c.latitude)"
                       />
                     </td>

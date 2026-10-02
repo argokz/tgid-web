@@ -15,6 +15,7 @@
           variant="text"
           size="small"
           color="white"
+          aria-label="Закрыть"
           @click="visible = false"
         />
       </v-card-title>

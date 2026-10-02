@@ -125,6 +125,7 @@
                 size="x-small"
                 variant="text"
                 title="Показать на карте"
+                aria-label="Показать на карте"
                 @click="locate(item)"
               />
               <v-btn
@@ -133,6 +134,7 @@
                 size="x-small"
                 variant="text"
                 title="Предпросмотр привязки"
+                aria-label="Предпросмотр привязки"
                 @click="preview([item])"
               />
             </td>
@@ -202,6 +204,7 @@
                     icon="mdi-crosshairs-gps"
                     size="x-small"
                     variant="text"
+                    aria-label="Показать на карте"
                     @click="locate(r)"
                   /></td>
                 </tr>

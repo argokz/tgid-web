@@ -195,6 +195,7 @@
                   size="small" 
                   color="primary"
                   :disabled="!hasCoordinates(item)"
+                  aria-label="Найти на карте"
                   @click="emit('locate-consumer', { longitude: Number(item.longitude), latitude: Number(item.latitude), id: item.id, nodeId: item.node_id, label: item.name || `Потребитель П-${item.id}` })"
                 >
                   <v-tooltip

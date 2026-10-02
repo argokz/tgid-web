@@ -12,6 +12,7 @@
         <v-btn
           icon="mdi-refresh"
           variant="text"
+          aria-label="Обновить"
           @click="fetchData"
           :loading="loading"
           class="mr-2"
@@ -19,6 +20,7 @@
         <v-btn
           icon="mdi-close"
           variant="text"
+          aria-label="Закрыть"
           @click="dialog = false"
         />
       </v-card-title>
@@ -168,6 +170,7 @@
                     size="small"
                     variant="text"
                     color="primary"
+                    aria-label="Показать на карте"
                     @click.stop="locateFault(fault)"
                   />
                 </template>

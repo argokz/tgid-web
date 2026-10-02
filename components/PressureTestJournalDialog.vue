@@ -285,6 +285,7 @@
                     icon="mdi-chevron-right"
                     size="x-small"
                     variant="text"
+                    aria-label="Подробнее"
                     @click.stop="openDetails(item.id)"
                   />
                 </td>
@@ -457,6 +458,7 @@
                         icon="mdi-crosshairs-gps"
                         size="x-small"
                         variant="text"
+                        aria-label="Показать на карте"
                         @click.stop="locateRelation(line, `Линия ${line.line_id}`)"
                       /></template>
                     </v-list-item>
@@ -482,6 +484,7 @@
                         icon="mdi-crosshairs-gps"
                         size="x-small"
                         variant="text"
+                        aria-label="Показать на карте"
                         @click.stop="locateRelation(node, String(node.node_name || `Узел ${node.node_id}`))"
                       /></template>
                     </v-list-item>

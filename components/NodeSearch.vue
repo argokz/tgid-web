@@ -18,6 +18,7 @@
           <v-btn
             icon
             variant="text"
+            aria-label="Закрыть"
             @click="dialog = false"
           >
             <v-icon>mdi-close</v-icon>
@@ -120,6 +121,7 @@
                     variant="text"
                     size="small"
                     color="primary"
+                    aria-label="Подробнее"
                   >
                     <v-icon>mdi-chevron-right</v-icon>
                   </v-btn>

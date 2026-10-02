@@ -11,6 +11,7 @@
         <v-btn
           icon="mdi-close"
           variant="text"
+          aria-label="Закрыть"
           @click="dialog = false"
         />
       </v-card-title>
@@ -100,6 +101,7 @@
                         color="success"
                         size="small"
                         variant="text"
+                        aria-label="Скачать Excel"
                       />
                     </template>
                   </v-list-item>

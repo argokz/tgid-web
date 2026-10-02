@@ -40,6 +40,7 @@
             density="compact"
             class="mr-2"
             variant="text"
+            aria-label="Удалить"
             @click="clear"
           >
             <v-icon>mdiDelete</v-icon>
@@ -49,6 +50,7 @@
             density="compact"
             class="mr-2"
             variant="text"
+            :aria-label="isFullscreen ? 'Выйти из полноэкранного режима' : 'Во весь экран'"
             @click="toggleFullscreen"
           >
             <v-icon>{{ isFullscreen ? 'mdiFullscreenExit' : 'mdiFullscreen' }}</v-icon>
@@ -58,6 +60,7 @@
             density="compact"
             class="mr-2"
             variant="text"
+            :aria-label="protocolHeight <= 45 ? 'Развернуть протокол' : 'Свернуть протокол'"
             @click="minimize"
           >
             <v-icon>{{ protocolHeight <= 45 ? 'mdiChevronUp' : 'mdiChevronDown' }}</v-icon>
@@ -66,6 +69,7 @@
             icon
             density="compact"
             variant="text"
+            aria-label="Закрыть"
             @click="close"
           >
             <v-icon>mdiClose</v-icon>
