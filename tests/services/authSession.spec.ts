@@ -69,7 +69,7 @@ describe('blob-ответы с ошибкой (QA F22)', () => {
   it('detail сервера из Blob, без URL; запрос не повторяется', async () => {
     const body = new Blob([JSON.stringify({ detail: 'Фрагмент 999 не найден' })], { type: 'application/json' })
     fetchMock.mockRejectedValue(fetchError(404, body))
-    const error = await fastApiService.downloadDxfExport([999]).catch((e) => e)
+    const error = await fastApiService.downloadShpExport([999]).catch((e) => e)
     expect(error.userMessage).toBe('Фрагмент 999 не найден')
     expect(error.userMessage).not.toContain('http')
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -78,7 +78,7 @@ describe('blob-ответы с ошибкой (QA F22)', () => {
 
   it('5xx у blob тоже без повторов и без сырого URL', async () => {
     fetchMock.mockRejectedValue(fetchError(500, new Blob(['<html>err</html>'], { type: 'text/html' })))
-    const error = await fastApiService.downloadDxfExport([1]).catch((e) => e)
+    const error = await fastApiService.downloadShpExport([1]).catch((e) => e)
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(error.userMessage).toBe('Ошибка на сервере (500). Попробуйте позже.')
   })

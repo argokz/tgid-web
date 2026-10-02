@@ -68,7 +68,7 @@ describe('RegimeAnalysisDialog', () => {
     (w.vm as any).$.setupState.queryKey = 'adm-3';
     await findButton(w, 'Выполнить').trigger('click');
     await flushPromises();
-    expect(api.getAdmissibility).toHaveBeenCalledWith(3, 74);
+    expect(api.getAdmissibility).toHaveBeenCalledWith(3, 74, undefined);
     expect(w.findAll('thead th').map((th) => th.text())).not.toContain('_hidden');
     expect(w.findAll('tbody tr')).toHaveLength(3);
     const chip = w.findAll('.v-chip').find((c) => c.text().includes('авария'));
