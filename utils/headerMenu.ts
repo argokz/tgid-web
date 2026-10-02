@@ -50,7 +50,7 @@ const EXPORT_ITEMS: HeaderMenuItem[] = [
 
 const EXCEL_ITEMS: HeaderMenuItem[] = [
   { id: 'excel-ut', title: 'Участки теплопроводов', icon: 'mdi-pipe', action: { kind: 'excel', docType: 'ut' } },
-  { id: 'excel-zd', title: 'Задвижки и арматура', icon: 'mdi-valve', action: { kind: 'excel', docType: 'zd' } },
+  { id: 'excel-zd', title: 'Задвижки', icon: 'mdi-valve', action: { kind: 'excel', docType: 'zd' } },
   { id: 'excel-bp', title: 'Байпасы', icon: 'mdi-dip-switch', action: { kind: 'excel', docType: 'bp' } },
   { id: 'excel-ns', title: 'Насосные агрегаты', icon: 'mdi-water-pump', action: { kind: 'excel', docType: 'ns' } },
   { id: 'excel-pt', title: 'Потребители', icon: 'mdi-home-city', action: { kind: 'excel', docType: 'pt' } },
