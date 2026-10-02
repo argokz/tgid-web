@@ -1124,8 +1124,8 @@
     />
     <v-snackbar
       v-model="showNotification"
-      :timeout="2000"
-      color="primary"
+      :timeout="notificationError ? 4000 : 2000"
+      :color="notificationError ? 'error' : 'primary'"
       location="bottom"
       rounded="pill"
     >
@@ -1135,7 +1135,7 @@
         style="gap: 8px;"
       >
 
-        <v-icon size="16">mdi-check-circle</v-icon>
+        <v-icon size="16">{{ notificationError ? 'mdi-alert-circle' : 'mdi-check-circle' }}</v-icon>
 
         {{ notificationMessage }}
 
@@ -1236,6 +1236,12 @@ const search = ref('')
 const copying = ref(false)
 
 const showNotification = ref(false)
+
+/** Снэкбар в стиле ошибки; сбрасывается при закрытии */
+
+const notificationError = ref(false)
+
+watch(showNotification, (v) => { if (!v) notificationError.value = false })
 
 const notificationMessage = ref('')
 
@@ -1696,7 +1702,17 @@ const copyAttribute = async (key: string, value: any) => {
 
     showNotification.value = true
 
-  } catch (e) { console.error('Copy error:', e) }
+  } catch (e) {
+
+    console.error('Copy error:', e)
+
+    notificationMessage.value = 'Не удалось скопировать: браузер запретил доступ к буферу обмена'
+
+    notificationError.value = true
+
+    showNotification.value = true
+
+  }
 
 }
 
@@ -1714,6 +1730,18 @@ const copyToClipboard = async () => {
     await navigator.clipboard.writeText(text)
 
     notificationMessage.value = `Скопировано ${totalAttributesCount.value} атрибутов`
+
+    showNotification.value = true
+
+  } catch (e) {
+
+    // Буфер обмена запрещён (не https, нет разрешения) — сказать пользователю (QA F24)
+
+    console.error('Copy error:', e)
+
+    notificationMessage.value = 'Не удалось скопировать: браузер запретил доступ к буферу обмена'
+
+    notificationError.value = true
 
     showNotification.value = true
 
