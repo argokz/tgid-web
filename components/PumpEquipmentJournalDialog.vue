@@ -302,22 +302,22 @@
         color="blue-grey-darken-3"
       />
 
-      <template v-if="modelDetails && !detailLoading">
+      <template v-if="(modelDetails || installedDetails) && !detailLoading">
         <div class="detail-alerts pa-3 pb-0">
           <v-alert
-            v-if="installedDetails?.configuration_status === 'missing_model'"
+            v-if="installedDetails && !modelDetails"
             type="warning"
             variant="tonal"
             density="compact"
-          >Для агрегата не выбрана паспортная модель. В desktop TGID это делается через «Тип насоса → Характеристики».</v-alert>
+          >Для агрегата не выбрана паспортная модель — график H(Q) не строится. Модель назначается через «Редактировать» → «Модель (тип насоса)», как в desktop «Тип насоса → Характеристики».</v-alert>
           <v-alert
-            v-if="modelDetails.quality_status === 'non_monotonic'"
+            v-if="modelDetails?.quality_status === 'non_monotonic'"
             type="warning"
             variant="tonal"
             density="compact"
           >Расход в паспортных точках расположен не по возрастанию. Точки показаны в исходном порядке и требуют проверки справочника.</v-alert>
           <v-alert
-            v-if="modelDetails.quality_status === 'incomplete'"
+            v-if="modelDetails?.quality_status === 'incomplete'"
             type="error"
             variant="tonal"
             density="compact"
@@ -389,12 +389,13 @@
                     sm="6"
                   >
                     <div class="detail-label mb-1">{{ field.label }}</div>
-                    <v-select
+                    <v-autocomplete
                       v-if="field.type === 'select'"
                       v-model="editFields[field.key]"
                       :items="field.items"
                       item-title="name"
                       item-value="id"
+                      :data-testid="`pump-edit-${field.key}`"
                       density="compact"
                       hide-details
                       variant="outlined"
@@ -412,6 +413,14 @@
                   </v-col>
                 </v-row>
               </v-card-text>
+              <v-alert
+                v-if="isEditing && saveError"
+                type="error"
+                variant="tonal"
+                density="compact"
+                class="mx-4 mb-2"
+                data-testid="equipment-save-error"
+              >{{ saveError }}</v-alert>
               <v-divider v-if="isEditing" />
               <v-card-actions
                 class="px-4 py-3 bg-grey-lighten-4"
@@ -436,6 +445,7 @@
             </v-card>
 
             <v-card
+              v-if="modelDetails"
               variant="outlined"
               class="mb-3"
             >
@@ -559,6 +569,7 @@
               >Редактировать</v-btn>
             </div>
             <v-card
+              v-if="modelDetails"
               variant="outlined"
               class="mb-3"
             >
@@ -569,7 +580,10 @@
                 autoresize
               /></v-card-text>
             </v-card>
-            <v-card variant="outlined">
+            <v-card
+              v-if="modelDetails"
+              variant="outlined"
+            >
               <v-card-title class="text-subtitle-1">Паспортные точки</v-card-title>
               <div class="points-wrap">
                 <table class="journal-table points-table">
@@ -586,7 +600,7 @@
               </div>
             </v-card>
             <v-card
-              v-if="!installedDetails && modelDetails.installed_pumps?.length"
+              v-if="!installedDetails && modelDetails?.installed_pumps?.length"
               variant="outlined"
               class="mt-3"
             >
@@ -604,53 +618,6 @@
         </v-row>
       </template>
 
-      <div
-        v-else-if="installedDetails && !modelDetails && !detailLoading"
-        class="pa-3"
-      >
-        <v-alert
-          type="warning"
-          variant="tonal"
-          class="mb-3"
-        >График построить нельзя: паспортная модель не выбрана.</v-alert>
-        <v-card variant="outlined">
-          <v-card-title class="text-subtitle-1">Установленный агрегат</v-card-title>
-          <v-card-text class="detail-grid">
-            <DetailValue
-              label="ID / линия"
-              :value="`${installedDetails.id} / ${installedDetails.line_id ?? '—'}`"
-            />
-            <DetailValue
-              label="Номер / станция"
-              :value="installedDetails.number || installedDetails.station_name"
-            />
-            <DetailValue
-              label="Состояние"
-              :value="installedDetails.state_name"
-            />
-            <DetailValue
-              label="Параллельно"
-              :value="installedDetails.parallel_count ? `${installedDetails.parallel_count} шт.` : null"
-            />
-            <DetailValue
-              label="Привод"
-              :value="installedDetails.drive_type_name"
-            />
-            <DetailValue
-              label="Рабочее колесо"
-              :value="installedDetails.rotor_diameter_type_name"
-            />
-            <DetailValue
-              label="Фрагмент"
-              :value="installedDetails.fragment_name"
-            />
-            <DetailValue
-              label="Готовность"
-              :value="configurationLabel(installedDetails.configuration_status)"
-            />
-          </v-card-text>
-        </v-card>
-      </div>
     </v-card>
   </v-dialog>
 </template>
@@ -665,7 +632,9 @@ import { DataZoomComponent, GridComponent, LegendComponent, MarkAreaComponent, T
 import VChart from 'vue-echarts'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
 import { beginEquipmentEdit, saveEquipmentEdit } from '~/services/equipmentEditService'
+import { pumpModelOptions, withCurrentOption } from '~/utils/pumpModels'
 import {
   fastApiService,
   type InstalledPumpDetails,
@@ -696,6 +665,7 @@ const emit = defineEmits<{
 }>()
 const { isMobile } = useMobile()
 const mutationsEnabled = useMutationsEnabled()
+const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
 const emptyLookups = (): PumpEquipmentLookups => ({ states: [], drive_types: [], rotor_diameter_types: [], fragments: [], pump_types: [], counts: {}, catalog_counts: {}, calculation_count: 0, result_count: 0 })
 const visible = ref(false)
 const detailVisible = ref(false)
@@ -717,9 +687,27 @@ const catalogFilters = ref<PumpCatalogFilters>({})
 const isEditing = ref(false)
 const saving = ref(false)
 const editFields = ref<Record<string, any>>({})
-
+// Модели каталога для назначения насосу (standardpumpid; в каталоге ~80 записей)
+const modelOptions = ref<Array<{ id: number; name: string }>>([])
+const loadModelOptions = async () => {
+  if (modelOptions.value.length) return
+  try {
+    const items: StandardPumpSummary[] = []
+    for (let page = 1; ; page += 1) {
+      const response = await fastApiService.getPumpCatalog({ page, page_size: 200 })
+      items.push(...response.items)
+      if (page >= response.pages) break
+    }
+    modelOptions.value = pumpModelOptions(items)
+  } catch (cause) {
+    saveError.value = formatApiError(cause, 'Не удалось загрузить каталог моделей насосов')
+  }
+}
 const buildFields = () => {
+  const current = installedDetails.value
   return [
+    { label: 'Модель (тип насоса)', key: 'standardpumpid', type: 'select', items: withCurrentOption(modelOptions.value, current?.standard_pump_id, current?.model_type || current?.model_name), value: current?.standard_pump_id },
+    { label: 'Заданный напор, м', key: 'thrust', type: 'number', value: current?.thrust },
     { label: 'Номер', key: 'number', type: 'text', value: installedDetails.value?.number },
     { label: 'Станция', key: 'pumpstationid', type: 'text', value: installedDetails.value?.station_name },
     { label: 'Состояние', key: 'stateid', type: 'select', items: lookups.value.states, value: installedDetails.value?.state_id },
@@ -733,6 +721,8 @@ const buildFields = () => {
 
 const startEdit = () => {
   isEditing.value = true
+  clearSaveError()
+  void loadModelOptions()
   beginEquipmentEdit('pumps', installedDetails.value?.id)
   editFields.value = {}
   for (const field of buildFields()) {
@@ -742,12 +732,15 @@ const startEdit = () => {
 
 const cancelEdit = () => {
   isEditing.value = false
+  clearSaveError()
   editFields.value = {}
 }
 
 const saveChanges = async () => {
   if (!installedDetails.value) return
+  const current = installedDetails.value
   saving.value = true
+  clearSaveError()
   try {
     const processedFields: Record<string, any> = {}
     for (const key in editFields.value) {
@@ -761,7 +754,7 @@ const saveChanges = async () => {
     isEditing.value = false
     await loadInstalled()
   } catch (cause) {
-    error.value = formatApiError(cause, 'Ошибка при сохранении')
+    reportSaveError(cause, () => openInstalledDetails(current.id))
   } finally {
     saving.value = false
   }
@@ -858,14 +851,14 @@ const loadInstalled = async () => {
   try {
     const response = await fastApiService.getInstalledPumps({ ...installedFilters.value, page: installedPage.value, page_size: 50 })
     installed.value = response.items; installedPages.value = response.pages
-  } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось загрузить насосы' } finally { loading.value = false }
+  } catch (reason) { error.value = formatApiError(reason, 'Не удалось загрузить насосы') } finally { loading.value = false }
 }
 const loadCatalog = async () => {
   loading.value = true; error.value = ''
   try {
     const response = await fastApiService.getPumpCatalog({ ...catalogFilters.value, page: catalogPage.value, page_size: 50 })
     catalog.value = response.items; catalogPages.value = response.pages
-  } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось загрузить каталог насосов' } finally { loading.value = false }
+  } catch (reason) { error.value = formatApiError(reason, 'Не удалось загрузить каталог насосов') } finally { loading.value = false }
 }
 const reloadInstalled = () => { installedPage.value = 1; void loadInstalled() }
 const reloadCatalog = () => { catalogPage.value = 1; void loadCatalog() }
@@ -878,11 +871,11 @@ const setCatalogStatus = (status: PumpCatalogStatus) => { catalogFilters.value.q
 
 const openInstalledDetails = async (pumpId: number) => {
   detailVisible.value = true; detailLoading.value = true; installedDetails.value = null; catalogDetails.value = null; isEditing.value = false
-  try { installedDetails.value = await fastApiService.getInstalledPump(pumpId) } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось открыть насос'; detailVisible.value = false } finally { detailLoading.value = false }
+  try { installedDetails.value = await fastApiService.getInstalledPump(pumpId) } catch (reason) { error.value = formatApiError(reason, 'Не удалось открыть насос'); detailVisible.value = false } finally { detailLoading.value = false }
 }
 const openCatalogDetails = async (standardPumpId: number) => {
   detailVisible.value = true; detailLoading.value = true; installedDetails.value = null; catalogDetails.value = null; isEditing.value = false
-  try { catalogDetails.value = await fastApiService.getStandardPump(standardPumpId) } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось открыть модель'; detailVisible.value = false } finally { detailLoading.value = false }
+  try { catalogDetails.value = await fastApiService.getStandardPump(standardPumpId) } catch (reason) { error.value = formatApiError(reason, 'Не удалось открыть модель'); detailVisible.value = false } finally { detailLoading.value = false }
 }
 const openDialog = async (scope: { pumpId?: number; standardPumpId?: number; lineId?: number } = {}) => {
   visible.value = true

@@ -470,6 +470,14 @@
           </v-row>
         </v-card-text>
         <v-divider />
+        <v-alert
+          v-if="isEditing && saveError"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mx-4 my-2"
+          data-testid="equipment-save-error"
+        >{{ saveError }}</v-alert>
         <v-card-actions class="px-4 py-3 bg-grey-lighten-4">
           <v-spacer />
           <v-btn
@@ -515,6 +523,7 @@ import { formatApiError } from '~/utils/apiError'
 import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
 import { beginEquipmentEdit, saveEquipmentEdit } from '~/services/equipmentEditService'
 import {
   fastApiService,
@@ -536,6 +545,7 @@ const emit = defineEmits<{
 }>()
 const { isMobile } = useMobile()
 const mutationsEnabled = useMutationsEnabled()
+const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
 const emptyLookups = (): NetworkDiaphragmLookups => ({ states: [], external_signs: [], locations: [], entry_marks: [], fragments: [], counts: {}, calculation_count: 0, result_count: 0 })
 const visible = ref(false)
 const detailVisible = ref(false)
@@ -565,6 +575,7 @@ const buildFields = () => {
 
 const startEdit = () => {
   isEditing.value = true
+  clearSaveError()
   beginEquipmentEdit('diaphragms', details.value?.id)
   editFields.value = {}
   for (const field of buildFields()) {
@@ -574,12 +585,15 @@ const startEdit = () => {
 
 const cancelEdit = () => {
   isEditing.value = false
+  clearSaveError()
   editFields.value = {}
 }
 
 const saveChanges = async () => {
   if (!details.value) return
+  const current = details.value
   saving.value = true
+  clearSaveError()
   try {
     const processedFields: Record<string, any> = {}
     for (const key in editFields.value) {
@@ -593,7 +607,7 @@ const saveChanges = async () => {
     isEditing.value = false
     await loadItems()
   } catch (cause) {
-    error.value = formatApiError(cause, 'Ошибка при сохранении')
+    reportSaveError(cause, () => openDetails(current.id))
   } finally {
     saving.value = false
   }
@@ -624,14 +638,14 @@ const loadLookups = async () => {
 const loadItems = async () => {
   loading.value = true; error.value = ''
   try { const response = await fastApiService.getNetworkDiaphragms({ ...filters.value, page: page.value, page_size: 50 }); items.value = response.items; pages.value = response.pages }
-  catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось загрузить диафрагмы' } finally { loading.value = false }
+  catch (reason) { error.value = formatApiError(reason, 'Не удалось загрузить диафрагмы') } finally { loading.value = false }
 }
 const reload = () => { page.value = 1; void loadItems() }
 const setQualityStatus = (status: NetworkDiaphragmQualityStatus) => { filters.value.quality_status = filters.value.quality_status === status ? undefined : status; reload() }
 const openDetails = async (diaphragmId: number) => {
   detailVisible.value = true; detailLoading.value = true; details.value = null; isEditing.value = false
   try { details.value = await fastApiService.getNetworkDiaphragm(diaphragmId) }
-  catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось открыть карточку диафрагмы'; detailVisible.value = false }
+  catch (reason) { error.value = formatApiError(reason, 'Не удалось открыть карточку диафрагмы'); detailVisible.value = false }
   finally { detailLoading.value = false }
 }
 const openDialog = async (scope: { diaphragmId?: number; lineId?: number } = {}) => {

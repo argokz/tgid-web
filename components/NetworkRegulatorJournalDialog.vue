@@ -544,6 +544,14 @@
             </v-col>
           </v-row>
         </v-card-text>
+        <v-alert
+          v-if="isEditing && saveError"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mx-4 my-2"
+          data-testid="equipment-save-error"
+        >{{ saveError }}</v-alert>
         <v-card-actions class="px-4 py-3 bg-grey-lighten-4">
           <v-spacer />
           <v-btn
@@ -674,6 +682,7 @@ import { formatApiError } from '~/utils/apiError'
 import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
 import { beginEquipmentEdit, saveEquipmentEdit } from '~/services/equipmentEditService'
 import {
   fastApiService,
@@ -702,6 +711,7 @@ const emit = defineEmits<{
 }>()
 const { isMobile } = useMobile()
 const mutationsEnabled = useMutationsEnabled()
+const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
 const emptyLookups = (): NetworkRegulatorLookups => ({ states: [], work_attributes: [], pipeline_signs: [], fragments: [], counts: {}, catalog_counts: {}, calculation_count: 0, result_count: 0 })
 const visible = ref(false)
 const detailVisible = ref(false)
@@ -783,6 +793,7 @@ const buildFields = () => {
 
 const startEdit = () => {
   isEditing.value = true
+  clearSaveError()
   beginEquipmentEdit(itemDetails.value ? getTableForType(itemDetails.value.regulator_type) : '', itemDetails.value?.id)
   editFields.value = {}
   const fields = buildFields()
@@ -793,12 +804,15 @@ const startEdit = () => {
 
 const cancelEdit = () => {
   isEditing.value = false
+  clearSaveError()
   editFields.value = {}
 }
 
 const saveChanges = async () => {
   if (!itemDetails.value) return
+  const current = itemDetails.value
   saving.value = true
+  clearSaveError()
   try {
     const table = getTableForType(itemDetails.value.regulator_type)
     if (!table) throw new Error('Неизвестный тип регулятора')
@@ -815,7 +829,7 @@ const saveChanges = async () => {
     isEditing.value = false
     await loadInventory()
   } catch (cause) {
-    error.value = formatApiError(cause, 'Ошибка при сохранении')
+    reportSaveError(cause, () => openItemDetails(current.regulator_type, current.id))
   } finally {
     saving.value = false
   }
@@ -857,14 +871,14 @@ const loadInventory = async () => {
   try {
     const response = await fastApiService.getNetworkRegulators({ ...filters.value, page: inventoryPage.value, page_size: 50 })
     inventory.value = response.items; inventoryPages.value = response.pages
-  } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось загрузить регуляторы' } finally { loading.value = false }
+  } catch (reason) { error.value = formatApiError(reason, 'Не удалось загрузить регуляторы') } finally { loading.value = false }
 }
 const loadCatalog = async () => {
   loading.value = true; error.value = ''
   try {
     const response = await fastApiService.getRegulatorCatalog({ ...catalogFilters.value, page: catalogPage.value, page_size: 50 })
     catalog.value = response.items; catalogPages.value = response.pages
-  } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось загрузить каталог регуляторов' } finally { loading.value = false }
+  } catch (reason) { error.value = formatApiError(reason, 'Не удалось загрузить каталог регуляторов') } finally { loading.value = false }
 }
 const reloadInventory = () => { inventoryPage.value = 1; void loadInventory() }
 const reloadCatalog = () => { catalogPage.value = 1; void loadCatalog() }
@@ -878,11 +892,11 @@ const setQualityStatus = (status: NetworkRegulatorQualityStatus) => {
 }
 const openItemDetails = async (regulatorType: NetworkRegulatorType, regulatorId: number) => {
   detailVisible.value = true; detailLoading.value = true; itemDetails.value = null; catalogDetails.value = null; isEditing.value = false
-  try { itemDetails.value = await fastApiService.getNetworkRegulator(regulatorType, regulatorId) } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось открыть карточку регулятора'; detailVisible.value = false } finally { detailLoading.value = false }
+  try { itemDetails.value = await fastApiService.getNetworkRegulator(regulatorType, regulatorId) } catch (reason) { error.value = formatApiError(reason, 'Не удалось открыть карточку регулятора'); detailVisible.value = false } finally { detailLoading.value = false }
 }
 const openCatalogDetails = async (catalogType: NetworkRegulatorType, catalogId: number) => {
   detailVisible.value = true; detailLoading.value = true; itemDetails.value = null; catalogDetails.value = null; isEditing.value = false
-  try { catalogDetails.value = await fastApiService.getRegulatorCatalogItem(catalogType, catalogId) } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось открыть паспорт регулятора'; detailVisible.value = false } finally { detailLoading.value = false }
+  try { catalogDetails.value = await fastApiService.getRegulatorCatalogItem(catalogType, catalogId) } catch (reason) { error.value = formatApiError(reason, 'Не удалось открыть паспорт регулятора'); detailVisible.value = false } finally { detailLoading.value = false }
 }
 const openDialog = async (scope: { regulatorType?: NetworkRegulatorType; regulatorId?: number; catalogType?: NetworkRegulatorType; catalogId?: number; lineId?: number } = {}) => {
   visible.value = true

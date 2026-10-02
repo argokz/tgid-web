@@ -523,6 +523,14 @@
           </v-row>
         </v-card-text>
         <v-divider />
+        <v-alert
+          v-if="isEditing && saveError"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mx-4 my-2"
+          data-testid="equipment-save-error"
+        >{{ saveError }}</v-alert>
         <v-card-actions class="px-4 py-3 bg-grey-lighten-4">
           <v-spacer />
           <v-btn
@@ -639,6 +647,7 @@ import { formatApiError } from '~/utils/apiError'
 import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
 import { beginEquipmentEdit, saveEquipmentEdit } from '~/services/equipmentEditService'
 import {
   fastApiService,
@@ -666,6 +675,7 @@ const emit = defineEmits<{
 }>()
 const { isMobile } = useMobile()
 const mutationsEnabled = useMutationsEnabled()
+const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
 const emptyLookups = (): NetworkBypassLookups => ({ states: [], pipeline_signs: [], standards: [], tube_standards: [], fragments: [], counts: {}, tube_counts: {}, calculation_count: 0, result_count: 0 })
 const visible = ref(false)
 const detailVisible = ref(false)
@@ -713,6 +723,7 @@ const buildFields = () => {
 
 const startEdit = () => {
   isEditing.value = true
+  clearSaveError()
   beginEquipmentEdit('bypass', itemDetails.value?.id)
   editFields.value = {}
   const fields = buildFields()
@@ -723,12 +734,15 @@ const startEdit = () => {
 
 const cancelEdit = () => {
   isEditing.value = false
+  clearSaveError()
   editFields.value = {}
 }
 
 const saveChanges = async () => {
   if (!itemDetails.value) return
+  const current = itemDetails.value
   saving.value = true
+  clearSaveError()
   try {
     const processedFields: Record<string, any> = {}
     for (const key in editFields.value) {
@@ -742,7 +756,7 @@ const saveChanges = async () => {
     isEditing.value = false
     await loadInventory()
   } catch (cause) {
-    error.value = formatApiError(cause, 'Ошибка при сохранении')
+    reportSaveError(cause, () => openItemDetails(current.id))
   } finally {
     saving.value = false
   }
@@ -768,12 +782,12 @@ const loadLookups = async () => {
 const loadInventory = async () => {
   loading.value = true; error.value = ''
   try { const response = await fastApiService.getNetworkBypasses({ ...filters.value, page: inventoryPage.value, page_size: 50 }); inventory.value = response.items; inventoryPages.value = response.pages }
-  catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось загрузить байпасы' } finally { loading.value = false }
+  catch (reason) { error.value = formatApiError(reason, 'Не удалось загрузить байпасы') } finally { loading.value = false }
 }
 const loadTubes = async () => {
   loading.value = true; error.value = ''
   try { const response = await fastApiService.getStandardTubes({ ...tubeFilters.value, page: tubePage.value, page_size: 50 }); tubes.value = response.items; tubePages.value = response.pages }
-  catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось загрузить стандартные трубы' } finally { loading.value = false }
+  catch (reason) { error.value = formatApiError(reason, 'Не удалось загрузить стандартные трубы') } finally { loading.value = false }
 }
 const reloadInventory = () => { inventoryPage.value = 1; void loadInventory() }
 const reloadTubes = () => { tubePage.value = 1; void loadTubes() }
@@ -781,11 +795,11 @@ const onTabChange = (tab: unknown) => { if (tab === 'tubes' && !tubes.value.leng
 const setQualityStatus = (status: NetworkBypassQualityStatus) => { filters.value.quality_status = filters.value.quality_status === status ? undefined : status; reloadInventory() }
 const openItemDetails = async (bypassId: number) => {
   detailVisible.value = true; detailLoading.value = true; itemDetails.value = null; tubeDetails.value = null; isEditing.value = false
-  try { itemDetails.value = await fastApiService.getNetworkBypass(bypassId) } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось открыть карточку байпаса'; detailVisible.value = false } finally { detailLoading.value = false }
+  try { itemDetails.value = await fastApiService.getNetworkBypass(bypassId) } catch (reason) { error.value = formatApiError(reason, 'Не удалось открыть карточку байпаса'); detailVisible.value = false } finally { detailLoading.value = false }
 }
 const openTubeDetails = async (tubeId: number) => {
   detailVisible.value = true; detailLoading.value = true; itemDetails.value = null; tubeDetails.value = null; isEditing.value = false
-  try { tubeDetails.value = await fastApiService.getStandardTube(tubeId) } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось открыть паспорт трубы'; detailVisible.value = false } finally { detailLoading.value = false }
+  try { tubeDetails.value = await fastApiService.getStandardTube(tubeId) } catch (reason) { error.value = formatApiError(reason, 'Не удалось открыть паспорт трубы'); detailVisible.value = false } finally { detailLoading.value = false }
 }
 const openDialog = async (scope: { bypassId?: number; standardTubeId?: number; lineId?: number } = {}) => {
   visible.value = true; await loadLookups()

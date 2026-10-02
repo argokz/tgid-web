@@ -539,6 +539,14 @@
           </v-col>
         </v-row>
         <v-divider />
+        <v-alert
+          v-if="isEditing && saveError"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mx-4 my-2"
+          data-testid="equipment-save-error"
+        >{{ saveError }}</v-alert>
         <v-card-actions class="px-4 py-3 bg-grey-lighten-4">
           <v-spacer />
           <template v-if="!isEditing">
@@ -660,6 +668,7 @@ import { formatApiError } from '~/utils/apiError'
 import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
 import { beginEquipmentEdit, saveEquipmentEdit } from '~/services/equipmentEditService'
 import {
   fastApiService,
@@ -688,6 +697,7 @@ const emit = defineEmits<{
 }>()
 const { isMobile } = useMobile()
 const mutationsEnabled = useMutationsEnabled()
+const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
 const emptyLookups = (): NetworkArmatureLookups => ({ states: [], purposes: [], fragments: [], counts: {}, catalog_count: 0, calculation_count: 0, damper_result_count: 0, regulating_result_count: 0, passport_asset_count: 0 })
 const visible = ref(false)
 const detailVisible = ref(false)
@@ -729,6 +739,7 @@ const buildFields = () => {
 
 const startEdit = () => {
   isEditing.value = true
+  clearSaveError()
   beginEquipmentEdit(itemDetails.value?.equipment_type === 'damper' ? 'dampers' : 'regularmatures', itemDetails.value?.id)
   editFields.value = {}
   for (const field of buildFields()) {
@@ -738,12 +749,15 @@ const startEdit = () => {
 
 const cancelEdit = () => {
   isEditing.value = false
+  clearSaveError()
   editFields.value = {}
 }
 
 const saveChanges = async () => {
   if (!itemDetails.value) return
+  const current = itemDetails.value
   saving.value = true
+  clearSaveError()
   try {
     const table = itemDetails.value.equipment_type === 'damper' ? 'dampers' : 'regularmatures'
     
@@ -761,7 +775,7 @@ const saveChanges = async () => {
     isEditing.value = false
     await loadInventory()
   } catch (cause) {
-    error.value = formatApiError(cause, 'Ошибка при сохранении')
+    reportSaveError(cause, () => openItemDetails(current.equipment_type, current.id))
   } finally {
     saving.value = false
   }
@@ -796,14 +810,14 @@ const loadInventory = async () => {
   try {
     const response = await fastApiService.getNetworkArmatures({ ...filters.value, page: inventoryPage.value, page_size: 50 })
     inventory.value = response.items; inventoryPages.value = response.pages
-  } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось загрузить арматуру' } finally { loading.value = false }
+  } catch (reason) { error.value = formatApiError(reason, 'Не удалось загрузить арматуру') } finally { loading.value = false }
 }
 const loadCatalog = async () => {
   loading.value = true; error.value = ''
   try {
     const response = await fastApiService.getStandardDampers({ ...catalogFilters.value, page: catalogPage.value, page_size: 50 })
     catalog.value = response.items; catalogPages.value = response.pages
-  } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось загрузить каталог задвижек' } finally { loading.value = false }
+  } catch (reason) { error.value = formatApiError(reason, 'Не удалось загрузить каталог задвижек') } finally { loading.value = false }
 }
 const reloadInventory = () => { inventoryPage.value = 1; void loadInventory() }
 const reloadCatalog = () => { catalogPage.value = 1; void loadCatalog() }
@@ -817,11 +831,11 @@ const setQualityStatus = (status: NetworkArmatureQualityStatus) => {
 }
 const openItemDetails = async (equipmentType: NetworkArmatureType, armatureId: number) => {
   detailVisible.value = true; detailLoading.value = true; itemDetails.value = null; catalogDetails.value = null; isEditing.value = false
-  try { itemDetails.value = await fastApiService.getNetworkArmature(equipmentType, armatureId) } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось открыть карточку арматуры'; detailVisible.value = false } finally { detailLoading.value = false }
+  try { itemDetails.value = await fastApiService.getNetworkArmature(equipmentType, armatureId) } catch (reason) { error.value = formatApiError(reason, 'Не удалось открыть карточку арматуры'); detailVisible.value = false } finally { detailLoading.value = false }
 }
 const openCatalogDetails = async (standardId: number) => {
   detailVisible.value = true; detailLoading.value = true; itemDetails.value = null; catalogDetails.value = null; isEditing.value = false
-  try { catalogDetails.value = await fastApiService.getStandardDamper(standardId) } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось открыть паспорт задвижки'; detailVisible.value = false } finally { detailLoading.value = false }
+  try { catalogDetails.value = await fastApiService.getStandardDamper(standardId) } catch (reason) { error.value = formatApiError(reason, 'Не удалось открыть паспорт задвижки'); detailVisible.value = false } finally { detailLoading.value = false }
 }
 const openDialog = async (scope: { equipmentType?: NetworkArmatureType; armatureId?: number; standardId?: number; lineId?: number } = {}) => {
   visible.value = true

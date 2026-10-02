@@ -6,7 +6,7 @@
  * и saveEquipmentEdit() при сохранении: уходят только изменённые поля с версией.
  */
 import { fastApiService } from '~/services/fastApiService';
-import { apiErrorText } from '~/utils/groupSetters';
+import { formatApiError } from '~/utils/apiError';
 
 export interface EquipmentField {
   name: string;
@@ -73,6 +73,21 @@ export function changedEquipmentFields(
   return out;
 }
 
+export const EQUIPMENT_CONFLICT_TEXT =
+  'Объект изменён другим пользователем — перезагрузите карточку и повторите правку.';
+
+/** 409: строку изменили после входа в правку (версия xmin не совпала) */
+export class EquipmentConflictError extends Error {
+  readonly conflict = true;
+  constructor(message = EQUIPMENT_CONFLICT_TEXT) {
+    super(message);
+    this.name = 'EquipmentConflictError';
+  }
+}
+
+export const isEquipmentConflict = (e: unknown): boolean =>
+  e instanceof EquipmentConflictError || (e as { conflict?: unknown } | null)?.conflict === true;
+
 const snapshots = new Map<string, Promise<EquipmentRecord>>();
 const snapKey = (table: string, id: number | string) => `${table}:${id}`;
 
@@ -104,8 +119,8 @@ export async function saveEquipmentEdit(
   } catch (e: any) {
     if (e?.status === 409 || e?.statusCode === 409) {
       snapshots.delete(key);
-      throw new Error('Объект изменён другим пользователем — закройте правку и откройте карточку заново.');
+      throw new EquipmentConflictError();
     }
-    throw new Error(apiErrorText(e, 'Ошибка при сохранении'));
+    throw new Error(formatApiError(e, 'Ошибка при сохранении'));
   }
 }
