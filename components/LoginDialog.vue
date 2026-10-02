@@ -69,6 +69,7 @@
 
 <script setup lang="ts">
 import { fastApiService } from '~/services/fastApiService'
+import { formatApiError } from '~/utils/apiError'
 
 const visible = defineModel<boolean>({ default: false })
 
@@ -92,7 +93,7 @@ watch(visible, async (open) => {
   if (!open) return
   error.value = ''
   password.value = ''
-  username.value = authStore.username || 'editor'
+  username.value = authStore.username || authStore.lastUsername || 'editor'
   try {
     const cfg = await fastApiService.getAuthConfig()
     allowRolePick.value = Boolean(cfg.dev_login_enabled || cfg.auth_disabled)
@@ -117,7 +118,8 @@ const submit = async () => {
     notify.showSuccess(`Вход: ${authStore.username} (${authStore.role})`)
     close()
   } catch (err: any) {
-    error.value = err?.message || String(err)
+    // 401 входа — «Неверный логин или пароль» (QA F72)
+    error.value = formatApiError(err, 'Не удалось войти')
   } finally {
     loading.value = false
   }

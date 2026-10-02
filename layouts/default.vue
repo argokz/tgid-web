@@ -329,6 +329,11 @@ onMounted(() => {
 
 const roleLabel = computed(() => ROLE_LABELS[authStore.role as Role] || authStore.role || 'пользователь');
 
+// Сессия истекла (exp или 401) — открыть форму входа (QA F71)
+watch(() => authStore.loginPrompt, () => {
+  showLogin.value = true;
+});
+
 // Роль понизили или вышли из учётной записи — окно расчёта закрывается
 watch(() => authStore.canCalculate, (allowed) => {
   if (!allowed) showCalculationModal.value = false;

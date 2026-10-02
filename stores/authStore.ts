@@ -1,9 +1,15 @@
 import { defineStore } from 'pinia'
 import { computePermissions, type Permissions } from '~/utils/permissions'
+import { isJwtExpired } from '~/utils/jwt'
+import { SESSION_EXPIRED_TEXT } from '~/utils/apiError'
+import { useNotificationStore } from '~/stores/notificationStore'
 
 const TOKEN_KEY = 'itwin_access_token'
 const ROLE_KEY = 'itwin_user_role'
 const USER_KEY = 'itwin_username'
+/** Проверка exp токена по таймеру (QA F71) */
+const EXPIRY_CHECK_MS = 30_000
+let expiryTimer: ReturnType<typeof setInterval> | null = null
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -16,6 +22,10 @@ export const useAuthStore = defineStore('auth', {
     authDisabled: false as boolean,
     mutationsEnabledServer: false as boolean,
     topologyMutationsEnabledServer: false as boolean,
+    /** Счётчик запросов открыть форму входа (истёкшая сессия); layout открывает LoginDialog */
+    loginPrompt: 0,
+    /** Логин истёкшей сессии — подставляется в форму входа */
+    lastUsername: '' as string,
   }),
   getters: {
     isAuthenticated: (state) => Boolean(state.accessToken),
@@ -61,9 +71,39 @@ export const useAuthStore = defineStore('auth', {
       this.role = localStorage.getItem(ROLE_KEY) || ''
       this.username = localStorage.getItem(USER_KEY) || ''
       this.loaded = true
+      void import('~/services/fastApiService').then(({ setUnauthorizedHandler }) => {
+        setUnauthorizedHandler(() => this.expireSession())
+      })
+      if (!expiryTimer) {
+        expiryTimer = setInterval(() => this.checkTokenExpiry(), EXPIRY_CHECK_MS)
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') this.checkTokenExpiry()
+        })
+      }
       void this.loadConfig().then(() => {
+        this.checkTokenExpiry()
         if (this.accessToken || this.authDisabled) void this.refreshMe()
       })
+    },
+    /** Токен истёк по exp — сбросить сессию до первого отказа сервера */
+    checkTokenExpiry() {
+      if (this.accessToken && isJwtExpired(this.accessToken)) this.expireSession()
+    },
+    /**
+     * Сессия истекла (exp или 401 сервера): выйти, предупредить и открыть форму входа.
+     * При AUTH_DISABLED токен не нужен — выходим молча.
+     */
+    expireSession() {
+      if (!this.accessToken) return
+      const username = this.username
+      this.logout()
+      this.lastUsername = username
+      if (this.authDisabled) return
+      useNotificationStore().notify('warning', SESSION_EXPIRED_TEXT, {
+        label: 'Войти',
+        handler: () => { this.loginPrompt += 1 },
+      })
+      this.loginPrompt += 1
     },
     /** Публичные флаги сервера: AUTH_DISABLED, MUTATIONS_ENABLED, TOPOLOGY_MUTATIONS_ENABLED */
     async loadConfig() {
@@ -112,11 +152,10 @@ export const useAuthStore = defineStore('auth', {
           localStorage.setItem(USER_KEY, me.username)
           localStorage.setItem(ROLE_KEY, me.role)
         }
-      } catch {
-        // Токен истёк или учётная запись заблокирована (401) — выходим тихо
-        if (!this.authDisabled) {
-          this.logout()
-        }
+      } catch (error: any) {
+        // 401 (токен истёк, учётная запись заблокирована) — сессия сброшена с уведомлением;
+        // сеть/5xx — сессию не трогаем
+        if (!this.authDisabled && error?.status === 401) this.expireSession()
       }
     },
     /** Production login: role comes from UsersDB, not from the client. */
