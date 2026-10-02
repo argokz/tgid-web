@@ -9,12 +9,13 @@
       tag="header"
     >
       <v-btn
-        v-if="mobile"
+        v-if="navCollapsed"
         icon
         variant="text"
         class="ms-1"
         aria-label="Открыть меню"
-        @click="mainMenuOpen = true"
+        :aria-expanded="mainMenuOpen"
+        @click="mainMenuOpen = !mainMenuOpen"
       >
         <v-icon>mdi-menu</v-icon>
       </v-btn>
@@ -22,7 +23,7 @@
       <!-- Брендинг -->
       <div
         class="app-brand d-flex align-center"
-        :class="mobile ? 'ms-1 me-2' : 'ms-3 me-4'"
+        :class="navCollapsed ? 'ms-1 me-2' : 'ms-3 me-4'"
       >
         <v-icon
           size="26"
@@ -33,148 +34,57 @@
         <span class="brand-subtitle">Map</span>
       </div>
 
-      <!-- Навигация (десктоп) -->
+      <!-- Навигация: кнопки в шапке, на узком экране — в выдвижном меню (QA F1, F57) -->
       <nav
-        v-if="!mobile"
+        v-if="!navCollapsed"
         class="nav-links d-flex align-center"
       >
-        <v-btn
-          v-for="link in links"
-          :key="link.to"
-          :to="link.to"
-          :prepend-icon="link.icon"
-          :color="isActive(link.to) ? 'primary' : undefined"
-          :class="['nav-btn', { 'active-link': isActive(link.to) }]"
-          variant="text"
-          rounded="lg"
-          size="small"
+        <template
+          v-for="(item, index) in menuItems"
+          :key="item.id"
         >
-          {{ link.text }}
-        </v-btn>
-
-        <!-- Запуск расчёта sety: роль calculator+ (сервер проверяет то же) -->
-        <v-btn
-          v-if="isHydrated && authStore.canCalculate"
-          prepend-icon="mdi-calculator-variant"
-          :color="showCalculationModal ? 'primary' : undefined"
-          :class="['nav-btn', 'ms-1', { 'active-link': showCalculationModal }]"
-          variant="text"
-          rounded="lg"
-          size="small"
-          @click="showCalculationModal = true"
-        >
-          Расчет
-        </v-btn>
-
-        <v-btn
-          prepend-icon="mdi-console-line"
-          :color="showProtocol ? 'primary' : undefined"
-          :class="['nav-btn', 'ms-1', { 'active-link': showProtocol }]"
-          variant="text"
-          rounded="lg"
-          size="small"
-          @click="showProtocol = !showProtocol"
-        >
-          {{ showProtocol ? 'Скрыть протокол' : 'Протокол' }}
-        </v-btn>
-
-        <v-btn
-          prepend-icon="mdi-toolbox-outline"
-          :color="uiStore.toolsPanelOpen ? 'primary' : undefined"
-          :class="['nav-btn', 'ms-1', { 'active-link': uiStore.toolsPanelOpen }]"
-          variant="text"
-          rounded="lg"
-          size="small"
-          @click="uiStore.toggleToolsPanel()"
-        >
-          Инструменты
-        </v-btn>
-
-        <v-menu offset-y>
-          <template #activator="{ props }">
-            <v-btn
-              v-bind="props"
-              prepend-icon="mdi-export"
-              class="nav-btn ms-1"
-              variant="text"
-              rounded="lg"
-              size="small"
-              :loading="exportingShp || exportingDxf || exportingGeoJson"
-            >
-              Экспорт
-            </v-btn>
-          </template>
-          <v-list density="compact">
-            <v-list-item
-              title="SHP (узлы и участки, zip)"
-              prepend-icon="mdi-export"
-              @click="downloadShp"
-            />
-            <v-list-item
-              title="DXF (линии участков)"
-              prepend-icon="mdi-vector-polyline"
-              @click="downloadDxf"
-            />
-            <v-list-item
-              title="GeoJSON (геометрия и паспорт)"
-              prepend-icon="mdi-code-json"
-              @click="downloadGeoJson(false)"
-            />
-            <v-list-item
-              title="GeoJSON с атрибутами (L, D, K_E)"
-              subtitle="Для ZuluGIS/QGIS: короткие имена полей"
-              prepend-icon="mdi-code-json"
-              @click="downloadGeoJson(true)"
-            />
-          </v-list>
-        </v-menu>
-
-        <v-menu offset-y>
-          <template #activator="{ props }">
-            <v-btn
-              v-bind="props"
-              prepend-icon="mdi-file-excel"
-              class="nav-btn ms-1"
-              variant="text"
-              rounded="lg"
-              size="small"
-            >
-              Ведомости Excel
-            </v-btn>
-          </template>
-          <v-list density="compact">
-            <v-list-item
-              title="Участки теплопроводов"
-              prepend-icon="mdi-pipe"
-              @click="downloadExcel('ut')"
-            />
-            <v-list-item
-              title="Задвижки и арматура"
-              prepend-icon="mdi-valve"
-              @click="downloadExcel('zd')"
-            />
-            <v-list-item
-              title="Байпасы"
-              prepend-icon="mdi-dip-switch"
-              @click="downloadExcel('bp')"
-            />
-            <v-list-item
-              title="Насосные агрегаты"
-              prepend-icon="mdi-water-pump"
-              @click="downloadExcel('ns')"
-            />
-            <v-list-item
-              title="Потребители"
-              prepend-icon="mdi-home-city"
-              @click="downloadExcel('pt')"
-            />
-            <v-list-item
-              title="Технические условия"
-              prepend-icon="mdi-file-certificate-outline"
-              @click="downloadExcel('tu')"
-            />
-          </v-list>
-        </v-menu>
+          <v-menu
+            v-if="item.children"
+            offset-y
+          >
+            <template #activator="{ props }">
+              <v-btn
+                v-bind="props"
+                :prepend-icon="item.icon"
+                :class="['nav-btn', { 'ms-1': index > 0 }]"
+                variant="text"
+                rounded="lg"
+                size="small"
+                :loading="isItemBusy(item)"
+              >
+                {{ item.title }}
+              </v-btn>
+            </template>
+            <v-list density="compact">
+              <v-list-item
+                v-for="child in item.children"
+                :key="child.id"
+                :title="child.title"
+                :subtitle="child.subtitle"
+                :prepend-icon="child.icon"
+                @click="runMenuAction(child)"
+              />
+            </v-list>
+          </v-menu>
+          <v-btn
+            v-else
+            :to="routeOf(item)"
+            :prepend-icon="item.icon"
+            :color="isItemActive(item) ? 'primary' : undefined"
+            :class="['nav-btn', { 'ms-1': index > 0, 'active-link': isItemActive(item) }]"
+            variant="text"
+            rounded="lg"
+            size="small"
+            @click="runMenuAction(item)"
+          >
+            {{ item.title }}
+          </v-btn>
+        </template>
       </nav>
 
       <v-spacer />
@@ -248,6 +158,69 @@
       </v-menu>
     </v-app-bar>
 
+    <!-- Меню гамбургера: те же пункты и права, что у кнопок шапки -->
+    <v-navigation-drawer
+      v-if="navCollapsed"
+      v-model="mainMenuOpen"
+      temporary
+      location="left"
+      width="300"
+      class="main-menu-drawer"
+      aria-label="Главное меню"
+    >
+      <v-list
+        density="comfortable"
+        nav
+        color="primary"
+      >
+        <template
+          v-for="item in menuItems"
+          :key="item.id"
+        >
+          <v-list-group
+            v-if="item.children"
+            :value="item.id"
+          >
+            <template #activator="{ props }">
+              <v-list-item
+                v-bind="props"
+                :prepend-icon="item.icon"
+                :title="item.title"
+              >
+                <template
+                  v-if="isItemBusy(item)"
+                  #append
+                >
+                  <v-progress-circular
+                    indeterminate
+                    size="18"
+                    width="2"
+                    class="me-2"
+                  />
+                </template>
+              </v-list-item>
+            </template>
+            <v-list-item
+              v-for="child in item.children"
+              :key="child.id"
+              :title="child.title"
+              :subtitle="child.subtitle"
+              :prepend-icon="child.icon"
+              @click="onDrawerItem(child)"
+            />
+          </v-list-group>
+          <v-list-item
+            v-else
+            :to="routeOf(item)"
+            :prepend-icon="item.icon"
+            :title="item.title"
+            :active="isItemActive(item)"
+            @click="onDrawerItem(item)"
+          />
+        </template>
+      </v-list>
+    </v-navigation-drawer>
+
     <!-- Деградация API: видно сразу, а не через пустые диалоги -->
     <v-alert
       v-if="!apiHealth.reachable || apiHealth.outdatedRoutes || !apiHealth.redisOk"
@@ -310,7 +283,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useMobile } from '~/composables/useMobile';
 import { apiHealth, describeExcelReportTruncation, fastApiService, refreshApiHealth } from '~/services/fastApiService';
@@ -322,14 +295,16 @@ import PlanningCalculationModal from '~/components/PlanningCalculationModal.vue'
 import CalculationProtocol from '~/components/CalculationProtocol.vue';
 import LoginDialog from '~/components/LoginDialog.vue';
 import { ROLE_LABELS, type Role } from '~/utils/permissions';
+import { buildHeaderMenu, isHeaderNavCollapsed, type HeaderMenuItem } from '~/utils/headerMenu';
 
-const { isMobile } = useMobile();
+const { screenWidth } = useMobile();
 // SSR не знает ширину окна и рендерит десктопную шапку; до монтирования клиент
 // обязан отрисовать то же самое, иначе гидратация расходится (кнопка меню,
 // классы брендинга, кнопки навигации). Мобильная раскладка и кнопки по роли
 // (роль/флаги сервера приходят из localStorage и /auth/config) — только после mount.
 const isHydrated = ref(false);
-const mobile = computed(() => isHydrated.value && isMobile.value);
+// Пункты шапки не помещаются уже на планшете: ниже порога — гамбургер и выдвижное меню
+const navCollapsed = computed(() => isHydrated.value && isHeaderNavCollapsed(screenWidth.value));
 const route = useRoute();
 const authStore = useAuthStore();
 const notificationStore = useNotificationStore();
@@ -356,11 +331,62 @@ watch(() => authStore.canCalculate, (allowed) => {
   if (!allowed) showCalculationModal.value = false;
 });
 
-const links = [
-  { text: 'Карта', to: '/', icon: 'mdi-map' }
-];
+// Экран расширили — меню гамбургера больше не нужно
+watch(navCollapsed, (collapsed) => {
+  if (!collapsed) mainMenuOpen.value = false;
+});
 
-const isActive = (to: string) => route.path === to;
+// Временный v-navigation-drawer сам по Esc не закрывается
+const onMenuKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') mainMenuOpen.value = false;
+};
+watch(mainMenuOpen, (open) => {
+  if (open) window.addEventListener('keydown', onMenuKeydown);
+  else window.removeEventListener('keydown', onMenuKeydown);
+});
+onBeforeUnmount(() => window.removeEventListener('keydown', onMenuKeydown));
+
+const menuItems = computed(() => buildHeaderMenu(
+  { canCalculate: isHydrated.value && authStore.canCalculate },
+  { protocolOpen: showProtocol.value },
+));
+
+const routeOf = (item: HeaderMenuItem) => (item.action?.kind === 'route' ? item.action.to : undefined);
+
+const isItemActive = (item: HeaderMenuItem): boolean => {
+  switch (item.action?.kind) {
+    case 'route': return route.path === item.action.to;
+    case 'calculation': return showCalculationModal.value;
+    case 'protocol': return showProtocol.value;
+    case 'tools': return uiStore.toolsPanelOpen;
+    default: return false;
+  }
+};
+
+const isItemBusy = (item: HeaderMenuItem) =>
+  item.id === 'export' && (exportingShp.value || exportingDxf.value || exportingGeoJson.value);
+
+const runMenuAction = (item: HeaderMenuItem) => {
+  const action = item.action;
+  if (!action) return;
+  switch (action.kind) {
+    case 'route': return; // переход делает :to
+    case 'calculation': showCalculationModal.value = true; return;
+    case 'protocol': showProtocol.value = !showProtocol.value; return;
+    case 'tools': uiStore.toggleToolsPanel(); return;
+    case 'export':
+      if (action.format === 'shp') void downloadShp();
+      else if (action.format === 'dxf') void downloadDxf();
+      else void downloadGeoJson(action.format === 'geojson-attrs');
+      return;
+    case 'excel': void downloadExcel(action.docType); return;
+  }
+};
+
+const onDrawerItem = (item: HeaderMenuItem) => {
+  mainMenuOpen.value = false;
+  runMenuAction(item);
+};
 
 const onCalculationLog = (log: any) => {
   if (protocolRef.value) {
