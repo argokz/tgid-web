@@ -15,7 +15,7 @@
 
         icon
 
-        size="large"
+        size="default"
 
         elevation="4"
 
@@ -184,7 +184,12 @@
 
     <!-- Control buttons (right column) -->
 
-    <div class="control-buttons">
+    <div
+      class="control-buttons"
+      role="toolbar"
+      aria-label="Инструменты карты"
+      aria-orientation="vertical"
+    >
 
       <!-- Поиск узлов -->
       <v-tooltip
@@ -195,7 +200,7 @@
           <v-btn
             v-bind="tp"
             icon
-            size="large"
+            size="default"
             elevation="4"
             color="white"
             class="control-btn"
@@ -216,10 +221,10 @@
           <v-btn
             v-bind="tp"
             icon
-            size="large"
+            size="default"
             elevation="4"
             :color="uiStore.toolsPanelOpen ? 'primary' : 'white'"
-            class="control-btn mt-2"
+            class="control-btn"
             aria-label="Инструменты: журналы, реестры, отчёты"
             @click="uiStore.toggleToolsPanel()"
           >
@@ -237,10 +242,10 @@
           <v-btn
             v-bind="tp"
             icon
-            size="large"
+            size="default"
             elevation="4"
             :color="uiStore.drawPanelOpen ? 'primary' : 'white'"
-            class="control-btn mt-2"
+            class="control-btn"
             aria-label="Рисование и измерения"
             @click="uiStore.toggleDrawPanel()"
           >
@@ -260,10 +265,10 @@
           <v-btn
             v-bind="tp"
             icon
-            size="large"
+            size="default"
             elevation="4"
             :color="isEditTopologyMode ? 'red' : 'white'"
-            class="control-btn mt-2"
+            class="control-btn"
             aria-label="Редактировать топологию сети"
             @click="$emit('toggle-edit-topology-mode')"
           >
@@ -288,7 +293,7 @@
 
             icon
 
-            size="large"
+            size="default"
 
             elevation="4"
 
@@ -329,7 +334,7 @@
 
             icon
 
-            size="large"
+            size="default"
 
             elevation="4"
 
@@ -368,7 +373,7 @@
 
             icon
 
-            size="large"
+            size="default"
 
             elevation="4"
 
@@ -405,7 +410,7 @@
 
             icon
 
-            size="large"
+            size="default"
 
             elevation="4"
 
@@ -442,7 +447,7 @@
 
             icon
 
-            size="large"
+            size="default"
 
             elevation="4"
 
@@ -466,6 +471,18 @@
       </v-tooltip>
 
 
+    </div>
+
+
+    <!-- Зум и подложка — отдельный нижний блок: всегда на экране, даже когда верхняя колонка прокручивается (QA F17, F59) -->
+
+    <div
+      class="control-buttons-bottom"
+      role="toolbar"
+      aria-label="Масштаб и подложка"
+      aria-orientation="vertical"
+    >
+
       <!-- Zoom In -->
 
       <v-tooltip
@@ -481,7 +498,7 @@
 
             icon
 
-            size="large"
+            size="default"
 
             elevation="4"
 
@@ -518,7 +535,7 @@
 
             icon
 
-            size="large"
+            size="default"
 
             elevation="4"
 
@@ -562,7 +579,7 @@
 
                 icon
 
-                size="large"
+                size="default"
 
                 elevation="4"
 
@@ -1024,22 +1041,25 @@ defineExpose({ identifyMode })
 
 <style scoped>
 
+/*
+ * Колонка от шапки до атрибуции карты (QA F17, F59): верхняя группа кнопок
+ * прокручивается, если не влезает по высоте; зум и подложка — внизу и видны всегда.
+ * Сама колонка прозрачна для мыши, чтобы промежуток между группами не мешал карте.
+ */
 .map-controls {
-
   position: fixed;
-
   top: 68px; /* 56px app bar + 12px gap */
-
   right: 12px;
-
+  bottom: 36px; /* над строкой атрибуции MapLibre */
   z-index: 200;
-
   display: flex;
-
   flex-direction: column;
-
+  align-items: flex-end;
   gap: 8px;
-
+  pointer-events: none;
+}
+.map-controls > * {
+  pointer-events: auto;
 }
 
 
@@ -1054,7 +1074,7 @@ defineExpose({ identifyMode })
 
 .search-panel-expanded {
 
-  width: 420px;
+  width: min(420px, calc(100vw - 24px));
 
   background: rgba(255, 255, 255, 0.98);
 
@@ -1067,9 +1087,9 @@ defineExpose({ identifyMode })
 
 @keyframes expandSearch {
 
-  from { width: 56px; opacity: 0; transform: scale(0.9); }
+  from { opacity: 0; transform: scale(0.9); }
 
-  to { width: 420px; opacity: 1; transform: scale(1); }
+  to { opacity: 1; transform: scale(1); }
 
 }
 
@@ -1119,15 +1139,25 @@ defineExpose({ identifyMode })
 
 
 .control-buttons {
-
   display: flex;
-
   flex-direction: column;
-
+  gap: 6px;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  /* место под тень и увеличение при наведении, иначе их обрежет overflow */
+  padding: 4px 6px;
+  margin: -4px -6px;
+}
+.control-buttons-bottom {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-
-  align-self: flex-end;
-
+  flex: none;
+  margin-top: auto;
 }
 
 
