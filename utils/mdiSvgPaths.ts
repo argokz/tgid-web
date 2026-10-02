@@ -127,6 +127,7 @@ import {
   mdiMagnify,
   mdiMagnifyScan,
   mdiMap,
+  mdiMapCheckOutline,
   mdiMapClockOutline,
   mdiMapLegend,
   mdiMapMarker,
@@ -343,6 +344,7 @@ const byExportName: Record<string, string> = {
   mdiMagnify,
   mdiMagnifyScan,
   mdiMap,
+  mdiMapCheckOutline,
   mdiMapClockOutline,
   mdiMapLegend,
   mdiMapMarker,
@@ -454,7 +456,7 @@ export function resolveMdiSvgPath(rawName: string): string {
 
     .replace(/^mdi-/, '')
 
-    .replace(/-([a-z])/g, (_: string, c: string) => c.toUpperCase())
+    .replace(/-([a-z0-9])/g, (_: string, c: string) => c.toUpperCase())
 
   const iconKey = 'mdi' + camelKey.charAt(0).toUpperCase() + camelKey.slice(1)
 
