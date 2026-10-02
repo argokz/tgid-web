@@ -436,6 +436,12 @@ import {
   type ConsumerLoadSummary,
   type ConsumerLoadType,
 } from '~/services/fastApiService'
+import {
+  DEFAULT_CONSUMER_LOAD_FILTERS,
+  consumerLoadFiltersForScope,
+  type ConsumerLoadFilters,
+  type ConsumerLoadScope,
+} from '~/utils/consumerLoadScope'
 
 const DetailValue = defineComponent({
   props: {
@@ -464,13 +470,7 @@ const page = ref(1)
 const pages = ref(0)
 const total = ref(0)
 const lookups = ref<ConsumerLoadLookups>({ states: [], fragments: [], counts: {}, calculation_warning: null })
-const filters = reactive<{
-  diagnostic?: ConsumerLoadDiagnosticKind
-  consumer_type?: ConsumerLoadType
-  fragment_id?: number
-  state_id?: number
-  search?: string
-}>({ diagnostic: 'zero_load' })
+const filters = reactive<ConsumerLoadFilters>({ ...DEFAULT_CONSUMER_LOAD_FILTERS })
 const consumerTypeOptions = [
   { title: 'Обобщённый', value: 'generalized' },
   { title: 'Реальный', value: 'real' },
@@ -515,7 +515,11 @@ async function loadPage() {
   } finally { loading.value = false }
 }
 async function reload() { page.value = 1; await loadPage() }
-async function selectDiagnostic(kind: ConsumerLoadDiagnosticKind) { filters.diagnostic = kind; await reload() }
+// Повторный клик снимает фильтр вида: журнал по всем потребителям (после открытия из карточки)
+async function selectDiagnostic(kind: ConsumerLoadDiagnosticKind) {
+  filters.diagnostic = filters.diagnostic === kind ? undefined : kind
+  await reload()
+}
 
 function exportCsv() {
   if (!items.value || items.value.length === 0) return
@@ -559,11 +563,13 @@ function locateDetails() {
   visible.value = false
   detailsVisible.value = false
 }
-async function openDialog(scope: { consumerType?: ConsumerLoadType; consumerId?: number; nodeId?: number; diagnostic?: ConsumerLoadDiagnosticKind } = {}) {
+async function openDialog(scope: ConsumerLoadScope = {}) {
   visible.value = true
+  // Из карточки — поиск именно этого объекта без фильтра «Нулевая нагрузка» и старого поиска (QA F20, F78)
+  const next = consumerLoadFiltersForScope(filters, scope)
+  for (const key of Object.keys(filters) as Array<keyof ConsumerLoadFilters>) delete filters[key]
+  Object.assign(filters, next)
   await loadLookups()
-  if (scope.diagnostic) filters.diagnostic = scope.diagnostic
-  if (scope.nodeId) filters.search = String(scope.nodeId)
   await reload()
   if (scope.consumerType && scope.consumerId) await openDetails(scope.consumerType, scope.consumerId)
 }
