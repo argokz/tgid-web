@@ -1,7 +1,10 @@
 <template>
   <client-only>
     <div class="map-viewer-root">
-      <div class="map-container">
+      <div
+        ref="mapContainerEl"
+        class="map-container"
+      >
         <!-- 2D Map (MapLibre) -->
         <div
           v-show="cesiumStore.viewMode === '2D'"
@@ -568,6 +571,13 @@ const isLayerSyncInProgress = computed(() => layerStore.isLayersLoading || Boole
 const layerSyncProgressVisible = ref(false);
 let layerSyncDeferTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Окно карты общее для 2D и 3D и всегда видно (холсты MapLibre/Cesium скрываются через v-show)
+const mapContainerEl = ref<HTMLElement | null>(null);
+const mapViewport = () => ({
+  width: mapContainerEl.value?.clientWidth ?? 0,
+  height: mapContainerEl.value?.clientHeight ?? 0,
+});
+
 const syncCesiumCameraFromMap = () => {
   if (!mapStore.map || !cesiumStore.isInitialized) return;
   const center = mapStore.map.getCenter();
@@ -575,7 +585,8 @@ const syncCesiumCameraFromMap = () => {
     [center.lng, center.lat],
     mapStore.map.getZoom(),
     mapStore.map.getBearing(),
-    mapStore.map.getPitch()
+    mapStore.map.getPitch(),
+    mapViewport()
   );
 };
 
@@ -617,7 +628,7 @@ watch(() => cesiumStore.viewMode, async (newMode) => {
     }
   } else {
     // Sync camera from Cesium to MapLibre
-    const state = cesiumStore.getCameraStateFor2D();
+    const state = cesiumStore.getCameraStateFor2D(mapViewport());
     if (state && mapStore.map) {
       mapStore.map.jumpTo({
         center: state.center,

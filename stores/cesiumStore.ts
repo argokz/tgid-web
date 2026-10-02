@@ -2,6 +2,15 @@ import { defineStore } from 'pinia'
 import { markRaw } from 'vue'
 import type { Cesium3DTileset, ImageryLayer, ImageryLayerCollection, TerrainProvider, Viewer } from 'cesium'
 import { describeTilesetError, type TilesetStatus } from '~/utils/cesiumTileset'
+import {
+  cameraRangeToZoom,
+  clampCameraHeight,
+  pitchFromCesium,
+  pitchToCesium,
+  safeViewport,
+  zoomToCameraRange,
+  type Viewport
+} from '~/utils/cameraSync'
 
 import { probeWmsOverlay, type Cesium3dBaseImagery, type Cesium3dWmsOverlay } from '~/utils/cesiumImagery'
 
@@ -14,6 +23,13 @@ let overlayLayers = new Map<string, ImageryLayer>()
 let hasNaturalEarth = false
 let lastOverlays: Cesium3dWmsOverlay[] = []
 let overlayGeneration = 0
+// Высота рельефа в последней точке взгляда: запас, пока тайлы рельефа не загрузились
+let lastGroundHeight: number | null = null
+
+/** Высота рельефа по загруженным тайлам; пока тайлы грубые (загрузка) — нет ответа */
+function loadedGroundHeight(viewer: Viewer, carto: Parameters<Viewer['scene']['globe']['getHeight']>[0]): number | undefined {
+  return viewer.scene.globe.tilesLoaded ? viewer.scene.globe.getHeight(carto) : undefined
+}
 // Результат проверки слоя GeoServer (url|layers|cql) — один запрос на слой за сессию
 const overlayProbe = new Map<string, Promise<boolean>>()
 // Фотореалистичные 3D Tiles (Google через Cesium ion); оверлеи сети в этом режиме драпируются на них
@@ -330,46 +346,110 @@ export const useCesiumStore = defineStore('cesium', {
       }
     },
 
-    syncCameraFrom2D(center: [number, number], zoom: number, bearing: number, pitch: number) {
+    /**
+     * Вид Cesium по виду MapLibre (QA F18): дальность камеры из зума и широты (метры на
+     * пиксель), точка взгляда на рельефе, камера не ниже рельефа плюс запас. `viewport` —
+     * размер окна карты (холст Cesium до показа скрыт и имеет размер 0).
+     */
+    syncCameraFrom2D(center: [number, number], zoom: number, bearing: number, pitch: number, viewport?: Partial<Viewport>) {
       const Cesium = this.cesium as CesiumModule | null
-      if (!this.viewer || !Cesium) return
+      const viewer = this.viewer
+      if (!viewer || !Cesium) return
 
-      const altitude =
-        156543.03392 *
-        Math.cos((center[1] * Math.PI) / 180) *
-        Math.pow(2, -zoom) *
-        this.viewer.canvas.clientHeight
+      const [lng, lat] = center
+      const camera = viewer.camera
+      const fov = (camera.frustum as { fov?: number }).fov ?? Math.PI / 3
+      const range = zoomToCameraRange(zoom, lat, safeViewport(viewport), fov)
+      const heading = Cesium.Math.toRadians(bearing)
+      const cesiumPitch = Cesium.Math.toRadians(pitchToCesium(pitch))
+      const targetCarto = Cesium.Cartographic.fromDegrees(lng, lat)
 
-      this.viewer.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(center[0], center[1], Math.max(altitude, 100)),
-        orientation: {
-          heading: Cesium.Math.toRadians(bearing),
-          pitch: Cesium.Math.toRadians(pitch - 90),
-          roll: 0.0
+      const place = (ground: number) => {
+        camera.lookAt(
+          Cesium.Cartesian3.fromDegrees(lng, lat, ground),
+          new Cesium.HeadingPitchRange(heading, cesiumPitch, range)
+        )
+        camera.lookAtTransform(Cesium.Matrix4.IDENTITY)
+        // Пологий наклон над склоном: камера не должна уйти под рельеф
+        const at = camera.positionCartographic
+        const groundUnder = loadedGroundHeight(viewer, at) ?? ground
+        const safeHeight = clampCameraHeight(at.height, groundUnder)
+        if (safeHeight > at.height) {
+          camera.setView({
+            destination: Cesium.Cartesian3.fromRadians(at.longitude, at.latitude, safeHeight),
+            orientation: { heading: camera.heading, pitch: camera.pitch, roll: 0 }
+          })
         }
-      })
-      this.viewer.scene.requestRender()
+        viewer.scene.requestRender()
+        return camera.position.clone()
+      }
+
+      const known = loadedGroundHeight(viewer, targetCarto)
+      const placed = place(known ?? lastGroundHeight ?? 0)
+      if (known !== undefined) {
+        lastGroundHeight = known
+        return
+      }
+      // Тайлы рельефа ещё не загружены (старт сразу в 3D): уточнить высоту и переставить
+      // камеру, если пользователь её ещё не сдвинул
+      if (viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider) return
+      Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [targetCarto])
+        .then(([sample]) => {
+          const height = sample?.height
+          if (this.viewer !== viewer || !Number.isFinite(height)) return
+          lastGroundHeight = height
+          if (Cesium.Cartesian3.equalsEpsilon(viewer.camera.position, placed, 0, 0.5)) place(height)
+        })
+        .catch(() => undefined)
     },
 
-    getCameraStateFor2D() {
+    /** Вид MapLibre по камере Cesium: точка в центре экрана и дальность до неё → центр и зум */
+    getCameraStateFor2D(viewport?: Partial<Viewport>) {
       const Cesium = this.cesium as CesiumModule | null
-      if (!this.viewer || !Cesium) return null
-      const camera = this.viewer.camera
-      const positionCartographic = Cesium.Cartographic.fromCartesian(camera.position)
-      const lng = Cesium.Math.toDegrees(positionCartographic.longitude)
-      const lat = Cesium.Math.toDegrees(positionCartographic.latitude)
+      const viewer = this.viewer
+      if (!viewer || !Cesium) return null
+      const camera = viewer.camera
+      const vp = safeViewport(viewport)
+      const fov = (camera.frustum as { fov?: number }).fov ?? Math.PI / 3
 
-      const altitude = positionCartographic.height
-      const zoom = Math.log2(
-        (156543.03392 * Math.cos((lat * Math.PI) / 180) * this.viewer.canvas.clientHeight) /
-          Math.max(altitude, 1)
-      )
+      // Точка взгляда — пересечение луча из центра экрана с поверхностью на высоте рельефа.
+      // globe.pick по недогруженным (грубым) тайлам рельефа ошибается на километры.
+      const canvas = viewer.canvas
+      let target: InstanceType<CesiumModule['Cartesian3']> | undefined
+      if (canvas.clientWidth > 0 && canvas.clientHeight > 0) {
+        const screenCenter = new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2)
+        const ray = camera.getPickRay(screenCenter)
+        const onEllipsoid = camera.pickEllipsoid(screenCenter)
+        if (ray && onEllipsoid) {
+          const ground = loadedGroundHeight(viewer, Cesium.Cartographic.fromCartesian(onEllipsoid)) ?? lastGroundHeight ?? 0
+          const radii = Cesium.Ellipsoid.WGS84.radii
+          const raised = new Cesium.Ellipsoid(radii.x + ground, radii.y + ground, radii.z + ground)
+          const hit = Cesium.IntersectionTests.rayEllipsoid(ray, raised)
+          target = hit ? Cesium.Ray.getPoint(ray, hit.start) : onEllipsoid
+        }
+      }
+
+      let lng: number
+      let lat: number
+      let range: number
+      if (target) {
+        const carto = Cesium.Cartographic.fromCartesian(target)
+        lng = Cesium.Math.toDegrees(carto.longitude)
+        lat = Cesium.Math.toDegrees(carto.latitude)
+        range = Cesium.Cartesian3.distance(camera.position, target)
+      } else {
+        // Взгляд в небо или холст скрыт: точка под камерой, дальность — высота над рельефом
+        const at = camera.positionCartographic
+        lng = Cesium.Math.toDegrees(at.longitude)
+        lat = Cesium.Math.toDegrees(at.latitude)
+        range = at.height - (loadedGroundHeight(viewer, at) ?? lastGroundHeight ?? 0)
+      }
 
       return {
         center: [lng, lat] as [number, number],
-        zoom,
+        zoom: cameraRangeToZoom(range, lat, vp, fov),
         bearing: Cesium.Math.toDegrees(camera.heading),
-        pitch: Math.max(0, Cesium.Math.toDegrees(camera.pitch) + 90)
+        pitch: target ? pitchFromCesium(Cesium.Math.toDegrees(camera.pitch)) : 0
       }
     },
 
