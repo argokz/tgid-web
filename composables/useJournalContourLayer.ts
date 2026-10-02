@@ -7,6 +7,7 @@ import { watch } from 'vue';
 import type maplibregl from 'maplibre-gl';
 import { useJournalMapBridge } from '~/composables/useJournalMapBridge';
 import { useMapStore } from '~/stores/mapStore';
+import { pickNetworkFeature } from '~/utils/networkFeature';
 
 const OVERLAY_SOURCE = 'journal-contour';
 const OVERLAY_LAYER = 'journal-contour-line';
@@ -18,10 +19,8 @@ const OWN_LAYERS = new Set([OVERLAY_LAYER, PICK_LAYER, PICK_NODE_LAYER]);
 const EMPTY = { type: 'FeatureCollection' as const, features: [] as any[] };
 
 interface Options {
-  isLineFeature: (feature: any) => boolean
-  /** Узел сети — для выбора узлов (групповые установщики по потребителям/узлам) */
-  isNodeFeature?: (feature: any) => boolean
-  featureId: (feature: any) => number | null
+  /** Фрагменты контекста: из копий объекта под курсором берётся объект этих фрагментов */
+  fragmentIds?: () => readonly number[]
   onPickHint?: (text: string) => void
 }
 
@@ -119,16 +118,21 @@ export function useJournalContourLayer(getMap: () => maplibregl.Map | null | und
     const map = getMap();
     if (!map) return;
     const r = 6;
-    const features = map.queryRenderedFeatures([[e.point.x - r, e.point.y - r], [e.point.x + r, e.point.y + r]]);
+    const features = map.queryRenderedFeatures([[e.point.x - r, e.point.y - r], [e.point.x + r, e.point.y + r]])
+      .filter((f: any) => !OWN_LAYERS.has(f?.layer?.id));
     const wantNode = bridge.state.pick.kind === 'node';
-    const matches = (f: any) => (wantNode ? Boolean(options.isNodeFeature?.(f)) : options.isLineFeature(f));
-    const hit = features.find((f: any) => !OWN_LAYERS.has(f?.layer?.id) && matches(f));
-    const id = hit ? options.featureId(hit) : null;
-    if (!id) {
+    // Единый выбор объекта сети (слой uzel/участки, фрагмент контекста), а не «первый под курсором» (QA F83)
+    const pick = pickNetworkFeature(features, { kind: wantNode ? 'node' : 'line', fragmentIds: options.fragmentIds?.() ?? [] });
+    if (pick.status === 'ambiguous') {
+      const frags = [...new Set(pick.candidates.map((c) => c.fragmentId).filter((id) => id != null))];
+      options.onPickHint?.(`Под курсором несколько объектов${frags.length ? ` (фрагменты ${frags.join(', ')})` : ''}: выберите фрагмент на карте.`);
+      return;
+    }
+    if (pick.status !== 'single' || !pick.candidate) {
       options.onPickHint?.(wantNode ? 'Кликните по узлу (потребителю) сети.' : 'Кликните по участку тепловой сети.');
       return;
     }
-    bridge.togglePicked(id, hit);
+    bridge.togglePicked(pick.candidate.id, pick.candidate.feature);
   };
 
   const attach = (map: maplibregl.Map) => {

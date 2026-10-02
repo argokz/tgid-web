@@ -28,7 +28,8 @@ export const networkFeatureKind = (feature: any): NetworkKind | null => {
   if (OVERLAY_PREFIXES.some((p) => layerId.startsWith(p))) return null;
   const sig = featureSignature(feature);
   const type = feature?.geometry?.type;
-  if ((sig.includes('node') || sig.includes('узел') || sig.includes('узл')) && (type === 'Point' || type === 'MultiPoint')) {
+  // MVT-слой узлов сети называется `uzel` (QA F83: без него привязки к узлам не было)
+  if ((sig.includes('uzel') || sig.includes('node') || sig.includes('узел') || sig.includes('узл')) && (type === 'Point' || type === 'MultiPoint')) {
     return 'node';
   }
   if (

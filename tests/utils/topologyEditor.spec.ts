@@ -94,3 +94,10 @@ describe('topology editor labels', () => {
     expect(topologyOperationLabel(null)).toBe('')
   })
 })
+
+describe('snap recognises MVT node layer uzel (QA F83)', () => {
+  it('uzel is a network node layer', () => {
+    const uzel = { layer: { id: 'AlmatyGIS:uzel-0-uzel' }, sourceLayer: 'uzel', properties: { id: 7 }, geometry: { type: 'Point', coordinates: [0, 0] } }
+    expect(networkFeatureKind(uzel)).toBe('node')
+  })
+})

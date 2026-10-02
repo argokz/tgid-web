@@ -525,7 +525,7 @@ import { useOverlayLayer } from '~/composables/useOverlayLayer';
 import type { RegimePointsResult } from '~/utils/regimeMapPoints';
 import { useLocateMarkers } from '~/composables/useLocateMarkers';
 import type { LocatePoint } from '~/composables/useLocateMarkers';
-import { getFeatureId, getFeatureKind, pickNetworkFeature } from '~/utils/networkFeature';
+import { pickNetworkFeature } from '~/utils/networkFeature';
 import type { PickCandidate } from '~/utils/networkFeature';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
@@ -1289,9 +1289,7 @@ const {
 
 // === Контуры журналов (этап 9): слой контура и выбор участков кликом ===
 const journalContourLayer = useJournalContourLayer(() => mapStore.map, {
-  isLineFeature: (feature: any) => getFeatureKind(feature) === 'line',
-  isNodeFeature: (feature: any) => getFeatureKind(feature) === 'node',
-  featureId: (feature: any) => getFeatureId(feature),
+  fragmentIds: () => fragmentStore.activeFragmentIds,
   onPickHint: (text: string) => useNotificationStore().showInfo(text),
 });
 
