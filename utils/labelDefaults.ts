@@ -16,3 +16,6 @@ export const defaultLabelAttributes = {
   showInPopup: false,
   icon: ''
 }; 
+/** Подписи (symbol-слой) можно повесить только на векторный источник: MVT или GeoJSON (QA F23) */
+export const isLabelableSourceType = (type: string | undefined | null): boolean =>
+  type === 'vector' || type === 'geojson';

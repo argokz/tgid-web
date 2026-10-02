@@ -15,6 +15,7 @@ import {
   applyContextLayersVisibility,
 } from '~/utils/contextMapLayers';
 import { buildMvtLayerIdentifiers, buildWmsOnlyLayerIdentifiers, buildWmsRasterSourceId } from '~/utils/geoserverMvtIds';
+import { combineWithFragmentFilter, fragmentFilterFor } from '~/utils/mapFragmentFilter';
 
 const pbfAttributeRequests = new globalThis.Map<string, Promise<string[]>>();
 
@@ -1148,21 +1149,10 @@ export const useLayerStore = defineStore('layer', {
       const fragmentStore = useFragmentStore();
       if (!mapStore.map) return;
 
-      // Build fragment filter using MapLibre legacy syntax for MVT: ["in", "propertyName", v0, v1, ...]
-      const fileIdVariants = ['fileID', 'fileid', 'fileId', 'FILEID', 'FileId', 'file_id', 'FILE_ID'];
-      let fragmentFilter: any[] | null = null;
-      
-      if (fragmentStore.visibleFragments.length > 0) {
-        // Include both number and string versions of each fragment ID
-        const ids = fragmentStore.visibleFragments;
-        const strIds = ids.map(id => String(id));
-        const numIds = ids.map(id => Number(id));
-        const allIds = [...new Set([...numIds, ...strIds])];
-        
-        fragmentFilter = ['any', ...fileIdVariants.map(variant => [
-          'in', variant, ...allIds
-        ])];
-      }
+      // Фильтр фрагмента для подписей (их symbol-слои без исходного фильтра — legacy-синтаксис);
+      // для подслоёв MBStyle синтаксис подбирается под их фильтр (combineWithFragmentFilter, QA F23)
+      const fragmentIds = [...fragmentStore.visibleFragments];
+      const fragmentFilter = fragmentFilterFor(fragmentIds, false);
 
       const { updateWmsLayer } = useWmsLayer();
 
@@ -1247,10 +1237,7 @@ export const useLayerStore = defineStore('layer', {
             const isSymbol = mbLayer?.type === 'symbol' || subId.toLowerCase().includes('label');
 
             if (fragmentFilter && !isSymbol) {
-              const combined = originalFilter
-                ? (['all', originalFilter, fragmentFilter] as any)
-                : (fragmentFilter as any);
-              mapStore.map.setFilter(subId, combined);
+              mapStore.map.setFilter(subId, combineWithFragmentFilter(originalFilter, fragmentIds));
             } else {
               mapStore.map.setFilter(subId, originalFilter);
             }

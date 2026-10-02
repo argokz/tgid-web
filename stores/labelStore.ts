@@ -8,6 +8,7 @@ import { useMapStore } from './mapStore';
 import { useLayerStore } from './layerStore';
 import { useFragmentStore } from './fragmentStore';
 import { getMapTilerGlyphsUrl } from '~/utils/maptiler';
+import { isLabelableSourceType } from '~/utils/labelDefaults';
 
 // Интерфейс для стиля надписей
 interface LabelStyle {
@@ -180,7 +181,15 @@ export const useLabelStore = defineStore('label', {
       const isLayerVisible = layerStore.visibleGeoServerLayers.includes(layer.layerId);
       
       const labelLayerId = `${layer.layerId}-labels`;
-      
+
+      // Подписи (symbol) — только над векторным источником: на растровом WMS MapLibre падает
+      // с «layer requires a vector source» (QA F23)
+      const sourceType = (mapStore.map.getSource(layer.sourceId) as { type?: string } | undefined)?.type;
+      if (!isLabelableSourceType(sourceType)) {
+        this.removeLayerLabels(layer.layerId);
+        return;
+      }
+
       try {
         // Удаляем существующие слои меток
         this.removeLayerLabels(layer.layerId);
@@ -233,7 +242,7 @@ export const useLabelStore = defineStore('label', {
           id: labelLayerId,
           type: 'symbol',
           source: layer.sourceId,
-          'source-layer': layer.sourceLayer,
+          ...(sourceType === 'vector' && layer.sourceLayer ? { 'source-layer': layer.sourceLayer } : {}),
           minzoom: layerMinZoom,
           maxzoom: layerMaxZoom,
           layout: {
@@ -409,4 +418,4 @@ export const useLabelStore = defineStore('label', {
       });
     }
   }
-});
+});
