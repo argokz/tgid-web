@@ -65,8 +65,9 @@
                 v-for="child in item.children"
                 :key="child.id"
                 :title="child.title"
-                :subtitle="child.subtitle"
+                :subtitle="childSubtitle(child)"
                 :prepend-icon="child.icon"
+                :disabled="isChildBusy(child)"
                 @click="runMenuAction(child)"
               />
             </v-list>
@@ -204,8 +205,9 @@
               v-for="child in item.children"
               :key="child.id"
               :title="child.title"
-              :subtitle="child.subtitle"
+              :subtitle="childSubtitle(child)"
               :prepend-icon="child.icon"
+              :disabled="isChildBusy(child)"
               @click="onDrawerItem(child)"
             />
           </v-list-group>
@@ -287,7 +289,15 @@
 import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useMobile } from '~/composables/useMobile';
-import { apiHealth, describeExcelReportTruncation, fastApiService, refreshApiHealth } from '~/services/fastApiService';
+import {
+  apiHealth,
+  describeExcelReportTruncation,
+  describeFileJobProgress,
+  describeNetworkExportTruncation,
+  fastApiService,
+  refreshApiHealth,
+  type NetworkExportMeta,
+} from '~/services/fastApiService';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { useAuthStore } from '~/stores/authStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
@@ -371,8 +381,36 @@ const isItemActive = (item: HeaderMenuItem): boolean => {
   }
 };
 
-const isItemBusy = (item: HeaderMenuItem) =>
-  item.id === 'export' && (exportingShp.value || exportingDxf.value || exportingGeoJson.value);
+const exportBusy = computed(() => exportingShp.value || exportingDxf.value || exportingGeoJson.value);
+// прогресс фоновой выгрузки DXF (file-job): «Формирование файла… 7 с»
+const exportProgress = ref('');
+
+const isItemBusy = (item: HeaderMenuItem) => item.id === 'export' && exportBusy.value;
+
+// Пока идёт выгрузка, пункты экспорта заблокированы: без параллельных повторных выгрузок (QA F77)
+const isChildBusy = (child: HeaderMenuItem) => child.action?.kind === 'export' && exportBusy.value;
+const childSubtitle = (child: HeaderMenuItem) =>
+  child.action?.kind === 'export' && child.action.format === 'dxf' && exportingDxf.value && exportProgress.value
+    ? exportProgress.value
+    : child.subtitle;
+
+const saveBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+/** Итог выгрузки сети: предупреждение, если упёрлись в предел объектов (QA F84) */
+const notifyNetworkExport = (format: string, fragmentIds: number[], meta: NetworkExportMeta | undefined) => {
+  const truncation = describeNetworkExportTruncation(format, meta);
+  if (truncation) useNotificationStore().showWarning(truncation);
+  else useNotificationStore().showSuccess(`Экспорт ${format} (фрагменты: ${fragmentIds.join(', ')})`);
+};
 
 const runMenuAction = (item: HeaderMenuItem) => {
   const action = item.action;
@@ -383,6 +421,10 @@ const runMenuAction = (item: HeaderMenuItem) => {
     case 'protocol': showProtocol.value = !showProtocol.value; return;
     case 'tools': uiStore.toggleToolsPanel(); return;
     case 'export':
+      if (exportBusy.value) {
+        useNotificationStore().showInfo('Выгрузка уже идёт — дождитесь её окончания');
+        return;
+      }
       if (action.format === 'shp') void downloadShp();
       else if (action.format === 'dxf') void downloadDxf();
       else void downloadGeoJson(action.format === 'geojson-attrs');
@@ -417,16 +459,9 @@ const downloadShp = async () => {
       useNotificationStore().showError('Выберите фрагмент на карте перед экспортом SHP');
       return;
     }
-    const { blob, filename } = await fastApiService.downloadShpExport(fragmentIds);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    useNotificationStore().showSuccess(`Экспорт SHP (фрагменты: ${fragmentIds.join(', ')})`);
+    const { blob, filename, meta } = await fastApiService.downloadShpExport(fragmentIds);
+    saveBlob(blob, filename);
+    notifyNetworkExport('SHP', fragmentIds, meta);
   } catch (err: any) {
     useNotificationStore().showError(formatApiErrorWith('Ошибка экспорта SHP', err));
   } finally {
@@ -442,20 +477,18 @@ const downloadDxf = async () => {
       useNotificationStore().showError('Выберите фрагмент на карте перед экспортом DXF');
       return;
     }
-    const { blob, filename } = await fastApiService.downloadDxfExport(fragmentIds);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    useNotificationStore().showSuccess(`Экспорт DXF (фрагменты: ${fragmentIds.join(', ')})`);
+    useNotificationStore().showInfo('DXF: формирование файла, это может занять до минуты…');
+    exportProgress.value = 'Формирование файла…';
+    const { blob, filename, meta } = await fastApiService.downloadDxfExport(fragmentIds, {
+      onProgress: (p) => { exportProgress.value = describeFileJobProgress(p); },
+    });
+    saveBlob(blob, filename);
+    notifyNetworkExport('DXF', fragmentIds, meta);
   } catch (err: any) {
     useNotificationStore().showError(formatApiErrorWith('Ошибка экспорта DXF', err));
   } finally {
     exportingDxf.value = false;
+    exportProgress.value = '';
   }
 };
 
@@ -467,18 +500,9 @@ const downloadGeoJson = async (withAttrs: boolean) => {
       useNotificationStore().showError('Выберите фрагмент на карте перед экспортом GeoJSON');
       return;
     }
-    const { blob, filename } = await fastApiService.downloadGeoJsonExport(fragmentIds, withAttrs);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    useNotificationStore().showSuccess(
-      `Экспорт GeoJSON${withAttrs ? ' с атрибутами' : ''} (фрагменты: ${fragmentIds.join(', ')})`
-    );
+    const { blob, filename, meta } = await fastApiService.downloadGeoJsonExport(fragmentIds, withAttrs);
+    saveBlob(blob, filename);
+    notifyNetworkExport(`GeoJSON${withAttrs ? ' с атрибутами' : ''}`, fragmentIds, meta);
   } catch (err: any) {
     useNotificationStore().showError(formatApiErrorWith('Ошибка экспорта GeoJSON', err));
   } finally {

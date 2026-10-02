@@ -1434,7 +1434,8 @@ export type FileJobKind =
   | 'report_excel'
   | 'catalog_report'
   | 'alseko_reconciliation'
-  | 'electrical_reconciliation';
+  | 'electrical_reconciliation'
+  | 'network_dxf';
 
 /** Статус фоновой выгрузки (GET api/v1/file-jobs/{task_id}) */
 export interface FileJobStatus {
@@ -1508,6 +1509,26 @@ export const parseExcelReportMeta = (get: HeaderGetter): ExcelReportMeta | undef
     .filter((n) => Number.isInteger(n) && n > 0);
   return { rows, total, truncated: get('x-report-truncated') === '1' || total > rows, fragments };
 };
+
+/** Полнота выгрузки сети DXF/SHP/GeoJSON (заголовки X-Export-Rows/Limit/Truncated, QA F84) */
+export interface NetworkExportMeta {
+  rows: number;
+  limit: number;
+  truncated: boolean;
+}
+
+export const parseNetworkExportMeta = (get: HeaderGetter): NetworkExportMeta | undefined => {
+  const truncated = get('x-export-truncated');
+  if (truncated == null || truncated === '') return undefined;
+  return { rows: Number(get('x-export-rows')) || 0, limit: Number(get('x-export-limit')) || 0, truncated: truncated === '1' };
+};
+
+/** Предупреждение об обрезанной выгрузке сети или null */
+export const describeNetworkExportTruncation = (format: string, meta: NetworkExportMeta | undefined): string | null =>
+  meta?.truncated
+    ? `${format}: выгрузка неполная — достигнут предел ${meta.limit.toLocaleString('ru-RU')} объектов. ` +
+      'Выберите меньше фрагментов, чтобы выгрузить сеть полностью.'
+    : null;
 
 /** Текст предупреждения о неполной ведомости или null, если выгружено всё */
 export const describeExcelReportTruncation = (meta: ExcelReportMeta | undefined): string | null =>
@@ -2575,7 +2596,8 @@ export const fastApiService = {
     return { blob, filename: `${journal}_${recordId}.docx` };
   },
 
-  async downloadShpExport(fragmentIds?: number[]): Promise<{ blob: Blob; filename: string }> {
+  async downloadShpExport(fragmentIds?: number[]): Promise<{ blob: Blob; filename: string; meta?: NetworkExportMeta }> {
+    let meta: NetworkExportMeta | undefined;
     const blob = await request<Blob>('api/export/shp', {
       responseType: 'blob',
       query: fragmentIds?.length
@@ -2583,31 +2605,61 @@ export const fastApiService = {
           ? { fragment_id: fragmentIds[0] }
           : { fragments: fragmentIds.join(',') }
         : undefined,
+      onResponse({ response }: any) {
+        if (response?.headers?.get) meta = parseNetworkExportMeta((name) => response.headers.get(name));
+      },
     });
     const suffix = fragmentIds?.length === 1 ? `_f${fragmentIds[0]}` : fragmentIds?.length ? '_frag' : '';
-    return { blob, filename: `network_export${suffix}.zip` };
+    return { blob, filename: `network_export${suffix}.zip`, meta };
   },
 
-  async downloadDxfExport(fragmentIds?: number[]): Promise<{ blob: Blob; filename: string }> {
-    const blob = await request<Blob>('api/export/dxf', {
-      responseType: 'blob',
-      query: fragmentIds?.length ? { fragments: fragmentIds.join(',') } : undefined,
-    });
+  /**
+   * DXF участков — фоновой задачей file-job с прогрессом (по фрагменту строится десятки секунд, QA F77);
+   * без воркера — синхронный эндпоинт.
+   */
+  async downloadDxfExport(
+    fragmentIds?: number[],
+    options: FileJobOptions = {},
+  ): Promise<{ blob: Blob; filename: string; meta?: NetworkExportMeta }> {
+    let meta: NetworkExportMeta | undefined;
+    const onHeaders = (get: HeaderGetter) => {
+      meta = parseNetworkExportMeta(get);
+    };
     const suffix = fragmentIds?.length === 1 ? `_f${fragmentIds[0]}` : fragmentIds?.length ? '_frag' : '';
-    return { blob, filename: `network${suffix}.dxf` };
+    const sync = async () => ({
+      blob: await request<Blob>('api/export/dxf', {
+        responseType: 'blob',
+        query: fragmentIds?.length ? { fragments: fragmentIds.join(',') } : undefined,
+        timeout: REPORT_TIMEOUT_MS,
+        onResponse({ response }: any) {
+          if (response?.headers?.get) onHeaders((name) => response.headers.get(name));
+        },
+      }),
+      filename: `network${suffix}.dxf`,
+    });
+    const params: Record<string, unknown> = fragmentIds?.length ? { fragments: fragmentIds } : {};
+    const result = await runFileJob('network_dxf', params, sync, options, onHeaders);
+    return { ...result, meta };
   },
 
   /**
    * GeoJSON участков (WGS84). withAttrs — «GeoJSON с атрибутами» (Sys, L, D, K_E — короткие имена
    * для загрузки в ZuluGIS/QGIS; раньше назывался «Zulu»-экспортом, API /api/export/zulugis — алиас).
    */
-  async downloadGeoJsonExport(fragmentIds?: number[], withAttrs = false): Promise<{ blob: Blob; filename: string }> {
+  async downloadGeoJsonExport(
+    fragmentIds?: number[],
+    withAttrs = false,
+  ): Promise<{ blob: Blob; filename: string; meta?: NetworkExportMeta }> {
+    let meta: NetworkExportMeta | undefined;
     const data = await request<unknown>(withAttrs ? 'api/export/geojson-attrs' : 'api/export/geojson', {
       query: fragmentIds?.length ? { fragments: fragmentIds.join(','), limit: 50000 } : { limit: 50000 },
+      onResponse({ response }: any) {
+        if (response?.headers?.get) meta = parseNetworkExportMeta((name) => response.headers.get(name));
+      },
     });
     const blob = new Blob([JSON.stringify(data)], { type: 'application/geo+json' });
     const suffix = fragmentIds?.length === 1 ? `_f${fragmentIds[0]}` : fragmentIds?.length ? '_frag' : '';
-    return { blob, filename: `network${withAttrs ? '_attrs' : ''}${suffix}.geojson` };
+    return { blob, filename: `network${withAttrs ? '_attrs' : ''}${suffix}.geojson`, meta };
   },
 
   /** Импорт (этап 10): разбор файла — колонки, образец, поля назначения, предложенное сопоставление */
