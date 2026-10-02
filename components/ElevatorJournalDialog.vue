@@ -162,7 +162,7 @@
             aria-label="Вернуться к журналу"
             @click="detailVisible = false"
           />
-          <v-toolbar-title>{{ details?.display_name || 'Паспорт элеватора' }}</v-toolbar-title>
+          <v-toolbar-title>{{ details ? `Элеватор №${details.id}` : 'Паспорт элеватора' }}</v-toolbar-title>
           <v-btn
             icon="mdi-close"
             aria-label="Закрыть карточку"

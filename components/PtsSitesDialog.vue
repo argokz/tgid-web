@@ -220,8 +220,9 @@
                 density="compact"
                 class="mb-2"
               >
-                Цепочка из {{ chainInfo.node_ids.length }} узлов: труб на пути {{ chainInfo.line_ids.length }}
-                <span v-if="chainInfo.other_lines">, прочих линейных объектов (арматура и т.п.) {{ chainInfo.other_lines }} — не привязываются</span>.
+                Цепочка из {{ chainInfo.node_ids.length }} узлов: труб на пути {{ chainInfo.line_ids.length }}<span
+                  v-if="chainInfo.other_lines"
+                >, прочих линейных объектов (арматура и т.п.) {{ chainInfo.other_lines }} — не привязываются</span>.
               </v-alert>
 
               <v-card

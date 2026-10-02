@@ -251,7 +251,7 @@
           aria-label="Вернуться к журналу"
           @click="detailVisible = false"
         />
-        <v-toolbar-title>{{ details?.display_name || 'Паспорт диафрагмы' }}</v-toolbar-title>
+        <v-toolbar-title>{{ details ? `Диафрагма №${details.id}` : 'Паспорт диафрагмы' }}</v-toolbar-title>
         <v-btn
           icon="mdi-close"
           aria-label="Закрыть карточку"
