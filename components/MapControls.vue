@@ -696,53 +696,9 @@ const emit = defineEmits<{
 
   'open-node-search': []
 
-  'open-topology-diagnostics': []
-
-  'open-fault-diagnostics': []
-
-  'open-calculation-diagnostics': []
-
   'toggle-trace-mode': []
 
   'toggle-edit-topology-mode': []
-
-  'open-passport-dialog': []
-
-  'open-defect-journal': []
-
-  'open-shurf-journal': []
-
-  'open-inspection-journal': []
-
-  'open-repair-journal': []
-
-  'open-pressure-test-journal': []
-
-  'open-technical-condition-journal': []
-
-  'open-corrosion-indicator-journal': []
-
-  'open-alseko-journal': []
-
-  'open-electrical-network-journal': []
-
-  'open-heat-loss-journal': []
-
-  'open-temperature-graph-journal': []
-
-  'open-consumer-load-diagnostics': []
-
-  'open-pump-equipment': []
-
-  'open-network-armatures': []
-
-  'open-network-regulators': []
-
-  'open-network-bypasses': []
-
-  'open-network-diaphragms': []
-
-  'open-elevators': []
 
 }>()
 
