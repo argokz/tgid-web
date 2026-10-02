@@ -2687,9 +2687,9 @@ export const fastApiService = {
   async getAdmissibilityCatalog(): Promise<{ id: number; title: string; object: 'node' | 'line' }[]> {
     return request('api/analysis/admissibility');
   },
-  async getAdmissibility(queryId: number, fragmentId: number): Promise<RegimeAnalysisResult> {
+  async getAdmissibility(queryId: number, fragmentId: number, calculationId?: number): Promise<RegimeAnalysisResult> {
     return request<RegimeAnalysisResult>(`api/analysis/admissibility/${queryId}`, {
-      query: { fragment_id: fragmentId },
+      query: { fragment_id: fragmentId, ...(calculationId ? { calculation_id: calculationId } : {}) },
     });
   },
 

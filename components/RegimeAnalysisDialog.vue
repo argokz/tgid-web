@@ -19,7 +19,8 @@
       </v-card-title>
       <v-card-text>
         <p class="text-body-2 text-medium-emphasis mb-3">
-          Аналог desktop «Анализ»: по результатам последнего расчёта фрагмента. Щелчок по строке — объект на карте.
+          Аналог desktop «Анализ»: по результатам выбранного (по умолчанию последнего) расчёта фрагмента.
+          Щелчок по строке — объект на карте.
         </p>
 
         <div class="d-flex flex-wrap ga-3 mb-3">
@@ -33,6 +34,19 @@
             variant="outlined"
             hide-details
             style="min-width: 260px; max-width: 360px"
+          />
+          <v-select
+            v-model="calculationId"
+            :items="calculationItems"
+            item-title="title"
+            item-value="value"
+            label="Расчёт"
+            density="compact"
+            variant="outlined"
+            hide-details
+            :loading="calculationsLoading"
+            :disabled="!fragmentId"
+            style="min-width: 240px; max-width: 340px"
           />
           <v-select
             v-model="queryKey"
@@ -80,6 +94,25 @@
             >
               Расчёт №{{ result.calculation_id }}<template v-if="result.tn != null">, Tн {{ result.tn }} °C</template>
             </v-chip>
+            <v-spacer />
+            <v-btn
+              size="small"
+              variant="tonal"
+              color="primary"
+              prepend-icon="mdi-map-marker-multiple"
+              :disabled="!mapPointsCount"
+              @click="showAllOnMap"
+            >
+              Показать все на карте ({{ mapPointsCount }})
+            </v-btn>
+            <v-btn
+              size="small"
+              variant="text"
+              prepend-icon="mdi-map-marker-off"
+              @click="emit('clearMap')"
+            >
+              Скрыть с карты
+            </v-btn>
           </div>
           <p
             v-if="result.note"
@@ -176,8 +209,13 @@ import { computed, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { fastApiService, type RegimeAnalysisKind, type RegimeAnalysisResult } from '~/services/fastApiService'
 import { useFragmentStore } from '~/stores/fragmentStore'
+import { regimePoints, type RegimePointsResult } from '~/utils/regimeMapPoints'
 
-const emit = defineEmits<{ (e: 'locate', point: { lat: number; lng: number }): void }>()
+const emit = defineEmits<{
+  (e: 'locate', point: { lat: number; lng: number }): void
+  (e: 'showAll', points: RegimePointsResult): void
+  (e: 'clearMap'): void
+}>()
 
 const { isMobile } = useMobile()
 const fragmentStore = useFragmentStore()
@@ -186,6 +224,10 @@ const loading = ref(false)
 const error = ref('')
 const result = ref<RegimeAnalysisResult | null>(null)
 const fragmentId = ref<number | null>(null)
+// null — последний расчёт фрагмента (как раньше); иначе выбранный (QA F39)
+const calculationId = ref<number | null>(null)
+const calculations = ref<Array<{ id: number; calculated_at: string | null; tn: number | null; name: string | null; has_results: boolean }>>([])
+const calculationsLoading = ref(false)
 const queryKey = ref<string>('negative-dp')
 const modeFilter = ref<string | null>(null)
 const page = ref(1)
@@ -305,6 +347,42 @@ const formatCell = (v: unknown) => {
 
 const hasCoords = (row: Record<string, any>) => row.latitude != null && row.longitude != null
 
+const calculationItems = computed(() => [
+  { title: 'Последний расчёт', value: null },
+  ...calculations.value.map(c => ({
+    value: c.id,
+    title: [
+      `№${c.id}`,
+      c.calculated_at ? new Date(c.calculated_at).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : null,
+      c.tn != null ? `Tн ${c.tn} °C` : null,
+      c.name,
+    ].filter(Boolean).join(' · '),
+  })),
+])
+
+const loadCalculations = async () => {
+  calculations.value = []
+  calculationId.value = null
+  if (!fragmentId.value) return
+  calculationsLoading.value = true
+  try {
+    const res = await fastApiService.listCalculations({ file_id: fragmentId.value, limit: 50 })
+    calculations.value = res.items.filter(c => c.has_results !== false)
+  } catch {
+    // список расчётов не обязателен: без него запросы идут по последнему расчёту
+  } finally {
+    calculationsLoading.value = false
+  }
+}
+watch(fragmentId, () => { void loadCalculations() })
+
+// все найденные объекты с координатами (с учётом фильтра режима), как подсветка gid6
+const mapPoints = computed(() => regimePoints(filteredRows.value))
+const mapPointsCount = computed(() => mapPoints.value.data.features.length)
+const showAllOnMap = () => {
+  if (mapPointsCount.value) emit('showAll', mapPoints.value)
+}
+
 const locate = (row: Record<string, any>) => {
   if (hasCoords(row)) emit('locate', { lat: row.latitude, lng: row.longitude })
 }
@@ -317,11 +395,13 @@ const run = async () => {
   modeFilter.value = null
   try {
     if (queryKey.value.startsWith('adm-')) {
-      result.value = await fastApiService.getAdmissibility(Number(queryKey.value.slice(4)), fragmentId.value)
+      result.value = await fastApiService.getAdmissibility(
+        Number(queryKey.value.slice(4)), fragmentId.value, calculationId.value ?? undefined)
     } else {
       const q = REGIME[queryKey.value]
       result.value = await fastApiService.getRegimeAnalysis(q.kind, fragmentId.value, {
         includeUncalculated: q.uncalculated,
+        calculationId: calculationId.value ?? undefined,
       })
     }
   } catch (e: any) {

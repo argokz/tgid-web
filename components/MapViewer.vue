@@ -522,6 +522,7 @@ import maplibregl from 'maplibre-gl';
 import { useTopologyEditor } from '~/composables/useTopologyEditor';
 import { useJournalContourLayer } from '~/composables/useJournalContourLayer';
 import { useOverlayLayer } from '~/composables/useOverlayLayer';
+import type { RegimePointsResult } from '~/utils/regimeMapPoints';
 import { useLocateMarkers } from '~/composables/useLocateMarkers';
 import type { LocatePoint } from '~/composables/useLocateMarkers';
 import { getFeatureId, getFeatureKind, pickNetworkFeature } from '~/utils/networkFeature';
@@ -893,6 +894,23 @@ const hydraulicOverlay = useOverlayLayer(() => mapStore.map, 'hydraulic-calc-sou
 });
 
 const onClearHydraulicThematic = () => hydraulicOverlay.clear();
+
+// «Анализ режима» → «Показать все на карте»: все найденные объекты разом (как gid6, QA F39)
+const regimeOverlay = useOverlayLayer(() => mapStore.map, 'regime-analysis-points', {
+  layerIds: ['regime-analysis-points-halo', 'regime-analysis-points-circle'],
+});
+const showRegimePoints = (points: RegimePointsResult) => {
+  const shown = regimeOverlay.show(points.data, [
+    { id: 'regime-analysis-points-halo', type: 'circle', paint: { 'circle-radius': 11, 'circle-color': '#ff6d00', 'circle-opacity': 0.25 } },
+    {
+      id: 'regime-analysis-points-circle', type: 'circle',
+      paint: { 'circle-radius': 5, 'circle-color': '#ff6d00', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5 },
+    },
+  ]);
+  if (shown && points.bounds) {
+    mapStore.map?.fitBounds(points.bounds, { padding: 80, maxZoom: 17, duration: 800 });
+  }
+};
 
 const hydraulicPipeColor = (colorPipes: boolean) => (colorPipes
   ? [
@@ -1310,7 +1328,7 @@ const toolDialogs: ToolDialogEntry[] = [
   { key: 'elevator', component: lazyDialog(() => import('./ElevatorJournalDialog.vue')), on: { locateElevator: locate.elevator } },
   { key: 'networkQueries', component: lazyDialog(() => import('./NetworkQueriesDialog.vue')), on: { locate: locate.fault } },
   // Desktop TGID «Анализ»: режим, допустимость, гидростатические зоны
-  { key: 'regimeAnalysis', component: lazyDialog(() => import('./RegimeAnalysisDialog.vue')), on: { locate: locate.fault } },
+  { key: 'regimeAnalysis', component: lazyDialog(() => import('./RegimeAnalysisDialog.vue')), on: { locate: locate.fault, showAll: showRegimePoints, clearMap: () => regimeOverlay.clear() } },
   // Desktop TGID «Excel»: отчёты по шаблонам gid6 excel2 и сводные ведомости
   { key: 'excelReports', component: lazyDialog(() => import('./ExcelReportsDialog.vue')) },
   // Локализация аварий и задвижек
