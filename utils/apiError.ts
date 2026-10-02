@@ -83,6 +83,13 @@ export function formatApiError(err: unknown, fallback = 'Не удалось в�
   return fallback;
 }
 
+/** HTTP-статус ошибки любого вида (ApiError, FetchError, {response}); 0 — неизвестен */
+export function apiErrorStatus(err: unknown): number {
+  if (err == null || typeof err !== 'object') return 0;
+  const e = err as Record<string, any>;
+  return Number(e.status ?? e.statusCode ?? e.response?.status ?? 0) || 0;
+}
+
 /** «Префикс: текст ошибки» — для уведомлений вида «Экспорт Excel: Ошибка на сервере (500)» */
 export function formatApiErrorWith(prefix: string, err: unknown, fallback = 'ошибка сервера'): string {
   return `${prefix}: ${formatApiError(err, fallback || 'ошибка сервера')}`;

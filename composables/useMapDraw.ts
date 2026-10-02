@@ -324,6 +324,14 @@ export function useMapDraw() {
     refresh();
   };
 
+  // Двойной клик завершает фигуру — во время рисования он не должен зумить карту (QA F25)
+  const syncDoubleClickZoom = (map: MapLibreMap, drawMode: DrawMode) => {
+    const handler = (map as any).doubleClickZoom;
+    if (!handler) return;
+    if (drawMode === 'none') handler.enable();
+    else handler.disable();
+  };
+
   const setMode = (next: DrawMode) => {
     // Смена режима завершает незакрытую фигуру, чтобы точки не «перетекали»
     if (draftPoints.value.length >= 2) finishShape();
@@ -332,7 +340,10 @@ export function useMapDraw() {
     mode.value = next;
     activeDrawMode.value = next;
     const map = mapRef.value;
-    if (map) map.getCanvas().style.cursor = next === 'none' ? '' : 'crosshair';
+    if (map) {
+      map.getCanvas().style.cursor = next === 'none' ? '' : 'crosshair';
+      syncDoubleClickZoom(map, next);
+    }
     refresh();
   };
 
@@ -351,6 +362,7 @@ export function useMapDraw() {
     map.on('click', onMapClick);
     map.on('mousemove', onMapMove);
     map.on('dblclick', finishShape);
+    syncDoubleClickZoom(map, mode.value);
   };
 
   const detach = () => {
@@ -360,6 +372,7 @@ export function useMapDraw() {
     map.off('click', onMapClick);
     map.off('mousemove', onMapMove);
     map.off('dblclick', finishShape);
+    syncDoubleClickZoom(map, 'none');
     map.getCanvas().style.cursor = '';
     for (const id of [LAYER_LABEL, LAYER_VERTEX, LAYER_DRAFT_LINE, LAYER_POINT, LAYER_LINE, LAYER_FILL]) {
       if (map.getLayer(id)) map.removeLayer(id);

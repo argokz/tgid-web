@@ -340,7 +340,8 @@
 </template>
 
 <script setup lang="ts">
-import { formatApiError } from '~/utils/apiError'
+import { apiErrorStatus, formatApiError } from '~/utils/apiError'
+import { useNotificationStore } from '~/stores/notificationStore'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
 
 const mutationsEnabled = useMutationsEnabled()
@@ -389,7 +390,17 @@ async function loadLookups() { if (!Object.keys(lookups.value.counts).length) lo
 async function loadPage() { loading.value = true; error.value = ''; try { const response = await fastApiService.getElectricalObjects({ page: page.value, page_size: 50, ...filters.value }); items.value = response.items; total.value = response.total; pages.value = response.pages } catch (cause) { error.value = formatApiError(cause, 'Не удалось загрузить электросеть') } finally { loading.value = false } }
 async function reload() { page.value = 1; await loadPage() }
 async function resetFilters() { filters.value = { search: '', object_type: undefined, owner_id: undefined, parent_line_id: undefined, voltage_kv: undefined }; await reload() }
-async function openDetails(objectType: ElectricalObjectType, objectId: number) { detailsVisible.value = true; detailsLoading.value = true; isEditing.value = false; try { selected.value = await fastApiService.getElectricalObject(objectType, objectId) } finally { detailsLoading.value = false } }
+async function openDetails(objectType: ElectricalObjectType, objectId: number) {
+  detailsVisible.value = true; detailsLoading.value = true; isEditing.value = false
+  try {
+    selected.value = await fastApiService.getElectricalObject(objectType, objectId)
+  } catch (cause) {
+    // 404 — объекта нет в данных электросети: это «нет данных», а не сбой (QA F25)
+    detailsVisible.value = false
+    if (apiErrorStatus(cause) === 404) useNotificationStore().showInfo(`Нет данных электросети по объекту №${objectId}`)
+    else useNotificationStore().showError(formatApiError(cause, 'Не удалось открыть объект электросети'))
+  } finally { detailsLoading.value = false }
+}
 function openRelation(row: Record<string, unknown>) { const type = row.object_type as ElectricalObjectType | undefined; if (type && Number(row.id)) void openDetails(type, Number(row.id)); else if (selected.value?.object_type === 'source' || selected.value?.object_type === 'receiver') { if (Number(row.id)) void openDetails('line', Number(row.id)) } }
 function locateReconciliation(payload: { longitude: number; latitude: number; id: number; objectType: ElectricalObjectType; label: string }) { emit('locate-electrical-object', payload); visible.value = false }
 function openReconciliationObject(payload: { objectType: ElectricalObjectType; id: number }) { void openDetails(payload.objectType, payload.id) }

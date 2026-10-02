@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { fastApiService } from '~/services/fastApiService';
 import type { Fragment } from '~/types';
 import { useLayerStore } from './layerStore';
+import { useMapStore } from './mapStore';
 
 export const useFragmentStore = defineStore('fragment', {
   state: () => ({
@@ -68,6 +69,19 @@ export const useFragmentStore = defineStore('fragment', {
       this.visibleFragments = uniq;
       this.saveVisibleFragments();
       useLayerStore().applyFragmentFilter();
+      if (uniq.length) void this.zoomToFragments(uniq);
+    },
+
+    /** Центрировать карту на охвате фрагментов (QA F25); ошибки не мешают выбору */
+    async zoomToFragments(ids: number[]) {
+      try {
+        const { bbox } = await fastApiService.getFragmentsExtent(ids);
+        const map = useMapStore().map;
+        if (!bbox || !map) return;
+        map.fitBounds([[bbox[0], bbox[1]], [bbox[2], bbox[3]]], { padding: 60, maxZoom: 17, duration: 800 });
+      } catch (e) {
+        console.warn('Не удалось получить охват фрагментов:', e);
+      }
     },
 
     saveVisibleFragments() {
@@ -83,4 +97,4 @@ export const useFragmentStore = defineStore('fragment', {
       layerStore.applyFragmentFilter();
     }
   }
-}); 
+}); 

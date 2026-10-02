@@ -1645,6 +1645,11 @@ export const fastApiService = {
     return fetchWithRetry<{ data: Fragment[] }>(buildApiUrl('fragments'));
   },
 
+  /** Охват фрагментов [minLng, minLat, maxLng, maxLat] по узлам; null — узлов нет (QA F25) */
+  async getFragmentsExtent(ids: number[]): Promise<{ fragments: number[]; bbox: [number, number, number, number] | null }> {
+    return request('api/v1/fragments/extent', { query: { fragments: ids.join(',') } });
+  },
+
   /** Экспорт фрагмента в .tgid десктопа (zip с tgid.txt) */
   async exportFragmentTgid(fileId: number): Promise<Blob> {
     return request<Blob>(`api/v1/fragments/${encodePath(fileId)}/export`, {

@@ -17,17 +17,26 @@ export interface NominatimResult {
   icon?: string
 }
 
+/** Охват Алматы [minLon, minLat, maxLon, maxLat] — поиск адреса по умолчанию только в городе (QA F25) */
+export const ALMATY_BBOX: [number, number, number, number] = [76.70, 43.05, 77.25, 43.45]
+
+/** URL поиска Nominatim, ограниченный охватом (viewbox + bounded=1) */
+export const nominatimSearchUrl = (query: string, bbox: [number, number, number, number] = ALMATY_BBOX): string =>
+  `https://nominatim.openstreetmap.org/search?` +
+  `format=json&` +
+  `q=${encodeURIComponent(query)}&` +
+  `limit=10&` +
+  `addressdetails=1&` +
+  `countrycodes=kz&` +
+  `viewbox=${bbox.join(',')}&` +
+  `bounded=1`
+
 export const useNominatim = () => {
-  const searchAddress = async (query: string): Promise<NominatimResult[]> => {
+  const searchAddress = async (query: string, bbox: [number, number, number, number] = ALMATY_BBOX): Promise<NominatimResult[]> => {
     if (typeof window === 'undefined') return []
     if (!query || query.trim().length < 3) return []
 
-    const url = `https://nominatim.openstreetmap.org/search?` +
-      `format=json&` +
-      `q=${encodeURIComponent(query)}&` +
-      `limit=10&` +
-      `addressdetails=1&` +
-      `countrycodes=kz`
+    const url = nominatimSearchUrl(query, bbox)
 
     try {
       const response = await fetch(url, {

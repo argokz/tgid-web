@@ -74,3 +74,13 @@ describe('formatApiError (QA F61)', () => {
     expect(BAD_CREDENTIALS_TEXT).toMatch(/Неверный логин или пароль/)
   })
 })
+
+describe('apiErrorStatus (QA F25)', () => {
+  it('статус из ApiError, FetchError и response', async () => {
+    const { apiErrorStatus } = await import('~/utils/apiError')
+    expect(apiErrorStatus({ statusCode: 404 })).toBe(404)
+    expect(apiErrorStatus({ response: { status: 500 } })).toBe(500)
+    expect(apiErrorStatus(new Error('x'))).toBe(0)
+    expect(apiErrorStatus(null)).toBe(0)
+  })
+})

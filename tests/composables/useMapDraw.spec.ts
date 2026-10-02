@@ -84,3 +84,28 @@ describe('геометрия рисования', () => {
     expect(formatArea(Number.NaN)).toBe('—');
   });
 });
+
+describe('рисование и двойной клик (QA F25)', () => {
+  it('во время рисования doubleClickZoom выключен, после — включён', async () => {
+    const { useMapDraw } = await import('~/composables/useMapDraw');
+    const dbl = { enabled: true, enable() { this.enabled = true; }, disable() { this.enabled = false; } };
+    const canvas = { style: { cursor: '' } };
+    const map: any = {
+      doubleClickZoom: dbl,
+      on() {}, off() {},
+      getCanvas: () => canvas,
+      getLayer: () => undefined, getSource: () => undefined,
+      addSource() {}, addLayer() {}, removeLayer() {}, removeSource() {},
+      isStyleLoaded: () => true, loaded: () => true, style: { _loaded: true },
+    };
+    const draw = useMapDraw();
+    draw.attach(map);
+    draw.setMode('polygon' as any);
+    expect(dbl.enabled).toBe(false);
+    draw.setMode('none');
+    expect(dbl.enabled).toBe(true);
+    draw.setMode('measure-area' as any);
+    draw.detach();
+    expect(dbl.enabled).toBe(true);
+  });
+});
