@@ -104,8 +104,40 @@ export const crsOptionsFor = (inspect: NetworkImportInspect | null) =>
     return o.value !== 'auto'
   })
 
-export const defaultCrsFor = (inspect: NetworkImportInspect): NetworkImportCrs =>
-  inspect.kind === 'shp' ? (inspect.crs_known ? 'auto' : 'local') : 'local'
+const toNumber = (v: unknown): number | null => {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  if (typeof v !== 'string' || !v.trim()) return null
+  const n = Number(v.trim().replace(/\s+/g, '').replace(',', '.'))
+  return Number.isFinite(n) ? n : null
+}
+
+/** Координаты из образца таблицы похожи на градусы: |X| ≤ 180 и |Y| ≤ 90 во всех строках (QA F55) */
+export const sampleLooksLikeDegrees = (
+  inspect: NetworkImportInspect,
+  mapping: Record<string, string | null | undefined> = inspect.suggested_mapping,
+): boolean => {
+  const xCol = mapping.x
+  const yCol = mapping.y
+  if (!xCol || !yCol) return false
+  let pairs = 0
+  for (const row of inspect.sample ?? []) {
+    const x = toNumber(row[xCol])
+    const y = toNumber(row[yCol])
+    if (x === null || y === null) continue
+    if (Math.abs(x) > 180 || Math.abs(y) > 90) return false
+    pairs++
+  }
+  return pairs > 0
+}
+
+/** SHP: из .prj, иначе местная; таблица: WGS84, если в образце градусы, иначе местная */
+export const defaultCrsFor = (
+  inspect: NetworkImportInspect,
+  mapping: Record<string, string | null | undefined> = inspect.suggested_mapping,
+): NetworkImportCrs => {
+  if (inspect.kind === 'shp') return inspect.crs_known ? 'auto' : 'local'
+  return sampleLooksLikeDegrees(inspect, mapping) ? 'wgs84' : 'local'
+}
 
 /** Пустые сопоставления не отправляются */
 export const cleanMapping = (mapping: Record<string, string | null | undefined>): Record<string, string> =>

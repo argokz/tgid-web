@@ -54,6 +54,22 @@ describe('network import helpers', () => {
     expect(defaultCrsFor(inspect({ kind: 'table' }))).toBe('local');
   });
 
+  it('suggests WGS84 when the sample coordinates are degrees (QA F55)', () => {
+    const deg = inspect({
+      kind: 'table',
+      suggested_mapping: { x: 'Долгота', y: 'Широта' },
+      sample: [{ Долгота: '76,9512', Широта: '43.2567' }, { Долгота: 76.95, Широта: 43.25 }, { Долгота: '', Широта: '' }],
+    });
+    expect(defaultCrsFor(deg)).toBe('wgs84');
+    const local = inspect({
+      kind: 'table',
+      suggested_mapping: { x: 'X', y: 'Y' },
+      sample: [{ X: 12345.6, Y: 54321.1 }],
+    });
+    expect(defaultCrsFor(local)).toBe('local');
+    expect(defaultCrsFor(inspect({ kind: 'table', suggested_mapping: { x: 'X', y: 'Y' }, sample: [] }))).toBe('local');
+  });
+
   it('drops empty mappings and lists missing required fields', () => {
     expect(cleanMapping({ x: 'X', y: '', code: null, name: undefined })).toEqual({ x: 'X' });
     const targets = [
