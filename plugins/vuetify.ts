@@ -1,5 +1,6 @@
 import { createVuetify } from 'vuetify'
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
+import { en, ru } from 'vuetify/locale'
 import { h } from 'vue'
 import { resolveMdiSvgPath } from '~/utils/mdiSvgPaths'
 
@@ -58,6 +59,13 @@ export default defineNuxtPlugin((app) => {
           },
         }
       }
+    },
+    // Русские подписи встроенных компонентов: пагинация таблиц («Строк на странице»),
+    // «Нет данных» и т. п. (QA F63, F32)
+    locale: {
+      locale: 'ru',
+      fallback: 'en',
+      messages: { ru, en },
     },
     defaults: {
       VCard: {

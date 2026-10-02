@@ -102,6 +102,7 @@
             :items="fragmentItems"
             item-title="name"
             item-value="id"
+            :filter-keys="FRAGMENT_FILTER_KEYS"
             multiple
             chips
             closable-chips
@@ -118,6 +119,7 @@
             :items="fragmentItems"
             item-title="name"
             item-value="id"
+            :filter-keys="FRAGMENT_FILTER_KEYS"
             variant="outlined"
             density="compact"
             placeholder="Выберите фрагмент"
@@ -429,6 +431,8 @@ const listModeOptions = [
 
 const fragmentStore = useFragmentStore();
 const fragments = computed(() => fragmentStore.getFragments);
+/** Фрагмент ищется и по имени, и по id (QA F32) */
+const FRAGMENT_FILTER_KEYS = ['title', 'value'];
 const fragmentItems = computed(() =>
   fragments.value.map(f => ({ id: Number(f.id), name: f.name ?? `Фрагмент ${f.id}` })));
 

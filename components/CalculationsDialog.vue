@@ -36,6 +36,7 @@
             :items="fragmentItems"
             item-title="name"
             item-value="id"
+            :filter-keys="FRAGMENT_FILTER_KEYS"
             label="Фрагмент"
             variant="outlined"
             density="compact"
@@ -136,8 +137,8 @@
               :disabled="!canDelete(item)"
               :title="deleteHint(item)"
               :aria-label="deleteHint(item)"
-            />
               @click="askDelete(item)"
+            />
           </template>
         </v-data-table-server>
         <p
@@ -220,6 +221,8 @@ const authStore = useAuthStore();
 const fragmentStore = useFragmentStore();
 const notificationStore = useNotificationStore();
 
+/** Фрагмент ищется и по имени, и по id (QA F32) */
+const FRAGMENT_FILTER_KEYS = ['title', 'value'];
 const fragmentItems = computed(() =>
   fragmentStore.getFragments.map(f => ({ id: Number(f.id), name: f.name ?? `Фрагмент ${f.id}` })));
 
