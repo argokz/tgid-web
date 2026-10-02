@@ -75,6 +75,14 @@ describe('mergeQueryLayerProperties', () => {
     const merged = mergeQueryLayerProperties({ id: 9 }, { id: 9, a: 1 }, 'nodes', 9)
     expect(merged).toEqual({ id: 9, a: 1 })
   })
+
+  it('здание zdaniya_2: таблица запоминается, карточка — строка здания (QA F79)', () => {
+    const merged = mergeQueryLayerProperties({ objectid: 636957 }, { id: 87055, number_1: '214а' }, 'zdaniya_2', 87055)
+    expect(merged.query_table).toBe('zdaniya_2')
+    expect(resolveCardObject(merged)).toEqual({ table: 'zdaniya_2', network: null, networkId: null, rowId: 87055 })
+    // query-слой ничего не вернул — таблицу не угадываем
+    expect(mergeQueryLayerProperties({ objectid: 1 }, null, 'zdaniya_2', 5).query_table).toBeUndefined()
+  })
 })
 
 describe('getCardLineId', () => {

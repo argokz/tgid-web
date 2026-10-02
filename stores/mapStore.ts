@@ -16,7 +16,7 @@ import { useLabelStore, TECHNICAL_LABELS } from '~/stores/labelStore';
 import { usePopupStore } from '~/stores/popupStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { escapeHtml } from '~/utils/escapeHtml';
-import { QUERY_LAYER_KEY_TABLE, mergeQueryLayerProperties } from '~/utils/networkFeature';
+import { BUILDING_CARD_TABLES, QUERY_LAYER_KEY_TABLE, mergeQueryLayerProperties } from '~/utils/networkFeature';
 import {
   getMapTilerGlyphsUrl,
   getMapTilerHybridTilesUrl,
@@ -1018,6 +1018,10 @@ export const useMapStore = defineStore('map', {
               table = 'consumers';
             } else if (sourceLayer.includes('source')) {
               table = 'sources';
+            } else {
+              // Здания (MVT `zdaniya_2`, `zdaniya_tu`): строка таблицы = id объекта тайла (QA F79)
+              const buildingLayer = sourceLayer.split(':').pop() || '';
+              if (BUILDING_CARD_TABLES.has(buildingLayer)) table = buildingLayer;
             }
           }
         }

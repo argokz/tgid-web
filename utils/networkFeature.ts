@@ -38,6 +38,9 @@ const toPositiveId = (raw: unknown): number | null => {
  * (heatpipesections.id ≠ lineid почти у всех строк); потребители/источники/насосные —
  * `WHERE N.id=%id%` (nodes.id). Такой `id` нельзя использовать как id участка/узла (QA F12, F54).
  */
+/** Слои зданий GeoServer: id объекта слоя = id строки таблицы (журналы АЛСЕКО и ТУ по зданию) */
+export const BUILDING_CARD_TABLES: ReadonlySet<string> = new Set(['zdaniya_2', 'zdaniya_tu']);
+
 export const QUERY_LAYER_KEY_TABLE: Readonly<Record<string, 'linesobj' | 'nodes'>> = {
   heatpipesections: 'linesobj',
   generalizedconsumers: 'nodes',
@@ -92,7 +95,14 @@ export const mergeQueryLayerProperties = (
 ): Record<string, any> => {
   const merged: Record<string, any> = { ...base, ...(queried || {}) };
   const keyTable = QUERY_LAYER_KEY_TABLE[String(table || '').toLowerCase()];
-  if (!keyTable) return merged;
+  if (!keyTable) {
+    // Прочие таблицы (здания zdaniya_2, zdaniya_tu…): id карточки — id строки query-слоя. Слой
+    // не несёт tab/gistable, поэтому таблицу запоминаем — иначе resolveCardObject не узнаёт
+    // объект и журнал АЛСЕКО / ТУ по зданию из карточки не открыть (QA F79)
+    const name = String(table || '').toLowerCase();
+    if (toPositiveId(queried?.id) && name !== 'nodes' && name !== 'linesobj') merged.query_table = name;
+    return merged;
+  }
   const rowId = toPositiveId(queried?.id);
   merged.id = lookupId;
   merged.query_table = String(table).toLowerCase();
