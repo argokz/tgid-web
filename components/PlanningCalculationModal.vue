@@ -415,6 +415,7 @@ import { useFragmentStore } from '~/stores/fragmentStore';
 import { useLayerStore } from '~/stores/layerStore';
 import { fastApiService, type SetyCalcMode, type SetyRunRequest } from '~/services/fastApiService';
 import { tnRangeHint, tnValidationError, type TnRange } from '~/utils/calcTemperature';
+import { calcOutcome, taskStateLabel } from '~/utils/calcProtocol';
 
 type RunKind = 'normal' | 'list' | 'emergency';
 
@@ -641,7 +642,8 @@ const pollTask = async (taskId: string) => {
 
     if (statusResponse.status !== lastStatus) {
       lastStatus = statusResponse.status;
-      addProtocolLog(`Статус: ${lastStatus}`, 'info');
+      const stateLabel = taskStateLabel(lastStatus);
+      if (stateLabel) addProtocolLog(`Задача: ${stateLabel}`, 'info');
     }
     const progress = statusResponse.meta?.message;
     if (progress && progress !== lastProgress) {
@@ -652,7 +654,9 @@ const pollTask = async (taskId: string) => {
     if (statusResponse.status === 'SUCCESS') {
       const finalResult = statusResponse.result || {};
       const ok = finalResult.status === 'success';
-      addProtocolLog(finalResult.message || 'Расчёт окончен', ok ? 'success' : 'error');
+      const outcome = calcOutcome(finalResult);
+      addProtocolLog(outcome.label, outcome.type);
+      if (finalResult.message) addProtocolLog(finalResult.message, outcome.type);
       if (finalResult.output) addProtocolLog(finalResult.output, ok ? 'success' : 'info', true);
       if (finalResult.error) addProtocolLog(finalResult.error, 'error', true);
       const layerStore = useLayerStore();
