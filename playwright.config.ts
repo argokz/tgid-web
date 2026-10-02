@@ -49,9 +49,8 @@ export default defineConfig({
     reuseExistingServer: true,
     timeout: 240_000,
     env: {
+      // Права на правку web берёт из API (/auth/config), публичных флагов нет
       NUXT_PUBLIC_MAP_API_BASE_URL: API_URL,
-      NUXT_PUBLIC_MUTATIONS_ENABLED: 'true',
-      NUXT_PUBLIC_TOPOLOGY_EDITING_ENABLED: 'true',
     },
   },
 });
