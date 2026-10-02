@@ -140,8 +140,15 @@
         </div>
       </v-card-text>
       
-      <v-card-actions class="pa-4 bg-grey-lighten-4 border-top">
+      <v-card-actions class="pa-4 bg-grey-lighten-4 border-top flex-wrap ga-2">
         <v-spacer />
+        <v-btn
+          v-if="mapStore.activeCalculationId !== null"
+          color="primary"
+          variant="tonal"
+          prepend-icon="mdi-map-check-outline"
+          @click="keepOnMap"
+        >Оставить на карте</v-btn>
         <v-btn
           variant="text"
           @click="dialog = false"
@@ -156,6 +163,7 @@ import { ref } from 'vue'
 import { fastApiService } from '~/services/fastApiService'
 import { useNotificationStore } from '~/stores/notificationStore'
 import { useMapStore } from '~/stores/mapStore'
+import { useDialogMapOverlay } from '~/composables/useDialogMapOverlay'
 
 const dialog = ref(false)
 const loading = ref(false)
@@ -163,6 +171,10 @@ const error = ref<string | null>(null)
 const calculations = ref<any[]>([])
 const notificationStore = useNotificationStore()
 const mapStore = useMapStore()
+// calculation-lines-layer снимается при закрытии окна, кроме «Оставить на карте» (QA F37)
+const { markShown, markCleared, keepOnMap } = useDialogMapOverlay(dialog, () => {
+  void mapStore.loadCalculation(null)
+})
 
 const fetchData = async () => {
   loading.value = true
@@ -185,6 +197,8 @@ const toggleCalculation = async (id: number | null) => {
   loading.value = true;
   try {
     await mapStore.loadCalculation(id);
+    if (id === null) markCleared();
+    else markShown();
     if (id !== null) {
       notificationStore.showSuccess('Расчет #' + id + ' загружен на карту');
     }

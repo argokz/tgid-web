@@ -434,7 +434,7 @@
 
       <v-divider />
 
-      <v-card-actions class="px-4 py-2">
+      <v-card-actions class="px-4 py-2 flex-wrap ga-2">
         <v-btn
           v-if="result"
           color="error"
@@ -445,6 +445,13 @@
           Снять подсветку с карты
         </v-btn>
         <v-spacer />
+        <v-btn
+          v-if="overlayShown"
+          color="primary"
+          variant="tonal"
+          prepend-icon="mdi-map-check-outline"
+          @click="keepOnMap"
+        >Оставить на карте</v-btn>
         <v-btn
           variant="text"
           @click="visible = false"
@@ -457,6 +464,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
+import { useDialogMapOverlay } from '~/composables/useDialogMapOverlay';
 import {
   fastApiService,
   type OutageSimulationResponse,
@@ -474,6 +482,9 @@ const emit = defineEmits<{
 }>();
 
 const visible = defineModel<boolean>({ default: false });
+// Слои outage-* снимаются при закрытии окна, кроме «Оставить на карте» (QA F37)
+const overlay = useDialogMapOverlay(visible, () => emit('clear-highlight'));
+const { shown: overlayShown, keepOnMap } = overlay;
 const { isMobile } = useMobile();
 
 const targetType = ref<'line' | 'node'>('line');
@@ -522,6 +533,7 @@ const runSimulation = async () => {
     const res = await fastApiService.simulateValveIsolation(payload);
     result.value = res;
     emit('show-on-map', res);
+    overlay.markShown();
   } catch (err: any) {
     errorMessage.value = err?.detail || err?.message || 'Ошибка моделирования отключения';
     result.value = null;
@@ -533,11 +545,13 @@ const runSimulation = async () => {
 const emitShowOnMap = () => {
   if (result.value) {
     emit('show-on-map', result.value);
+    overlay.markShown();
   }
 };
 
 const emitClearHighlight = () => {
   emit('clear-highlight');
+  overlay.markCleared();
 };
 
 const focusCoords = (lng: number, lat: number) => {

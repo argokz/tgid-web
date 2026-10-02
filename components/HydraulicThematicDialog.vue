@@ -206,7 +206,7 @@
 
       <v-divider />
 
-      <v-card-actions class="pa-4 d-flex justify-space-between">
+      <v-card-actions class="pa-4 d-flex flex-wrap justify-space-between ga-2">
         <v-btn
           color="error"
           variant="outlined"
@@ -220,7 +220,7 @@
           Скрыть с карты
         </v-btn>
 
-        <div class="d-flex ga-2">
+        <div class="d-flex flex-wrap justify-end ga-2">
           <v-btn
             v-if="selectedCalculationId"
             color="success"
@@ -246,6 +246,18 @@
             >mdi-check-circle</v-icon>
             Применить на карте
           </v-btn>
+          <v-btn
+            color="primary"
+            variant="tonal"
+            :disabled="!isApplied"
+            @click="keepOnMap"
+          >
+            <v-icon
+              start
+              size="18"
+            >mdi-map-check-outline</v-icon>
+            Оставить на карте
+          </v-btn>
         </div>
       </v-card-actions>
     </v-card>
@@ -256,6 +268,7 @@
 import { ref, computed } from 'vue';
 import { fastApiService, type CalculationSummaryItem, type CalculationGeoJsonResponse } from '~/services/fastApiService';
 import { useNotificationStore } from '~/stores/notificationStore';
+import { useDialogMapOverlay } from '~/composables/useDialogMapOverlay';
 
 const visible = ref(false);
 const calculations = ref<CalculationSummaryItem[]>([]);
@@ -263,7 +276,6 @@ const selectedCalculationId = ref<number | null>(null);
 const loadingCalculations = ref(false);
 const loadingResults = ref(false);
 const geojsonResult = ref<CalculationGeoJsonResponse | null>(null);
-const isApplied = ref(false);
 
 // Toggles
 const showFlowArrows = ref(true);
@@ -287,6 +299,11 @@ const emit = defineEmits<{
   }): void;
   (e: 'clear-thematic'): void;
 }>();
+
+// Слои hydraulic-* снимаются при закрытии окна, кроме «Оставить на карте» (QA F27)
+const overlay = useDialogMapOverlay(visible, () => emit('clear-thematic'));
+const isApplied = overlay.shown;
+const keepOnMap = overlay.keepOnMap;
 
 const summary = computed(() => geojsonResult.value?.summary ?? null);
 
@@ -366,7 +383,7 @@ const loadResults = async () => {
 
 const applyThematic = () => {
   if (!geojsonResult.value) return;
-  isApplied.value = true;
+  overlay.markShown();
   emit('apply-thematic', {
     geojson: geojsonResult.value,
     showArrows: showFlowArrows.value,
@@ -374,8 +391,7 @@ const applyThematic = () => {
     colorNodes: colorNodesThematic.value,
     showNodeLabels: showNodeLabels.value,
   });
-  visible.value = false;
-  useNotificationStore().showSuccess('Гидравлический режим отображен на карте.');
+  useNotificationStore().showSuccess('Гидравлический режим отображён на карте. Чтобы закрыть окно без снятия слоёв — «Оставить на карте».');
 };
 
 const emitSettings = () => {
@@ -390,7 +406,7 @@ const emitSettings = () => {
 };
 
 const clearThematic = () => {
-  isApplied.value = false;
+  overlay.markCleared();
   emit('clear-thematic');
   useNotificationStore().showInfo('Гидравлический режим скрыт с карты.');
 };
