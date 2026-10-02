@@ -347,7 +347,7 @@ import {
   describeImportAction,
   importApiError,
   importSummary,
-  missingRequired,
+  missingRequiredTargets,
   type NetworkImportCrs,
   type NetworkImportInspect,
   type NetworkImportMode,
@@ -392,7 +392,7 @@ const matchItems = [
 const fragmentItems = computed(() =>
   (fragmentStore.fragments || []).map((f: any) => ({ title: `${f.id} — ${f.name ?? ''}`, value: Number(f.id) })),
 );
-const missing = computed(() => (inspect.value ? missingRequired(inspect.value.targets, mapping) : []));
+const missing = computed(() => (inspect.value ? missingRequiredTargets(inspect.value.targets, mapping) : []));
 const canPreview = computed(
   () =>
     !!inspect.value &&

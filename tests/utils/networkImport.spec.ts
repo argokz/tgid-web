@@ -6,7 +6,7 @@ import {
   describeImportAction,
   importApiError,
   importSummary,
-  missingRequired,
+  missingRequiredTargets,
   type NetworkImportInspect,
   type NetworkImportReport,
 } from '~/utils/networkImport';
@@ -60,7 +60,7 @@ describe('network import helpers', () => {
       { key: 'x', label: 'X', required: true },
       { key: 'code', label: 'Код', required: false },
     ];
-    expect(missingRequired(targets, { code: 'K' })).toEqual(['X']);
+    expect(missingRequiredTargets(targets, { code: 'K' })).toEqual(['X']);
   });
 
   it('summarizes dry-run and applied reports', () => {

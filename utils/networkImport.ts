@@ -111,7 +111,7 @@ export const defaultCrsFor = (inspect: NetworkImportInspect): NetworkImportCrs =
 export const cleanMapping = (mapping: Record<string, string | null | undefined>): Record<string, string> =>
   Object.fromEntries(Object.entries(mapping).filter(([, v]) => typeof v === 'string' && v !== '')) as Record<string, string>
 
-export const missingRequired = (targets: NetworkImportTarget[], mapping: Record<string, string | null | undefined>): string[] =>
+export const missingRequiredTargets = (targets: NetworkImportTarget[], mapping: Record<string, string | null | undefined>): string[] =>
   targets.filter((t) => t.required && !mapping[t.key]).map((t) => t.label)
 
 export const importSummary = (r: NetworkImportReport): string => {
