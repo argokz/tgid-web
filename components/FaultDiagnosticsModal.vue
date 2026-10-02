@@ -195,6 +195,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiErrorWith } from '~/utils/apiError'
 import { ref, watch } from 'vue'
 import { fastApiService } from '~/services/fastApiService'
 import { useNotificationStore } from '~/stores/notificationStore'
@@ -245,7 +246,7 @@ const fetchData = async () => {
     const status = err?.statusCode || err?.response?.status
     error.value = status === 404
       ? 'Маршруты журналов недоступны на сервере API. Похоже, развёрнута устаревшая версия itwin-api — обновите её.'
-      : 'Не удалось загрузить неисправности: ' + (err?.message || 'неизвестная ошибка')
+      : formatApiErrorWith('Не удалось загрузить неисправности', err, 'неизвестная ошибка')
     notificationStore.showError(error.value)
   } finally {
     loading.value = false

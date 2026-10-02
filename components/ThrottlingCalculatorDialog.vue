@@ -772,6 +772,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiErrorWith } from '~/utils/apiError';
 import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
 import { useNotificationStore } from '~/stores/notificationStore';
@@ -854,7 +855,7 @@ const orificeDiameterText = computed(() => {
 });
 
 const reportError = (what: string, err: any) => {
-  notificationStore.showError(`${what}: ${err?.message || 'ошибка сервера'}`);
+  notificationStore.showError(formatApiErrorWith(what, err));
 };
 
 watch(

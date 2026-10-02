@@ -206,6 +206,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { computed, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import {
@@ -304,7 +305,7 @@ const download = async () => {
     lastDownload.value = `Скачан ${result.filename}`
     useNotificationStore().showSuccess(`Отчёт «${item.title}» сформирован`)
   } catch (e: any) {
-    error.value = e?.userMessage || e?.data?.detail || e?.message || String(e)
+    error.value = formatApiError(e)
   } finally {
     downloading.value = false
   }
@@ -318,7 +319,7 @@ const loadCatalog = async () => {
     items.value = catalog.items
     notPorted.value = catalog.not_ported
   } catch (e: any) {
-    error.value = e?.userMessage || e?.message || 'Не удалось загрузить каталог отчётов'
+    error.value = formatApiError(e, 'Не удалось загрузить каталог отчётов')
   } finally {
     loadingCatalog.value = false
   }

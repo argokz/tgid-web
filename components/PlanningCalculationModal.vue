@@ -402,6 +402,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiErrorWith } from '~/utils/apiError';
 import { ref, computed, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
 import CalculationsDialog from '~/components/CalculationsDialog.vue';
@@ -700,7 +701,7 @@ const calculate = async () => {
     await pollTask(result.task_id);
   } catch (error: any) {
     addProtocolLog('Ошибка при связи с сервером', 'error');
-    addProtocolLog(`Детали ошибки: ${error?.userMessage || error?.message || error}`, 'error');
+    addProtocolLog(formatApiErrorWith('Детали ошибки', error), 'error');
   } finally {
     calculating.value = false;
   }

@@ -349,6 +349,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { computed, defineComponent, h, ref } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import AlsekoReconciliationPanel from '~/components/AlsekoReconciliationPanel.vue'
@@ -411,7 +412,7 @@ async function loadItemsPage() {
       const response = await fastApiService.getUnassignedAlsekoBuildings({ page: page.value, page_size: 50, search: filters.value.search })
       buildingItems.value = response.items; total.value = response.total; pages.value = response.pages
     }
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : 'Не удалось загрузить АЛСЕКО' } finally { loading.value = false }
+  } catch (cause) { error.value = formatApiError(cause, 'Не удалось загрузить АЛСЕКО') } finally { loading.value = false }
 }
 async function reload() { page.value = 1; await loadItemsPage() }
 async function changeMode() { page.value = 1; await loadItemsPage() }

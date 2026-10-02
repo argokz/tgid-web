@@ -462,6 +462,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError';
 import { computed, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
 import { useDialogMapOverlay } from '~/composables/useDialogMapOverlay';
@@ -535,7 +536,7 @@ const runSimulation = async () => {
     emit('show-on-map', res);
     overlay.markShown();
   } catch (err: any) {
-    errorMessage.value = err?.detail || err?.message || 'Ошибка моделирования отключения';
+    errorMessage.value = formatApiError(err, 'Ошибка моделирования отключения');
     result.value = null;
   } finally {
     loading.value = false;

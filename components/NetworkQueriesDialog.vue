@@ -236,6 +236,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { computed, ref } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { fastApiService } from '~/services/fastApiService'
@@ -295,7 +296,7 @@ const run = async (kind: QueryKind) => {
     else if (kind === 'closed-consumers') result.value = await fastApiService.getNetworkQueryClosedConsumers(ids)
     else result.value = await fastApiService.getNetworkQueryHeatConsumption(ids)
   } catch (e: any) {
-    error.value = e?.message || String(e)
+    error.value = formatApiError(e)
   } finally {
     loading.value = null
   }

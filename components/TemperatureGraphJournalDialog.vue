@@ -527,6 +527,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { use } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
@@ -660,7 +661,7 @@ const recalculateGraph = async () => {
     useNotificationStore().showSuccess(`Температурный график ${title}: ${result.points} точек`)
     await openDetails(details.value.id)
   } catch (err: any) {
-    useNotificationStore().showError(err?.message || 'Не удалось пересчитать TG')
+    useNotificationStore().showError(formatApiError(err, 'Не удалось пересчитать TG'))
   } finally {
     recalculating.value = false
   }
@@ -683,7 +684,7 @@ const applyStationary = async () => {
     stationaryDialog.value = false
     await openDetails(details.value.id)
   } catch (err: any) {
-    useNotificationStore().showError(err?.message || 'Не удалось применить стационарный график')
+    useNotificationStore().showError(formatApiError(err, 'Не удалось применить стационарный график'))
   } finally {
     applyingStationary.value = false
   }

@@ -345,6 +345,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError, formatApiErrorWith } from '~/utils/apiError';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { computed, ref, watch } from 'vue';
 import {
@@ -418,7 +419,7 @@ const onDoubleMenu = async (open: boolean) => {
     calcList.value = res.items || [];
   } catch (err: any) {
     calcList.value = [];
-    useNotificationStore().showError(`Список расчётов: ${err?.message || 'ошибка сервера'}`);
+    useNotificationStore().showError(formatApiErrorWith('Список расчётов', err, 'ошибка сервера'));
   } finally {
     calcListLoading.value = false;
   }
@@ -443,7 +444,7 @@ const loadTravelTime = async () => {
   try {
     travel.value = await fastApiService.getTravelTime(nodes);
   } catch (err: any) {
-    travelError.value = err?.message || 'Ошибка расчёта времени прохождения';
+    travelError.value = formatApiError(err, 'Ошибка расчёта времени прохождения');
   } finally {
     travelLoading.value = false;
   }
@@ -681,7 +682,7 @@ const exportExcel = async () => {
     link.remove();
     URL.revokeObjectURL(url);
   } catch (err: any) {
-    useNotificationStore().showError(`Экспорт Excel: ${err?.message || 'ошибка сервера'}`);
+    useNotificationStore().showError(formatApiErrorWith('Экспорт Excel', err, 'ошибка сервера'));
   } finally {
     exportingExcel.value = false;
   }

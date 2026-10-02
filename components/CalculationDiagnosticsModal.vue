@@ -182,7 +182,7 @@ const fetchData = async () => {
   try {
     calculations.value = await fastApiService.getLatestCalculations(20)
   } catch (err: any) {
-    error.value = 'Не удалось загрузить историю расчетов: ' + err.message
+    error.value = formatApiErrorWith('Не удалось загрузить историю расчетов', err)
     notificationStore.showError(error.value)
   } finally {
     loading.value = false
@@ -222,7 +222,7 @@ const downloadCalcExcel = async (calcId: number) => {
     URL.revokeObjectURL(url)
     notificationStore.showSuccess('Результаты расчета #' + calcId + ' выгружены в Excel')
   } catch (err: any) {
-    notificationStore.showError('Ошибка выгрузки Excel: ' + err.message)
+    notificationStore.showError(formatApiErrorWith('Ошибка выгрузки Excel', err))
   }
 }
 
@@ -244,3 +244,4 @@ defineExpose({
   border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 </style>
+import { formatApiErrorWith } from '~/utils/apiError'

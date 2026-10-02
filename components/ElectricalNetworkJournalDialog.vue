@@ -336,6 +336,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
 
 const mutationsEnabled = useMutationsEnabled()
@@ -381,7 +382,7 @@ function relationTitle(key: string) { return ({ lines: 'Связанные ЛЭ�
 function relationText(row: Record<string, unknown>) { return String(row.name || row.description || row.document_type_name || row.path || row.object_type || 'Связанная запись') }
 
 async function loadLookups() { if (!Object.keys(lookups.value.counts).length) lookups.value = await fastApiService.getElectricalNetworkLookups() }
-async function loadPage() { loading.value = true; error.value = ''; try { const response = await fastApiService.getElectricalObjects({ page: page.value, page_size: 50, ...filters.value }); items.value = response.items; total.value = response.total; pages.value = response.pages } catch (cause) { error.value = cause instanceof Error ? cause.message : 'Не удалось загрузить электросеть' } finally { loading.value = false } }
+async function loadPage() { loading.value = true; error.value = ''; try { const response = await fastApiService.getElectricalObjects({ page: page.value, page_size: 50, ...filters.value }); items.value = response.items; total.value = response.total; pages.value = response.pages } catch (cause) { error.value = formatApiError(cause, 'Не удалось загрузить электросеть') } finally { loading.value = false } }
 async function reload() { page.value = 1; await loadPage() }
 async function resetFilters() { filters.value = { search: '', object_type: undefined, owner_id: undefined, parent_line_id: undefined, voltage_kv: undefined }; await reload() }
 async function openDetails(objectType: ElectricalObjectType, objectId: number) { detailsVisible.value = true; detailsLoading.value = true; isEditing.value = false; try { selected.value = await fastApiService.getElectricalObject(objectType, objectId) } finally { detailsLoading.value = false } }
@@ -440,7 +441,7 @@ const saveChanges = async () => {
     await openDetails(selected.value.object_type, selected.value.id)
     isEditing.value = false
     await loadPage()
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : 'Ошибка при сохранении' } finally { saving.value = false }
+  } catch (cause) { error.value = formatApiError(cause, 'Ошибка при сохранении') } finally { saving.value = false }
 }
 
 defineExpose({ openDialog })

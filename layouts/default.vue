@@ -294,6 +294,7 @@ import { useUiStore } from '~/stores/uiStore';
 import PlanningCalculationModal from '~/components/PlanningCalculationModal.vue';
 import CalculationProtocol from '~/components/CalculationProtocol.vue';
 import LoginDialog from '~/components/LoginDialog.vue';
+import { formatApiErrorWith } from '~/utils/apiError';
 import { ROLE_LABELS, type Role } from '~/utils/permissions';
 import { buildHeaderMenu, isHeaderNavCollapsed, type HeaderMenuItem } from '~/utils/headerMenu';
 
@@ -420,7 +421,7 @@ const downloadShp = async () => {
     URL.revokeObjectURL(url);
     useNotificationStore().showSuccess(`Экспорт SHP (фрагменты: ${fragmentIds.join(', ')})`);
   } catch (err: any) {
-    useNotificationStore().showError('Ошибка экспорта SHP: ' + err.message);
+    useNotificationStore().showError(formatApiErrorWith('Ошибка экспорта SHP', err));
   } finally {
     exportingShp.value = false;
   }
@@ -445,7 +446,7 @@ const downloadDxf = async () => {
     URL.revokeObjectURL(url);
     useNotificationStore().showSuccess(`Экспорт DXF (фрагменты: ${fragmentIds.join(', ')})`);
   } catch (err: any) {
-    useNotificationStore().showError('Ошибка экспорта DXF: ' + err.message);
+    useNotificationStore().showError(formatApiErrorWith('Ошибка экспорта DXF', err));
   } finally {
     exportingDxf.value = false;
   }
@@ -472,7 +473,7 @@ const downloadGeoJson = async (withAttrs: boolean) => {
       `Экспорт GeoJSON${withAttrs ? ' с атрибутами' : ''} (фрагменты: ${fragmentIds.join(', ')})`
     );
   } catch (err: any) {
-    useNotificationStore().showError('Ошибка экспорта GeoJSON: ' + err.message);
+    useNotificationStore().showError(formatApiErrorWith('Ошибка экспорта GeoJSON', err));
   } finally {
     exportingGeoJson.value = false;
   }
@@ -496,7 +497,7 @@ const downloadExcel = async (docType: string) => {
     if (truncation) useNotificationStore().showWarning(`Ведомость ${docType.toUpperCase()}${scope}: ${truncation}`);
     else useNotificationStore().showSuccess(`Ведомость ${docType.toUpperCase()}${scope} скачана`);
   } catch (err: any) {
-    useNotificationStore().showError('Ошибка скачивания ведомости: ' + err.message);
+    useNotificationStore().showError(formatApiErrorWith('Ошибка скачивания ведомости', err));
   }
 };
 </script>

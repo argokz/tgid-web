@@ -192,6 +192,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError';
 import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
 import {
@@ -305,7 +306,7 @@ const load = (): Promise<void> => {
       total.value = res.total;
     } catch (e: any) {
       if (inflight?.key !== key) return;
-      error.value = e?.userMessage || e?.message || 'Не удалось загрузить список расчётов';
+      error.value = formatApiError(e, 'Не удалось загрузить список расчётов');
     } finally {
       if (inflight?.key === key) {
         inflight = null;
@@ -334,7 +335,7 @@ const confirmDelete = async () => {
     emit('deleted', id);
     await load();
   } catch (e: any) {
-    notificationStore.showError(e?.userMessage || e?.message || `Не удалось удалить расчёт #${id}`);
+    notificationStore.showError(formatApiError(e, `Не удалось удалить расчёт №${id}`));
   } finally {
     deleting.value = false;
   }

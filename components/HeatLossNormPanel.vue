@@ -355,6 +355,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { useAuthStore } from '~/stores/authStore'
 import {
   fastApiService,
@@ -528,7 +529,7 @@ async function loadScope() {
   try {
     scope.value = await fastApiService.getHeatLossNormScope(seasonId.value, fragmentId.value, losesType.value)
   } catch (err: any) {
-    notify().showError(err?.message || 'Не удалось получить источники')
+    notify().showError(formatApiError(err, 'Не удалось получить источники'))
   } finally {
     scopeLoading.value = false
   }
@@ -542,7 +543,7 @@ async function prepareConditions(sourceId: number) {
     notify().showSuccess(`Условия работы источника №${sourceId}: ${res.months.length} строк`)
     await loadScope()
   } catch (err: any) {
-    notify().showError(err?.message || 'Не удалось задать условия работы')
+    notify().showError(formatApiError(err, 'Не удалось задать условия работы'))
   } finally {
     preparing.value = null
   }
@@ -552,7 +553,7 @@ async function loadRuns() {
   try {
     runs.value = (await fastApiService.getHeatLossNormResults({ fragment_id: fragmentId.value, limit: 50 })).items
   } catch (err: any) {
-    notify().showError(err?.message || 'Не удалось получить список расчётов')
+    notify().showError(formatApiError(err, 'Не удалось получить список расчётов'))
   }
 }
 
@@ -564,7 +565,7 @@ async function openRun(id: number) {
     sections.value = []
     sectionTotal.value = 0
   } catch (err: any) {
-    notify().showError(err?.message || 'Не удалось открыть расчёт')
+    notify().showError(formatApiError(err, 'Не удалось открыть расчёт'))
   }
 }
 
@@ -586,7 +587,7 @@ watch(losesType, async (value) => {
     try {
       factSeasons.value = (await fastApiService.getHeatLossNormSeasons('fact')).items
     } catch (err: any) {
-      notify().showError(err?.message || 'Не удалось получить сезоны фактических потерь')
+      notify().showError(formatApiError(err, 'Не удалось получить сезоны фактических потерь'))
     }
   }
   seasonId.value = activeSeasons.value[0]?.id ?? null
@@ -620,7 +621,7 @@ async function runCalculation() {
     }
     notify().showError('Таймаут ожидания расчёта теплопотерь')
   } catch (err: any) {
-    notify().showError(err?.message || 'Не удалось запустить расчёт')
+    notify().showError(formatApiError(err, 'Не удалось запустить расчёт'))
   } finally {
     running.value = false
   }
@@ -639,7 +640,7 @@ async function downloadExcel(id: number) {
     link.remove()
     URL.revokeObjectURL(url)
   } catch (err: any) {
-    notify().showError(err?.message || 'Не удалось выгрузить Excel')
+    notify().showError(formatApiError(err, 'Не удалось выгрузить Excel'))
   } finally {
     exporting.value = null
   }
@@ -652,7 +653,7 @@ async function removeRun(id: number) {
     if (run.value?.id === id) run.value = null
     await loadRuns()
   } catch (err: any) {
-    notify().showError(err?.message || 'Не удалось удалить расчёт')
+    notify().showError(formatApiError(err, 'Не удалось удалить расчёт'))
   }
 }
 

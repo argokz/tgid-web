@@ -170,6 +170,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { computed, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { fastApiService, type RegimeAnalysisKind, type RegimeAnalysisResult } from '~/services/fastApiService'
@@ -323,7 +324,7 @@ const run = async () => {
       })
     }
   } catch (e: any) {
-    error.value = e?.data?.detail || e?.message || String(e)
+    error.value = formatApiError(e)
   } finally {
     loading.value = false
   }

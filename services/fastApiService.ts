@@ -1,4 +1,5 @@
 import { reactive } from 'vue';
+import { BAD_CREDENTIALS_TEXT, SESSION_EXPIRED_TEXT, serverDetailText, statusMessage } from '~/utils/apiError';
 import type { FeatureData, Fragment } from '~/types';
 import type {
   NetworkImportInspect,
@@ -1213,32 +1214,54 @@ export const formatTopologyBlockers = (detail: { message?: string; blockers?: Re
   return [detail.message, parts.join('; ')].filter(Boolean).join(': ');
 };
 
-const extractDetail = (error: any): string => {
+/**
+ * Тело ответа с ошибкой. У responseType: 'blob' ofetch отдаёт Blob — читаем его как JSON/текст,
+ * чтобы показать detail сервера, а не `[GET] "http://…": 500` (QA F22).
+ */
+const readErrorBody = async (error: any): Promise<any> => {
   const data = error?.data ?? error?.response?._data;
-  if (typeof data === 'string') return data;
-  if (data?.detail) {
-    if (typeof data.detail === 'string') return data.detail;
-    if (data.detail.code === 'version_conflict') return formatVersionConflict(data.detail);
-    if (data.detail.blockers) return formatTopologyBlockers(data.detail);
-    return JSON.stringify(data.detail);
+  if (typeof Blob === 'undefined' || !(data instanceof Blob)) return data;
+  try {
+    const text = await data.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      // HTML-страница прокси/сервера — не показываем
+      return /^\s*</.test(text) ? null : text.slice(0, 500);
+    }
+  } catch {
+    return null;
   }
-  return error?.message || 'неизвестная ошибка';
 };
 
+/** Текст detail сервера; пусто, если сервер его не прислал (сырое сообщение ofetch не показываем) */
+const extractDetail = (data: any): string => {
+  if (typeof data === 'string') return /^\s*</.test(data) ? '' : data.trim();
+  const detail = data?.detail;
+  if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+    if (detail.code === 'version_conflict') return formatVersionConflict(detail);
+    if (detail.blockers) return formatTopologyBlockers(detail);
+    return serverDetailText(data) || JSON.stringify(detail);
+  }
+  return serverDetailText(data);
+};
+
+const isLoginPath = (path: string) => /(^|\/)auth\/login$/.test(path);
+
 const userMessageFor = (status: number, detail: string, path: string): string => {
-  if (status === 0) return 'Сервер API недоступен. Проверьте подключение к сети.';
-  if (status === 401) return 'Требуется авторизация.';
-  if (status === 403) return 'Недостаточно прав для этой операции.';
-  if (status === 404) {
+  if (status === 401 && isLoginPath(path)) return BAD_CREDENTIALS_TEXT;
+  if (status === 404 && !detail) {
     return path.match(/\/\d+$/)
       ? 'Запись не найдена.'
       : 'Маршрут отсутствует на сервере API — вероятно, развёрнута устаревшая версия.';
   }
-  if (status === 408 || status === 504) return 'Сервер не ответил вовремя. Попробуйте ещё раз.';
-  if (status === 422) return `Некорректные параметры запроса: ${detail}`;
-  if (status === 429) return 'Слишком много запросов, попробуйте позже.';
-  if (status >= 500) return `Ошибка на сервере: ${detail}`;
-  return detail;
+  return statusMessage(status, detail);
+};
+
+/** 401 при отправленном токене: сессия истекла — authStore сбрасывает её и открывает вход (QA F71) */
+let unauthorizedHandler: ((path: string) => void) | null = null;
+export const setUnauthorizedHandler = (handler: ((path: string) => void) | null) => {
+  unauthorizedHandler = handler;
 };
 
 /** Доступность API — для индикатора деградации в интерфейсе */
@@ -1300,7 +1323,9 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
   const url = buildApiUrl(path.startsWith('/') ? path.slice(1) : path);
   const method = String(options?.method || 'GET').toUpperCase();
   const isMutation = method !== 'GET' && method !== 'HEAD';
-  const maxAttempts = isMutation ? 1 : MAX_RETRIES + 1;
+  // Файлы (blob) не повторяем: выгрузка тяжёлая (DXF ~30 с), повтор даёт параллельные выгрузки (QA F22, F77)
+  const isBlob = options?.responseType === 'blob';
+  const maxAttempts = isMutation || isBlob ? 1 : MAX_RETRIES + 1;
 
   // JWT уходит со всеми вызовами API: при AUTH_REQUIRED_GET сервер закрывает
   // и POST-расчёты (пьезометр, калькуляторы, локализация), не только чтение
@@ -1314,8 +1339,8 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
         timeout: DEFAULT_TIMEOUT_MS,
         ...(options || {}),
         headers,
-        // ofetch сам повторяет GET на 5xx; мутации — никогда (ретраи только по maxAttempts выше)
-        ...(isMutation ? { retry: 0 } : {}),
+        // встроенные ретраи ofetch (GET на 409/5xx) выключены: повторы только по maxAttempts выше
+        retry: 0,
       });
       markApiResponded();
       return result;
@@ -1331,17 +1356,7 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
         continue;
       }
 
-      const detail = extractDetail(error);
-      const rawDetail = (error?.data ?? error?.response?._data)?.detail;
-      const hasServerDetail = typeof rawDetail === 'string' && rawDetail !== '' && rawDetail !== 'Not Found';
-      const apiError = new ApiError({
-        status,
-        detail,
-        path,
-        userMessage: status === 404 && hasServerDetail ? detail : userMessageFor(status, detail, path),
-        data: rawDetail && typeof rawDetail === 'object' ? rawDetail : null,
-        hasServerDetail,
-      });
+      const apiError = await toApiError(error, path, Boolean(headers.Authorization), status);
 
       if (apiError.isUnavailable) {
         apiHealth.reachable = false;
@@ -1356,6 +1371,30 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
   }
 
   throw lastError;
+};
+
+/** Ошибка ofetch → ApiError с текстом для пользователя (detail сервера, в т. ч. из Blob) */
+const toApiError = async (
+  error: any,
+  path: string,
+  sentToken: boolean,
+  status = extractStatus(error),
+): Promise<ApiError> => {
+  const body = await readErrorBody(error);
+  const detail = extractDetail(body);
+  const rawDetail = body && typeof body === 'object' ? body.detail : undefined;
+  const hasServerDetail = typeof rawDetail === 'string' && rawDetail !== '' && rawDetail !== 'Not Found';
+  // 401 с отправленным токеном — сессия истекла: сбросить её и предложить войти (QA F71)
+  const sessionExpired = status === 401 && sentToken && !isLoginPath(path);
+  if (sessionExpired) unauthorizedHandler?.(path);
+  return new ApiError({
+    status,
+    detail: detail || String(error?.message || ''),
+    path,
+    userMessage: sessionExpired ? SESSION_EXPIRED_TEXT : userMessageFor(status, detail, path),
+    data: rawDetail && typeof rawDetail === 'object' ? rawDetail : null,
+    hasServerDetail,
+  });
 };
 
 /** Совместимость: раньше использовался отдельный хелпер с ретраями */
@@ -1534,15 +1573,21 @@ const runFileJob = async (
     report('downloading', 'Скачивание…');
     const url = buildApiUrl(`api/v1/file-jobs/${encodePath(taskId)}/download`);
     let disposition: string | null = null;
-    const blob = await $fetch<Blob>(url, {
-      responseType: 'blob',
-      timeout: REPORT_TIMEOUT_MS,
-      headers: authHeaders(),
-      onResponse({ response }: any) {
-        disposition = response?.headers?.get?.('content-disposition') ?? null;
-        if (onHeaders && response?.headers?.get) onHeaders((name) => response.headers.get(name));
-      },
-    });
+    let blob: Blob;
+    try {
+      blob = await $fetch<Blob>(url, {
+        responseType: 'blob',
+        timeout: REPORT_TIMEOUT_MS,
+        headers: authHeaders(),
+        retry: 0,
+        onResponse({ response }: any) {
+          disposition = response?.headers?.get?.('content-disposition') ?? null;
+          if (onHeaders && response?.headers?.get) onHeaders((name) => response.headers.get(name));
+        },
+      });
+    } catch (error: any) {
+      throw await toApiError(error, `api/v1/file-jobs/${taskId}/download`, Boolean(authHeaders().Authorization));
+    }
     return { blob, filename: filenameFromDisposition(disposition) || status.filename || `${kind}.xlsx` };
   }
 };

@@ -213,6 +213,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import {
@@ -305,7 +306,7 @@ const load = async () => {
     total.value = res.total
     note.value = res.note || ''
   } catch (e: any) {
-    error.value = e?.userMessage || e?.message || 'Не удалось загрузить историю правок'
+    error.value = formatApiError(e, 'Не удалось загрузить историю правок')
   } finally {
     loading.value = false
   }

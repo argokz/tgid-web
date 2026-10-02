@@ -146,6 +146,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiErrorWith } from '~/utils/apiError';
 import { computed, onBeforeUnmount, watch } from 'vue';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { formatArea, formatLength, useMapDraw, type DrawMode } from '~/composables/useMapDraw';
@@ -199,7 +200,7 @@ const exportGeoJson = () => {
     URL.revokeObjectURL(url);
     notificationStore.showSuccess('Геометрия выгружена в GeoJSON');
   } catch (e: any) {
-    notificationStore.showError('Не удалось выгрузить GeoJSON: ' + (e?.message || ''));
+    notificationStore.showError(formatApiErrorWith('Не удалось выгрузить GeoJSON', e, ''));
   }
 };
 

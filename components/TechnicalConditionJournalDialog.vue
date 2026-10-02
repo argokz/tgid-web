@@ -562,6 +562,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError, formatApiErrorWith } from '~/utils/apiError'
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
@@ -765,7 +766,7 @@ const saveChanges = async () => {
     }
   } catch (e: any) {
     // форма остаётся открытой с введёнными значениями
-    notifications.showError('Ошибка при сохранении: ' + (e?.userMessage || e?.message || ''))
+    notifications.showError(formatApiErrorWith('Ошибка при сохранении', e))
   } finally {
     saving.value = false
   }
@@ -793,7 +794,7 @@ const downloadBalance = async () => {
       `Свод ТУ ${balance.year || ''}: ${balance.totals?.tu_count ?? 0} записей${note}`
     )
   } catch (e: any) {
-    useNotificationStore().showError(e?.message || 'Не удалось выгрузить свод ТУ')
+    useNotificationStore().showError(formatApiError(e, 'Не удалось выгрузить свод ТУ'))
   } finally {
     loadingBalance.value = false
   }
@@ -808,7 +809,7 @@ const deleteTechnicalCondition = async (id: number) => {
     detailsVisible.value = false
     await loadConditions()
   } catch (e: any) {
-    notifications.showError('Ошибка при удалении: ' + (e?.userMessage || e?.message || ''))
+    notifications.showError(formatApiErrorWith('Ошибка при удалении', e))
   } finally {
     deleting.value = false
   }

@@ -1,3 +1,4 @@
+import { formatApiError } from '~/utils/apiError';
 /**
  * Чистые помощники диалогов «Групповые установщики» и «Справочники» (тестируются без UI).
  */
@@ -114,7 +115,7 @@ export function apiErrorText(e: any, fallback = 'Ошибка запроса'): 
     if (data.unknown_fields) parts.push(`неизвестные поля: ${data.unknown_fields.join(', ')}`);
     if (parts.length) return parts.join(' — ');
   }
-  return e?.userMessage || e?.message || fallback;
+  return formatApiError(e, fallback);
 }
 
 /** Поля формы справочника → тело fields (пустые строки → null, только изменённые при правке) */

@@ -1,3 +1,4 @@
+import { formatApiError, formatApiErrorWith } from '~/utils/apiError';
 import maplibregl from 'maplibre-gl';
 import { getCurrentInstance, onBeforeUnmount, ref, watch } from 'vue';
 import type { Ref } from 'vue';
@@ -180,7 +181,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       });
       return;
     }
-    notify.showError(`${prefix}: ${err?.userMessage || err?.message || ''}`);
+    notify.showError(formatApiErrorWith(prefix, err));
   };
 
   const toggleMergeMode = () => {
@@ -219,7 +220,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
         source_node_id: source,
       });
     } catch (err: any) {
-      mergePreviewError.value = err?.userMessage || err?.message || 'Не удалось получить превью';
+      mergePreviewError.value = formatApiError(err, 'Не удалось получить превью');
     } finally {
       mergePreviewLoading.value = false;
     }
@@ -277,7 +278,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       // версия участка на момент превью — подтверждение применится, только если он не изменился
       splitPreviewTarget.value = { lineId, lng, lat, version: preview.versions?.[`line:${lineId}`] };
     } catch (err: any) {
-      splitPreviewError.value = err?.userMessage || err?.message || 'Не удалось получить превью';
+      splitPreviewError.value = formatApiError(err, 'Не удалось получить превью');
     } finally {
       splitPreviewLoading.value = false;
     }
@@ -311,7 +312,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     splitPreviewTarget.value = null;
   };
 
-  const toggleEditTopologyMode = () => {
+  const toggleEditTopologyMode = async () => {
     if (!isEditTopologyMode.value && isDrawActive()) {
       useNotificationStore().showWarning('Сначала завершите рисование или измерение на панели рисования.');
       return;

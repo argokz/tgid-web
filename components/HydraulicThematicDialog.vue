@@ -265,6 +265,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiErrorWith } from '~/utils/apiError';
 import { ref, computed } from 'vue';
 import { fastApiService, type CalculationSummaryItem, type CalculationGeoJsonResponse } from '~/services/fastApiService';
 import { useNotificationStore } from '~/stores/notificationStore';
@@ -328,7 +329,7 @@ const downloadExcel = async () => {
     a.click();
     URL.revokeObjectURL(url);
   } catch (err: any) {
-    useNotificationStore().showError(`Экспорт Excel: ${err?.message || 'ошибка сервера'}`);
+    useNotificationStore().showError(formatApiErrorWith('Экспорт Excel', err, 'ошибка сервера'));
   } finally {
     excelLoading.value = false;
   }
@@ -355,7 +356,7 @@ const fetchCalculations = async () => {
   try {
     calculations.value = await fastApiService.getLatestCalculations(25);
   } catch (err: any) {
-    useNotificationStore().showError('Не удалось загрузить список расчетов: ' + (err?.message || ''));
+    useNotificationStore().showError(formatApiErrorWith('Не удалось загрузить список расчетов', err, ''));
   } finally {
     loadingCalculations.value = false;
   }
@@ -375,7 +376,7 @@ const loadResults = async () => {
       `Результаты расчета #${selectedCalculationId.value} загружены (${geojsonResult.value.features.length} объектов)`
     );
   } catch (err: any) {
-    useNotificationStore().showError('Ошибка загрузки результатов расчета: ' + (err?.message || ''));
+    useNotificationStore().showError(formatApiErrorWith('Ошибка загрузки результатов расчета', err, ''));
   } finally {
     loadingResults.value = false;
   }

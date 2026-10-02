@@ -246,6 +246,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError, formatApiErrorWith } from '~/utils/apiError';
 import { computed, ref, watch } from 'vue';
 import { fastApiService, type FragmentTransferReport } from '~/services/fastApiService';
 import { useAuthStore } from '~/stores/authStore';
@@ -288,7 +289,7 @@ const loadFragments = async () => {
     const res = await fastApiService.getFragments();
     fragments.value = (res.data || []).map((f: any) => ({ id: Number(f.id), name: String(f.name ?? f.id) }));
   } catch (err: any) {
-    error.value = `Список фрагментов: ${err?.message || 'ошибка сервера'}`;
+    error.value = formatApiErrorWith('Список фрагментов', err, 'ошибка сервера');
   } finally {
     fragmentsLoading.value = false;
   }
@@ -304,7 +305,7 @@ const run = async (fn: () => Promise<void>) => {
     await fn();
   } catch (err: any) {
     const detail = err?.data?.detail;
-    error.value = typeof detail === 'string' ? detail : err?.userMessage || err?.message || 'Ошибка сервера';
+    error.value = typeof detail === 'string' ? detail : formatApiError(err, 'Ошибка сервера');
   } finally {
     busy.value = false;
   }

@@ -215,6 +215,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { reactive, ref } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import {
@@ -272,7 +273,7 @@ const passwordUser = ref<AdminUser | null>(null)
 const newPassword = ref('')
 const savingPassword = ref(false)
 
-const errorText = (e: any, fallback: string) => e?.detail || e?.userMessage || e?.message || fallback
+const errorText = (e: any, fallback: string) => formatApiError(e, fallback)
 
 const load = async () => {
   if (!authStore.isAdmin) return

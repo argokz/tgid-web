@@ -163,6 +163,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiErrorWith } from '~/utils/apiError'
 import { computed, ref } from 'vue'
 import {
   fastApiService,
@@ -196,7 +197,7 @@ const fetchDiagnostics = async () => {
   try {
     result.value = await fastApiService.getTopologyDiagnostics(id, 200)
   } catch (err: any) {
-    error.value = 'Не удалось загрузить диагностику топологии: ' + (err?.userMessage || err?.message || err)
+    error.value = formatApiErrorWith('Не удалось загрузить диагностику топологии', err)
     notificationStore.showError(error.value)
   } finally {
     loading.value = false

@@ -96,6 +96,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { useMobile } from '~/composables/useMobile'
 import { fastApiService } from '~/services/fastApiService'
 
@@ -133,7 +134,7 @@ const load = async () => {
     tableName.value = data.table ?? null
     note.value = data.note || ''
   } catch (e: any) {
-    error.value = e?.message || String(e)
+    error.value = formatApiError(e)
     items.value = []
     total.value = 0
   } finally {

@@ -501,6 +501,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError';
 import { activeDrawMode } from '~/composables/useMapDraw';
 import { useMapStore } from '~/stores/mapStore';
 import { usePopupStore } from '~/stores/popupStore';
@@ -1155,7 +1156,7 @@ const buildPiezometerRoute = async () => {
     piezometerTotalLength.value = res.total_length;
     highlightRoute(res.path);
   } catch (e: any) {
-    piezometerError.value = e?.userMessage || e?.message || 'Ошибка построения маршрута';
+    piezometerError.value = formatApiError(e, 'Ошибка построения маршрута');
   } finally {
     piezometerLoading.value = false;
   }

@@ -602,6 +602,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
@@ -795,7 +796,7 @@ const saveChanges = async () => {
     await loadShurfs()
     if (id) await openDetails(id)
   } catch (e: any) {
-    recordForm.showError(e?.message || 'Ошибка при сохранении')
+    recordForm.showError(formatApiError(e, 'Ошибка при сохранении'))
   } finally {
     saving.value = false
   }
@@ -952,7 +953,7 @@ const exportWord = async () => {
     a.remove()
     URL.revokeObjectURL(url)
   } catch (e: any) {
-    detailsError.value = e?.message || 'Не удалось сформировать Word'
+    detailsError.value = formatApiError(e, 'Не удалось сформировать Word')
   } finally {
     exportingWord.value = false
   }

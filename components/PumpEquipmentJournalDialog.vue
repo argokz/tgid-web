@@ -656,6 +656,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { use } from 'echarts/core'
 import { LineChart, ScatterChart } from 'echarts/charts'
@@ -760,7 +761,7 @@ const saveChanges = async () => {
     isEditing.value = false
     await loadInstalled()
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'Ошибка при сохранении'
+    error.value = formatApiError(cause, 'Ошибка при сохранении')
   } finally {
     saving.value = false
   }

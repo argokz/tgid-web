@@ -117,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiErrorWith } from '~/utils/apiError';
 import { useMapStore } from '~/stores/mapStore';
 import { useLayerStore } from '~/stores/layerStore';
 import type { ExtendedLayerConfig } from '~/types';
@@ -464,7 +465,7 @@ async function applyIcon() {
     }
   } catch (error: any) {
     console.error('Error applying icon:', error);
-    errorMessage.value = `Ошибка при применении иконки: ${error.message || 'Неизвестная ошибка'}`;
+    errorMessage.value = formatApiErrorWith('Ошибка при применении иконки', error, 'Неизвестная ошибка');
   } finally {
     // Выключаем индикатор загрузки
     isLoading.value = false;
@@ -503,7 +504,7 @@ async function resetIcon() {
     }
   } catch (error: any) {
     console.error('Error resetting icon:', error);
-    errorMessage.value = `Ошибка при сбросе иконки: ${error.message || 'Неизвестная ошибка'}`;
+    errorMessage.value = formatApiErrorWith('Ошибка при сбросе иконки', error, 'Неизвестная ошибка');
   } finally {
     isLoading.value = false;
   }

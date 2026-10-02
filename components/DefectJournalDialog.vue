@@ -523,6 +523,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
@@ -721,7 +722,7 @@ const saveChanges = async () => {
     await loadDefects()
     if (id) await openDetails(id)
   } catch (e: any) {
-    recordForm.showError(e?.message || 'Ошибка при сохранении')
+    recordForm.showError(formatApiError(e, 'Ошибка при сохранении'))
   } finally {
     saving.value = false
   }

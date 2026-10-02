@@ -656,6 +656,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
@@ -760,7 +761,7 @@ const saveChanges = async () => {
     isEditing.value = false
     await loadInventory()
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'Ошибка при сохранении'
+    error.value = formatApiError(cause, 'Ошибка при сохранении')
   } finally {
     saving.value = false
   }

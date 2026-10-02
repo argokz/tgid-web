@@ -1101,6 +1101,7 @@
 
 
 <script setup lang="ts">
+import { formatApiError, formatApiErrorWith } from '~/utils/apiError'
 
 import { ref, computed, watch } from 'vue'
 
@@ -1712,7 +1713,7 @@ const downloadPassport = async () => {
 
   } catch (error: any) {
 
-    notificationMessage.value = `Ошибка формирования паспорта: ${error?.message || error}`
+    notificationMessage.value = formatApiErrorWith('Ошибка формирования паспорта', error)
 
     showNotification.value = true
 
@@ -1742,7 +1743,7 @@ const reverseLineDirection = async () => {
   try {
     reversePreviewReport.value = await fastApiService.previewReverseLine(lineId, reversePreviewSectionId.value)
   } catch (error: any) {
-    reversePreviewError.value = error?.userMessage || error?.message || 'Не удалось получить превью'
+    reversePreviewError.value = formatApiError(error, 'Не удалось получить превью')
   } finally {
     reversePreviewLoading.value = false
   }
@@ -1781,7 +1782,7 @@ const confirmReverse = async ({ acceptDirectionChange, includePair }: { acceptDi
         await reverseLineDirection()
       })
     } else {
-      notificationMessage.value = error?.userMessage || error?.message || 'Не удалось развернуть участок'
+      notificationMessage.value = formatApiError(error, 'Не удалось развернуть участок')
       showNotification.value = true
     }
   } finally {
@@ -1808,7 +1809,7 @@ const downloadWordReport = async () => {
 
   } catch (error: any) {
 
-    notificationMessage.value = `Ошибка формирования отчёта: ${error?.message || error}`
+    notificationMessage.value = formatApiErrorWith('Ошибка формирования отчёта', error)
 
     showNotification.value = true
 

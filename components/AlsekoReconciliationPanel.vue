@@ -281,6 +281,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { computed, defineComponent, h, onMounted, ref, watch, type PropType } from 'vue'
 import {
   fastApiService,
@@ -342,7 +343,7 @@ const columnTitle = alsekoColumnTitle
 function fail(cause: unknown, fallback: string) {
   const anyCause = cause as { data?: { detail?: { message?: string } | string }, message?: string }
   const detail = anyCause?.data?.detail
-  error.value = (typeof detail === 'object' ? detail?.message : detail) || anyCause?.message || fallback
+  error.value = (typeof detail === 'object' ? detail?.message : detail) || formatApiError(cause, fallback)
 }
 
 async function loadSummary() {

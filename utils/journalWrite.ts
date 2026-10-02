@@ -1,3 +1,4 @@
+import { formatApiError } from '~/utils/apiError';
 /**
  * Чистые помощники форм журналов: какие поля отправлять, как показать ошибку сервера.
  * Сервер (routers/journals.py) отвечает 422/409 с detail-объектом:
@@ -105,7 +106,7 @@ export function formatJournalError(error: any, schema?: JournalSchema | null, fa
     const text = parts.filter(Boolean).join(' — ');
     if (text) return text;
   }
-  return error?.userMessage || error?.message || fallback;
+  return formatApiError(error, fallback);
 }
 
 /** Причина отказа в пакетном утверждении → строка */

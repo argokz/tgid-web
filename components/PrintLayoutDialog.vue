@@ -221,6 +221,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiErrorWith } from '~/utils/apiError';
 import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
 import { useLayerStore } from '~/stores/layerStore';
@@ -364,7 +365,7 @@ const render = async () => {
     result.value = res;
     previewUrl.value = small.toDataURL('image/png');
   } catch (e: any) {
-    error.value = `Не удалось сформировать лист: ${e?.message || e}`;
+    error.value = formatApiErrorWith('Не удалось сформировать лист', e);
   } finally {
     rendering.value = false;
   }
@@ -395,7 +396,7 @@ const downloadSnapshot = async () => {
     const canvas = await captureCurrentView(requireMap());
     downloadBlob(await canvasToBlob(canvas), `karta_ekran_${Date.now()}.png`);
   } catch (e: any) {
-    error.value = `Снимок не получен: ${e?.message || e}`;
+    error.value = formatApiErrorWith('Снимок не получен', e);
   } finally {
     snapshotting.value = false;
   }

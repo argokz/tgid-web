@@ -125,6 +125,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError, formatApiErrorWith } from '~/utils/apiError';
 import { computed, ref, watch } from 'vue';
 import { fastApiService, type PiezometerDirection } from '~/services/fastApiService';
 import { useAuthStore } from '~/stores/authStore';
@@ -166,7 +167,7 @@ const refresh = async () => {
   try {
     items.value = (await fastApiService.listPiezometerDirections()).items;
   } catch (err: any) {
-    error.value = err?.message || 'Ошибка загрузки направлений';
+    error.value = formatApiError(err, 'Ошибка загрузки направлений');
   } finally {
     loading.value = false;
   }
@@ -199,7 +200,7 @@ const load = async (id: number) => {
     emit('load', nodes);
     emit('update:modelValue', false);
   } catch (err: any) {
-    notify.showError(`Направление: ${err?.message || 'ошибка сервера'}`);
+    notify.showError(formatApiErrorWith('Направление', err, 'ошибка сервера'));
   }
 };
 
@@ -217,7 +218,7 @@ const save = async (replace: boolean) => {
     if (err?.status === 409 || err?.statusCode === 409) {
       conflictName.value = name;
     } else {
-      notify.showError(`Сохранение: ${err?.message || 'ошибка сервера'}`);
+      notify.showError(formatApiErrorWith('Сохранение', err, 'ошибка сервера'));
     }
   } finally {
     saving.value = false;
@@ -230,7 +231,7 @@ const remove = async (d: PiezometerDirection) => {
     await fastApiService.deletePiezometerDirection(d.id);
     await refresh();
   } catch (err: any) {
-    notify.showError(`Удаление: ${err?.message || 'ошибка сервера'}`);
+    notify.showError(formatApiErrorWith('Удаление', err, 'ошибка сервера'));
   }
 };
 </script>

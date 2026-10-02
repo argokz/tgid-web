@@ -511,6 +511,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiError } from '~/utils/apiError'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
 import { useAuthStore } from '~/stores/authStore'
 
@@ -557,7 +558,7 @@ const downloadSeasonsExcel = async () => {
     URL.revokeObjectURL(url)
     useNotificationStore().showSuccess('Ведомость сезонов теплопотерь')
   } catch (err: any) {
-    useNotificationStore().showError(err?.message || 'Не удалось выгрузить Excel')
+    useNotificationStore().showError(formatApiError(err, 'Не удалось выгрузить Excel'))
   } finally {
     exportingSeasons.value = false
   }
@@ -669,7 +670,7 @@ const runHeatLossForSource = async () => {
     }
     useNotificationStore().showError('Таймаут ожидания теплопотерь (6 мин)')
   } catch (err: any) {
-    useNotificationStore().showError(err?.message || 'Не удалось запустить теплопотери')
+    useNotificationStore().showError(formatApiError(err, 'Не удалось запустить теплопотери'))
   } finally {
     runningHeatLoss.value = false
   }

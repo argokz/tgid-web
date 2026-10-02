@@ -489,6 +489,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiErrorWith } from '~/utils/apiError'
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
@@ -696,7 +697,7 @@ const saveChanges = async () => {
     }
   } catch (e: any) {
     // форма остаётся открытой с введёнными значениями
-    notifications.showError('Ошибка при сохранении: ' + (e?.userMessage || e?.message || ''))
+    notifications.showError(formatApiErrorWith('Ошибка при сохранении', e))
   } finally {
     saving.value = false
   }
@@ -711,7 +712,7 @@ const deleteIndicator = async (id: number) => {
     detailsVisible.value = false
     await loadIndicators()
   } catch (e: any) {
-    notifications.showError('Ошибка при удалении: ' + (e?.userMessage || e?.message || ''))
+    notifications.showError(formatApiErrorWith('Ошибка при удалении', e))
   } finally {
     deleting.value = false
   }

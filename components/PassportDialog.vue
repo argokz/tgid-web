@@ -114,6 +114,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatApiErrorWith } from '~/utils/apiError'
 import { ref } from 'vue'
 import { useNotificationStore } from '~/stores/notificationStore'
 import {
@@ -146,7 +147,7 @@ const fetchHierarchy = async () => {
     hierarchy.value = hier
     diagnostics.value = diag
   } catch (e: any) {
-    notificationStore.showError('Ошибка загрузки паспортов: ' + e.message)
+    notificationStore.showError(formatApiErrorWith('Ошибка загрузки паспортов', e))
   } finally {
     loading.value = false
   }
@@ -179,7 +180,7 @@ const downloadPassport = async (msRs: PassportSite['ms_rs'], id: number) => {
     URL.revokeObjectURL(objectUrl)
     notificationStore.showSuccess(`Паспорт «${filename}» сформирован`)
   } catch (e: any) {
-    notificationStore.showError('Ошибка формирования паспорта: ' + e.message)
+    notificationStore.showError(formatApiErrorWith('Ошибка формирования паспорта', e))
   } finally {
     downloadingSiteId.value = null
   }

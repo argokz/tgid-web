@@ -3,6 +3,8 @@
  * Режимы: узлы (SHP-точки или таблица X/Y), участки (SHP-линии), координаты узлов (id/код → X/Y).
  */
 
+import { formatApiError } from '~/utils/apiError'
+
 export type NetworkImportMode = 'nodes' | 'lines' | 'coords'
 export type NetworkImportCrs = 'auto' | 'wgs84' | 'local' | 'desktop'
 
@@ -151,5 +153,5 @@ export const importApiError = (e: any): { message: string; report: NetworkImport
   }
   if (typeof detail === 'string') return { message: detail, report: null }
   if (detail?.message) return { message: detail.message, report: null }
-  return { message: e?.message || String(e), report: null }
+  return { message: formatApiError(e, 'Не удалось выполнить импорт'), report: null }
 }
