@@ -214,7 +214,7 @@
 
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
-import { useDisplay } from 'vuetify'
+import { useMobile } from '~/composables/useMobile'
 import {
   fastApiService,
   type AuditChange,
@@ -222,7 +222,7 @@ import {
   type AuditLookups,
 } from '~/services/fastApiService'
 
-const { mobile } = useDisplay()
+const { isMobile: mobile } = useMobile()
 
 const visible = ref(false)
 const loading = ref(false)

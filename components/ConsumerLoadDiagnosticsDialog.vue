@@ -427,7 +427,7 @@
 
 <script setup lang="ts">
 import { defineComponent, h, type PropType } from 'vue'
-import { useDisplay } from 'vuetify'
+import { useMobile } from '~/composables/useMobile'
 import {
   fastApiService,
   type ConsumerLoadDetails,
@@ -453,7 +453,7 @@ const DetailValue = defineComponent({
 const emit = defineEmits<{
   'locate-consumer': [payload: { longitude: number; latitude: number; id: number; nodeId: number; label: string }]
 }>()
-const { smAndDown: isMobile } = useDisplay()
+const { isMobile } = useMobile()
 const visible = ref(false)
 const detailsVisible = ref(false)
 const loading = ref(false)

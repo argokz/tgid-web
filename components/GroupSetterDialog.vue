@@ -361,7 +361,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
-import { useDisplay } from 'vuetify';
+import { useMobile } from '~/composables/useMobile';
 import SetterValueInput from '~/components/SetterValueInput.vue';
 import { useJournalMapBridge } from '~/composables/useJournalMapBridge';
 import {
@@ -385,7 +385,7 @@ import {
   type SelectionDraft,
 } from '~/utils/groupSetters';
 
-const { mobile } = useDisplay();
+const { isMobile: mobile } = useMobile();
 const authStore = useAuthStore();
 const fragmentStore = useFragmentStore();
 const mapStore = useMapStore();

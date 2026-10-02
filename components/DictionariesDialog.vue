@@ -239,7 +239,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
-import { useDisplay } from 'vuetify';
+import { useMobile } from '~/composables/useMobile';
 import {
   groupSettersService,
   type DictFieldInfo,
@@ -252,7 +252,7 @@ import { useFragmentStore } from '~/stores/fragmentStore';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { apiErrorText, dictionaryPayload, formatCell } from '~/utils/groupSetters';
 
-const { mobile } = useDisplay();
+const { isMobile: mobile } = useMobile();
 const authStore = useAuthStore();
 const fragmentStore = useFragmentStore();
 

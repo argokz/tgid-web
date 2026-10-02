@@ -518,7 +518,7 @@ const mutationsEnabled = useMutationsEnabled()
 /** Запуск теплопотерь пишет в БД: роль calculator+ и MUTATIONS_ENABLED на сервере */
 const authStore = useAuthStore()
 import { defineComponent, h, type PropType } from 'vue'
-import { useDisplay } from 'vuetify'
+import { useMobile } from '~/composables/useMobile'
 import { fastApiService, type HeatLossLookups, type HeatLossSeasonDetails, type HeatLossSeasonSummary, type HeatLossSourceDetails, type HeatLossSourceSummary } from '~/services/fastApiService'
 
 const DetailValue = defineComponent({
@@ -535,7 +535,7 @@ const DetailValue = defineComponent({
 })
 
 const emit = defineEmits<{ 'locate-heat-source': [payload: { longitude: number; latitude: number; id: number; nodeId: number; label: string }] }>()
-const { smAndDown: isMobile } = useDisplay()
+const { isMobile } = useMobile()
 const visible = ref(false)
 const detailsVisible = ref(false)
 const loading = ref(false)

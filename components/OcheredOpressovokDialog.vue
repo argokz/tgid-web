@@ -96,10 +96,10 @@
 </template>
 
 <script setup lang="ts">
-import { useDisplay } from 'vuetify'
+import { useMobile } from '~/composables/useMobile'
 import { fastApiService } from '~/services/fastApiService'
 
-const { smAndDown: isMobile } = useDisplay()
+const { isMobile } = useMobile()
 const visible = ref(false)
 const loading = ref(false)
 const error = ref('')

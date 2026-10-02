@@ -205,7 +205,7 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, ref, computed } from 'vue'
-import { useDisplay } from 'vuetify'
+import { useMobile } from '~/composables/useMobile'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 
 interface Props {
@@ -215,7 +215,7 @@ interface Props {
 const props = defineProps<Props>()
 const config = useRuntimeConfig()
 
-const { mobile } = useDisplay()
+const { isMobile: mobile } = useMobile()
 
 const resultsScrollStyle = computed(() =>
   mobile.value

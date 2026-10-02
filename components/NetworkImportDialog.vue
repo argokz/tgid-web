@@ -333,7 +333,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
-import { useDisplay } from 'vuetify';
+import { useMobile } from '~/composables/useMobile';
 import { fastApiService } from '~/services/fastApiService';
 import { useAuthStore } from '~/stores/authStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
@@ -355,7 +355,7 @@ import {
   type NetworkImportReport,
 } from '~/utils/networkImport';
 
-const { mobile } = useDisplay();
+const { isMobile: mobile } = useMobile();
 const authStore = useAuthStore();
 const fragmentStore = useFragmentStore();
 const layerStore = useLayerStore();

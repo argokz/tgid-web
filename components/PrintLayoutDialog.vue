@@ -222,7 +222,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
-import { useDisplay } from 'vuetify';
+import { useMobile } from '~/composables/useMobile';
 import { useLayerStore } from '~/stores/layerStore';
 import { useMapStore } from '~/stores/mapStore';
 import { useAuthStore } from '~/stores/authStore';
@@ -246,7 +246,7 @@ import {
   type PrintResult,
 } from '~/utils/printRender';
 
-const { mobile } = useDisplay();
+const { isMobile: mobile } = useMobile();
 const mapStore = useMapStore();
 const layerStore = useLayerStore();
 const authStore = useAuthStore();

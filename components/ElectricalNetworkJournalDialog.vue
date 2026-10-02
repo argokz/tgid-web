@@ -340,14 +340,14 @@ import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
 
 const mutationsEnabled = useMutationsEnabled()
 import { computed, ref } from 'vue'
-import { useDisplay } from 'vuetify'
+import { useMobile } from '~/composables/useMobile'
 import ElectricalReconciliationPanel from '~/components/ElectricalReconciliationPanel.vue'
 import { fastApiService, type ElectricalNetworkLookups, type ElectricalObjectDetails, type ElectricalObjectSummary, type ElectricalObjectType } from '~/services/fastApiService'
 
 export interface ElectricalNetworkJournalScope { objectType?: ElectricalObjectType; objectId?: number; parentLineId?: number }
 
 const emit = defineEmits<{ 'locate-electrical-object': [payload: { longitude: number; latitude: number; id: number; objectType: ElectricalObjectType; label: string }] }>()
-const { mobile } = useDisplay(), isMobile = computed(() => mobile.value)
+const { isMobile } = useMobile()
 const visible = ref(false), detailsVisible = ref(false), loading = ref(false), detailsLoading = ref(false), error = ref('')
 const page = ref(1), pages = ref(0), total = ref(0), items = ref<ElectricalObjectSummary[]>([]), selected = ref<ElectricalObjectDetails | null>(null)
 const lookups = ref<ElectricalNetworkLookups>({ owners: [], source_types: [], receiver_types: [], line_types: [], cable_marks: [], voltages: [], counts: {} })

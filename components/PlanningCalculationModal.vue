@@ -403,7 +403,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { useDisplay } from 'vuetify';
+import { useMobile } from '~/composables/useMobile';
 import CalculationsDialog from '~/components/CalculationsDialog.vue';
 import { useAuthStore } from '~/stores/authStore';
 import { requestSavesPo } from '~/utils/permissions';
@@ -430,7 +430,7 @@ const fragments = computed(() => fragmentStore.getFragments);
 const fragmentItems = computed(() =>
   fragments.value.map(f => ({ id: Number(f.id), name: f.name ?? `Фрагмент ${f.id}` })));
 
-const { mobile } = useDisplay();
+const { isMobile: mobile } = useMobile();
 
 const runKind = ref<RunKind>('normal');
 const listMode = ref<SetyCalcMode>('plan');

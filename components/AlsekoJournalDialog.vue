@@ -350,7 +350,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, ref } from 'vue'
-import { useDisplay } from 'vuetify'
+import { useMobile } from '~/composables/useMobile'
 import AlsekoReconciliationPanel from '~/components/AlsekoReconciliationPanel.vue'
 import { fastApiService, type AlsekoBuildingDetails, type AlsekoBuildingSummary, type AlsekoLoadDetails, type AlsekoLoadSummary, type AlsekoLookups } from '~/services/fastApiService'
 
@@ -368,8 +368,7 @@ const RelationTable = defineComponent({
 })
 
 const emit = defineEmits<{ 'locate-alseko': [payload: { longitude: number; latitude: number; id: number; kind: 'load' | 'building'; label: string }] }>()
-const { mobile } = useDisplay()
-const isMobile = computed(() => mobile.value)
+const { isMobile } = useMobile()
 const visible = ref(false), detailsVisible = ref(false), loading = ref(false), detailsLoading = ref(false)
 const error = ref(''), mode = ref<'loads' | 'buildings' | 'reconciliation'>('loads'), page = ref(1), pages = ref(0), total = ref(0)
 const loadItems = ref<AlsekoLoadSummary[]>([]), buildingItems = ref<AlsekoBuildingSummary[]>([])

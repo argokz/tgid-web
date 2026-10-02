@@ -216,7 +216,7 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { useDisplay } from 'vuetify'
+import { useMobile } from '~/composables/useMobile'
 import {
   fastApiService,
   type AdminRole,
@@ -227,7 +227,7 @@ import { useAuthStore } from '~/stores/authStore'
 import { useNotificationStore } from '~/stores/notificationStore'
 import { ROLE_LABELS, ROLE_ORDER } from '~/utils/permissions'
 
-const { mobile } = useDisplay()
+const { isMobile: mobile } = useMobile()
 const authStore = useAuthStore()
 const notificationStore = useNotificationStore()
 
