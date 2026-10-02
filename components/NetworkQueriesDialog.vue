@@ -18,19 +18,28 @@
       </v-card-title>
       <v-card-text>
         <p class="text-body-2 text-medium-emphasis mb-3">
-          Аналог desktop «Запросы» (Zap1–Zap7_1). По умолчанию — видимые фрагменты карты.
+          Аналог desktop «Запросы» (Zap1–Zap7_1). Участки отбираются по фрагменту начального узла,
+          как в gid6 (n1.fileID). По умолчанию — выбранный или видимые фрагменты карты.
         </p>
+        <v-autocomplete
+          v-model="scopeIds"
+          :items="fragmentItems"
+          item-title="title"
+          item-value="value"
+          label="Фрагмент"
+          placeholder="Вся сеть"
+          multiple
+          chips
+          closable-chips
+          clearable
+          density="compact"
+          variant="outlined"
+          class="mb-2"
+          data-testid="nq-fragment"
+          hide-details
+        />
         <v-chip
-          v-if="scopeLabel"
-          size="small"
-          class="mb-3"
-          color="primary"
-          variant="tonal"
-        >
-          {{ scopeLabel }}
-        </v-chip>
-        <v-chip
-          v-else
+          v-if="!scopeIds.length"
           size="small"
           class="mb-3"
           color="warning"
@@ -242,6 +251,7 @@ import { useMobile } from '~/composables/useMobile'
 import { fastApiService } from '~/services/fastApiService'
 import { useFragmentStore } from '~/stores/fragmentStore'
 import { heatConsumptionRows } from '~/utils/heatConsumption'
+import { fragmentScopeItems } from '~/utils/fragmentScope'
 
 const emit = defineEmits<{ (e: 'locate', point: { lat: number; lng: number }): void }>()
 const { isMobile } = useMobile()
@@ -251,20 +261,10 @@ const loading = ref<string | null>(null)
 const error = ref('')
 const result = ref<any>(null)
 
-const fragmentIds = computed(() => {
-  if (fragmentStore.selectedFragmentId != null) return [fragmentStore.selectedFragmentId]
-  return [...fragmentStore.visibleFragments]
-})
+// Фрагменты запроса: пусто — вся сеть. При открытии — контекст карты (выбранный или видимые).
+const scopeIds = ref<number[]>([])
 
-const scopeLabel = computed(() => {
-  const ids = fragmentIds.value
-  if (!ids.length) return ''
-  if (ids.length === 1) {
-    const name = fragmentStore.fragments.find((f) => f.id === ids[0])?.name
-    return name ? `Фрагмент: ${name}` : `Фрагмент #${ids[0]}`
-  }
-  return `Фрагменты: ${ids.join(', ')}`
-})
+const fragmentItems = computed(() => fragmentScopeItems(fragmentStore.fragments, scopeIds.value))
 
 const formatNum = (v: number | null | undefined) =>
   v == null || Number.isNaN(Number(v))
@@ -286,7 +286,7 @@ const run = async (kind: QueryKind) => {
   error.value = ''
   result.value = null
   try {
-    const ids = fragmentIds.value
+    const ids = [...scopeIds.value]
     if (kind === 'volume') result.value = await fastApiService.getNetworkQueryVolume(ids)
     else if (kind === 'length') result.value = await fastApiService.getNetworkQueryLength(ids)
     else if (kind === 'diameter') result.value = await fastApiService.getNetworkQueryLengthByDiameter(ids)
@@ -306,6 +306,8 @@ const openDialog = () => {
   visible.value = true
   error.value = ''
   result.value = null
+  scopeIds.value = [...fragmentStore.activeFragmentIds]
+  if (!fragmentStore.fragments.length) void fragmentStore.loadFragments()
 }
 
 defineExpose({ openDialog })
