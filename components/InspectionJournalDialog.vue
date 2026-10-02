@@ -583,6 +583,8 @@
 </template>
 
 <script setup lang="ts">
+import { hasLonLat, localToday } from '~/utils/journalFields'
+import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
@@ -636,6 +638,8 @@ const defectOptions = [
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 
 const detailsVisible = ref(false)
+// Другой журнал начал выбор участков на карте — закрыть это окно (QA F48)
+useCloseOnMapPick(() => visible.value || detailsVisible.value, () => { detailsVisible.value = false; visible.value = false })
 const detailsLoading = ref(false)
 const detailsError = ref('')
 const selected = ref<InspectionDetails | null>(null)
@@ -664,8 +668,7 @@ const formatValue = (value: unknown) => {
   if (typeof value === 'boolean') return value ? 'Да' : 'Нет'
   return String(value)
 }
-const hasCoordinates = (item: { longitude?: unknown; latitude?: unknown }) =>
-  Number.isFinite(Number(item.longitude)) && Number.isFinite(Number(item.latitude))
+const hasCoordinates = (item: { longitude?: unknown; latitude?: unknown }) => hasLonLat(item)
 const fileName = (path: unknown) => String(path || 'Файл не указан').split(/[\\/]/).pop() || 'Файл'
 const nodeRange = (line: Record<string, unknown>) =>
   [line.start_node_name, line.end_node_name].filter(Boolean).join(' — ') || 'узлы не указаны'
@@ -753,7 +756,7 @@ const createInspection = async () => {
   isNew.value = true
   isEditing.value = true
   // gid6 SaveOpresNew("osmotr", …): наименование «Осмотр», дата — сегодня
-  editFields.value = { name: 'Осмотр', inspected_on: new Date().toISOString().slice(0, 10) }
+  editFields.value = { name: 'Осмотр', inspected_on: localToday() }
   selected.value = null
   detailsVisible.value = true
   detailsError.value = ''

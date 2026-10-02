@@ -490,6 +490,8 @@
 </template>
 
 <script setup lang="ts">
+import { hasLonLat } from '~/utils/journalFields'
+import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiErrorWith } from '~/utils/apiError'
 import { confirmAction } from '~/composables/useConfirm'
 import { computed, reactive, ref, watch } from 'vue'
@@ -524,6 +526,8 @@ const lookups = reactive<CorrosionIndicatorLookups>({
   pipeline_signs: [], responsible_people: [], years: []
 })
 const detailsVisible = ref(false), detailsLoading = ref(false), detailsError = ref('')
+// Другой журнал начал выбор участков на карте — закрыть это окно (QA F48)
+useCloseOnMapPick(() => visible.value || detailsVisible.value, () => { detailsVisible.value = false; visible.value = false })
 const selected = ref<CorrosionIndicatorDetails | null>(null)
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -544,7 +548,7 @@ const formatDate = (value: unknown) => {
 const formatValue = (value: unknown) => value === null || value === undefined || value === '' ? '—' : typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? formatDate(value) : String(value)
 const corrosionRate = (value: unknown) => value === null || value === undefined || value === '' ? '—' : `${Number(value).toLocaleString('ru-RU')} мм/год`
 const phaseColor = (phase: number | null) => phase === 1 ? 'info' : phase === 2 ? 'warning' : phase === 3 ? 'success' : phase === 4 ? 'grey' : 'grey'
-const hasCoordinates = (item: { longitude?: unknown; latitude?: unknown }) => Number.isFinite(Number(item.longitude)) && Number.isFinite(Number(item.latitude))
+const hasCoordinates = (item: { longitude?: unknown; latitude?: unknown }) => hasLonLat(item)
 const nodeRange = (item: CorrosionIndicatorSummary) => [item.start_node_name, item.end_node_name].filter(Boolean).join(' — ') || item.linked_node_name || 'узлы не указаны'
 const seasonLabel = (entry: Record<string, unknown>) => {
   const value = entry.installed_on || entry.planned_on

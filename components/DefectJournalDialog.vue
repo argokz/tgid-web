@@ -523,6 +523,8 @@
 </template>
 
 <script setup lang="ts">
+import { hasLonLat, localToday, withDateInputs } from '~/utils/journalFields'
+import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
@@ -572,6 +574,8 @@ const lookups = reactive<DefectLookups>({ sources: [], states: [], categories: [
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 
 const detailsVisible = ref(false)
+// Другой журнал начал выбор участков на карте — закрыть это окно (QA F48)
+useCloseOnMapPick(() => visible.value || detailsVisible.value, () => { detailsVisible.value = false; visible.value = false })
 const detailsLoading = ref(false)
 const detailsError = ref('')
 const selected = ref<DefectDetails | null>(null)
@@ -615,8 +619,7 @@ const stateColor = (value: number | null) => {
   return 'grey'
 }
 
-const hasCoordinates = (item: Pick<DefectSummary, 'longitude' | 'latitude'>) =>
-  Number.isFinite(Number(item.longitude)) && Number.isFinite(Number(item.latitude))
+const hasCoordinates = (item: Pick<DefectSummary, 'longitude' | 'latitude'>) => hasLonLat(item)
 
 const loadLookups = async () => {
   if (lookups.sources.length) return
@@ -691,17 +694,20 @@ const createDefect = async () => {
   isNew.value = true
   isEditing.value = true
   // точка нарушения ставится на середину выбранного трубопровода (сервер), дата — сегодня
-  editFields.value = { detected_at: new Date().toISOString().split('T')[0], line_id: scope.lineId ?? null }
+  editFields.value = { detected_at: localToday(), line_id: scope.lineId ?? null }
   selected.value = null
   detailsVisible.value = true
   detailsError.value = ''
 }
 
+const DEFECT_DATE_KEYS = ['detected_at', 'repair_started_on', 'repair_finished_on']
+
 const startEdit = () => {
   if (!selected.value) return
   isNew.value = false
   isEditing.value = true
-  editFields.value = { ...selected.value }
+  // data_osmotra — timestamp ('2024-05-01T00:00:00'), поле type="date" его не показывает (QA F80)
+  editFields.value = withDateInputs({ ...selected.value }, DEFECT_DATE_KEYS)
 }
 
 const cancelEdit = () => {

@@ -563,6 +563,8 @@
 </template>
 
 <script setup lang="ts">
+import { hasLonLat } from '~/utils/journalFields'
+import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError, formatApiErrorWith } from '~/utils/apiError'
 import { confirmAction } from '~/composables/useConfirm'
 import { computed, reactive, ref, watch } from 'vue'
@@ -595,6 +597,8 @@ const scope = reactive<TechnicalConditionJournalScope>({})
 const lookups = reactive<TechnicalConditionLookups>({ states: [], heat_sources: [], districts: [], years: [] })
 const linkOptions = [{ title: 'Привязанные', value: true }, { title: 'Без привязки', value: false }]
 const detailsVisible = ref(false), detailsLoading = ref(false), detailsError = ref('')
+// Другой журнал начал выбор участков на карте — закрыть это окно (QA F48)
+useCloseOnMapPick(() => visible.value || detailsVisible.value, () => { detailsVisible.value = false; visible.value = false })
 const selected = ref<TechnicalConditionDetails | null>(null)
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -616,7 +620,7 @@ const formatDate = (value: unknown) => {
 const formatValue = (value: unknown) => value === null || value === undefined || value === '' ? '—' : typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? formatDate(value) : String(value)
 const heatLoad = (value: unknown) => value === null || value === undefined || value === '' ? '—' : `${Number(value).toLocaleString('ru-RU')} Гкал/ч`
 const stateColor = (state: number | null) => state === 1 ? 'success' : state === 4 ? 'info' : state === 2 || state === 3 ? 'warning' : 'grey'
-const hasCoordinates = (item: { longitude?: unknown; latitude?: unknown }) => Number.isFinite(Number(item.longitude)) && Number.isFinite(Number(item.latitude))
+const hasCoordinates = (item: { longitude?: unknown; latitude?: unknown }) => hasLonLat(item)
 const fileName = (path: unknown) => String(path || 'Путь не указан').split(/[\\/]/).pop() || 'Файл'
 const documentTitle = (document: Record<string, unknown>) => document.kind === 'contract' ? 'Договор' : document.kind === 'admission_act' ? 'Акт допуска' : `Технические условия${document.index ? ` · файл ${document.index}` : ''}`
 const buildFields = (entries: Array<[string, unknown, string?, string?, any[]?]>) => {

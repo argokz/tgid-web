@@ -195,6 +195,7 @@
 </template>
 
 <script setup lang="ts">
+import { localToday } from '~/utils/journalFields';
 import { pluralRu } from '~/utils/pluralRu';
 import { confirmAction } from '~/composables/useConfirm';
 import { computed, reactive, ref } from 'vue';
@@ -213,7 +214,7 @@ const error = ref('');
 const schema = ref<JournalSchema | null>(null);
 const candidates = ref<Array<{ id: number; name: string | null; planned_start: string | null }>>([]);
 const selectedIds = ref<number[]>([]);
-const approvedOn = ref(new Date().toISOString().slice(0, 10));
+const approvedOn = ref(localToday());
 const signers = reactive<Record<string, any>>({});
 const result = ref<ApproveResult | null>(null);
 

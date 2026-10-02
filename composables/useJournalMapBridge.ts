@@ -2,7 +2,7 @@
  * Связь журналов с картой: показ контура (GeoJSON участков) и выбор участков контура кликами.
  * Состояние общее для приложения (модульный singleton): журнал запрашивает, MapViewer рисует.
  */
-import { reactive } from 'vue';
+import { reactive, watch } from 'vue';
 
 export interface ContourOverlay {
   label: string;
@@ -79,4 +79,15 @@ export function useJournalMapBridge() {
   };
 
   return { state, showContour, clearContour, startPick, togglePicked, finishPick };
+}
+
+/**
+ * Журнал закрывается, когда другой журнал начинает «Выбрать на карте» (QA F48): иначе его окно
+ * остаётся поверх карты. Журнал-инициатор к этому моменту уже скрыт сам (hideForMap) — его не трогаем.
+ * Вызывать в setup диалога.
+ */
+export function useCloseOnMapPick(isOpen: () => boolean, close: () => void) {
+  watch(() => state.pick.active, (active) => {
+    if (active && isOpen()) close();
+  });
 }

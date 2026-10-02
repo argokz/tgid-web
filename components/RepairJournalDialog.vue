@@ -256,7 +256,7 @@
             >mdi-hammer-wrench</v-icon>
             <div class="text-subtitle-1 mt-3">Ремонты не найдены</div>
             <div class="text-body-2 text-medium-emphasis mt-1">
-              Измените фильтры или загрузите исторические данные TGID в таблицу remont2.
+              Измените фильтры или загрузите в журнал исторические данные ремонтов.
             </div>
           </div>
 
@@ -648,6 +648,8 @@
 </template>
 
 <script setup lang="ts">
+import { hasLonLat } from '~/utils/journalFields'
+import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
@@ -691,6 +693,8 @@ const lookups = reactive<RepairLookups>({
 const approvalOptions = [{ title: 'Утверждено', value: true }, { title: 'Не утверждено', value: false }]
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 const detailsVisible = ref(false)
+// Другой журнал начал выбор участков на карте — закрыть это окно (QA F48)
+useCloseOnMapPick(() => visible.value || detailsVisible.value, () => { detailsVisible.value = false; visible.value = false })
 const detailsLoading = ref(false)
 const detailsError = ref('')
 const selected = ref<RepairDetails | null>(null)
@@ -720,7 +724,7 @@ const formatValue = (value: unknown) => {
   return String(value)
 }
 const stateColor = (state: number | null) => state === 3 ? 'success' : state === 2 ? 'warning' : state === 1 ? 'info' : 'grey'
-const hasCoordinates = (item: { longitude?: unknown; latitude?: unknown }) => Number.isFinite(Number(item.longitude)) && Number.isFinite(Number(item.latitude))
+const hasCoordinates = (item: { longitude?: unknown; latitude?: unknown }) => hasLonLat(item)
 const fileName = (path: unknown) => String(path || 'Файл не указан').split(/[\\/]/).pop() || 'Файл'
 const nodeRange = (line: Record<string, unknown>) => [line.start_node_name, line.end_node_name].filter(Boolean).join(' — ') || 'узлы не указаны'
 const lineSummary = (line: Record<string, unknown>) => [line.diameter && `DN ${line.diameter}`, line.length && `длина ${line.length} м`, line.tubing_type_name].filter(Boolean).join(' · ') || 'Параметры участка не заполнены'

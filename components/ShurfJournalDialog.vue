@@ -604,6 +604,8 @@
 </template>
 
 <script setup lang="ts">
+import { hasLonLat } from '~/utils/journalFields'
+import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
@@ -651,6 +653,8 @@ const approvalOptions = [
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 
 const detailsVisible = ref(false)
+// Другой журнал начал выбор участков на карте — закрыть это окно (QA F48)
+useCloseOnMapPick(() => visible.value || detailsVisible.value, () => { detailsVisible.value = false; visible.value = false })
 const detailsLoading = ref(false)
 const detailsError = ref('')
 const selected = ref<ShurfDetails | null>(null)
@@ -686,8 +690,7 @@ const dateRange = (start: unknown, finish: unknown) => {
 }
 const nodeRange = (item: ShurfSummary) => [item.line_start_node, item.line_end_node].filter(Boolean).join(' — ')
 const stateColor = (id: number | null) => id === 3 ? 'success' : id === 2 ? 'warning' : 'info'
-const hasCoordinates = (item: Pick<ShurfSummary, 'longitude' | 'latitude'>) =>
-  Number.isFinite(Number(item.longitude)) && Number.isFinite(Number(item.latitude))
+const hasCoordinates = (item: Pick<ShurfSummary, 'longitude' | 'latitude'>) => hasLonLat(item)
 const fileName = (path: unknown) => String(path || 'Файл не указан').split(/[\\/]/).pop() || 'Файл'
 const riskSummary = (risk: Record<string, unknown>) => [
   risk.ground_name && `грунт: ${risk.ground_name}`,

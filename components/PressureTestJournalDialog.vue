@@ -327,6 +327,18 @@
               v-if="!isNew"
             >{{ selected?.state_name || 'Состояние не указано' }} · линий {{ selected?.line_count || 0 }} · документов {{ selected?.document_count || 0 }}</div>
           </div>
+          <!-- Удаление — иконкой в заголовке, как в остальных журналах (QA F48) -->
+          <v-btn
+            v-if="mutationsEnabled && !isEditing && selected && !isNew"
+            icon
+            variant="text"
+            color="error"
+            class="mr-1"
+            title="Удалить опрессовку"
+            aria-label="Удалить опрессовку"
+            :loading="deleting"
+            @click="deletePressureTest(selected.id)"
+          ><v-icon>mdi-delete</v-icon></v-btn>
           <v-btn
             icon
             variant="text"
@@ -576,14 +588,6 @@
             :loading="exportingWord"
             @click="exportWord"
           >Word</v-btn>
-          <v-btn
-            v-if="mutationsEnabled && !isEditing && selected && !isNew"
-            color="error"
-            variant="text"
-            prepend-icon="mdi-delete"
-            :loading="deleting"
-            @click="deletePressureTest(selected.id)"
-          >Удалить</v-btn>
           <v-spacer />
           <template v-if="isEditing">
             <v-btn
@@ -616,6 +620,8 @@
 </template>
 
 <script setup lang="ts">
+import { hasLonLat } from '~/utils/journalFields'
+import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
@@ -643,6 +649,8 @@ const lookups = reactive<PressureTestLookups>({ states: [], test_types: [], heat
 const approvalOptions = [{ title: 'Утверждено', value: true }, { title: 'Не утверждено', value: false }]
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 const detailsVisible = ref(false), detailsLoading = ref(false), detailsError = ref('')
+// Другой журнал начал выбор участков на карте — закрыть это окно (QA F48)
+useCloseOnMapPick(() => visible.value || detailsVisible.value, () => { detailsVisible.value = false; visible.value = false })
 const selected = ref<PressureTestDetails | null>(null)
 
 const isEditing = ref(false)
@@ -663,7 +671,7 @@ const formatRange = (start: unknown, finish: unknown) => [formatDate(start), for
 const formatValue = (value: unknown) => value === null || value === undefined || value === '' ? '—' : typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? formatDate(value) : String(value)
 const pressure = (value: unknown) => value === null || value === undefined || value === '' ? '—' : `${value} кгс/см²`
 const stateColor = (state: number | null) => state === 3 ? 'success' : state === 2 ? 'warning' : state === 1 ? 'info' : 'grey'
-const hasCoordinates = (item: { longitude?: unknown; latitude?: unknown }) => Number.isFinite(Number(item.longitude)) && Number.isFinite(Number(item.latitude))
+const hasCoordinates = (item: { longitude?: unknown; latitude?: unknown }) => hasLonLat(item)
 const fileName = (path: unknown) => String(path || 'Файл не указан').split(/[\\/]/).pop() || 'Файл'
 const nodeRange = (line: Record<string, unknown>) => [line.start_node_name, line.end_node_name].filter(Boolean).join(' — ') || 'узлы не указаны'
 const lineSummary = (line: Record<string, unknown>) => [line.diameter && `DN ${line.diameter}`, line.length && `длина ${line.length} м`, line.tubing_type_name].filter(Boolean).join(' · ') || 'Параметры участка не заполнены'

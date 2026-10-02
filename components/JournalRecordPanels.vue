@@ -455,6 +455,7 @@
 </template>
 
 <script setup lang="ts">
+import { localToday } from '~/utils/journalFields';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled';
 import { useJournalMapBridge } from '~/composables/useJournalMapBridge';
@@ -495,7 +496,7 @@ const approval = ref<ApprovalInfo | null>(null);
 const approvalLoading = ref(false);
 const approving = ref(false);
 const approveFormOpen = ref(false);
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localToday();
 const approveForm = reactive<{ approved_on: string; signers: Record<string, any> }>({ approved_on: today(), signers: {} });
 
 const contour = ref<ContourResponse | null>(null);

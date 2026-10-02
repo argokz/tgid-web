@@ -527,6 +527,7 @@
 </template>
 
 <script setup lang="ts">
+import { hasLonLat } from '~/utils/journalFields'
 import { formatApiError } from '~/utils/apiError'
 import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { use } from 'echarts/core'
@@ -742,7 +743,7 @@ const openDialog = async (scope: { sourceId?: number; nodeId?: number; graphStat
   await loadSources()
   if (scope.sourceId) await openDetails(scope.sourceId)
 }
-const hasCoordinates = (item: TemperatureGraphSourceSummary) => Number.isFinite(Number(item.longitude)) && Number.isFinite(Number(item.latitude))
+const hasCoordinates = (item: TemperatureGraphSourceSummary) => hasLonLat(item)
 const locate = (item: TemperatureGraphSourceSummary) => emit('locate-source', { longitude: Number(item.longitude), latitude: Number(item.latitude), id: item.id, nodeId: item.node_id, label: item.name })
 const statusLabel = (status: TemperatureGraphStatus) => ({ ready: 'готов', missing: 'нет графика', duplicates: 'дубли', incomplete: 'диапазон' })[status]
 const statusColor = (status: TemperatureGraphStatus) => ({ ready: 'green', missing: 'orange', duplicates: 'red', incomplete: 'amber-darken-3' })[status]
