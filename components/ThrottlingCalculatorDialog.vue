@@ -51,7 +51,7 @@
               start
               size="18"
             >mdi-pipe-valve</v-icon>
-            По напорам узла (движок)
+            По напорам узла
           </v-tab>
           <v-tab value="excel">
             <v-icon
@@ -213,7 +213,7 @@
                     v-if="orificeResult?.recommended_standard_diameter != null"
                     class="text-body-2 text-medium-emphasis"
                   >
-                    Рекомендуемый стандартный: <span class="font-weight-bold">{{ orificeResult.recommended_standard_diameter }} мм</span>
+                    Рекомендуемый стандартный: <span class="font-weight-bold">{{ fmtNum(orificeResult.recommended_standard_diameter, 1) }} мм</span>
                   </div>
                   <v-alert
                     v-if="orificeResult?.warning"
@@ -233,18 +233,18 @@
                   >
                     <div class="d-flex justify-space-between py-1">
                       <span class="text-medium-emphasis">Расход G:</span>
-                      <span class="font-weight-bold">{{ orificeResult.flow_g }} т/ч</span>
+                      <span class="font-weight-bold">{{ fmtNum(orificeResult.flow_g, 3) }} т/ч</span>
                     </div>
                     <div class="d-flex justify-space-between py-1">
                       <span class="text-medium-emphasis">Располагаемый напор Hрас:</span>
-                      <span class="font-weight-bold">{{ orificeResult.available_head_m }} м</span>
+                      <span class="font-weight-bold">{{ fmtNum(orificeResult.available_head_m) }} м</span>
                     </div>
                     <div class="d-flex justify-space-between py-1">
                       <span class="text-medium-emphasis">Гасимый напор Hгас:</span>
-                      <span class="font-weight-bold">{{ orificeResult.head_loss_dissipated }} м</span>
+                      <span class="font-weight-bold">{{ fmtNum(orificeResult.head_loss_dissipated) }} м</span>
                     </div>
                     <div class="text-caption text-medium-emphasis mt-2">
-                      Формула бланка dross: d = {{ orificeResult.scheme === 'nozzle' ? '9.6' : '10' }} · (G² / Hгас)¼, не менее 3 мм
+                      Формула бланка: d = {{ orificeResult.scheme === 'nozzle' ? '9,6' : '10' }} · (G² / Hгас)¼, не менее 3 мм
                     </div>
                   </div>
                   <div
@@ -375,27 +375,27 @@
                   >
                     <div class="d-flex justify-space-between py-1">
                       <span class="text-medium-emphasis">Диаметр сопла (Dс):</span>
-                      <span class="font-weight-bold text-h6 text-primary">{{ elevatorResult.nozzle_diameter_mm }} мм</span>
+                      <span class="font-weight-bold text-h6 text-primary">{{ fmtNum(elevatorResult.nozzle_diameter_mm, 1) }} мм</span>
                     </div>
                     <div class="d-flex justify-space-between py-1">
                       <span class="text-medium-emphasis">Диаметр горловины (Dгор):</span>
-                      <span class="font-weight-bold text-h6">{{ elevatorResult.mixing_chamber_diameter_mm }} мм</span>
+                      <span class="font-weight-bold text-h6">{{ fmtNum(elevatorResult.mixing_chamber_diameter_mm, 1) }} мм</span>
                     </div>
                     <div class="d-flex justify-space-between py-1">
                       <span class="text-medium-emphasis">Коэффициент смешения (u):</span>
-                      <span class="font-weight-bold">{{ elevatorResult.mixing_ratio_u }}</span>
+                      <span class="font-weight-bold">{{ fmtNum(elevatorResult.mixing_ratio_u) }}</span>
                     </div>
                     <div class="d-flex justify-space-between py-1">
                       <span class="text-medium-emphasis">Располагаемый напор Hрас:</span>
-                      <span class="font-weight-bold">{{ elevatorResult.available_head_m }} м</span>
+                      <span class="font-weight-bold">{{ fmtNum(elevatorResult.available_head_m) }} м</span>
                     </div>
                     <div class="d-flex justify-space-between py-1">
-                      <span class="text-medium-emphasis">Требуемый напор ≈ 1.4·hс·(1+u)²:</span>
-                      <span class="font-weight-bold">{{ elevatorResult.required_head_m }} м</span>
+                      <span class="text-medium-emphasis">Требуемый напор ≈ 1,4·hс·(1+u)²:</span>
+                      <span class="font-weight-bold">{{ fmtNum(elevatorResult.required_head_m) }} м</span>
                     </div>
                     <div class="d-flex justify-space-between py-1">
                       <span class="text-medium-emphasis">Расход сетевой воды:</span>
-                      <span class="font-weight-bold">{{ elevatorResult.flow_g }} т/ч</span>
+                      <span class="font-weight-bold">{{ fmtNum(elevatorResult.flow_g, 3) }} т/ч</span>
                     </div>
                     <v-alert
                       v-for="(w, i) in elevatorResult.warnings"
@@ -422,7 +422,7 @@
           <!-- Диафрагмы по напорам узла: движок sety (drvary1) -->
           <v-window-item value="engine">
             <p class="text-body-2 text-medium-emphasis mb-3">
-              Как в гидравлическом расчёте sety (dross/drvary1): диаметр шайбы 10·√(G/√H), не меньше
+              Как в гидравлическом расчёте сети: диаметр шайбы 10·√(G/√H), не меньше
               минимального; если меньше — ставятся шайбы минимального диаметра (не больше трёх), остаток
               напора не гасится.
             </p>
@@ -510,6 +510,9 @@
                     class="mt-3 text-body-2"
                   >
                     <div>Сопло: <b>{{ fmtMm(engineElevatorResult.nozzle_diameter_mm) }}</b>, напор на сопле {{ fmtM(engineElevatorResult.nozzle_head_m) }}, элеватор №{{ engineElevatorResult.elevator_number ?? '—' }}</div>
+                    <div v-if="engineElevatorResult.mixing_chamber_diameter_mm != null">
+                      Диаметр горловины (Dгор): <b>{{ fmtMm(engineElevatorResult.mixing_chamber_diameter_mm) }}</b>
+                    </div>
                     <div v-if="engineElevatorResult.pre_nozzle">
                       Диафрагма перед соплом: <b>{{ fmtMm(engineElevatorResult.pre_nozzle.diameter_mm) }}</b> × {{ engineElevatorResult.pre_nozzle.count }},
                       гасит {{ fmtM(engineElevatorResult.pre_nozzle.head_dissipated_m) }}
@@ -774,6 +777,7 @@
 
 <script setup lang="ts">
 import { formatApiErrorWith } from '~/utils/apiError';
+import { fmtFixed, fmtNum, missingFields, missingFieldsText, optNum } from '~/utils/calcInput';
 import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
 import { useNotificationStore } from '~/stores/notificationStore';
@@ -852,7 +856,7 @@ const elevatorResult = ref<ElevatorNozzleResult | null>(null);
 const orificeDiameterText = computed(() => {
   if (!orificeResult.value) return '—';
   const d = orificeResult.value.diameter_orifice_mm;
-  return d == null ? 'не рассчитывается' : `${d} мм`;
+  return d == null ? 'не рассчитывается' : `${fmtNum(d, 1)} мм`;
 });
 
 const reportError = (what: string, err: any) => {
@@ -868,17 +872,29 @@ watch(
   }
 );
 
+/** Обязательные поля заполнены? Иначе — понятное уведомление вместо 422 от сервера (QA F31) */
+const checkRequired = (what: string, fields: Array<[unknown, string]>): boolean => {
+  const missing = missingFields(fields);
+  if (missing.length) notificationStore.showError(`${what}: ${missingFieldsText(missing)}`);
+  return missing.length === 0;
+};
+
 const calcOrifice = async () => {
+  const byFlow = orificeForm.flowMode === 'flow';
+  const required: Array<[unknown, string]> = [[orificeForm.deltaH, 'Располагаемый напор ΔH']];
+  if (byFlow) required.push([orificeForm.flowG, 'Расход сетевой воды G']);
+  else required.push([orificeForm.qLoad, 'Тепловая нагрузка Q'], [orificeForm.tSupply, 'T1 (подача)'], [orificeForm.tReturn, 'T2 (обратка)']);
+  if (!checkRequired('Расчёт шайбы', required)) return;
   loadingOrifice.value = true;
   try {
     const payload: OrificePlateParams = {
-      flow_g: orificeForm.flowMode === 'flow' ? orificeForm.flowG : undefined,
+      flow_g: byFlow ? orificeForm.flowG : undefined,
       delta_h: orificeForm.deltaH,
-      p1: orificeForm.p1,
-      p2: orificeForm.p2,
-      q_heating_gcal: orificeForm.flowMode === 'load' ? orificeForm.qLoad : undefined,
-      t_supply: orificeForm.tSupply,
-      t_return: orificeForm.tReturn,
+      p1: optNum(orificeForm.p1),
+      p2: optNum(orificeForm.p2),
+      q_heating_gcal: byFlow ? undefined : orificeForm.qLoad,
+      t_supply: optNum(orificeForm.tSupply),
+      t_return: optNum(orificeForm.tReturn),
       scheme: orificeForm.scheme,
     };
     orificeResult.value = await fastApiService.calculateOrificePlate(payload);
@@ -911,22 +927,33 @@ const engineElevatorResult = ref<ElevatorEngineResult | null>(null);
 const engineCircResult = ref<GvsCirculationResult | null>(null);
 const loadingEngineElevator = ref(false);
 const loadingEngineCirc = ref(false);
-const fmtMm = (v: number | null | undefined) => (v == null ? '—' : `${Number(v).toFixed(1)} мм`);
-const fmtM = (v: number | null | undefined) => (v == null ? '—' : `${Number(v).toFixed(2)} м`);
+const fmtMm = (v: number | null | undefined) => (v == null ? '—' : `${fmtFixed(v, 1)} мм`);
+const fmtM = (v: number | null | undefined) => (v == null ? '—' : `${fmtFixed(v, 2)} м`);
 
 const calcEngineElevator = async () => {
+  const e = engineElevator;
+  if (!checkRequired('Элеватор', [
+    [e.available_head, 'Располагаемый напор'], [e.heating_flow, 'Расход на отопление'], [e.mixing_ratio, 'Коэффициент смешения'],
+    [e.system_loss, 'Потери в системе'], [e.min_nozzle_diameter, 'Мин. диаметр сопла'], [e.street_share, 'Доля уличного фасада'],
+    [e.circulation_head, 'Напор подпорно-цирк. диафрагмы'],
+  ])) return;
   loadingEngineElevator.value = true;
   try {
     engineElevatorResult.value = await fastApiService.calculateElevatorEngine({ ...engineElevator });
   } catch (err: any) {
     engineElevatorResult.value = null;
-    reportError('Элеватор (движок)', err);
+    reportError('Элеватор', err);
   } finally {
     loadingEngineElevator.value = false;
   }
 };
 
 const calcEngineCirc = async () => {
+  const c = engineCirc;
+  if (!checkRequired('Циркуляционная диафрагма ГВС', [
+    [c.circulation_flow, 'Расход циркуляции'], [c.return_head, 'Напор в обратном узла'],
+    [c.required_head, 'Напор у водоразборных приборов'], [c.circulation_loss, 'Потери в циркуляции'],
+  ])) return;
   loadingEngineCirc.value = true;
   try {
     engineCircResult.value = await fastApiService.calculateGvsCirculationDiaphragm({ ...engineCirc });
@@ -938,7 +965,14 @@ const calcEngineCirc = async () => {
   }
 };
 
+/** Поля бланка «Сопло и элеватор»: они же нужны для Excel */
+const elevatorRequired = (): Array<[unknown, string]> => [
+  [elevatorForm.p1, 'P1 (подача)'], [elevatorForm.p2, 'P2 (обратка)'], [elevatorForm.qHeating, 'Нагрузка отопления Qот'],
+  [elevatorForm.t1, 'T1 (сеть)'], [elevatorForm.t2, 'T2 (обратка)'], [elevatorForm.t3, 'T3 (система)'],
+];
+
 const calcElevator = async () => {
+  if (!checkRequired('Расчёт элеватора', [...elevatorRequired(), [elevatorForm.deltaHSystem, 'Сопротивление СО Hc']])) return;
   loadingElevator.value = true;
   try {
     const payload = {
@@ -960,6 +994,7 @@ const calcElevator = async () => {
 };
 
 const downloadExcelSheet = async () => {
+  if (!checkRequired('Бланк Excel', elevatorRequired())) return;
   loadingExcel.value = true;
   try {
     const payload: ThrottlingSheetParams = {
@@ -970,8 +1005,8 @@ const downloadExcelSheet = async () => {
       p1: elevatorForm.p1,
       p2: elevatorForm.p2,
       q_heating_gcal: elevatorForm.qHeating,
-      q_vent_gcal: excelForm.qVent || 0,
-      q_gvs_gcal: excelForm.qGvsMax || 0,
+      q_vent_gcal: optNum(excelForm.qVent) ?? 0,
+      q_gvs_gcal: optNum(excelForm.qGvsMax) ?? 0,
       t1: elevatorForm.t1,
       t2: elevatorForm.t2,
       t3: elevatorForm.t3,
