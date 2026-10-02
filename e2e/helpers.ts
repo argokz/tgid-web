@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 export const FRAGMENT_ID = Number(process.env.E2E_FRAGMENT_ID || 74);
 
@@ -84,6 +84,32 @@ export async function focusFragmentPipe(page: Page, fragmentId = FRAGMENT_ID): P
     mid: abs({ x: (px.s.x + px.e.x) / 2, y: (px.s.y + px.e.y) / 2 }),
     name: target!.name,
   };
+}
+
+/**
+ * Клик по карте, после которого может открыться меню «Выберите объект»: участки и узлы
+ * фрагментов лежат друг на друге (копии сети в 1/74/89/99), и без контекстного фрагмента
+ * выбор неоднозначен (QA F53, F28). Если меню открылось — выбрать объект нужного фрагмента
+ * (подзаголовок «Фрагмент N · участок/узел id»). `done` — признак, что клик уже обработан
+ * без меню (карточка открылась, точка маршрута добавилась).
+ */
+export async function clickAndChooseFragment(
+  page: Page,
+  point: { x: number; y: number },
+  done: Locator,
+  fragmentId = FRAGMENT_ID,
+) {
+  await page.mouse.click(point.x, point.y);
+  const menu = page.locator('.feature-menu');
+  await expect(done.or(menu).first()).toBeVisible();
+  if (await menu.isVisible()) {
+    await menu
+      .locator('.menu-item')
+      .filter({ hasText: new RegExp(`Фрагмент ${fragmentId}\\b`) })
+      .first()
+      .click();
+    await expect(menu).toBeHidden();
+  }
 }
 
 /** Открыть инструмент из панели «Инструменты» шапки */

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { FRAGMENT_ID, focusFragmentPipe, mapEval, openMap, openTool } from './helpers';
+import { FRAGMENT_ID, clickAndChooseFragment, focusFragmentPipe, mapEval, openMap, openTool } from './helpers';
 
 /**
  * Smoke по ключевым сценариям на копии БД. Только чтение: ничего не пишет
@@ -31,12 +31,9 @@ test.describe('ITwin Map smoke', () => {
 
   test('клик по участку открывает карточку', async ({ page }) => {
     const pipe = await focusFragmentPipe(page);
-    await page.mouse.click(pipe.mid.x, pipe.mid.y);
     const card = page.locator('.ap-card');
-    // несколько объектов под курсором (участок в нескольких фрагментах) → «Выберите объект»
-    const menuItem = page.getByText(`ID: ${FRAGMENT_ID}`, { exact: true }).or(page.getByText(/^ID: \d+$/)).first();
-    await expect(card.or(menuItem)).toBeVisible();
-    if (!(await card.isVisible())) await menuItem.click();
+    // участок лежит в нескольких фрагментах → «Выберите объект», берём копию FRAGMENT_ID
+    await clickAndChooseFragment(page, pipe.mid, card);
     await expect(card).toBeVisible();
     await expect(card).toContainText(/Участок|участок/);
   });
@@ -60,9 +57,12 @@ test.describe('ITwin Map smoke', () => {
     await page.getByRole('button', { name: 'Пьезометрический график' }).click();
     const panel = page.locator('[aria-label="Построение маршрута пьезометра"]');
     await expect(panel).toBeVisible();
-    await page.mouse.click(pipe.start.x, pipe.start.y);
-    await page.mouse.click(pipe.end.x, pipe.end.y);
-    await expect(panel.locator('.v-chip')).toHaveCount(2);
+    const chips = panel.locator('.v-chip');
+    // первый узел: без активного фрагмента — меню выбора; второй берётся во фрагменте первого
+    await clickAndChooseFragment(page, pipe.start, chips.first());
+    await expect(chips).toHaveCount(1);
+    await clickAndChooseFragment(page, pipe.end, chips.nth(1));
+    await expect(chips).toHaveCount(2);
     const response = page.waitForResponse((r) => r.url().includes('piezometer/route'));
     await panel.getByRole('button', { name: 'Построить график' }).click();
     expect((await response).status()).toBe(200);
