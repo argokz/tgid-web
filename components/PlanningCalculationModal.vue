@@ -517,7 +517,7 @@ watch(isOpen, (val) => {
 
 watch(calcMode, () => {
   // имя по умолчанию следует за режимом, пока пользователь его не менял
-  if (/^Расчёт (планового|аварийного) режима /.test(calculationName.value)) {
+  if (/^Расч[её]т (планового|аварийного) режима /.test(calculationName.value)) {
     calculationName.value = defaultCalculationName();
   }
 });

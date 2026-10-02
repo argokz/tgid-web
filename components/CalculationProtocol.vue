@@ -99,7 +99,7 @@
                   :class="['protocol-message', log.type]"
                 >{{ log.message }}</span>
                 <v-btn
-                  v-if="!log.html && log.message.includes('Начало расчёта')"
+                  v-if="!log.html && /Начало расч[её]та/.test(log.message)"
                   size="small"
                   variant="text"
                   color="primary"
