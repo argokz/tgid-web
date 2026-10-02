@@ -24,7 +24,7 @@
               <v-icon class="mr-2">
                 mdiCalculator
               </v-icon>
-              Расчет
+              Расчёт
             </v-tab>
             <v-tab value="system">
               <v-icon class="mr-2">
@@ -99,7 +99,7 @@
                   :class="['protocol-message', log.type]"
                 >{{ log.message }}</span>
                 <v-btn
-                  v-if="!log.html && log.message.includes('Начало расчета')"
+                  v-if="!log.html && log.message.includes('Начало расчёта')"
                   size="small"
                   variant="text"
                   color="primary"

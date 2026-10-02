@@ -810,7 +810,7 @@
                   size="small"
                   class="mr-1"
                 >mdi-calculator</v-icon>
-                Результаты расчета
+                Результаты расчёта
               </v-card-title>
               <v-divider />
               <v-card-text class="pa-0">
@@ -2229,7 +2229,7 @@ defineExpose({ show, close })
 
   color: #90a4ae;
 
-  text-transform: uppercase;
+  /* без uppercase: единицы «м*ч^2/т^2» капсом читаются неверно (QA F67) */
 
   letter-spacing: 0.4px;
 

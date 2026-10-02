@@ -333,7 +333,7 @@ function loadSavedSettings() {
         
         // Оценка размера иконки из сохраненных стилей
         if (style.icon.width && style.icon.height) {
-          // Примерный расчет и обязательное преобразование в число
+          // Примерный расчёт и обязательное преобразование в число
           const calculatedSize = style.icon.width / (24 * 24);
           iconSize.value = Number(calculatedSize);
         } else {

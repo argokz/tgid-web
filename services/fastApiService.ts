@@ -2865,7 +2865,7 @@ export const fastApiService = {
       body: params,
       responseType: 'blob',
     });
-    return { blob, filename: `Расчет_дросселирования_${Date.now()}.xlsx` };
+    return { blob, filename: `Расчёт_дросселирования_${Date.now()}.xlsx` };
   },
 
   /** Превью разворота участка: узлы, геометрия, оборудование по классам, версия участка */

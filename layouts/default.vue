@@ -240,7 +240,7 @@
     <LoginDialog v-model="showLogin" />
     <ConfirmDialogHost />
 
-    <!-- Модальное окно расчета -->
+    <!-- Модальное окно расчёта -->
     <PlanningCalculationModal
       v-if="isHydrated && authStore.canCalculate"
       v-model="showCalculationModal"

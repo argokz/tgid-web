@@ -125,7 +125,7 @@
                   <td>{{ item.line_id ?? '—' }}<div class="muted">узлы {{ item.node_id_1 ?? '—' }} → {{ item.node_id_2 ?? '—' }}</div></td>
                   <td><strong>{{ item.number || `Насос №${item.id}` }}</strong><div class="muted">{{ item.station_name || 'станция не указана' }}</div></td>
                   <td>{{ item.model_name || item.model_type || 'не выбрана' }}</td>
-                  <td>{{ item.parallel_count || '—' }} шт.<div class="muted">{{ item.drive_type_name || 'привод не задан' }}</div></td>
+                  <td>{{ item.parallel_count ? `${item.parallel_count} шт.` : '—' }}<div class="muted">{{ item.drive_type_name || 'привод не задан' }}</div></td>
                   <td><v-chip
                     size="x-small"
                     :color="stateColor(item.state_name)"
@@ -623,6 +623,7 @@
 </template>
 
 <script setup lang="ts">
+import { hasLonLat } from '~/utils/journalFields'
 import { formatApiError } from '~/utils/apiError'
 import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { use } from 'echarts/core'
@@ -887,7 +888,7 @@ const openDialog = async (scope: { pumpId?: number; standardPumpId?: number; lin
   if (scope.pumpId) await openInstalledDetails(scope.pumpId)
 }
 
-const hasCoordinates = (item: InstalledPumpSummary) => Number.isFinite(Number(item.longitude)) && Number.isFinite(Number(item.latitude))
+const hasCoordinates = (item: InstalledPumpSummary) => hasLonLat(item)
 const locate = (item: InstalledPumpSummary) => emit('locate-pump', { longitude: Number(item.longitude), latitude: Number(item.latitude), id: item.id, lineId: item.line_id, label: item.number || item.model_name || `Насос №${item.id}` })
 const configurationLabel = (status: PumpConfigurationStatus) => ({ configured: 'настроен', missing_model: 'нет модели', coefficients_missing: 'нет коэффициентов', line_missing: 'нет линии' })[status]
 const configurationColor = (status: PumpConfigurationStatus) => ({ configured: 'green', missing_model: 'orange', coefficients_missing: 'amber-darken-3', line_missing: 'red' })[status]

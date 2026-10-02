@@ -1,7 +1,7 @@
 /**
  * Пункты шапки приложения (layouts/default.vue). Один список на две раскладки:
  * кнопки в шапке на широком экране и выдвижное меню (гамбургер) на узком.
- * Права те же, что у кнопок шапки: «Расчет» — calculator+ (сервер проверяет то же).
+ * Права те же, что у кнопок шапки: «Расчёт» — calculator+ (сервер проверяет то же).
  */
 import type { Permissions } from '~/utils/permissions'
 
@@ -69,7 +69,7 @@ export function buildHeaderMenu(
     { id: 'map', title: 'Карта', icon: 'mdi-map', action: { kind: 'route', to: '/' } },
   ]
   if (permissions.canCalculate) {
-    items.push({ id: 'calculation', title: 'Расчет', icon: 'mdi-calculator-variant', action: { kind: 'calculation' } })
+    items.push({ id: 'calculation', title: 'Расчёт', icon: 'mdi-calculator-variant', action: { kind: 'calculation' } })
   }
   items.push(
     {

@@ -141,10 +141,10 @@
               <th>Потребитель</th>
               <th>Узел</th>
               <th>Фрагмент</th>
-              <th>Отопление</th>
-              <th>Вентиляция</th>
-              <th>ГВС</th>
-              <th>Всего</th>
+              <th>Отопление, Гкал/ч</th>
+              <th>Вентиляция, Гкал/ч</th>
+              <th>ГВС, Гкал/ч</th>
+              <th>Всего, Гкал/ч</th>
               <th>Состояние</th>
               <th>Действия</th>
             </tr>
@@ -189,19 +189,21 @@
                 </v-chip>
               </td>
               <td @click.stop>
-                <v-btn 
-                  icon="mdi-crosshairs-gps" 
-                  variant="text" 
-                  size="small" 
+                <!-- icon без prop: при слоте default Vuetify не рисует icon="…" — кнопка была пустой (QA F70) -->
+                <v-btn
+                  icon
+                  variant="text"
+                  size="small"
                   color="primary"
                   :disabled="!hasCoordinates(item)"
-                  aria-label="Найти на карте"
-                  @click="emit('locate-consumer', { longitude: Number(item.longitude), latitude: Number(item.latitude), id: item.id, nodeId: item.node_id, label: item.name || `Потребитель П-${item.id}` })"
+                  aria-label="Показать на карте"
+                  @click="locateItem(item)"
                 >
+                  <v-icon>mdi-crosshairs-gps</v-icon>
                   <v-tooltip
                     activator="parent"
                     location="left"
-                  >Найти на карте</v-tooltip>
+                  >Показать на карте</v-tooltip>
                 </v-btn>
               </td>
             </tr>
@@ -427,6 +429,7 @@
 </template>
 
 <script setup lang="ts">
+import { hasLonLat } from '~/utils/journalFields'
 import { defineComponent, h, type PropType } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import {
@@ -500,7 +503,7 @@ function formatLoad(value: number | null | undefined) { return value === null ||
 function typeLabel(type: ConsumerLoadType) { return type === 'generalized' ? 'Обобщённый' : 'Реальный' }
 function recordValue(record: Record<string, unknown> | null | undefined, key: string): string | number | null { const value = record?.[key]; return typeof value === 'string' || typeof value === 'number' ? value : null }
 function attributeValue(key: string) { return recordValue(details.value?.attributes, key) }
-function hasCoordinates(item: ConsumerLoadSummary) { return Number.isFinite(Number(item.longitude)) && Number.isFinite(Number(item.latitude)) }
+function hasCoordinates(item: ConsumerLoadSummary) { return hasLonLat(item) }
 function diagnosticCount(kind: ConsumerLoadDiagnosticKind) { return lookups.value.counts[kind] || 0 }
 
 async function loadLookups() {
@@ -556,6 +559,13 @@ async function openDetails(consumerType: ConsumerLoadType, consumerId: number) {
   detailsVisible.value = true
   detailLoading.value = true
   try { details.value = await fastApiService.getConsumerLoadDiagnostic(consumerType, consumerId) } finally { detailLoading.value = false }
+}
+/** Показать потребителя на карте; окна закрываются, иначе карта под ними не видна (QA F70) */
+function locateItem(item: ConsumerLoadSummary) {
+  if (!hasCoordinates(item)) return
+  emit('locate-consumer', { longitude: Number(item.longitude), latitude: Number(item.latitude), id: item.id, nodeId: item.node_id, label: item.name || `Потребитель №${item.id}` })
+  visible.value = false
+  detailsVisible.value = false
 }
 function locateDetails() {
   const item = details.value

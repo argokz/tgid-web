@@ -80,9 +80,9 @@
             состояние объектов в БД (закрытые задвижки и т.п.).
           </p>
 
-          <!-- Наименование расчета -->
+          <!-- Наименование расчёта -->
           <p class="text-subtitle-2 mb-1">
-            Наименование расчета
+            Наименование расчёта
           </p>
           <v-text-field
             v-model="calculationName"
@@ -94,7 +94,7 @@
           />
 
           <p class="text-subtitle-2 mb-1">
-            {{ runKind === 'list' ? 'Фрагменты для расчета (по очереди)' : 'Фрагмент для расчета' }}
+            {{ runKind === 'list' ? 'Фрагменты для расчёта (по очереди)' : 'Фрагмент для расчёта' }}
           </p>
           <v-autocomplete
             v-if="runKind === 'list'"
@@ -124,14 +124,14 @@
             density="compact"
             placeholder="Выберите фрагмент"
             :error="fragmentError"
-            :error-messages="fragmentError ? 'Необходимо выбрать фрагмент для расчета' : undefined"
+            :error-messages="fragmentError ? 'Необходимо выбрать фрагмент для расчёта' : undefined"
             class="mb-2"
           />
 
           <!-- Плановый режим (Param1Dialog) -->
           <template v-if="calcMode === 'plan'">
             <p class="text-subtitle-2 mb-1">
-              Расчетные расходы потребителей
+              Расчётные расходы потребителей
             </p>
             <v-radio-group
               v-model="consumptionType"
@@ -176,7 +176,7 @@
 
               <div class="w-50 pl-2 calc-form-col">
                 <p class="text-subtitle-2 mb-1 mt-1">
-                  Температура расчета тепловых потерь
+                  Температура расчёта тепловых потерь
                 </p>
                 <v-select
                   v-model="heatLossTemperature"
@@ -265,7 +265,7 @@
               <template v-if="calcMode === 'plan'">
                 <v-checkbox
                   v-model="calculateThrottleValves"
-                  label="Расчет дроссельных органов и запись сопротивлений"
+                  label="Расчёт дроссельных органов и запись сопротивлений"
                   density="compact"
                   hide-details
                   :disabled="!canWriteSource"
@@ -288,7 +288,7 @@
 
             <div class="w-50 pl-2 calc-form-col">
               <p class="text-subtitle-2 mb-1">
-                Расчетный перепад напора:
+                Расчётный перепад напора:
               </p>
               <v-checkbox
                 v-model="mainFragment"
@@ -354,7 +354,7 @@
           :loading="calculating"
           @click="calculate"
         >
-          Расчет
+          Расчёт
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -381,7 +381,7 @@
             {{ SAVE_PO_WARNING }}
           </p>
           <p class="mb-0">
-            Старые значения останутся только в истории правок (audit_log). Продолжить расчёт с записью?
+            Старые значения останутся только в истории правок. Продолжить расчёт с записью?
           </p>
         </v-card-text>
         <v-card-actions class="justify-end">
@@ -419,7 +419,7 @@ import { tnRangeHint, tnValidationError, type TnRange } from '~/utils/calcTemper
 type RunKind = 'normal' | 'list' | 'emergency';
 
 const heatLossTemperatureOptions = [
-  { label: 'расчетная tн отопл', value: 0 },
+  { label: 'расчётная tн отопл', value: 0 },
   { label: 'среднесезонная tн от.периода', value: 1 },
   { label: 'Текущая tн', value: 2 }
 ];
@@ -470,8 +470,8 @@ const isOpen = computed({
 });
 
 const dialogTitle = computed(() => (calcMode.value === 'plan'
-  ? 'Установки расчета планового режима'
-  : 'Установки расчета аварийного (фактического) режима'));
+  ? 'Установки расчёта планового режима'
+  : 'Установки расчёта аварийного (фактического) режима'));
 
 function defaultCalculationName() {
   const stamp = new Date().toLocaleString('ru-RU', {
@@ -482,8 +482,8 @@ function defaultCalculationName() {
     minute: '2-digit'
   }).replace(',', '');
   return calcMode.value === 'plan'
-    ? `Расчет планового режима ${stamp}`
-    : `Расчет аварийного режима ${stamp}`;
+    ? `Расчёт планового режима ${stamp}`
+    : `Расчёт аварийного режима ${stamp}`;
 }
 
 const calculationName = ref(defaultCalculationName());
@@ -517,7 +517,7 @@ watch(isOpen, (val) => {
 
 watch(calcMode, () => {
   // имя по умолчанию следует за режимом, пока пользователь его не менял
-  if (/^Расчет (планового|аварийного) режима /.test(calculationName.value)) {
+  if (/^Расчёт (планового|аварийного) режима /.test(calculationName.value)) {
     calculationName.value = defaultCalculationName();
   }
 });
@@ -652,7 +652,7 @@ const pollTask = async (taskId: string) => {
     if (statusResponse.status === 'SUCCESS') {
       const finalResult = statusResponse.result || {};
       const ok = finalResult.status === 'success';
-      addProtocolLog(finalResult.message || 'Расчет окончен', ok ? 'success' : 'error');
+      addProtocolLog(finalResult.message || 'Расчёт окончен', ok ? 'success' : 'error');
       if (finalResult.output) addProtocolLog(finalResult.output, ok ? 'success' : 'info', true);
       if (finalResult.error) addProtocolLog(finalResult.error, 'error', true);
       const layerStore = useLayerStore();
@@ -660,7 +660,7 @@ const pollTask = async (taskId: string) => {
       return;
     }
     if (statusResponse.status === 'FAILURE') {
-      addProtocolLog('Ошибка при выполнении расчета на сервере', 'error');
+      addProtocolLog('Ошибка при выполнении расчёта на сервере', 'error');
       if (statusResponse.error) addProtocolLog(statusResponse.error, 'error', true);
       return;
     }
@@ -679,7 +679,7 @@ const calculate = async () => {
   tnError.value = tnMessage !== null;
   if (fragmentError.value || tnMessage) {
     addProtocolLog(fragmentError.value
-      ? 'Ошибка: необходимо выбрать фрагмент(ы) для расчета'
+      ? 'Ошибка: необходимо выбрать фрагмент(ы) для расчёта'
       : `Ошибка: ${tnMessage}`, 'error');
     return;
   }
@@ -691,7 +691,7 @@ const calculate = async () => {
   }
 
   isOpen.value = false;
-  addProtocolLog('Отправка запроса на расчет...', 'info');
+  addProtocolLog('Отправка запроса на расчёт...', 'info');
 
   calculating.value = true;
   try {

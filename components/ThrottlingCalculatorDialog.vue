@@ -412,14 +412,14 @@
                     v-else
                     class="text-medium-emphasis"
                   >
-                    Заполните параметры и нажмите кнопку расчета
+                    Заполните параметры и нажмите кнопку расчёта
                   </div>
                 </v-card>
               </v-col>
             </v-row>
           </v-window-item>
 
-          <!-- Диафрагмы по напорам узла: движок sety (drvary1) -->
+          <!-- Диафрагмы по напорам узла: как в расчёте sety (drvary1) -->
           <v-window-item value="engine">
             <p class="text-body-2 text-medium-emphasis mb-3">
               Как в гидравлическом расчёте сети: диаметр шайбы 10·√(G/√H), не меньше
@@ -509,7 +509,7 @@
                     v-if="engineElevatorResult"
                     class="mt-3 text-body-2"
                   >
-                    <div>Сопло: <b>{{ fmtMm(engineElevatorResult.nozzle_diameter_mm) }}</b>, напор на сопле {{ fmtM(engineElevatorResult.nozzle_head_m) }}, элеватор №{{ engineElevatorResult.elevator_number ?? '—' }}</div>
+                    <div>Сопло: <b>{{ fmtMm(engineElevatorResult.nozzle_diameter_mm) }}</b>, напор на сопле {{ fmtM(engineElevatorResult.nozzle_head_m) }}, элеватор {{ engineElevatorResult.elevator_number != null ? `№${engineElevatorResult.elevator_number}` : '—' }}</div>
                     <div v-if="engineElevatorResult.mixing_chamber_diameter_mm != null">
                       Диаметр горловины (Dгор): <b>{{ fmtMm(engineElevatorResult.mixing_chamber_diameter_mm) }}</b>
                     </div>
@@ -622,7 +622,7 @@
               class="pa-4 rounded-lg"
             >
               <div class="text-subtitle-1 font-weight-bold mb-3">
-                Формирование официального бланка расчета теплового ввода
+                Формирование официального бланка расчёта теплового ввода
               </div>
               <p class="text-body-2 text-medium-emphasis mb-4">
                 Расчётный лист дроссельных диафрагм и сопла элеватора по форме десктопного бланка (dross) в формате Excel (.xlsx).

@@ -45,7 +45,8 @@
             <li
               v-for="u in errorUsage.by"
               :key="`${u.table}.${u.column}`"
-            >{{ u.label }} ({{ u.table }}.{{ u.column }}): {{ u.count }}</li>
+              :title="`${u.table}.${u.column}`"
+            >{{ u.label }}: {{ u.count }}</li>
           </ul>
         </v-alert>
 
@@ -111,8 +112,12 @@
             v-else-if="info.note"
             class="text-caption text-medium-emphasis mb-2"
           >{{ info.note }}</div>
-          <div class="text-caption text-medium-emphasis mb-2">
-            Таблица {{ info.table }} · ссылки: {{ info.usages.join(', ') || '—' }}
+          <!-- Имя таблицы БД — только во всплывающей подсказке (QA F66) -->
+          <div
+            class="text-caption text-medium-emphasis mb-2"
+            :title="`Таблица БД: ${info.table}`"
+          >
+            Используется в: {{ info.usages.join(', ') || '—' }}
           </div>
 
           <v-data-table-server

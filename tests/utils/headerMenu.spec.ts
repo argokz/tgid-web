@@ -43,23 +43,23 @@ describe('isHeaderNavCollapsed: порог гамбургера (QA F1, F57)', (
 })
 
 describe('buildHeaderMenu: состав меню по правам', () => {
-  it('без входа и viewer — всё, кроме «Расчет»', () => {
+  it('без входа и viewer — всё, кроме «Расчёт»', () => {
     for (const role of ['', 'viewer']) {
       expect(ids(menuFor(role))).toEqual(['map', 'protocol', 'tools', 'export', 'excel'])
     }
   })
 
-  it('calculator, editor, admin — с «Расчет» сразу после «Карты»', () => {
+  it('calculator, editor, admin — с «Расчёт» сразу после «Карты»', () => {
     for (const role of ['calculator', 'editor', 'admin']) {
       expect(ids(menuFor(role))).toEqual(['map', 'calculation', 'protocol', 'tools', 'export', 'excel'])
     }
   })
 
-  it('AUTH_DISABLED — сервер считает всех admin, «Расчет» есть', () => {
+  it('AUTH_DISABLED — сервер считает всех admin, «Расчёт» есть', () => {
     expect(ids(menuFor('', { authDisabled: true }))).toContain('calculation')
   })
 
-  it('«Расчет» не зависит от MUTATIONS_ENABLED (как кнопка в шапке)', () => {
+  it('«Расчёт» не зависит от MUTATIONS_ENABLED (как кнопка в шапке)', () => {
     expect(ids(menuFor('calculator', { mutationsEnabled: false }))).toContain('calculation')
   })
 

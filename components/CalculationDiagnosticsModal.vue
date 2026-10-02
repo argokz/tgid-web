@@ -7,7 +7,7 @@
     <v-card>
       <v-card-title class="d-flex align-center bg-primary text-white pa-4">
         <v-icon class="mr-3">mdi-calculator-variant</v-icon>
-        Диагностика расчетов
+        Диагностика расчётов
         <v-spacer />
         <v-btn
           icon="mdi-refresh"
@@ -62,7 +62,7 @@
         
         <v-divider class="mb-4" />
         
-        <div class="text-subtitle-2 mb-2">История расчетов (последние 20)</div>
+        <div class="text-subtitle-2 mb-2">История расчётов (последние 20)</div>
         <v-list lines="two">
           <v-list-item
             v-for="calc in calculations"
@@ -85,7 +85,7 @@
             </template>
             
             <v-list-item-title class="font-weight-medium">
-              Расчет #{{ calc.id }}: {{ calc.name || 'Без названия' }}
+              Расчёт #{{ calc.id }}: {{ calc.name || 'Без названия' }}
             </v-list-item-title>
             
             <v-list-item-subtitle class="mt-1">
@@ -185,7 +185,7 @@ const fetchData = async () => {
   try {
     calculations.value = await fastApiService.getLatestCalculations(20)
   } catch (err: any) {
-    error.value = formatApiErrorWith('Не удалось загрузить историю расчетов', err)
+    error.value = formatApiErrorWith('Не удалось загрузить историю расчётов', err)
     notificationStore.showError(error.value)
   } finally {
     loading.value = false
@@ -203,10 +203,10 @@ const toggleCalculation = async (id: number | null) => {
     if (id === null) markCleared();
     else markShown();
     if (id !== null) {
-      notificationStore.showSuccess('Расчет #' + id + ' загружен на карту');
+      notificationStore.showSuccess('Расчёт #' + id + ' загружен на карту');
     }
   } catch {
-    notificationStore.showError('Ошибка загрузки расчета');
+    notificationStore.showError('Ошибка загрузки расчёта');
   } finally {
     loading.value = false;
   }
@@ -223,7 +223,7 @@ const downloadCalcExcel = async (calcId: number) => {
     link.click()
     link.remove()
     URL.revokeObjectURL(url)
-    notificationStore.showSuccess('Результаты расчета #' + calcId + ' выгружены в Excel')
+    notificationStore.showSuccess('Результаты расчёта #' + calcId + ' выгружены в Excel')
   } catch (err: any) {
     notificationStore.showError(formatApiErrorWith('Ошибка выгрузки Excel', err))
   }

@@ -115,7 +115,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
       { label: 'Осмотры', hint: 'Контуры осмотра и результаты', icon: 'mdi-clipboard-search-outline', color: 'teal-darken-2', event: 'open-inspection-journal', dialog: 'inspection' },
       { label: 'Ремонты', hint: 'План и факт по контурам', icon: 'mdi-hammer-wrench', color: 'deep-purple-darken-2', event: 'open-repair-journal', dialog: 'repair' },
       { label: 'Опрессовки', hint: 'Испытания и акты', icon: 'mdi-gauge', color: 'blue-darken-2', event: 'open-pressure-test-journal', dialog: 'pressureTest' },
-      { label: 'Очередь опрессовок', hint: 'Отдельный legacy-реестр очередей', icon: 'mdi-format-list-numbered', color: 'indigo-darken-2', event: 'open-ochered-opressovok', dialog: 'ocheredOpressovok' },
+      { label: 'Очередь опрессовок', hint: 'Реестр очередей опрессовок из прежней системы', icon: 'mdi-format-list-numbered', color: 'indigo-darken-2', event: 'open-ochered-opressovok', dialog: 'ocheredOpressovok' },
       { label: 'Индикаторы коррозии', hint: 'Сезонная история и оценки', icon: 'mdi-test-tube', color: 'orange-darken-3', event: 'open-corrosion-indicator-journal', dialog: 'corrosionIndicator' },
     ],
   },
@@ -138,7 +138,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     color: 'primary',
     items: [
       { label: 'Гидравлический режим на карте', hint: 'Стрелки потоков, hуд > 80 Па/м, скорости и напоры', icon: 'mdi-map-clock-outline', color: 'indigo-darken-2', event: 'open-hydraulic-thematic', dialog: 'hydraulicThematic' },
-      { label: 'Калькулятор дросселирования', hint: 'Расчет шайб и сопел элеваторов', icon: 'mdi-calculator', color: 'teal-darken-3', event: 'open-throttling-calculator', dialog: 'throttlingCalculator' },
+      { label: 'Калькулятор дросселирования', hint: 'Расчёт шайб и сопел элеваторов', icon: 'mdi-calculator', color: 'teal-darken-3', event: 'open-throttling-calculator', dialog: 'throttlingCalculator' },
       { label: 'Диагностика расчётов', hint: 'Готовность исходных данных', icon: 'mdi-calculator-variant', color: 'primary', event: 'open-calculation-diagnostics', dialog: 'calculationDiagnostics' },
       { label: 'Диагностика топологии', hint: 'Разрывы и висячие узлы', icon: 'mdi-stethoscope', color: 'deep-purple-darken-2', event: 'open-topology-diagnostics', dialog: 'topologyDiagnostics' },
       { label: 'Поиск неисправностей', hint: 'Дефекты и коррозия на карте', icon: 'mdi-alert-octagon', color: 'error', event: 'open-fault-diagnostics', dialog: 'faultDiagnostics' },
@@ -178,7 +178,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     icon: 'mdi-shield-account',
     color: 'blue-grey-darken-2',
     items: [
-      { label: 'История правок', hint: 'Журнал изменений audit_log', icon: 'mdi-history', color: 'blue-grey-darken-2', event: 'open-audit-history', dialog: 'auditHistory', requires: 'viewer' },
+      { label: 'История правок', hint: 'Кто, когда и что изменил в данных', icon: 'mdi-history', color: 'blue-grey-darken-2', event: 'open-audit-history', dialog: 'auditHistory', requires: 'viewer' },
       { label: 'Пользователи', hint: 'Роли, блокировка, пароли', icon: 'mdi-account-cog', color: 'blue-grey-darken-3', event: 'open-users-admin', dialog: 'usersAdmin', requires: 'admin' },
     ],
   },

@@ -21,7 +21,7 @@
       </v-card-title>
 
       <v-card-text class="pa-4">
-        <!-- Выбор расчета -->
+        <!-- Выбор расчёта -->
         <v-row
           dense
           class="mb-3"
@@ -74,7 +74,7 @@
           class="pa-3 mb-4 rounded-lg"
         >
           <div class="text-caption font-weight-bold mb-2 text-uppercase">
-            Сводка расчета #{{ summary.calculation_id }}
+            Сводка расчёта #{{ summary.calculation_id }}
           </div>
           <v-row dense>
             <v-col
@@ -357,7 +357,7 @@ const fetchCalculations = async () => {
   try {
     calculations.value = await fastApiService.getLatestCalculations(25);
   } catch (err: any) {
-    useNotificationStore().showError(formatApiErrorWith('Не удалось загрузить список расчетов', err, ''));
+    useNotificationStore().showError(formatApiErrorWith('Не удалось загрузить список расчётов', err, ''));
   } finally {
     loadingCalculations.value = false;
   }
@@ -374,10 +374,10 @@ const loadResults = async () => {
   try {
     geojsonResult.value = await fastApiService.getCalculationResultsGeoJson(selectedCalculationId.value);
     useNotificationStore().showSuccess(
-      `Результаты расчета #${selectedCalculationId.value} загружены (${geojsonResult.value.features.length} объектов)`
+      `Результаты расчёта #${selectedCalculationId.value} загружены (${geojsonResult.value.features.length} объектов)`
     );
   } catch (err: any) {
-    useNotificationStore().showError(formatApiErrorWith('Ошибка загрузки результатов расчета', err, ''));
+    useNotificationStore().showError(formatApiErrorWith('Ошибка загрузки результатов расчёта', err, ''));
   } finally {
     loadingResults.value = false;
   }
