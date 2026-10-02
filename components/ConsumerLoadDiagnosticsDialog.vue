@@ -23,7 +23,7 @@
           size="small"
           variant="outlined"
         >
-          {{ formatInteger(lookups.counts.total) }} потребителей
+          {{ formatInteger(scopeCount('total')) }} потребителей
         </v-chip>
         <v-chip
           class="mr-2"
@@ -31,7 +31,7 @@
           size="small"
           variant="outlined"
         >
-          {{ formatInteger(lookups.counts.zero_load) }} без нагрузки
+          {{ formatInteger(scopeCount('zero_load')) }} без нагрузки
         </v-chip>
         <v-chip
           class="mr-2"
@@ -39,7 +39,7 @@
           size="small"
           variant="outlined"
         >
-          {{ formatInteger(lookups.counts.closed) }} закрыто
+          {{ formatInteger(scopeCount('closed')) }} закрыто
         </v-chip>
         <v-btn
           icon="mdi-close"
@@ -292,8 +292,15 @@
             {{ details.state_name || 'Состояние не задано' }}
           </v-chip>
           <v-chip
-            v-if="details.zero_heating_load"
+            v-if="details.zero_load"
             color="orange"
+          >
+            Нулевая нагрузка (отопление, вентиляция, ГВС)
+          </v-chip>
+          <v-chip
+            v-else-if="details.zero_heating_load"
+            color="orange"
+            variant="outlined"
           >
             Нулевая отопительная нагрузка
           </v-chip>
@@ -504,7 +511,11 @@ function typeLabel(type: ConsumerLoadType) { return type === 'generalized' ? 'О
 function recordValue(record: Record<string, unknown> | null | undefined, key: string): string | number | null { const value = record?.[key]; return typeof value === 'string' || typeof value === 'number' ? value : null }
 function attributeValue(key: string) { return recordValue(details.value?.attributes, key) }
 function hasCoordinates(item: ConsumerLoadSummary) { return hasLonLat(item) }
-function diagnosticCount(kind: ConsumerLoadDiagnosticKind) { return lookups.value.counts[kind] || 0 }
+// Счётчики — по текущим фильтрам (фрагмент, тип, состояние, поиск) из ответа списка;
+// до первой загрузки — общие из lookups (QA F36)
+const scopeCounts = ref<Record<string, number> | null>(null)
+function scopeCount(kind: string) { return (scopeCounts.value ?? lookups.value.counts)[kind] || 0 }
+function diagnosticCount(kind: ConsumerLoadDiagnosticKind) { return scopeCount(kind) }
 
 async function loadLookups() {
   if (!lookups.value.states.length) lookups.value = await fastApiService.getConsumerLoadLookups()
@@ -516,6 +527,7 @@ async function loadPage() {
     items.value = response.items
     total.value = response.total
     pages.value = response.pages
+    scopeCounts.value = (response as { counts?: Record<string, number> }).counts ?? null
   } finally { loading.value = false }
 }
 async function reload() { page.value = 1; await loadPage() }
