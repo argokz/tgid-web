@@ -113,3 +113,22 @@ T.id, L.id AS lineid, ST_Transform(L.shape, 4326) as shape,
 
 Аналогично в `id_generalizedconsumers`, `id_realconsumers`, `id_heatsources`,
 `id_pumpstations`: `T.id, N.id AS nodeid, …`. Web берёт явный `lineid` в приоритете.
+
+**Применено на itwin.kz 04.10.2026** (REST GeoServer, бэкап `H:\tgid-backups\2026-10-04_geoserver\`):
+`L.id AS lineid` в `id_heatpipesections`, `N.id AS nodeid` в четырёх узловых view. Проверено WFS:
+участок 386603 → `id` 203325, `lineid` 386603; источник 535304 → `id` 177, `nodeid` 535304.
+
+Важно при правке через REST: `GET …/featuretypes/<name>.xml` отдаёт вычисленный список `<attributes>`,
+и если отправить его обратно в `PUT`, схема SQL view «замораживается» — новые колонки не появятся.
+Перед `PUT` заменять блок на `<attributes/>`, затем `POST /rest/reset`.
+
+## Шаг 5. Подпись «Длина» участков (QA F19)
+
+Параметр `DLINA` был объявлен у view `heatpipesections`, но не участвовал в `text`. Как в десктопе
+(`gid8/python/qgis/qgz/draw_label_hps.py`: `L` = `heatpipesections.pipeSectLength`), после строки расхода добавлено:
+
+```sql
+tg_format_check('%DLINA%'='on', 'L', hps.pipeSectLength) ||
+```
+
+Применено 04.10.2026; WMS и MVT с `viewparams=DLINA:on` дают `L=10.1` (совпадает с БД).
