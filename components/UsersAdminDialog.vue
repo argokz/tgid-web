@@ -132,7 +132,7 @@
                 density="compact"
                 hide-details
                 :disabled="!canWrite || busyId === item.id"
-                style="max-width: 180px;"
+                style="min-width: 150px; max-width: 180px;"
                 @update:model-value="(role: UserRole) => changeRole(item, role)"
               />
             </template>
@@ -179,7 +179,10 @@
               </v-chip>
             </template>
             <template #[`item.actions`]="{ item }">
-              <template v-if="canWrite">
+              <div
+                v-if="canWrite"
+                class="d-flex flex-nowrap"
+              >
                 <v-btn
                   v-if="pgBackend"
                   icon="mdi-pencil"
@@ -207,7 +210,7 @@
                   aria-label="Сменить пароль"
                   @click="askPassword(item)"
                 />
-              </template>
+              </div>
             </template>
           </v-data-table>
 
