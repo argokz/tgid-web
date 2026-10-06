@@ -58,6 +58,7 @@
           <v-combobox
             v-model="filter.changed_by"
             :items="lookups.users.map((u) => u.name)"
+            :item-title="authorLabel"
             label="Пользователь"
             variant="outlined"
             density="compact"
@@ -137,6 +138,9 @@
           no-data-text="Изменений не найдено"
           @update:options="load"
         >
+          <template #[`item.changed_by`]="{ item }">
+            {{ authorLabel(item.changed_by) }}
+          </template>
           <template #[`item.changed_at`]="{ item }">
             {{ formatDate(item.changed_at) }}
           </template>
@@ -214,6 +218,7 @@
 
 <script setup lang="ts">
 import { formatApiError } from '~/utils/apiError'
+import { authorLabel } from '~/utils/auditAuthor'
 import { reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import {

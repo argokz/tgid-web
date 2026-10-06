@@ -511,7 +511,7 @@ const emit = defineEmits<{
   'locate-corrosion-indicator': [coordinates: { longitude: number; latitude: number; id: number; label: string }]
 }>()
 const { isMobile } = useMobile()
-const mutationsEnabled = useMutationsEnabled()
+const mutationsEnabled = useMutationsEnabled('corrosion')
 const visible = ref(false), loading = ref(false), error = ref('')
 const items = ref<CorrosionIndicatorSummary[]>([])
 const total = ref(0), pages = ref(0), page = ref(1)

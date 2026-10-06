@@ -485,7 +485,8 @@ const emit = defineEmits<{
   restore: []
 }>();
 
-const canEdit = useMutationsEnabled();
+// журнал ремонтов — предметное право «Ремонты», остальные — роль editor
+const canEdit = useMutationsEnabled(props.journal === 'repairs' ? 'repairs' : undefined);
 const notifications = useNotificationStore();
 const bridge = useJournalMapBridge();
 

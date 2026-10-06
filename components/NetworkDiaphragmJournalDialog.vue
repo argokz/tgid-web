@@ -545,7 +545,7 @@ const emit = defineEmits<{
   'locate-diaphragm': [payload: { longitude: number; latitude: number; id: number; lineId: number | null; label: string }]
 }>()
 const { isMobile } = useMobile()
-const mutationsEnabled = useMutationsEnabled()
+const mutationsEnabled = useMutationsEnabled('network')
 const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
 const emptyLookups = (): NetworkDiaphragmLookups => ({ states: [], external_signs: [], locations: [], entry_marks: [], fragments: [], counts: {}, calculation_count: 0, result_count: 0 })
 const visible = ref(false)

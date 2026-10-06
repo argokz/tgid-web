@@ -26,6 +26,12 @@ export const useAuthStore = defineStore('auth', {
     loginPrompt: 0,
     /** Логин истёкшей сессии — подставляется в форму входа */
     lastUsername: '' as string,
+    /** AUTH_BACKEND=pg: пользователь — роль PostgreSQL (sub = tgid_u_*), права и территория из /auth/me */
+    pgUser: false as boolean,
+    caps: [] as string[],
+    fragments: null as number[] | null,
+    displayName: '' as string,
+    mustChangePassword: false as boolean,
   }),
   getters: {
     isAuthenticated: (state) => Boolean(state.accessToken),
@@ -37,6 +43,9 @@ export const useAuthStore = defineStore('auth', {
         authDisabled: state.authDisabled,
         mutationsEnabled: state.mutationsEnabledServer,
         topologyMutationsEnabled: state.topologyMutationsEnabledServer,
+        pgUser: state.pgUser,
+        caps: state.caps,
+        fragments: state.fragments,
       }),
     /** Роль editor+ (при AUTH_DISABLED сервер считает всех admin) */
     canEdit(): boolean {
@@ -62,6 +71,22 @@ export const useAuthStore = defineStore('auth', {
     },
     canViewHistory(): boolean {
       return this.permissions.canViewHistory
+    },
+    /** Предметные права (пользователи PostgreSQL); UsersDB — по роли editor */
+    canEditNetwork(): boolean {
+      return this.permissions.canEditNetwork
+    },
+    canEditRepairs(): boolean {
+      return this.permissions.canEditRepairs
+    },
+    canEditCorrosion(): boolean {
+      return this.permissions.canEditCorrosion
+    },
+    canEditPts(): boolean {
+      return this.permissions.canEditPts
+    },
+    canEditNetworkStruct(): boolean {
+      return this.permissions.canEditNetworkStruct
     },
   },
   actions: {
@@ -132,6 +157,11 @@ export const useAuthStore = defineStore('auth', {
       this.accessToken = ''
       this.username = ''
       this.role = ''
+      this.pgUser = false
+      this.caps = []
+      this.fragments = null
+      this.displayName = ''
+      this.mustChangePassword = false
       if (process.client) {
         localStorage.removeItem(TOKEN_KEY)
         localStorage.removeItem(USER_KEY)
@@ -144,6 +174,11 @@ export const useAuthStore = defineStore('auth', {
         const me = await fastApiService.authMe()
         this.username = me.username
         this.role = me.role
+        this.pgUser = me.auth_backend === 'pg' && String(me.sub || '').startsWith('tgid_u_')
+        this.caps = me.caps || []
+        this.fragments = me.fragments ?? null
+        this.displayName = me.display_name || me.username
+        this.mustChangePassword = Boolean(me.must_change_password)
         this.authDisabled = Boolean(me.auth_disabled)
         this.mutationsEnabledServer = Boolean(me.mutations_enabled)
         this.topologyMutationsEnabledServer = Boolean(me.topology_mutations_enabled)

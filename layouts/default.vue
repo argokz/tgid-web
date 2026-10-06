@@ -126,7 +126,7 @@
           >
             <v-list-item
               v-if="authStore.isAuthenticated"
-              :title="authStore.username"
+              :title="authStore.displayName || authStore.username"
               :subtitle="roleLabel"
               prepend-icon="mdi-account-check"
             />
@@ -135,6 +135,12 @@
               prepend-icon="mdi-login"
               title="Войти"
               @click="showLogin = true"
+            />
+            <v-list-item
+              v-if="authStore.pgUser"
+              prepend-icon="mdi-lock-reset"
+              title="Сменить пароль"
+              @click="showChangePassword = true"
             />
             <v-list-item
               prepend-icon="mdi-account-outline"
@@ -240,6 +246,7 @@
     </v-main>
 
     <LoginDialog v-model="showLogin" />
+    <ChangePasswordDialog v-model="showChangePassword" />
     <ConfirmDialogHost />
 
     <!-- Модальное окно расчёта -->
@@ -305,6 +312,7 @@ import { useUiStore } from '~/stores/uiStore';
 import PlanningCalculationModal from '~/components/PlanningCalculationModal.vue';
 import CalculationProtocol from '~/components/CalculationProtocol.vue';
 import LoginDialog from '~/components/LoginDialog.vue';
+import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue';
 import ConfirmDialogHost from '~/components/ConfirmDialogHost.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { ROLE_LABELS, type Role } from '~/utils/permissions';
@@ -342,6 +350,12 @@ const roleLabel = computed(() => ROLE_LABELS[authStore.role as Role] || authStor
 // Сессия истекла (exp или 401) — открыть форму входа (QA F71)
 watch(() => authStore.loginPrompt, () => {
   showLogin.value = true;
+});
+
+// Смена пароля (AUTH_BACKEND=pg); временный пароль от администратора — предложить сразу после входа
+const showChangePassword = ref(false);
+watch(() => authStore.mustChangePassword, (must) => {
+  if (must) showChangePassword.value = true;
 });
 
 // Роль понизили или вышли из учётной записи — окно расчёта закрывается

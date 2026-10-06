@@ -361,6 +361,7 @@
 
 <script setup lang="ts">
 import { pluralRu } from '~/utils/pluralRu'
+import { allows } from '~/utils/permissions'
 import { confirmAction } from '~/composables/useConfirm'
 import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
@@ -416,7 +417,7 @@ const draft = reactive<SelectionDraft>({
   conditions: [],
 });
 
-const canEditData = computed(() => authStore.canEditData);
+const canEditData = computed(() => authStore.canEditNetwork);
 const settersByKey = computed<Record<string, GroupSetterInfo>>(() =>
   Object.fromEntries((catalog.value?.setters || []).map((s) => [s.key, s])),
 );
@@ -467,7 +468,8 @@ const currentBbox = (): [number, number, number, number] | null => {
 
 const requestKey = () => JSON.stringify({ k: setterKey.value, v: value.value, d: { ...draft, bbox: null } });
 const previewStale = computed(() => Boolean(preview.value) && previewKey.value !== requestKey());
-const canPreview = computed(() => Boolean(setter.value) && authStore.canEdit);
+// предпросмотр — то же право, что и применение (сервер: require_roles('editor', cap='network'))
+const canPreview = computed(() => Boolean(setter.value) && allows(authStore.permissions.role, 'editor', 'network', authStore.pgUser, authStore.permissions.caps));
 
 const addCondition = () => {
   draft.conditions.push({ field: filterFieldItems.value[0]?.value || '', op: 'eq', value: null });

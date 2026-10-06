@@ -696,7 +696,7 @@ const emit = defineEmits<{
   'locate-armature': [payload: { longitude: number; latitude: number; id: number; lineId: number | null; label: string }]
 }>()
 const { isMobile } = useMobile()
-const mutationsEnabled = useMutationsEnabled()
+const mutationsEnabled = useMutationsEnabled('network')
 const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
 const emptyLookups = (): NetworkArmatureLookups => ({ states: [], purposes: [], fragments: [], counts: {}, catalog_count: 0, calculation_count: 0, damper_result_count: 0, regulating_result_count: 0, passport_asset_count: 0 })
 const visible = ref(false)

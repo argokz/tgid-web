@@ -1,4 +1,4 @@
-import type { Role } from '~/utils/permissions'
+import type { Cap, Role } from '~/utils/permissions'
 
 /**
  * Каталог инструментов, не относящихся к карте: журналы, реестры,
@@ -87,6 +87,8 @@ export interface ToolDescriptor {
   label: string
   /** Минимальная роль: пункт скрыт, если у пользователя роль ниже (utils/permissions.ts) */
   requires?: Role
+  /** Предметное право пользователя PostgreSQL вместо роли (как require_roles(cap=…) на сервере) */
+  requiresCap?: Cap
   icon: string
   color: string
   event: ToolEvent
@@ -168,8 +170,8 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     icon: 'mdi-book-open-page-variant-outline',
     color: 'teal-darken-3',
     items: [
-      { label: 'Групповые установщики', hint: 'Поле = значение для фрагмента, выделения или фильтра (aSet*)', icon: 'mdi-select-group', color: 'deep-orange-darken-2', event: 'open-group-setters', dialog: 'groupSetters', requires: 'editor' },
-      { label: 'Импорт SHP / Excel / координат', hint: 'Узлы, участки из SHP, координаты узлов: сопоставление полей, превью, отмена', icon: 'mdi-database-import', color: 'indigo-darken-2', event: 'open-network-import', dialog: 'networkImport', requires: 'editor' },
+      { label: 'Групповые установщики', hint: 'Поле = значение для фрагмента, выделения или фильтра (aSet*)', icon: 'mdi-select-group', color: 'deep-orange-darken-2', event: 'open-group-setters', dialog: 'groupSetters', requires: 'editor', requiresCap: 'network' },
+      { label: 'Импорт SHP / Excel / координат', hint: 'Узлы, участки из SHP, координаты узлов: сопоставление полей, превью, отмена', icon: 'mdi-database-import', color: 'indigo-darken-2', event: 'open-network-import', dialog: 'networkImport', requires: 'editor', requiresCap: 'network_struct' },
       { label: 'Справочники', hint: 'Удельные расходы, Kv, температуры, ГВС, организации, районы', icon: 'mdi-book-open-page-variant-outline', color: 'teal-darken-3', event: 'open-dictionaries', dialog: 'dictionaries', requires: 'editor' },
     ],
   },

@@ -674,7 +674,7 @@ const emit = defineEmits<{
   'locate-bypass': [payload: { longitude: number; latitude: number; id: number; lineId: number | null; label: string }]
 }>()
 const { isMobile } = useMobile()
-const mutationsEnabled = useMutationsEnabled()
+const mutationsEnabled = useMutationsEnabled('network')
 const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
 const emptyLookups = (): NetworkBypassLookups => ({ states: [], pipeline_signs: [], standards: [], tube_standards: [], fragments: [], counts: {}, tube_counts: {}, calculation_count: 0, result_count: 0 })
 const visible = ref(false)

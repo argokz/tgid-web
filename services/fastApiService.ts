@@ -1004,11 +1004,38 @@ export interface ReportsCatalog {
 export type UserRole = 'viewer' | 'calculator' | 'editor' | 'admin';
 
 export interface AdminUser {
-  id: number;
+  /** UsersDB — число; AUTH_BACKEND=pg — имя роли tgid_u_<логин> */
+  id: number | string;
   username: string;
   role: UserRole;
   is_active: boolean;
-  is_admin: boolean;
+  is_admin?: boolean;
+  /** AUTH_BACKEND=pg (docs/pg-auth.md) */
+  role_name?: string;
+  display_name?: string | null;
+  full_name?: string | null;
+  caps?: string[];
+  /** Фрагменты правки; [] — вся сеть */
+  fragments?: number[];
+  web_access?: boolean;
+  password_set?: boolean;
+  must_change_password?: boolean;
+  legacy_right?: number | null;
+}
+
+export interface AdminUserUpdate {
+  role?: UserRole;
+  is_active?: boolean;
+  caps?: string[];
+  fragments?: number[];
+  display_name?: string | null;
+  full_name?: string | null;
+  web_access?: boolean;
+}
+
+export interface AdminCap {
+  cap: string;
+  description: string;
 }
 
 export interface AdminUsersResponse {
@@ -1718,8 +1745,22 @@ export const fastApiService = {
     auth_disabled: boolean;
     dev_login_enabled?: boolean;
     strict_auth?: boolean;
+    /** AUTH_BACKEND=pg: профиль пользователя-роли PostgreSQL (docs/pg-auth.md) */
+    auth_backend?: string;
+    display_name?: string | null;
+    caps?: string[];
+    fragments?: number[] | null;
+    must_change_password?: boolean;
   }> {
     return request('api/v1/auth/me', mutationOptions('GET'));
+  },
+
+  /** Смена своего пароля (AUTH_BACKEND=pg): тот же пароль у веба и десктопа */
+  async changeOwnPassword(currentPassword: string, newPassword: string): Promise<{ success: boolean }> {
+    return request('api/v1/auth/password', mutationOptions('POST', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    }));
   },
 
   async getTaskStatus(taskId: string): Promise<any> {
@@ -2518,7 +2559,7 @@ export const fastApiService = {
   },
 
   /** Администрирование пользователей UsersDB (только admin) */
-  async getAdminRoles(): Promise<{ items: AdminRole[] }> {
+  async getAdminRoles(): Promise<{ items: AdminRole[]; caps?: AdminCap[]; backend?: string }> {
     return request('api/v1/admin/roles', mutationOptions('GET'));
   },
 
@@ -2530,11 +2571,11 @@ export const fastApiService = {
     return request<AdminUser>('api/v1/admin/users', mutationOptions('POST', body));
   },
 
-  async updateAdminUser(userId: number, body: { role?: UserRole; is_active?: boolean }): Promise<AdminUser> {
+  async updateAdminUser(userId: number | string, body: AdminUserUpdate): Promise<AdminUser> {
     return request<AdminUser>(`api/v1/admin/users/${encodePath(userId)}`, mutationOptions('PATCH', body));
   },
 
-  async setAdminUserPassword(userId: number, password: string): Promise<{ success: boolean; id: number }> {
+  async setAdminUserPassword(userId: number | string, password: string): Promise<{ success: boolean; id: number | string }> {
     return request(`api/v1/admin/users/${encodePath(userId)}/password`, mutationOptions('PUT', { password }));
   },
 

@@ -663,7 +663,7 @@ const emit = defineEmits<{
   'open-defect': [defectId: number]
 }>()
 const { isMobile } = useMobile()
-const mutationsEnabled = useMutationsEnabled()
+const mutationsEnabled = useMutationsEnabled('repairs')
 
 const openForm10Report = () => {
   const url = fastApiService.getFormReportUrl('f10_remont', search.value)

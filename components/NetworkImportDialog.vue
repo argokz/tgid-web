@@ -336,6 +336,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
 import { fastApiService } from '~/services/fastApiService';
 import { useAuthStore } from '~/stores/authStore';
+import { allows } from '~/utils/permissions';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { useLayerStore } from '~/stores/layerStore';
 import { useNotificationStore } from '~/stores/notificationStore';
@@ -382,7 +383,7 @@ const busy = ref<'' | 'inspect' | 'preview' | 'apply' | 'undo'>('');
 const error = ref('');
 
 const currentMode = computed(() => IMPORT_MODES.find((m) => m.value === mode.value)!);
-const canApply = computed(() => authStore.isAdmin && authStore.canEditTopology);
+const canApply = computed(() => authStore.canEditTopology);
 const needsFragment = computed(() => mode.value !== 'coords' || matchBy.value === 'code');
 const crsItems = computed(() => crsOptionsFor(inspect.value));
 const matchItems = [
@@ -398,7 +399,7 @@ const canPreview = computed(
     !!inspect.value &&
     !missing.value.length &&
     (!needsFragment.value || fileid.value != null) &&
-    authStore.canEdit,
+    allows(authStore.permissions.role, 'editor', 'network_struct', authStore.pgUser, authStore.permissions.caps),
 );
 
 const params = (): NetworkImportParams => ({

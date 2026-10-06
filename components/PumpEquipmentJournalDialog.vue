@@ -665,7 +665,7 @@ const emit = defineEmits<{
   'locate-pump': [payload: { longitude: number; latitude: number; id: number; lineId: number | null; label: string }]
 }>()
 const { isMobile } = useMobile()
-const mutationsEnabled = useMutationsEnabled()
+const mutationsEnabled = useMutationsEnabled('network')
 const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
 const emptyLookups = (): PumpEquipmentLookups => ({ states: [], drive_types: [], rotor_diameter_types: [], fragments: [], pump_types: [], counts: {}, catalog_counts: {}, calculation_count: 0, result_count: 0 })
 const visible = ref(false)

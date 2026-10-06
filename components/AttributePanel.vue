@@ -120,7 +120,7 @@
 
             <!-- Разворот меняет топологию: только в режиме редактирования сети -->
             <v-btn
-              v-if="cardLineId && isLineObject && isEditTopologyMode"
+              v-if="cardLineId && isLineObject && isEditTopologyMode && cardInTerritory"
               icon
               variant="text"
               size="small"
@@ -649,7 +649,7 @@
 
             <v-btn
 
-              v-if="isEditTopologyMode"
+              v-if="isEditTopologyMode && cardInTerritory"
 
               icon
 
@@ -1158,7 +1158,8 @@ import { useMobile } from '~/composables/useMobile'
 import { useAttributeTabs, type TabData } from '~/composables/useAttributeTabs'
 
 import { ApiError, fastApiService, type ReverseLineReport } from '~/services/fastApiService'
-import { getSectionRowId, resolveCardObject, type CardObject } from '~/utils/networkFeature'
+import { getFeatureFragmentId, getSectionRowId, resolveCardObject, type CardObject } from '~/utils/networkFeature'
+import { canEditFragment } from '~/utils/permissions'
 import { useAuthStore } from '~/stores/authStore'
 import { useNotificationStore } from '~/stores/notificationStore'
 
@@ -1302,6 +1303,10 @@ const cardNodeId = computed<number | null>(() => (isNodeObject.value ? cardObjec
 const cardRowId = computed<number | null>(() => cardObject.value.rowId)
 /** «История»: записи audit_log этой таблицы и этого id (триггеры пишут table_name в lower case) */
 const authStore = useAuthStore()
+// Территория пользователя PostgreSQL (фрагменты правки): правка чужого объекта всё равно
+// отклонится сервером («вне вашей территории») — кнопки не показываем
+const cardFragmentId = computed<number | null>(() => getFeatureFragmentId({ properties: propsData.value }))
+const cardInTerritory = computed(() => canEditFragment(authStore.permissions, cardFragmentId.value))
 const historyTarget = computed<{ table: string; recordId: number } | null>(() => {
   const { table, network, networkId, rowId } = cardObject.value
   // потребитель/источник с карты: история узла (строка роли может быть не определена)

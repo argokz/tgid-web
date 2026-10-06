@@ -413,7 +413,7 @@ const lastResult = ref<PtsPipesResult | null>(null);
 const lastUndone = ref(false);
 const fieldsCache: Partial<Record<SiteKind, CardField[]>> = {};
 
-const canEditData = computed(() => authStore.canEditData);
+const canEditData = computed(() => authStore.canEditPts);
 const groups = computed(() => groupSitesByChief(sites.value, query.value || ''));
 const pipesTotal = computed(() => sites.value.reduce((s, i) => s + (i.pipes || 0), 0));
 const sitesWithPipes = computed(() => sites.value.filter((i) => i.pipes > 0).length);
