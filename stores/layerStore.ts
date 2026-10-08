@@ -16,6 +16,7 @@ import {
 } from '~/utils/contextMapLayers';
 import { buildMvtLayerIdentifiers, buildWmsOnlyLayerIdentifiers, buildWmsRasterSourceId } from '~/utils/geoserverMvtIds';
 import { combineWithFragmentFilter, fragmentFilterFor } from '~/utils/mapFragmentFilter';
+import { combineCql } from '~/utils/nodeKindLayers';
 
 const pbfAttributeRequests = new globalThis.Map<string, Promise<string[]>>();
 
@@ -330,7 +331,7 @@ export const useLayerStore = defineStore('layer', {
             workspace: ws,
             layerName: layer.sourceLayer,
             url: baseUrl.replace(/\/$/, ''),
-            cqlFilter: cqlFilterStr
+            cqlFilter: combineCql(layer.cqlFilter, cqlFilterStr)
           });
         }
         
@@ -580,7 +581,8 @@ export const useLayerStore = defineStore('layer', {
           if (map.getLayer(lId)) map.removeLayer(lId);
         }
         const ws = layer.workspace || 'AlmatyGIS';
-        const sl = layer.sourceLayer;
+        // У слоя-фильтра (heatsources по тайлам uzel) свои источники: источники uzel не трогаем
+        const sl = layer.idSource || layer.sourceLayer;
         const vecSid = buildMvtLayerIdentifiers(ws, sl).sourceId;
         const rastSid = layer.wmsRasterSourceId || buildWmsRasterSourceId(ws, sl);
         const wmsOnly = buildWmsOnlyLayerIdentifiers(ws, sl);
@@ -1176,6 +1178,7 @@ export const useLayerStore = defineStore('layer', {
             updateWmsLayer(mapStore.map as any, sourceId, mapLayerId, {
               workspace: layer.workspace || 'AlmatyGIS',
               layerName: layer.sourceLayer,
+              cqlFilter: layer.cqlFilter,
               viewParams: {
                 viewparams: viewparams // This will be encoded in createWmsTileUrl
               } as any

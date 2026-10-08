@@ -7,6 +7,13 @@ import {
 } from '~/utils/geoserverMvtIds';
 import type { GeoCatalogLayerEntry, GeoWorkspaceCatalogEntry } from '~/utils/geoserverLayerCatalog';
 import { convertSldToMapLibre } from '~/utils/sldToMapLibre';
+import {
+  NODE_BASE_LAYER,
+  combineWithNodeCodes,
+  nodeCodesCql,
+  nodeKindCodes,
+  withCqlParam
+} from '~/utils/nodeKindLayers';
 
 /** Тестовый BBOX Web Mercator (Алматы), чтобы подставить вместо {bbox-epsg-3857}. */
 const MVT_PROBE_BBOX_3857 = '8500000,5280000,8580000,5360000';
@@ -401,8 +408,30 @@ export default defineEventHandler(async (event) => {
     );
     effective.push(...discovered);
 
+    // Источники/насосные/потребители — не слои GeoServer, а узлы uzel с кодом типа
+    // (utils/nodeKindLayers.ts); uzel тогда показывает только остальные узлы
+    const nodeKindOf = (le: EffectiveLayerEntry): string[] | null => {
+      const codes = nodeKindCodes(le.source);
+      if (!codes || discoveredCandidates.has(`${le.workspace}:${le.source}`)) return null;
+      return discoveredCandidates.has(`${le.workspace}:${NODE_BASE_LAYER}`) ? codes : null;
+    };
+    const nodeKindCodesByWorkspace = new Map<string, string[]>();
+    for (const le of effective) {
+      const codes = nodeKindOf(le);
+      if (codes) {
+        nodeKindCodesByWorkspace.set(le.workspace, [...(nodeKindCodesByWorkspace.get(le.workspace) || []), ...codes]);
+      }
+    }
+
     const buildLayer = async (le: EffectiveLayerEntry): Promise<LayerConfig | null> => {
-      const qualified = `${le.workspace}:${le.source}`;
+      const kindCodes = nodeKindOf(le);
+      const excludedCodes = le.source === NODE_BASE_LAYER ? nodeKindCodesByWorkspace.get(le.workspace) : undefined;
+      const nodeCodes = kindCodes || (excludedCodes?.length ? excludedCodes : null);
+      const excludeCodes = !kindCodes && Boolean(nodeCodes);
+      const cqlFilter = nodeCodes ? nodeCodesCql(nodeCodes, excludeCodes) : undefined;
+      // Слой GeoServer, из которого берутся тайлы (для фильтра по типу узла — uzel)
+      const tileSource = kindCodes ? NODE_BASE_LAYER : le.source;
+      const qualified = `${le.workspace}:${tileSource}`;
       const wmtsXml = wmtsByQualified.get(qualified);
       const titleFallback = wmtsXml?.['ows:Title'] || qualified;
       const label = le.label?.trim() ? le.label : String(titleFallback);
@@ -416,8 +445,16 @@ export default defineEventHandler(async (event) => {
       let mvtUrl = '';
 
       if (le.mvt && wmtsXml) {
-        mvtUrl = mvtTemplateUrl.replace('{layerName}', qualified);
-        mvtPack = await fetchMvtStylePack(le.workspace, le.source, wmtsXml, sanitizeFilterTypeCoercion);
+        const baseMvtUrl = mvtTemplateUrl.replace('{layerName}', qualified);
+        // CQL_FILTER работает у MVT через WMS GetMap; у тайлов GWC остаётся фильтр MapLibre ниже
+        mvtUrl = withCqlParam(baseMvtUrl, cqlFilter) ?? baseMvtUrl;
+        mvtPack = await fetchMvtStylePack(le.workspace, tileSource, wmtsXml, sanitizeFilterTypeCoercion);
+        if (mvtPack && nodeCodes) {
+          mvtPack.mbLayers = mvtPack.mbLayers.map((l: any) => ({
+            ...l,
+            filter: combineWithNodeCodes(l.filter, nodeCodes, excludeCodes)
+          }));
+        }
         if (mvtPack && mvtProbeTiles) {
           const ok = await verifyMvtTileUrl(mvtUrl);
           if (!ok) {
@@ -447,7 +484,9 @@ export default defineEventHandler(async (event) => {
           displayName: label,
           sourceId: ids.sourceId,
           layerId: ids.layerId,
-          sourceLayer: le.source,
+          sourceLayer: tileSource,
+          idSource: kindCodes ? le.source : undefined,
+          cqlFilter,
           workspace: le.workspace,
           workspaceBaseUrl: le.workspaceBaseUrl,
           type: 'line',
@@ -474,7 +513,9 @@ export default defineEventHandler(async (event) => {
         displayName: label,
         sourceId: ids.sourceId,
         layerId: ids.layerId,
-        sourceLayer: le.source,
+        sourceLayer: tileSource,
+        idSource: kindCodes ? le.source : undefined,
+        cqlFilter,
         workspace: le.workspace,
         workspaceBaseUrl: le.workspaceBaseUrl,
         type: mvtPack.type,

@@ -1473,7 +1473,9 @@ export const useMapStore = defineStore('map', {
             type: String(feature.layer.type || '')
           }
         : null;
-      const fallbackId = properties.id ?? properties.ID ?? properties.fileid ?? feature?.id;
+      // У узлов uzel в тайле нет properties.id — ключ объекта это id тайла; fileid (фрагмент)
+      // общий у соседних узлов и раньше склеивал их в одну строку выбора
+      const fallbackId = properties.id ?? properties.ID ?? feature?.id ?? properties.fileid;
 
       // Preserve the raw tile/WMS feature ID (e.g. 13587 or "heatpipesections.13587")
       // separately so WFS lookup can use it instead of an unrelated properties.id field.
@@ -1503,7 +1505,7 @@ export const useMapStore = defineStore('map', {
         || properties.__layerId
         || 'unknown-layer'
       );
-      const featureId = properties.id ?? properties.ID ?? feature?.id ?? properties.fileid;
+      const featureId = properties.id ?? properties.ID ?? feature?._sourceId ?? feature?.id ?? properties.fileid;
 
       if (featureId !== undefined && featureId !== null && String(featureId).length > 0) {
         return `${sourceType}|${workspace}|${sourceLayer}|${String(featureId)}`;

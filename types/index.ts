@@ -5,6 +5,13 @@ export interface LayerConfig {
   sourceId: string;
   layerId: string;
   sourceLayer: string;
+  /**
+   * Имя для идентификаторов источника, если слой — фильтр другого слоя GeoServer
+   * (heatsources → тайлы uzel с кодом IS, utils/nodeKindLayers.ts); иначе — sourceLayer.
+   */
+  idSource?: string;
+  /** Постоянный CQL_FILTER слоя для WMS (тип узла), объединяется с фильтром фрагментов */
+  cqlFilter?: string;
   layerName?: string;
   type: 'symbol' | 'line' | 'circle' | 'fill' | 'image';
   url?: string;
