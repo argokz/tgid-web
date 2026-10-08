@@ -608,6 +608,22 @@ export const useLayerStore = defineStore('layer', {
         return this.layerAttributes[layer.layerId];
       }
 
+      // Растровый WMS объектов не отдаёт — ждать нечего
+      if (layer.renderFormat === 'wms') return [];
+
+      // Слой по типу узла (heatsources…) — те же тайлы uzel: поля берём у него
+      const sameTiles = this.geoServerLayers.find((l) =>
+        l.layerId !== layer.layerId
+        && l.workspace === layer.workspace
+        && l.sourceLayer === layer.sourceLayer
+        && (this.layerAttributes[l.layerId]?.length ?? 0) > 0
+      );
+      if (sameTiles) {
+        this.layerAttributes[layer.layerId] = [...this.layerAttributes[sameTiles.layerId]];
+        this.saveLayerAttributes();
+        return this.layerAttributes[layer.layerId];
+      }
+
       const inFlight = pbfAttributeRequests.get(layer.layerId);
       if (inFlight) {
         return inFlight;
@@ -673,7 +689,9 @@ export const useLayerStore = defineStore('layer', {
           if (checkFeatures()) return;
 
           if (attempt >= 20) {
-            console.warn(`Timeout waiting for features in layer ${layer.layerId}`);
+            // Не ошибка: узлы рисуются только на крупном масштабе (стиль uzel до 1:3000),
+            // на обзорном масштабе объектов в кадре нет
+            if (import.meta.dev) console.debug(`[layerStore] No features in view for ${layer.layerId}, attributes not discovered`);
             if (!this.layerAttributes[layer.layerId]) {
               this.layerAttributes[layer.layerId] = [];
               this.saveLayerAttributes();
