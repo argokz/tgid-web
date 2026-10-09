@@ -37,7 +37,7 @@
 
           <div
             class="d-flex align-center"
-            style="gap: 12px; min-width: 0; flex: 1;"
+            style="gap: 12px; min-width: 200px; flex: 1 1 200px;"
           >
 
             <v-avatar
@@ -71,9 +71,10 @@
 
           </div>
 
+          <!-- у участка до 14 кнопок: переносятся, а не сжимают заголовок в столбик -->
           <div
-            class="d-flex align-center"
-            style="gap: 4px; flex-shrink: 0;"
+            class="d-flex align-center flex-wrap justify-end"
+            style="gap: 4px; flex: 0 1 auto; min-width: 0;"
           >
 
             <v-btn

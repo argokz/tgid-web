@@ -1,0 +1,38 @@
+{
+  "comment": "Подложка Астаны из базы astana (выгрузка ArcGIS, SRID 0, местная система Астаны = EPSG:9995 в GeoServer). Astana1 — карта города, Astana2 — схема тепловых сетей (аналоги Almaty1/Almaty2).",
+  "postgres": { "host": "localhost", "port": 5440, "database": "astana", "schema": "public", "user": "postgres" },
+  "namesFile": "../../../gid6/gidr/kls/Astana.txt2",
+  "srid": 9995,
+  "proj4": "+proj=tmerc +lat_0=0 +lon_0=72 +k=1 +x_0=40406 +y_0=-5671186 +ellps=krass +towgs84=24,-121,-76,0,0,0,0 +units=m +no_defs",
+  "nativeBoundingBox": [-25000, -25000, 25000, 22000],
+  "latLonBoundingBox": [71.05, 50.94, 71.79, 51.37],
+  "workspaces": [
+    {
+      "name": "Astana1",
+      "title": "Карта города (Астана)",
+      "layers": [
+        { "table": "reka", "title": "Реки", "style": { "kind": "polygon", "fill": "#aad3df", "stroke": "#7fb3c5", "width": 0.5 } },
+        { "table": "zdaniya", "title": "Здания", "style": { "kind": "polygon", "fill": "#e6e1d8", "stroke": "#b3aa9b", "width": 0.5, "maxScale": 40000 } },
+        { "table": "most", "title": "Мосты", "style": { "kind": "polygon", "fill": "#d9d9d9", "stroke": "#8c8c8c", "width": 0.6 } },
+        { "table": "ulitsy", "title": "Улицы (границы)", "style": { "kind": "line", "stroke": "#a8a8a8", "width": 0.8, "maxScale": 40000 } },
+        { "table": "zheleznaya_doroga", "title": "Железная дорога", "style": { "kind": "line", "stroke": "#555555", "width": 1.5, "dash": "6 3" } },
+        { "table": "nazvanie_ulitsy", "title": "Названия улиц", "style": { "kind": "label", "field": "text", "placement": "line", "size": 11, "color": "#444444", "maxScale": 10000 } }
+      ]
+    },
+    {
+      "name": "Astana2",
+      "title": "Схема тепловых сетей (Астана)",
+      "layers": [
+        { "table": "truboprovody", "title": "Трубопроводы теплоснабжения", "style": { "kind": "line", "stroke": "#d7301f", "width": 1.2 } },
+        { "table": "proektiruemyy_truboprovod", "title": "Проектируемые трубопроводы", "style": { "kind": "line", "stroke": "#fd8d3c", "width": 1, "dash": "4 3" } },
+        { "table": "teplovye_kamery__pavilony", "title": "Тепловые камеры, павильоны", "style": { "kind": "polygon", "fill": "#fcbba1", "stroke": "#a50f15", "width": 0.6, "maxScale": 20000 } },
+        { "table": "istochniki_teplosnabzheniya", "title": "Источники теплоснабжения", "style": { "kind": "polygon", "fill": "#cb181d", "fillOpacity": 0.7, "stroke": "#67000d", "width": 1 } },
+        { "table": "nasosnye_stantsii", "title": "Насосные станции", "style": { "kind": "polygon", "fill": "#2171b5", "fillOpacity": 0.7, "stroke": "#08306b", "width": 1 } },
+        { "table": "tstrp", "title": "ЦТП", "style": { "kind": "polygon", "fill": "#6a51a3", "fillOpacity": 0.7, "stroke": "#3f007d", "width": 1 } },
+        { "table": "kolodtsy", "title": "Колодцы", "style": { "kind": "point", "fill": "#636363", "size": 5, "maxScale": 5000 } },
+        { "table": "nadpis_ut", "title": "Надписи участков", "style": { "kind": "label", "field": "text", "size": 10, "color": "#7f0000", "maxScale": 5000 } },
+        { "table": "diametr_2", "title": "Диаметры", "style": { "kind": "label", "field": "text", "size": 9, "color": "#08519c", "maxScale": 3000 } }
+      ]
+    }
+  ]
+}

@@ -17,11 +17,10 @@ export interface NominatimResult {
   icon?: string
 }
 
-/** Охват Алматы [minLon, minLat, maxLon, maxLat] — поиск адреса по умолчанию только в городе (QA F25) */
-export const ALMATY_BBOX: [number, number, number, number] = [76.70, 43.05, 77.25, 43.45]
+import { getCityConfig, type LonLatBBox } from '~/utils/cityConfig'
 
-/** URL поиска Nominatim, ограниченный охватом (viewbox + bounded=1) */
-export const nominatimSearchUrl = (query: string, bbox: [number, number, number, number] = ALMATY_BBOX): string =>
+/** URL поиска Nominatim, ограниченный охватом (viewbox + bounded=1); по умолчанию — охват города стенда (QA F25) */
+export const nominatimSearchUrl = (query: string, bbox: LonLatBBox = getCityConfig().bbox): string =>
   `https://nominatim.openstreetmap.org/search?` +
   `format=json&` +
   `q=${encodeURIComponent(query)}&` +
@@ -32,7 +31,7 @@ export const nominatimSearchUrl = (query: string, bbox: [number, number, number,
   `bounded=1`
 
 export const useNominatim = () => {
-  const searchAddress = async (query: string, bbox: [number, number, number, number] = ALMATY_BBOX): Promise<NominatimResult[]> => {
+  const searchAddress = async (query: string, bbox: LonLatBBox = getCityConfig().bbox): Promise<NominatimResult[]> => {
     if (typeof window === 'undefined') return []
     if (!query || query.trim().length < 3) return []
 

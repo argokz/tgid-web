@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ALMATY_BBOX, nominatimSearchUrl } from '~/composables/useNominatim'
+import { nominatimSearchUrl } from '~/composables/useNominatim'
+import { ALMATY_BBOX } from '~/utils/cityConfig'
 
 describe('поиск адреса ограничен Алматы (QA F25)', () => {
   it('viewbox Алматы и bounded=1', () => {

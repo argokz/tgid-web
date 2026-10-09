@@ -156,6 +156,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import type { CSSProperties } from 'vue'
 import { useMapStore } from '~/stores/mapStore'
 import { describeMenuFeature } from '~/utils/networkFeature'
+import { getCityConfig } from '~/utils/cityConfig'
 
 const mapStore = useMapStore()
 
@@ -234,7 +235,7 @@ const groupedFeatures = computed(() => {
 
   mapStore.potentialFeatures.forEach((feature, index) => {
     const p = feature.properties || {}
-    const workspaceId = feature.workspace || p.__workspaceId || 'AlmatyGIS'
+    const workspaceId = feature.workspace || p.__workspaceId || getCityConfig().workspace
     const workspaceName = feature.workspaceName || p.__workspaceName || workspaceId
     const key = `${workspaceId}__${workspaceName}`
 

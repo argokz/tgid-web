@@ -658,6 +658,7 @@ import type { Map } from 'maplibre-gl'
 import type { NominatimResult } from '~/composables/useNominatim'
 
 import { useNominatim } from '~/composables/useNominatim'
+import { getCityConfig } from '~/utils/cityConfig'
 
 import { useBaseLayers } from '~/composables/useBaseLayers'
 
@@ -848,7 +849,7 @@ const goHome = () => {
 
   if (!props.map) return
 
-  props.map.flyTo({ center: [76.92, 43.26], zoom: 11, duration: 2000, essential: true })
+  props.map.flyTo({ center: getCityConfig().center, zoom: 11, duration: 2000, essential: true })
 
 }
 

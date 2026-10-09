@@ -14,14 +14,19 @@ import {
   nodeKindCodes,
   withCqlParam
 } from '~/utils/nodeKindLayers';
+import { readCityConfig } from '~/utils/cityConfig';
 
-/** Тестовый BBOX Web Mercator (Алматы), чтобы подставить вместо {bbox-epsg-3857}. */
-const MVT_PROBE_BBOX_3857 = '8500000,5280000,8580000,5360000';
+/** Тестовый BBOX Web Mercator (±40 км от центра города), чтобы подставить вместо {bbox-epsg-3857}. */
+function mvtProbeBbox3857([lon, lat]: [number, number]): string {
+  const x = lon * 20037508.34 / 180;
+  const y = Math.log(Math.tan((90 + lat) * Math.PI / 360)) * 6378137;
+  return [x - 40000, y - 40000, x + 40000, y + 40000].map((v) => Math.round(v)).join(',');
+}
 
-async function verifyMvtTileUrl(urlTemplate: string): Promise<boolean> {
+async function verifyMvtTileUrl(urlTemplate: string, center: [number, number]): Promise<boolean> {
   let url = urlTemplate;
   if (url.includes('{bbox-epsg-3857}')) {
-    url = url.replace('{bbox-epsg-3857}', MVT_PROBE_BBOX_3857);
+    url = url.replace('{bbox-epsg-3857}', mvtProbeBbox3857(center));
   }
   try {
     const buf = await $fetch<ArrayBuffer>(url, {
@@ -456,7 +461,7 @@ export default defineEventHandler(async (event) => {
           }));
         }
         if (mvtPack && mvtProbeTiles) {
-          const ok = await verifyMvtTileUrl(mvtUrl);
+          const ok = await verifyMvtTileUrl(mvtUrl, readCityConfig(runtimeConfig.public as any).center);
           if (!ok) {
             console.warn(`[GEO] MVT probe failed for ${qualified}, откат к WMS если доступен`);
             mvtPack = null;

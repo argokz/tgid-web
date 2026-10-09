@@ -56,6 +56,8 @@ export const useGeoServer = () => {
           groupName: ws.groupName
         }
       }
+      // Workspace вне каталога (автообнаружение: Almaty2, Astana1/2) — тот же GeoServer
+      return { ...getActiveWorkspace(), workspace: workspaceId, groupName: workspaceId }
     }
     return getActiveWorkspace()
   }

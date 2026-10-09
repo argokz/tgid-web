@@ -3,6 +3,7 @@ import { fastApiService } from '~/services/fastApiService';
 import type { Fragment } from '~/types';
 import { useLayerStore } from './layerStore';
 import { useMapStore } from './mapStore';
+import { getCityConfig } from '~/utils/cityConfig';
 
 export const useFragmentStore = defineStore('fragment', {
   state: () => ({
@@ -28,8 +29,10 @@ export const useFragmentStore = defineStore('fragment', {
   actions: {
     async loadFragments() {
       try {
-        // Fetch from GeoServer WFS as requested by user
-        const url = 'https://itwin.kz/geoserver/AlmatyGIS/ows?service=WFS&version=1.1.0&request=GetFeature&typeName=AlmatyGIS:fragments&outputFormat=application/json';
+        // Fetch from GeoServer WFS as requested by user (workspace схемы ТГИД города — utils/cityConfig.ts)
+        const { workspace } = getCityConfig();
+        const gsUrl = String((useRuntimeConfig().public as any)?.geoserver?.url || 'https://itwin.kz/geoserver').replace(/\/$/, '');
+        const url = `${gsUrl}/${workspace}/ows?service=WFS&version=1.1.0&request=GetFeature&typeName=${workspace}:fragments&outputFormat=application/json`;
         const response: any = await $fetch(url);
         
         if (response && response.features) {

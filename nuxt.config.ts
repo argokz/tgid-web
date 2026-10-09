@@ -90,6 +90,9 @@ export default defineNuxtConfig({
       visicomAttribution:
         process.env.NUXT_PUBLIC_VISICOM_ATTRIBUTION || env.NUXT_PUBLIC_VISICOM_ATTRIBUTION || '',
       visicomMaxZoom: process.env.NUXT_PUBLIC_VISICOM_MAX_ZOOM || env.NUXT_PUBLIC_VISICOM_MAX_ZOOM || '',
+      // Город стенда (utils/cityConfig.ts): охват "minLon,minLat,maxLon,maxLat" и центр "lon,lat"; пусто — Алматы
+      cityBbox: process.env.NUXT_PUBLIC_CITY_BBOX || env.NUXT_PUBLIC_CITY_BBOX || '',
+      mapCenter: process.env.NUXT_PUBLIC_MAP_CENTER || env.NUXT_PUBLIC_MAP_CENTER || '',
       geoserver: {
         url:
           process.env.NUXT_PUBLIC_GEOSERVER_URL ||

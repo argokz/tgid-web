@@ -16,6 +16,7 @@ import { useLabelStore, TECHNICAL_LABELS } from '~/stores/labelStore';
 import { usePopupStore } from '~/stores/popupStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { escapeHtml } from '~/utils/escapeHtml';
+import { getCityConfig } from '~/utils/cityConfig';
 import { BUILDING_CARD_TABLES, QUERY_LAYER_KEY_TABLE, mergeQueryLayerProperties } from '~/utils/networkFeature';
 import {
   getMapTilerGlyphsUrl,
@@ -212,7 +213,7 @@ export const useMapStore = defineStore('map', {
           layers: [],
           glyphs: getMapTilerGlyphsUrl()
         } as StyleSpecification,
-        center: [76.946, 43.222],
+        center: getCityConfig().center,
         zoom: 12,
         transformRequest: (url, resourceType) => {
           if (resourceType === 'Tile' || resourceType === 'Source') {
@@ -983,6 +984,8 @@ export const useMapStore = defineStore('map', {
         // 2. Prefix of the feature ID (e.g. "heatpipesections" from "heatpipesections.13587")
         // 3. sourceLayer / layer-id keyword analysis (MVT fallback)
         let table = '';
+        // Workspace query-слоя: у подложки (Almaty2, Astana1/2) карточка — id_<таблица> своего workspace
+        let queryWorkspace: string | undefined;
         // FID/слой query-слоя id_<table>: число — id строки этой таблицы, а не ключ объекта сети
         let idFromQueryLayer = /^id_/i.test(String(rawSourceId ?? ''))
           || /(^|:)id_/i.test(String(normalizedFeature.sourceLayer ?? ''));
@@ -1001,8 +1004,22 @@ export const useMapStore = defineStore('map', {
               table = table.slice(3);
               idFromQueryLayer = true;
             }
+          } else if ((() => {
+            // Priority 3a: query-слой id_<таблица> из конфига слоя (подложка: tr_tep, truboprovody…)
+            const styleLayerId = String(normalizedFeature.layer?.id || '');
+            const layerConfig = styleLayerId
+              ? useLayerStore().geoServerLayers.find((l) =>
+                styleLayerId === l.layerId || styleLayerId.startsWith(`${l.layerId}-`))
+              : undefined;
+            const queryLayer = String((layerConfig as any)?.queryLayerName || '');
+            if (!/^id_/i.test(queryLayer)) return false;
+            table = queryLayer.slice(3).toLowerCase();
+            queryWorkspace = layerConfig?.workspace;
+            return true;
+          })()) {
+            // таблица и workspace взяты из query-слоя
           } else {
-            // Priority 3: sourceLayer keyword analysis (MVT tiles)
+            // Priority 3b: sourceLayer keyword analysis (MVT tiles)
             const sourceLayer = String(
               normalizedFeature.sourceLayer
               || normalizedFeature.layer?.['source-layer']
@@ -1052,7 +1069,7 @@ export const useMapStore = defineStore('map', {
 
         // Fetch full payload via WFS if possible
         if (table && lookupId !== null) {
-          const wfsData = await getFeatureById(table, lookupId);
+          const wfsData = await getFeatureById(table, lookupId, queryWorkspace);
           if (wfsData && wfsData.properties) {
             properties = mergeQueryLayerProperties(properties, wfsData.properties, table, lookupId);
             if (import.meta.dev) console.debug('[Select] Augmented selection via WFS table:', table, 'id:', wfsId);

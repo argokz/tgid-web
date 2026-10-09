@@ -208,6 +208,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, computed } from 'vue'
 import { useMobile } from '~/composables/useMobile'
+import { getCityConfig } from '~/utils/cityConfig'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 
 interface Props {
@@ -348,7 +349,7 @@ const loadNodes = async () => {
   if (searchAbortController) searchAbortController.abort()
   searchAbortController = new AbortController()
   try {
-    const workspace = 'AlmatyGIS'
+    const workspace = getCityConfig().workspace
     const url = `${baseUrl}/${workspace}/ows?service=WFS&version=1.1.0&request=GetFeature` +
       `&typeName=${workspace}:find_node&outputFormat=application/json` +
       `&viewparams=${encodeURIComponent(`text:${searchText.value.trim()}`)}`
@@ -391,7 +392,7 @@ const getNodeGeometry = async (nodeId: string) => {
   try {
     if (geometryAbortController) geometryAbortController.abort()
     geometryAbortController = new AbortController()
-    const workspace = 'AlmatyGIS'
+    const workspace = getCityConfig().workspace
     const url = `${baseUrl}/${workspace}/ows?service=WFS&version=1.1.0&request=GetFeature` +
       `&typeName=${workspace}:id_nodes&viewparams=id:${nodeId}&outputFormat=application/json`
 

@@ -4,6 +4,7 @@
  *   http-подложки без CORS заменяются на растровую MapTiler/OSM);
  * - сеть — WMS GetMap GeoServer по видимым слоям (тот же слой, что MVT/WMS в 2D), с фильтром фрагментов.
  */
+import { getCityConfig } from '~/utils/cityConfig'
 
 export interface BaseLayerLike {
   id: string
@@ -75,11 +76,13 @@ export function buildNetworkWmsOverlays(
     })
 }
 
-/** Маленький GetMap по центру Алматы: отличает рабочий слой (картинка) от ошибки GeoServer (XML) */
-export function buildWmsProbeUrl(overlay: Cesium3dWmsOverlay): string {
+/** Маленький GetMap по центру города: отличает рабочий слой (картинка) от ошибки GeoServer (XML) */
+export function buildWmsProbeUrl(overlay: Cesium3dWmsOverlay, center: [number, number] = getCityConfig().center): string {
+  const [lon, lat] = center
+  const bbox = [lon - 0.03, lat - 0.03, lon + 0.03, lat + 0.03].map((v) => v.toFixed(4)).join(',')
   const params = [
     'SERVICE=WMS', 'VERSION=1.1.1', 'REQUEST=GetMap', `LAYERS=${encodeURIComponent(overlay.layers)}`, 'STYLES=',
-    'SRS=EPSG:4326', 'BBOX=76.90,43.20,76.96,43.26', 'WIDTH=8', 'HEIGHT=8', 'FORMAT=image/png', 'TRANSPARENT=true'
+    'SRS=EPSG:4326', `BBOX=${bbox}`, 'WIDTH=8', 'HEIGHT=8', 'FORMAT=image/png', 'TRANSPARENT=true'
   ]
   if (overlay.cqlFilter) params.push(`CQL_FILTER=${encodeURIComponent(overlay.cqlFilter)}`)
   return `${overlay.url}?${params.join('&')}`
