@@ -28,7 +28,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 import xml.etree.ElementTree as ET
 
@@ -55,28 +54,45 @@ def eq(field: str, value: int) -> list:
     return ['==', field, str(value)]
 
 
+def stops(*pairs: tuple[float, float], k: float = 1) -> dict:
+    """Значение по зуму (функция MBStyle с stops — её понимают и MapLibre, и GeoServer)"""
+    return {'stops': [[z, round(v * k, 2)] for z, v in pairs]}
+
+
+# Ширина и разнос подачи/обратки по зуму. Магистрали видны с обзора города (9), распределительные
+# сети — с 12: на обзоре они сливаются в сплошную заливку. До 12–13 разноса нет, линии одна поверх
+# другой (сверху подача), дальше расходятся, как в программе.
+MAG_MINZOOM, DIST_MINZOOM = 9, 12
+MAG_WIDTH = ((9, 1), (12, 1.6), (14, 2.4), (16, 3), (18, 4), (20, 5))
+MAG_OFFSET = ((9, 0), (12, 0.4), (14, 1.4), (16, 2), (18, 2.6), (20, 3.2))
+DIST_WIDTH = ((12, 0.5), (14, 0.9), (16, 1.2), (18, 1.7), (20, 2.4))
+DIST_OFFSET = ((12, 0), (13, 0.3), (15, 0.9), (17, 1.3), (20, 1.9))
+DIST_OPACITY = ((12, 0.55), (14, 0.9), (15, 1))
+
+
 def build_style(label_layers: list[dict]) -> dict:
     layers: list[dict] = [{
         'id': 'Выделенные (warning=1)',
         'type': 'line',
         'source': 'pipelines',
         'source-layer': 'heatpipesections',
-        'minzoom': 9,
+        'minzoom': MAG_MINZOOM,
         'filter': eq('warning', 1),
         'layout': {'line-cap': 'round', 'line-join': 'round'},
-        'paint': {'line-color': '#ffff00', 'line-width': 7},
+        'paint': {'line-color': '#ffff00', 'line-width': stops((9, 3), (14, 6), (18, 9))},
     }]
     for side, closed, name, color, sign in (('obr', 'zakr_o', 'Обратка', RETURN, 1),
                                             ('pod', 'zakr_p', 'Подача', SUPPLY, -1)):
         for mag in (0, 1):
             for nadz in (0, 1):
                 for zakr in (0, 1):
-                    width = 3 if mag else 1
                     paint: dict = {
                         'line-color': CLOSED if zakr else color,
-                        'line-width': width,
-                        'line-offset': sign * (2 if mag else 1.5),
+                        'line-width': stops(*(MAG_WIDTH if mag else DIST_WIDTH)),
+                        'line-offset': stops(*(MAG_OFFSET if mag else DIST_OFFSET), k=sign),
                     }
+                    if not mag:
+                        paint['line-opacity'] = stops(*DIST_OPACITY)
                     if nadz:
                         paint['line-dasharray'] = [2, 1] if mag else [3, 2]
                     title = ' '.join(filter(None, [
@@ -90,7 +106,7 @@ def build_style(label_layers: list[dict]) -> dict:
                         'type': 'line',
                         'source': 'pipelines',
                         'source-layer': 'heatpipesections',
-                        'minzoom': 9,
+                        'minzoom': MAG_MINZOOM if mag else DIST_MINZOOM,
                         'filter': ['all', eq(side, 1), eq('mag_gid', mag), eq('nadz_gid', nadz), eq(closed, zakr)],
                         'layout': {'line-cap': 'butt', 'line-join': 'round'},
                         'paint': paint,
@@ -113,14 +129,150 @@ def put_featuretype(gs: Gs, path: str, ft: ET.Element):
     gs.post_xml(path, ft, method='PUT')
 
 
-TK_SVG = """<?xml version="1.0" encoding="UTF-8"?>
-<!-- Узел с внутренней схемой: квадрат, круг и задвижка (gid8 gidview/primdrawnode.h picKAM) -->
-<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="-50 -50 100 100">
-  <rect x="-33" y="-33" width="66" height="66" fill="white" stroke="black" stroke-width="4"/>
-  <circle cx="0" cy="0" r="33" fill="white" stroke="black" stroke-width="4"/>
-  <polygon points="27,20 27,-20 -27,20 -27,-20" fill="black"/>
-</svg>
-"""
+# Значки узлов: квадрат 100×100 без пустых полей, обводка толще — при 8–12 px контур ещё читается.
+# Форма — как у знаков десктопа (gid8 gidview/primdrawnode.h). Растр веба — по width/height файла,
+# поэтому у всех файлов 100×100: тогда размер в SLD = размер значка в пикселях.
+def _svg(body: str, comment: str) -> str:
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            f'<!-- {comment} (gid_desktop_style.py) -->\n'
+            '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="-50 -50 100 100">\n'
+            f'{body}\n</svg>\n')
+
+
+NODE_SVGS = {
+    'us.svg': _svg('  <circle r="38" fill="white" stroke="black" stroke-width="12"/>', 'Узел'),
+    'pr.svg': _svg('  <circle r="40" fill="white" stroke="black" stroke-width="10"/>\n'
+                   '  <circle r="17" fill="black"/>', 'Потребитель (зависимая схема)'),
+    'el.svg': _svg('  <polygon points="-6,0 46,-30 46,30" fill="white" stroke="black" stroke-width="8"'
+                   ' stroke-linejoin="round"/>\n'
+                   '  <circle cx="-14" r="30" fill="white" stroke="black" stroke-width="10"/>\n'
+                   '  <circle cx="-14" r="11" fill="black"/>', 'Потребитель с элеватором'),
+    'nz.svg': _svg('  <rect x="-38" y="-38" width="76" height="76" fill="white" stroke="black" stroke-width="10"/>\n'
+                   '  <circle r="14" fill="black"/>', 'Потребитель (независимая схема)'),
+    'po.svg': _svg('  <circle r="40" fill="white" stroke="black" stroke-width="9"/>\n'
+                   '  <circle r="18" fill="white" stroke="black" stroke-width="9"/>', 'Обобщённый потребитель'),
+    'is.svg': _svg('  <polygon points="44,44 44,-6 30,-6 16,-26 2,-26 -10,-6 -18,-6 -18,-46 -34,-46 -34,-6 -44,-6 -44,44"'
+                   ' fill="#ffe0e0" stroke="#7f0000" stroke-width="7" stroke-linejoin="round"/>\n'
+                   '  <circle cx="0" cy="20" r="10" fill="#7f0000"/>', 'Источник тепла'),
+    'ns.svg': _svg('  <rect x="-42" y="-42" width="84" height="84" fill="white" stroke="black" stroke-width="8"/>\n'
+                   '  <circle r="36" fill="white" stroke="black" stroke-width="8"/>\n'
+                   '  <polygon points="34,0 -18,-30 -18,30" fill="black"/>', 'Насосная станция'),
+    'tk.svg': _svg('  <rect x="-42" y="-42" width="84" height="84" fill="white" stroke="black" stroke-width="8"/>\n'
+                   '  <circle r="40" fill="white" stroke="black" stroke-width="7"/>\n'
+                   '  <polygon points="32,24 32,-24 -32,24 -32,-24" fill="black"/>',
+                   'Узел с внутренней схемой: камера, ЦТРП, павильон (picKAM)'),
+}
+
+# Размер значка (px) по зуму: с какого зума категория видна и как растёт (шаг ~2 px на уровень,
+# без скачков). Источники и насосные видны на обзоре города, камеры/ЦТРП — с района, потребители —
+# с квартала, проходные узлы — с улицы. Последнее значение действует и дальше.
+NODE_ZOOMS = list(range(11, 20))
+NODE_MINZOOM = 9
+NODE_SIZES = {
+    #     11  12  13  14  15  16  17  18  19+
+    'IS': (16, 18, 20, 22, 24, 26, 28, 30, 32),
+    'NS': (12, 14, 16, 18, 20, 22, 24, 26, 28),
+    'TK': (0, 0, 10, 12, 14, 16, 18, 21, 24),
+    'PR': (0, 0, 0, 8, 10, 12, 14, 17, 20),
+    'EL': (0, 0, 0, 8, 10, 12, 14, 17, 20),
+    'NZ': (0, 0, 0, 8, 10, 12, 14, 17, 20),
+    'PO': (0, 0, 0, 8, 10, 12, 14, 17, 20),
+    'US': (0, 0, 0, 0, 6, 7, 9, 12, 15),
+}
+NODE_ICONS = {'IS': 'is', 'NS': 'ns', 'TK': 'tk', 'PR': 'pr', 'EL': 'el', 'NZ': 'nz', 'PO': 'po', 'US': 'us'}
+CONSUMERS = ('PR', 'EL', 'NZ', 'PO', 'US')
+# Подписи: (коды, с какого зума, до какого, шрифт, жирный, поле). На крупном масштабе у узла под
+# названием — результаты расчёта (поле text), как в Алматы. Веб уменьшает шрифт стилей на 20%
+# (services/mapService.ts), на экране 15 → 12 px, 13 → 10,4 px.
+NODE_LABELS = [
+    (('IS',), 12, None, 15, True, 'name'),
+    (('NS',), 14, None, 14, True, 'name'),
+    (('TK',), 15, None, 13, False, 'name'),
+    (CONSUMERS, 17, 18, 13, False, 'name'),
+    (CONSUMERS, 18, None, 14, False, 'name+text'),
+]
+SCALE_AT_ZOOM_ZERO = 559082264.0287178  # как в utils/sldToMapLibre.ts: правила SLD → minzoom/maxzoom
+
+
+def _scale(zoom: float) -> str:
+    return f'{SCALE_AT_ZOOM_ZERO / 2 ** zoom:.2f}'
+
+
+def _scale_range(zmin: float, zmax: float | None) -> str:
+    out = f'<se:MaxScaleDenominator>{_scale(zmin)}</se:MaxScaleDenominator>'
+    if zmax is not None:
+        out = f'<se:MinScaleDenominator>{_scale(zmax)}</se:MinScaleDenominator>' + out
+    return out
+
+
+def _code_filter(codes: tuple[str, ...]) -> str:
+    eqs = ''.join(f'<ogc:PropertyIsEqualTo><ogc:PropertyName>code</ogc:PropertyName>'
+                  f'<ogc:Literal>{c}</ogc:Literal></ogc:PropertyIsEqualTo>' for c in codes)
+    return f'<ogc:Filter>{eqs if len(codes) == 1 else f"<ogc:Or>{eqs}</ogc:Or>"}</ogc:Filter>'
+
+
+NEWLINE_LITERAL = '<ogc:Literal><![CDATA[\n]]></ogc:Literal>'
+
+
+def build_uzel_sld() -> str:
+    rules: list[str] = []
+    for code, sizes in NODE_SIZES.items():
+        # соседние зумы с одинаковым размером — одно правило
+        spans: list[list] = []
+        for zoom, size in zip(NODE_ZOOMS, sizes):
+            if spans and spans[-1][2] == size:
+                spans[-1][1] = zoom + 1
+            else:
+                spans.append([zoom, zoom + 1, size])
+        spans[-1][1] = None
+        if spans[0][2]:
+            spans[0][0] = NODE_MINZOOM  # видна с обзора города — и при отдалении
+        for zmin, zmax, size in spans:
+            if not size:
+                continue
+            rules.append(
+                f'<se:Rule><se:Name>{code} {zmin}</se:Name>{_code_filter((code,))}{_scale_range(zmin, zmax)}'
+                '<se:PointSymbolizer uom="http://www.opengeospatial.org/se/units/pixel"><se:Graphic>'
+                f'<se:ExternalGraphic><se:OnlineResource xlink:type="simple" xlink:href="svg/{NODE_ICONS[code]}.svg"/>'
+                f'<se:Format>image/svg+xml</se:Format></se:ExternalGraphic><se:Size>{size}</se:Size>'
+                '</se:Graphic></se:PointSymbolizer></se:Rule>')
+    for codes, zmin, zmax, font, bold, field in NODE_LABELS:
+        size = max(NODE_SIZES[c][min(zmin, 19) - 11] for c in codes) or 10
+        if field == 'name':
+            label = '<ogc:PropertyName>name</ogc:PropertyName>'
+        else:
+            label = ('<ogc:Function name="Concatenate"><ogc:PropertyName>name</ogc:PropertyName>'
+                     f'{NEWLINE_LITERAL}<ogc:PropertyName>text</ogc:PropertyName></ogc:Function>')
+        weight = '<se:SvgParameter name="font-weight">bold</se:SvgParameter>' if bold else ''
+        rules.append(
+            f'<se:Rule><se:Name>Подпись {",".join(codes)} {zmin}</se:Name>{_code_filter(codes)}{_scale_range(zmin, zmax)}'
+            f'<se:TextSymbolizer uom="http://www.opengeospatial.org/se/units/pixel"><se:Label>{label}</se:Label>'
+            f'<se:Font><se:SvgParameter name="font-family">Arial, sans-serif</se:SvgParameter>'
+            f'<se:SvgParameter name="font-size">{font}</se:SvgParameter>{weight}</se:Font>'
+            '<se:LabelPlacement><se:PointPlacement><se:AnchorPoint><se:AnchorPointX>0.5</se:AnchorPointX>'
+            '<se:AnchorPointY>1.0</se:AnchorPointY></se:AnchorPoint><se:Displacement>'
+            f'<se:DisplacementX>0</se:DisplacementX><se:DisplacementY>-{size // 2 + 3}</se:DisplacementY>'
+            '</se:Displacement></se:PointPlacement></se:LabelPlacement>'
+            '<se:Halo><se:Radius>2</se:Radius><se:Fill><se:SvgParameter name="fill">#ffffff</se:SvgParameter>'
+            '</se:Fill></se:Halo>'
+            '<se:Fill><se:SvgParameter name="fill">#000000</se:SvgParameter></se:Fill>'
+            '<se:VendorOption name="partials">true</se:VendorOption>'
+            '<se:VendorOption name="spaceAround">10</se:VendorOption>'
+            '<se:VendorOption name="conflictResolution">true</se:VendorOption>'
+            '</se:TextSymbolizer></se:Rule>')
+    body = '\n'.join(rules)
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<!-- Сгенерирован scripts/geoserver/gid_desktop_style.py: размеры значков и подписи по зуму -->\n'
+            '<StyledLayerDescriptor xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"'
+            ' xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:se="http://www.opengis.net/se"'
+            ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.1.0"'
+            ' xsi:schemaLocation="http://www.opengis.net/sld'
+            ' http://schemas.opengis.net/sld/1.1.0/StyledLayerDescriptor.xsd">\n'
+            '<NamedLayer><se:Name>uzel</se:Name><UserStyle><se:Name>uzel</se:Name><se:FeatureTypeStyle>\n'
+            f'{body}\n'
+            '</se:FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>\n')
+
+
 NODE_SQL_EDITS = [
     ("   ELSE 'US'",
      "   WHEN sch.id is not null then 'TK'  -- узел с внутренней схемой: знак камеры десктопа (gid_desktop_style.py)\n"
@@ -149,28 +301,16 @@ def patch_uzel(gs: Gs, ws: str, store: str, layer: str = 'uzel') -> list[str]:
         put_featuretype(gs, path, ft)
         done.append('view: code TK')
 
-    gs.req('PUT', f'/rest/resource/workspaces/{ws}/styles/svg/tk.svg', data=TK_SVG.encode('utf-8'),
-           headers={'Content-Type': 'image/svg+xml'})
+    for name, svg in NODE_SVGS.items():
+        gs.req('PUT', f'/rest/resource/workspaces/{ws}/styles/svg/{name}', data=svg.encode('utf-8'),
+               headers={'Content-Type': 'image/svg+xml'})
+    done.append(f'значки: {len(NODE_SVGS)}')
 
     style = bare(gs.get_xml(f'/rest/layers/{ws}:{layer}.xml').findtext('defaultStyle/name'))
-    info = gs.get_xml(f'/rest/workspaces/{ws}/styles/{style}.xml')
-    filename = info.findtext('filename') or f'{style}.sld'
-    sld = gs.req('GET', f'/rest/resource/workspaces/{ws}/styles/{filename}').content.decode('utf-8')
-    if 'svg/tk.svg' not in sld:
-        rules = re.findall(r'<se:Rule>(?:(?!</se:Rule>).)*?<ogc:Literal>US</ogc:Literal>.*?</se:Rule>', sld, re.S)
-        if not rules:
-            sys.exit(f'{ws}:{style}: нет правил code = US')
-        for rule in rules:
-            tk = (rule.replace('<ogc:Literal>US</ogc:Literal>', '<ogc:Literal>TK</ogc:Literal>')
-                      .replace('svg/us.svg', 'svg/tk.svg'))
-            # Знак камеры в десктопе крупнее точки узла: ±5 против r=3
-            tk = re.sub(r'<Size>(\d+(?:\.\d+)?)</Size>', lambda m: f'<Size>{round(float(m.group(1)) * 1.6)}</Size>', tk)
-            sld = sld.replace(rule, rule + '\n<!-- узел с внутренней схемой (gid_desktop_style.py) -->\n' + tk, 1)
-        version = info.findtext('languageVersion/version') or '1.0.0'
-        ctype = 'application/vnd.ogc.se+xml' if version.startswith('1.1') else 'application/vnd.ogc.sld+xml'
-        gs.req('PUT', f'/rest/workspaces/{ws}/styles/{style}', params={'raw': 'true'},
-               data=sld.encode('utf-8'), headers={'Content-Type': ctype})
-        done.append(f'стиль {style}: {len(rules)} правил TK')
+    sld = build_uzel_sld()
+    gs.req('PUT', f'/rest/workspaces/{ws}/styles/{style}', params={'raw': 'true'},
+           data=sld.encode('utf-8'), headers={'Content-Type': 'application/vnd.ogc.se+xml'})
+    done.append(f'стиль {style}: {sld.count("<se:Rule>")} правил')
     return done
 
 
