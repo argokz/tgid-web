@@ -1,3 +1,4 @@
+import { appStorage } from '~/utils/appStorage';
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import type {
@@ -184,7 +185,7 @@ export const useMapStore = defineStore('map', {
 
     loadSelectedBaseLayer() {
       this.syncConfigurableBaseLayers();
-      const savedLayer = localStorage.getItem('selectedBaseLayer') || localStorage.getItem('baseLayer');
+      const savedLayer = appStorage.getItem('selectedBaseLayer') || appStorage.getItem('baseLayer');
       if (!savedLayer) return;
       const hasLayer = this.baseLayers.some((layer: { id: string }) => layer.id === savedLayer);
       if (hasLayer) {
@@ -397,8 +398,8 @@ export const useMapStore = defineStore('map', {
 
     loadVisiblePlanetLayers() {
       const PLANET_PREFS_VERSION = 2;
-      const ver = localStorage.getItem('visiblePlanetLayers_v');
-      const saved = localStorage.getItem('visiblePlanetLayers');
+      const ver = appStorage.getItem('visiblePlanetLayers_v');
+      const saved = appStorage.getItem('visiblePlanetLayers');
       if (saved && ver === String(PLANET_PREFS_VERSION)) {
         try {
           this.visiblePlanetLayers = JSON.parse(saved);
@@ -414,13 +415,13 @@ export const useMapStore = defineStore('map', {
     },
 
     saveVisiblePlanetLayers() {
-      localStorage.setItem('visiblePlanetLayers', JSON.stringify(this.visiblePlanetLayers));
-      localStorage.setItem('visiblePlanetLayers_v', '2');
+      appStorage.setItem('visiblePlanetLayers', JSON.stringify(this.visiblePlanetLayers));
+      appStorage.setItem('visiblePlanetLayers_v', '2');
     },
 
     loadPlanetLayerStyleOverrides() {
       try {
-        const raw = localStorage.getItem('planetLayerStyleOverrides');
+        const raw = appStorage.getItem('planetLayerStyleOverrides');
         this.planetLayerStyleOverrides = raw ? JSON.parse(raw) : {};
       } catch {
         this.planetLayerStyleOverrides = {};
@@ -428,7 +429,7 @@ export const useMapStore = defineStore('map', {
     },
 
     savePlanetLayerStyleOverrides() {
-      localStorage.setItem('planetLayerStyleOverrides', JSON.stringify(this.planetLayerStyleOverrides));
+      appStorage.setItem('planetLayerStyleOverrides', JSON.stringify(this.planetLayerStyleOverrides));
     },
 
     applyAllPlanetStyleOverrides() {
@@ -719,8 +720,8 @@ export const useMapStore = defineStore('map', {
       if (!this.map || this.selectedBaseLayer === newBaseLayer) return;
       this.selectedBaseLayer = newBaseLayer;
       await this.addBaseLayer();
-      localStorage.setItem('selectedBaseLayer', newBaseLayer);
-      localStorage.setItem('baseLayer', newBaseLayer);
+      appStorage.setItem('selectedBaseLayer', newBaseLayer);
+      appStorage.setItem('baseLayer', newBaseLayer);
     },
 
     selectBaseLayer(layerId: string) {
@@ -1381,7 +1382,7 @@ export const useMapStore = defineStore('map', {
       if (!this.map) return;
       const layerIds = this.getLayerIdsOnMap(layerId);
       this.layerStyles[layerId] = { ...this.layerStyles[layerId], ...style };
-      localStorage.setItem('layerStyles', JSON.stringify(this.layerStyles));
+      appStorage.setItem('layerStyles', JSON.stringify(this.layerStyles));
 
       layerIds.forEach(id => {
           const layer = this.map?.getLayer(id);
@@ -1579,7 +1580,7 @@ export const useMapStore = defineStore('map', {
     },
 
     loadLayerStyles() {
-      const saved = localStorage.getItem('layerStyles');
+      const saved = appStorage.getItem('layerStyles');
       this.layerStyles = saved ? JSON.parse(saved) : {};
     },
 

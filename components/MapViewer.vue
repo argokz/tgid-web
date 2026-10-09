@@ -479,6 +479,7 @@
 </template>
 
 <script setup lang="ts">
+import { appStorage } from '~/utils/appStorage';
 import { formatApiError } from '~/utils/apiError';
 import { activeDrawMode } from '~/composables/useMapDraw';
 import { useMapStore } from '~/stores/mapStore';
@@ -658,7 +659,7 @@ const saveMapViewportState = () => {
     }
   };
   savedPageState.value = nextState;
-  localStorage.setItem(PAGE_STATE_KEY, JSON.stringify(nextState));
+  appStorage.setItem(PAGE_STATE_KEY, JSON.stringify(nextState));
 };
 
 const waitForMapContainer = async (attempts = 20, delayMs = 50): Promise<boolean> => {
@@ -1428,7 +1429,7 @@ const onIdentifyModeChange = (enabled: boolean) => {
   if (process.client) {
     const currentState = savedPageState.value ?? {};
     savedPageState.value = { ...currentState, identifyMode: enabled };
-    localStorage.setItem(PAGE_STATE_KEY, JSON.stringify(savedPageState.value));
+    appStorage.setItem(PAGE_STATE_KEY, JSON.stringify(savedPageState.value));
   }
   if (import.meta.dev) console.debug('Identify mode:', enabled);
 };
@@ -1453,7 +1454,7 @@ onMounted(() => {
     cesiumStore.loadSavedViewMode();
     window.addEventListener('pagehide', onPageHideBfCache);
     window.addEventListener('pageshow', onPageShowBfCache);
-    const rawSavedState = localStorage.getItem(PAGE_STATE_KEY);
+    const rawSavedState = appStorage.getItem(PAGE_STATE_KEY);
     if (rawSavedState) {
       try {
         savedPageState.value = JSON.parse(rawSavedState);

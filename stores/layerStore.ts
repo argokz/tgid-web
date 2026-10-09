@@ -1,3 +1,4 @@
+import { appStorage } from '~/utils/appStorage';
 import { defineStore } from 'pinia';
 import { mapService, isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 import type { LayerConfig, ExtendedLayerConfig, WmsLayerConfig } from '~/types';
@@ -58,7 +59,7 @@ export const useLayerStore = defineStore('layer', {
     },
 
     loadVisibleContextLayers() {
-      const saved = localStorage.getItem('visibleContextLayers');
+      const saved = appStorage.getItem('visibleContextLayers');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
@@ -75,7 +76,7 @@ export const useLayerStore = defineStore('layer', {
     },
 
     saveVisibleContextLayers() {
-      localStorage.setItem('visibleContextLayers', JSON.stringify(this.visibleContextLayers));
+      appStorage.setItem('visibleContextLayers', JSON.stringify(this.visibleContextLayers));
     },
 
     /** Установить источники/слои контекста и видимость; выровнять стек под рабочими слоями. */
@@ -199,14 +200,14 @@ export const useLayerStore = defineStore('layer', {
     },
 
     loadVisibleWmsLayers() {
-      const saved = localStorage.getItem('visibleWmsLayers');
+      const saved = appStorage.getItem('visibleWmsLayers');
       if (saved) {
         this.visibleWmsLayers = JSON.parse(saved);
       }
     },
 
     saveVisibleWmsLayers() {
-      localStorage.setItem('visibleWmsLayers', JSON.stringify(this.visibleWmsLayers));
+      appStorage.setItem('visibleWmsLayers', JSON.stringify(this.visibleWmsLayers));
     },
 
     async toggleWmsLayer(layerId: string) {
@@ -397,7 +398,7 @@ export const useLayerStore = defineStore('layer', {
         this.geoServerLayers
           .filter((l) => (l as any).defaultVisible !== false)
           .map((l) => l.layerId);
-      const saved = localStorage.getItem('visibleGeoServerLayers');
+      const saved = appStorage.getItem('visibleGeoServerLayers');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
@@ -815,11 +816,11 @@ export const useLayerStore = defineStore('layer', {
         const layer = this.geoServerLayers.find(l => l.layerId === id);
         if (layer) layer.zIndex = zIndex;
       }
-      localStorage.setItem('layerZIndex', JSON.stringify(layerOrders));
+      appStorage.setItem('layerZIndex', JSON.stringify(layerOrders));
     },
 
     loadLayerOrder() {
-      const saved = localStorage.getItem('layerZIndex');
+      const saved = appStorage.getItem('layerZIndex');
       if (saved) {
         try {
           const orders: { id: string; zIndex: number }[] = JSON.parse(saved);
@@ -1082,18 +1083,18 @@ export const useLayerStore = defineStore('layer', {
     },
 
     saveLayerAttributes() {
-      localStorage.setItem('layerAttributes', JSON.stringify(this.layerAttributes));
+      appStorage.setItem('layerAttributes', JSON.stringify(this.layerAttributes));
     },
 
     loadLayerAttributes() {
-      const saved = localStorage.getItem('layerAttributes');
+      const saved = appStorage.getItem('layerAttributes');
       if (saved) {
         this.layerAttributes = JSON.parse(saved);
       }
     },
 
     saveLayerStyles() {
-      localStorage.setItem('layerStyles', JSON.stringify(this.layerStyles));
+      appStorage.setItem('layerStyles', JSON.stringify(this.layerStyles));
     },
 
     updateLayerStyle(layerId: string, style: any) {
@@ -1154,11 +1155,11 @@ export const useLayerStore = defineStore('layer', {
     },
 
     saveVisibleLayers() {
-      localStorage.setItem('visibleGeoServerLayers', JSON.stringify(this.visibleGeoServerLayers));
+      appStorage.setItem('visibleGeoServerLayers', JSON.stringify(this.visibleGeoServerLayers));
     },
 
     loadLayerStyles() {
-      const savedStyles = localStorage.getItem('layerStyles');
+      const savedStyles = appStorage.getItem('layerStyles');
       if (savedStyles) {
         this.layerStyles = JSON.parse(savedStyles);
         }
@@ -1282,11 +1283,11 @@ export const useLayerStore = defineStore('layer', {
     },
 
     saveCachingSettings() {
-      localStorage.setItem('cachingEnabledLayers', JSON.stringify(this.cachingEnabledLayers));
+      appStorage.setItem('cachingEnabledLayers', JSON.stringify(this.cachingEnabledLayers));
     },
 
     loadCachingSettings() {
-      const saved = localStorage.getItem('cachingEnabledLayers');
+      const saved = appStorage.getItem('cachingEnabledLayers');
       if (saved) {
         this.cachingEnabledLayers = JSON.parse(saved);
       } else {

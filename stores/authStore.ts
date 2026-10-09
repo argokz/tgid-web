@@ -1,3 +1,4 @@
+import { appStorage } from '~/utils/appStorage'
 import { defineStore } from 'pinia'
 import { computePermissions, type Permissions } from '~/utils/permissions'
 import { isJwtExpired } from '~/utils/jwt'
@@ -92,9 +93,9 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     hydrate() {
       if (!process.client) return
-      this.accessToken = localStorage.getItem(TOKEN_KEY) || ''
-      this.role = localStorage.getItem(ROLE_KEY) || ''
-      this.username = localStorage.getItem(USER_KEY) || ''
+      this.accessToken = appStorage.getItem(TOKEN_KEY) || ''
+      this.role = appStorage.getItem(ROLE_KEY) || ''
+      this.username = appStorage.getItem(USER_KEY) || ''
       this.loaded = true
       void import('~/services/fastApiService').then(({ setUnauthorizedHandler }) => {
         setUnauthorizedHandler(() => this.expireSession())
@@ -148,9 +149,9 @@ export const useAuthStore = defineStore('auth', {
       this.username = username
       this.role = role
       if (process.client) {
-        localStorage.setItem(TOKEN_KEY, token)
-        localStorage.setItem(USER_KEY, username)
-        localStorage.setItem(ROLE_KEY, role)
+        appStorage.setItem(TOKEN_KEY, token)
+        appStorage.setItem(USER_KEY, username)
+        appStorage.setItem(ROLE_KEY, role)
       }
     },
     logout() {
@@ -163,9 +164,9 @@ export const useAuthStore = defineStore('auth', {
       this.displayName = ''
       this.mustChangePassword = false
       if (process.client) {
-        localStorage.removeItem(TOKEN_KEY)
-        localStorage.removeItem(USER_KEY)
-        localStorage.removeItem(ROLE_KEY)
+        appStorage.removeItem(TOKEN_KEY)
+        appStorage.removeItem(USER_KEY)
+        appStorage.removeItem(ROLE_KEY)
       }
     },
     async refreshMe() {
@@ -184,8 +185,8 @@ export const useAuthStore = defineStore('auth', {
         this.topologyMutationsEnabledServer = Boolean(me.topology_mutations_enabled)
         this.configLoaded = true
         if (process.client && this.accessToken) {
-          localStorage.setItem(USER_KEY, me.username)
-          localStorage.setItem(ROLE_KEY, me.role)
+          appStorage.setItem(USER_KEY, me.username)
+          appStorage.setItem(ROLE_KEY, me.role)
         }
       } catch (error: any) {
         // 401 (токен истёк, учётная запись заблокирована) — сессия сброшена с уведомлением;

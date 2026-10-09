@@ -4,8 +4,10 @@
  * Один веб обслуживает одну базу (API: DB_NAME). Для другого города (Астана) задаются:
  *   NUXT_PUBLIC_CITY_BBOX="71.05,50.94,71.79,51.37"  — охват [minLon,minLat,maxLon,maxLat] (поиск адреса)
  *   NUXT_PUBLIC_MAP_CENTER="71.43,51.13"             — стартовый центр и «Домой» (иначе — центр охвата)
- *   GEOSERVER_LAYER_CATALOG                          — первый workspace каталога (AstanaGIS)
+ *   GEOSERVER_LAYER_CATALOG                          — первый workspace каталога (AstanaGIS);
+ *                                                      в сборке — NUXT_PUBLIC_GEOSERVER_LAYER_CATALOG
  * Переменные NUXT_PUBLIC_* читаются при запуске сервера, пересборка не нужна.
+ * Прод с двумя городами на одном домене — docs/geoserver-city-workspace.md.
  */
 
 export type LonLatBBox = [number, number, number, number]

@@ -1,3 +1,4 @@
+import { appStorage } from '~/utils/appStorage'
 import { defineStore } from 'pinia'
 import { markRaw } from 'vue'
 import type { Cesium3DTileset, ImageryLayer, ImageryLayerCollection, TerrainProvider, Viewer } from 'cesium'
@@ -78,6 +79,10 @@ export const useCesiumStore = defineStore('cesium', {
         this.cleanup()
       }
 
+      // Workers и ресурсы Cesium лежат в public/cesium. Путь приложения задаётся при запуске
+      // (NUXT_APP_BASE_URL), поэтому CESIUM_BASE_URL не зашит в сборку, а выставляется здесь.
+      const baseURL = useRuntimeConfig().app.baseURL.replace(/\/?$/, '/')
+      ;(window as any).CESIUM_BASE_URL = `${baseURL}cesium/`
       const Cesium = await import('cesium')
       this.cesium = markRaw(Cesium)
 
@@ -223,7 +228,7 @@ export const useCesiumStore = defineStore('cesium', {
     async setPhotorealistic(enabled: boolean, assetId = photoAssetId) {
       const Cesium = this.cesium as CesiumModule | null
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem(PHOTOREALISTIC_KEY, enabled ? '1' : '0') } catch { /* private mode */ }
+        try { appStorage.setItem(PHOTOREALISTIC_KEY, enabled ? '1' : '0') } catch { /* private mode */ }
       }
       if (assetId) photoAssetId = assetId
       if (!this.viewer || !Cesium) {
@@ -270,7 +275,7 @@ export const useCesiumStore = defineStore('cesium', {
 
     loadSavedPhotorealistic(): boolean {
       if (typeof window === 'undefined') return false
-      try { return localStorage.getItem(PHOTOREALISTIC_KEY) === '1' } catch { return false }
+      try { return appStorage.getItem(PHOTOREALISTIC_KEY) === '1' } catch { return false }
     },
 
     setSyncedSelection(selection: SyncedSelection) {
@@ -333,13 +338,13 @@ export const useCesiumStore = defineStore('cesium', {
     toggleViewMode() {
       this.viewMode = this.viewMode === '2D' ? '3D' : '2D'
       if (typeof window !== 'undefined') {
-        localStorage.setItem('viewMode', this.viewMode)
+        appStorage.setItem('viewMode', this.viewMode)
       }
     },
 
     loadSavedViewMode() {
       if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('viewMode')
+        const saved = appStorage.getItem('viewMode')
         if (saved === '2D' || saved === '3D') {
           this.viewMode = saved
         }

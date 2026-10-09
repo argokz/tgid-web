@@ -93,6 +93,8 @@ export default defineNuxtConfig({
       // Город стенда (utils/cityConfig.ts): охват "minLon,minLat,maxLon,maxLat" и центр "lon,lat"; пусто — Алматы
       cityBbox: process.env.NUXT_PUBLIC_CITY_BBOX || env.NUXT_PUBLIC_CITY_BBOX || '',
       mapCenter: process.env.NUXT_PUBLIC_MAP_CENTER || env.NUXT_PUBLIC_MAP_CENTER || '',
+      // Префикс ключей localStorage (utils/appStorage.ts): города на одном домене не делят настройки
+      storagePrefix: process.env.NUXT_PUBLIC_STORAGE_PREFIX || env.NUXT_PUBLIC_STORAGE_PREFIX || '',
       geoserver: {
         url:
           process.env.NUXT_PUBLIC_GEOSERVER_URL ||
@@ -116,6 +118,8 @@ export default defineNuxtConfig({
   },
   modules: ['@pinia/nuxt'],
   app: {
+    // Путь задаётся и при запуске: NUXT_APP_BASE_URL=/tgid/astana/ (одна сборка на несколько городов).
+    // Поэтому других путей с /itwin-map/ в сборке нет: иконка — в app.vue, CESIUM_BASE_URL — в cesiumStore.
     baseURL: '/itwin-map/',
     head: {
       title: 'ITwin Map - Интерактивная карта',
@@ -129,7 +133,6 @@ export default defineNuxtConfig({
         { name: 'format-detection', content: 'telephone=no' }
       ],
       link: [
-        { rel: 'icon', type: 'image/x-icon', href: '/itwin-map/favicon.ico' },
         { rel: 'dns-prefetch', href: '//itwin.kz' },
         { rel: 'preconnect', href: 'https://itwin.kz', crossorigin: '' },
       ]
@@ -180,9 +183,6 @@ export default defineNuxtConfig({
   },
 
   vite: {
-    define: {
-      CESIUM_BASE_URL: JSON.stringify('/itwin-map/cesium/')
-    },
     css: {
       preprocessorOptions: {
         scss: {

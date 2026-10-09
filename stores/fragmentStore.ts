@@ -1,3 +1,4 @@
+import { appStorage } from '~/utils/appStorage';
 import { defineStore } from 'pinia';
 import { fastApiService } from '~/services/fastApiService';
 import type { Fragment } from '~/types';
@@ -88,11 +89,11 @@ export const useFragmentStore = defineStore('fragment', {
     },
 
     saveVisibleFragments() {
-      localStorage.setItem('visibleFragments', JSON.stringify(this.visibleFragments));
+      appStorage.setItem('visibleFragments', JSON.stringify(this.visibleFragments));
     },
 
     loadVisibleFragments() {
-      const saved = localStorage.getItem('visibleFragments');
+      const saved = appStorage.getItem('visibleFragments');
       this.visibleFragments = saved ? JSON.parse(saved) : [];
       
       // Применяем фильтр через layerStore

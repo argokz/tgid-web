@@ -1,6 +1,7 @@
 /**
  * Composable для управления базовыми слоями карты
  */
+import { appStorage } from '~/utils/appStorage'
 import { ref, computed } from 'vue'
 import { VISICOM_BASE_LAYER_ID, buildVisicomTiles, isVisicomEnabled, readVisicomConfig } from '~/utils/visicom'
 
@@ -99,15 +100,15 @@ export const useBaseLayers = () => {
     if (layers.find(l => l.id === layerId)) {
       currentLayer.value = layerId
       if (typeof window !== 'undefined') {
-        localStorage.setItem('baseLayer', layerId)
-        localStorage.setItem('selectedBaseLayer', layerId)
+        appStorage.setItem('baseLayer', layerId)
+        appStorage.setItem('selectedBaseLayer', layerId)
       }
     }
   }
 
   const loadSavedLayer = () => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('selectedBaseLayer') || localStorage.getItem('baseLayer')
+      const saved = appStorage.getItem('selectedBaseLayer') || appStorage.getItem('baseLayer')
       if (saved && layers.find(l => l.id === saved)) {
         currentLayer.value = saved
       }

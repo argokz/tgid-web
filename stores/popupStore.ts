@@ -1,3 +1,4 @@
+import { appStorage } from '~/utils/appStorage';
 import { defineStore } from 'pinia';
 import type { PopupOptions } from 'maplibre-gl';
 import { getMaplibreDefault } from '~/utils/maplibreLoader';
@@ -26,10 +27,10 @@ export const usePopupStore = defineStore('popup', {
 
   actions: {
     initPopupSettings() {
-      const savedMinZoom = localStorage.getItem('popupMinZoom');
-      const savedMaxZoom = localStorage.getItem('popupMaxZoom');
-      const savedShowAll = localStorage.getItem('showAllPopups');
-      const savedAllZoom = localStorage.getItem('allPopupsZoom');
+      const savedMinZoom = appStorage.getItem('popupMinZoom');
+      const savedMaxZoom = appStorage.getItem('popupMaxZoom');
+      const savedShowAll = appStorage.getItem('showAllPopups');
+      const savedAllZoom = appStorage.getItem('allPopupsZoom');
 
       this.popupMinZoom = savedMinZoom ? parseInt(savedMinZoom) : 0;
       this.popupMaxZoom = savedMaxZoom ? parseInt(savedMaxZoom) : 22;
@@ -90,19 +91,19 @@ export const usePopupStore = defineStore('popup', {
 
     toggleShowAllPopups(value: boolean) {
       this.showAllPopups = value;
-      localStorage.setItem('showAllPopups', value.toString());
+      appStorage.setItem('showAllPopups', value.toString());
     },
 
     updateAllPopupsZoom(zoom: number) {
       this.allPopupsZoom = zoom;
-      localStorage.setItem('allPopupsZoom', zoom.toString());
+      appStorage.setItem('allPopupsZoom', zoom.toString());
     },
 
     updatePopupZoomLimits(min: number, max: number) {
       this.popupMinZoom = min;
       this.popupMaxZoom = max;
-      localStorage.setItem('popupMinZoom', min.toString());
-      localStorage.setItem('popupMaxZoom', max.toString());
+      appStorage.setItem('popupMinZoom', min.toString());
+      appStorage.setItem('popupMaxZoom', max.toString());
     }
   }
 });

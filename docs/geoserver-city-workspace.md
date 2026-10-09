@@ -46,10 +46,27 @@ python scripts/geoserver/publish_table_layers.py scripts/geoserver/astana_basema
 
 | Переменная | Астана | По умолчанию |
 |---|---|---|
-| `GEOSERVER_LAYER_CATALOG` | первый workspace `AstanaGIS` (слои как у Алматы, без `zdaniya_2`) | — |
+| `GEOSERVER_LAYER_CATALOG` (dev) / `NUXT_PUBLIC_GEOSERVER_LAYER_CATALOG` (сборка) | первый workspace `AstanaGIS` (слои как у Алматы, без `zdaniya_2`) | каталог из `.env` сборки |
+| `NUXT_PUBLIC_GEOSERVER_WORKSPACE`, `NUXT_PUBLIC_GEOSERVER_GROUP_NAME` (сборка) | `AstanaGIS` | из каталога сборки |
 | `GEOSERVER_DISCOVER_WORKSPACES` | `AstanaGIS,Astana1,Astana2` | — |
 | `NUXT_PUBLIC_CITY_BBOX` | `71.05,50.94,71.79,51.37` | охват Алматы |
 | `NUXT_PUBLIC_MAP_CENTER` | `71.43,51.13` | центр Алматы |
+| `NUXT_APP_BASE_URL` | `/tgid/astana/` | `/itwin-map/` |
+| `NUXT_PUBLIC_STORAGE_PREFIX` | `astana` | пусто |
+
+В собранном приложении (`node .output/server/index.mjs`) `.env` не читается: значения из
+`nuxt.config.ts` запечены при сборке и перекрываются только переменными `NUXT_*` /
+`NUXT_PUBLIC_*` по пути ключа. Поэтому каталог для сборки передаётся как
+`NUXT_PUBLIC_GEOSERVER_LAYER_CATALOG`, а не `GEOSERVER_LAYER_CATALOG`.
+
+**Путь приложения при запуске.** `NUXT_APP_BASE_URL` переопределяет `app.baseURL`, и одна сборка
+обслуживает оба города. Поэтому в сборке нет других путей с `/itwin-map/`: иконка задаётся в
+`app.vue`, `CESIUM_BASE_URL` — в `stores/cesiumStore.ts` перед загрузкой Cesium.
+
+**localStorage.** Он общий на домен, а оба города открываются с `itwin.kz`. Все ключи идут через
+`utils/appStorage.ts` с префиксом `NUXT_PUBLIC_STORAGE_PREFIX`. У Астаны префикс `astana:`, у Алматы
+его нет, и сохранённые настройки пользователей остаются на месте. Без префикса города делили бы
+видимые слои и фрагменты, стили, положение карты и вход.
 
 `utils/cityConfig.ts`: стартовый центр карты, кнопка «Домой», поиск адреса (Nominatim в охвате
 города), пробный запрос 3D, workspace поиска узлов и списка фрагментов. Раньше всё это было
@@ -82,3 +99,29 @@ nginx на час. Новые слои GeoServer веб увидит не ран
   - поиск узла;
   - карточки участка (4 вкладки), потребителя (5), узла, источника, трубопровода подложки;
   - окно выбора из нескольких объектов.
+
+## Прод: два города на itwin.kz (09.10)
+
+| | Алматы | Астана |
+|---|---|---|
+| адрес | https://itwin.kz/tgid/almaty/ | https://itwin.kz/tgid/astana/ |
+| веб | `tgid-web` :3007, `NUXT_APP_BASE_URL=/tgid/almaty/` | `tgid-web-astana` :3010 (127.0.0.1), `/tgid/astana/`, переменные Астаны из таблицы выше |
+| API | `tgid-api` :8011, `/tgid/almaty/map-api/` (и прежний `/map-api/`) | `tgid-api-astana` :8021, `/tgid/astana/map-api/` |
+| воркер | `tgid-worker`, `REDIS_DB=1` | `tgid-worker-astana`, `REDIS_DB=4`, `tgid-astana@%h` |
+| база | `almatygid` | `astanagid_2026_09_22` |
+
+Сборка веба одна (`H:\deploy	gid-web\.output`), код API один (`H:\deploy	gid-server`). API Астаны берёт
+`.env` Алматы, служба перекрывает только `DB_NAME` и `REDIS_DB`: `load_dotenv` не трогает уже заданные
+переменные. Переменные служб записаны в реестр (`AppEnvironmentExtra`, REG_MULTI_SZ): через аргументы
+nssm PowerShell 5.1 теряет кавычки JSON каталога.
+
+nginx: `C:
+ginx\conf	gid-cities.conf` подключён в `server 443`. У API и у `/itwin-map/` стоит `^~`, чтобы
+регулярные location статики не перехватывали их запросы. API лежит под `map-api/`, а не `api/`: путь
+`<путь веба>/api/…` занят серверными маршрутами самого Nuxt (`server/api`). Старый `https://itwin.kz/itwin-map/…` отвечает
+302 на `/tgid/almaty/…`.
+
+Установка: `H:\deploy\install-tgid-cities.ps1` (от администратора, после `npm run build`). Сначала
+предпроверки: сборка новая, база Астаны с миграциями и SRID, порты свободны, `nginx.conf` не менялся,
+`nginx -t`. Затем ставятся службы Астаны, Алматы переводится на `/tgid/almaty/`, заменяется `nginx.conf`
+и выполняется reload. Откат — `H:\deployollback-tgid-cities.ps1`.

@@ -1,3 +1,4 @@
+import { appStorage } from '~/utils/appStorage';
 import { defineStore } from 'pinia';
 import type { 
   LayerSpecification, 
@@ -71,11 +72,11 @@ export const useLabelStore = defineStore('label', {
       if (process.client) {
         console.log('Loading saved layer labels...');
         
-        const savedLabels = localStorage.getItem('layerLabels');
-        const savedStyles = localStorage.getItem('labelStyles');
-        const savedMinZoom = localStorage.getItem('labelMinZoom');
-        const savedMaxZoom = localStorage.getItem('labelMaxZoom');
-        const savedGlobalLabels = localStorage.getItem('globalLabels');
+        const savedLabels = appStorage.getItem('layerLabels');
+        const savedStyles = appStorage.getItem('labelStyles');
+        const savedMinZoom = appStorage.getItem('labelMinZoom');
+        const savedMaxZoom = appStorage.getItem('labelMaxZoom');
+        const savedGlobalLabels = appStorage.getItem('globalLabels');
         
         if (savedLabels) {
           this.layerLabels = JSON.parse(savedLabels);
@@ -107,11 +108,11 @@ export const useLabelStore = defineStore('label', {
     // Сохранение настроек надписей
     saveLayerLabels() {
       if (process.client) {
-        localStorage.setItem('layerLabels', JSON.stringify(this.layerLabels));
-        localStorage.setItem('labelStyles', JSON.stringify(this.labelStyles));
-        localStorage.setItem('labelMinZoom', JSON.stringify(this.labelMinZoom));
-        localStorage.setItem('labelMaxZoom', JSON.stringify(this.labelMaxZoom));
-        localStorage.setItem('globalLabels', JSON.stringify(this.globalLabels));
+        appStorage.setItem('layerLabels', JSON.stringify(this.layerLabels));
+        appStorage.setItem('labelStyles', JSON.stringify(this.labelStyles));
+        appStorage.setItem('labelMinZoom', JSON.stringify(this.labelMinZoom));
+        appStorage.setItem('labelMaxZoom', JSON.stringify(this.labelMaxZoom));
+        appStorage.setItem('globalLabels', JSON.stringify(this.globalLabels));
       }
     },
     

@@ -1,3 +1,4 @@
+import { appStorage } from '~/utils/appStorage';
 import { defineStore } from 'pinia';
 import type { WorkspaceConfig, WmsLayerConfig, AppSettings } from '~/types';
 
@@ -20,7 +21,7 @@ export const useSettingsStore = defineStore('settings', {
       const defaultWorkspaces = this.getDefaultWorkspaces(geoserver, defaultUrl);
 
       if (process.client) {
-        const stored = localStorage.getItem(STORAGE_KEY);
+        const stored = appStorage.getItem(STORAGE_KEY);
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
@@ -89,7 +90,7 @@ export const useSettingsStore = defineStore('settings', {
     saveSettings() {
       if (process.client) {
         this.lastUpdated = new Date().toISOString();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.$state));
+        appStorage.setItem(STORAGE_KEY, JSON.stringify(this.$state));
       }
     },
 
@@ -129,7 +130,7 @@ export const useSettingsStore = defineStore('settings', {
 
     resetSettings() {
       if (process.client) {
-        localStorage.removeItem(STORAGE_KEY);
+        appStorage.removeItem(STORAGE_KEY);
         this.initSettings();
       }
     }

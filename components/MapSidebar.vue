@@ -100,6 +100,7 @@
 </template>
 
 <script setup lang="ts">
+import { appStorage } from '~/utils/appStorage'
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useLayerStore }    from '~/stores/layerStore'
@@ -135,7 +136,7 @@ const openPanel = () => {
 }
 
 const saveSidebarState = () => {
-  localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify({
+  appStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify({
     desktopCollapsed: desktopCollapsed.value,
     mobileOpen: mobileOpen.value,
     activeTab: activeTab.value
@@ -153,7 +154,7 @@ const updateLayerOpacity = (layerId: string, opacity: number) => {
   for (const subId of subIds) {
     setMapSubLayerOpacity(map, subId, opacity)
   }
-  localStorage.setItem('layerOpacities', JSON.stringify(layerOpacities.value))
+  appStorage.setItem('layerOpacities', JSON.stringify(layerOpacities.value))
 }
 
 const onLayersApplied = () => {
@@ -206,7 +207,7 @@ const loadFragments = async () => {
 
 // Lifecycle
 onMounted(() => {
-  const savedUiStateRaw = localStorage.getItem(SIDEBAR_STATE_KEY)
+  const savedUiStateRaw = appStorage.getItem(SIDEBAR_STATE_KEY)
   if (savedUiStateRaw) {
     try {
       const savedUiState = JSON.parse(savedUiStateRaw)
@@ -219,7 +220,7 @@ onMounted(() => {
       // ignore malformed snapshot
     }
   }
-  const saved = localStorage.getItem('layerOpacities')
+  const saved = appStorage.getItem('layerOpacities')
   if (saved) try { layerOpacities.value = JSON.parse(saved) } catch { /* ignore */ }
   loadFragments()
   void nextTick(() => {
