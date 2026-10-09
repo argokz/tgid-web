@@ -18,6 +18,7 @@ import {
 import { buildMvtLayerIdentifiers, buildWmsOnlyLayerIdentifiers, buildWmsRasterSourceId } from '~/utils/geoserverMvtIds';
 import { combineWithFragmentFilter, fragmentFilterFor } from '~/utils/mapFragmentFilter';
 import { combineCql } from '~/utils/nodeKindLayers';
+import { buildViewparams, type PtsHighlight } from '~/utils/ptsHighlight';
 
 const pbfAttributeRequests = new globalThis.Map<string, Promise<string[]>>();
 
@@ -37,6 +38,8 @@ export const useLayerStore = defineStore('layer', {
     loadingFailedLayers: 0,
     /** Видимые слои контекста MapTiler (ключи: contours | buildings | hillshade) */
     visibleContextLayers: [] as ContextLayerKey[],
+    /** Подсветка участков ПТС (начальник / участок МС / РС) — параметры view слоя участков */
+    ptsHighlight: null as PtsHighlight | null,
   }),
 
   actions: {
@@ -282,12 +285,8 @@ export const useLayerStore = defineStore('layer', {
           if (mvtUrl && mapStore.map) {
             const fragmentStore = useFragmentStore();
             
-            const fragmentsS = fragmentStore.visibleFragments.length > 0 
-              ? encodeURIComponent(fragmentStore.visibleFragments.join('_')) 
-              : '';
-            const fragmentsPart = fragmentsS ? `fragments:${fragmentsS};` : '';
             const fieldsPart = this.getLayerVisibleFields(layer);
-            const viewparams = `${fragmentsPart}${fieldsPart}${fieldsPart.endsWith(';') || !fieldsPart ? '' : ';'}nach:2;`;
+            const viewparams = buildViewparams(fragmentStore.visibleFragments, fieldsPart, this.ptsHighlight);
             
             // CRITICAL: Don't use URL object as it encodes {z}/{x}/{y} placeholders
             const separator = mvtUrl.includes('?') ? '&' : '?';
@@ -724,12 +723,8 @@ export const useLayerStore = defineStore('layer', {
         
         // Build new viewparams
         const fragmentStore = useFragmentStore();
-        const fragmentsS = fragmentStore.visibleFragments.length > 0 
-          ? encodeURIComponent(fragmentStore.visibleFragments.join('_')) 
-          : '';
-        const fragmentsPart = fragmentsS ? `fragments:${fragmentsS};` : '';
         const fieldsPart = this.getLayerVisibleFields(layer);
-        const viewparams = `${fragmentsPart}${fieldsPart}${fieldsPart.endsWith(';') || !fieldsPart ? '' : ';'}nach:2;`;
+        const viewparams = buildViewparams(fragmentStore.visibleFragments, fieldsPart, this.ptsHighlight);
         
         const separator = originalUrl.includes('?') ? '&' : '?';
         const cacheBust = force ? `&_=${Date.now()}` : '';
@@ -750,6 +745,12 @@ export const useLayerStore = defineStore('layer', {
           mapStore.map.triggerRepaint();
         }
       }
+    },
+
+    /** Подсветить на карте трубы начальника участка или участка МС/РС; null — снять подсветку */
+    setPtsHighlight(highlight: PtsHighlight | null) {
+      this.ptsHighlight = highlight;
+      this.applyFragmentFilter();
     },
 
     refreshVisibleDataLayers() {
@@ -1187,12 +1188,8 @@ export const useLayerStore = defineStore('layer', {
           if (mapStore.map.getSource(sourceId)) {
             const fragmentStore = useFragmentStore();
             
-            const fragmentsS = fragmentStore.visibleFragments.length > 0 
-              ? encodeURIComponent(fragmentStore.visibleFragments.join('_')) 
-              : '';
-            const fragmentsPart = fragmentsS ? `fragments:${fragmentsS};` : '';
             const fieldsPart = this.getLayerVisibleFields(layer);
-            const viewparams = `${fragmentsPart}${fieldsPart}${fieldsPart.endsWith(';') || !fieldsPart ? '' : ';'}nach:2;`;
+            const viewparams = buildViewparams(fragmentStore.visibleFragments, fieldsPart, this.ptsHighlight);
 
             updateWmsLayer(mapStore.map as any, sourceId, mapLayerId, {
               workspace: layer.workspace || 'AlmatyGIS',
@@ -1217,12 +1214,8 @@ export const useLayerStore = defineStore('layer', {
              // We'll update the Tile source if possible, or trigger reload.
              const fragmentStore = useFragmentStore();
              
-             const fragmentsS = fragmentStore.visibleFragments.length > 0 
-                ? encodeURIComponent(fragmentStore.visibleFragments.join('_')) 
-                : '';
-             const fragmentsPart = fragmentsS ? `fragments:${fragmentsS};` : '';
              const fieldsPart = this.getLayerVisibleFields(layer);
-             const viewparams = `${fragmentsPart}${fieldsPart}${fieldsPart.endsWith(';') || !fieldsPart ? '' : ';'}nach:2;`;
+             const viewparams = buildViewparams(fragmentStore.visibleFragments, fieldsPart, this.ptsHighlight);
              
              const source = mapStore.map.getSource(sourceId) as any;
              if (source && source.tiles) {

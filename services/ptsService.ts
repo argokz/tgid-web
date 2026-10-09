@@ -71,6 +71,15 @@ export interface PtsPipesChange {
   all_pipes?: boolean;
 }
 
+/** Подсветка на карте: трубы в базе (с копиями во фрагментах-вариантах), охват EPSG:4326, фрагменты */
+export interface PtsHighlightExtent {
+  kind: 'nach' | 'ms' | 'rs';
+  id: number;
+  pipes: number;
+  fragment_ids: number[];
+  bbox: [number, number, number, number] | null;
+}
+
 export type PtsPipesPreview = GroupSetterPreview & { dry_run: true; line_ids: number[]; action: string };
 export type PtsPipesResult = GroupSetterApplyResult & { dry_run: false; line_ids: number[]; action: string };
 
@@ -105,6 +114,10 @@ export const ptsService = {
 
   remove(kind: SiteKind, id: number, unassignPipes: boolean): Promise<{ deleted: boolean; unassigned: number }> {
     return req(`${base}/sites/${kind}/${enc(id)}`, { method: 'DELETE', query: { unassign_pipes: unassignPipes } });
+  },
+
+  highlight(kind: 'nach' | 'ms' | 'rs', id: number): Promise<PtsHighlightExtent> {
+    return req(`${base}/highlight`, { query: { kind, id } });
   },
 
   chain(nodeIds: number[]): Promise<PtsChain> {

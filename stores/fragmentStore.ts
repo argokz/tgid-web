@@ -68,13 +68,16 @@ export const useFragmentStore = defineStore('fragment', {
       layerStore.applyFragmentFilter();
     },
 
-    /** Разом применить выбор фрагментов (после кнопки «Применить» в UI). */
-    applyVisibleFragmentsSelection(ids: number[]) {
+    /**
+     * Разом применить выбор фрагментов (после кнопки «Применить» в UI).
+     * zoom=false — карту не двигать (подключение фрагментов подсветки участка: карта идёт к участку).
+     */
+    applyVisibleFragmentsSelection(ids: number[], zoom = true) {
       const uniq = [...new Set(ids)].sort((a, b) => a - b);
       this.visibleFragments = uniq;
       this.saveVisibleFragments();
       useLayerStore().applyFragmentFilter();
-      if (uniq.length) void this.zoomToFragments(uniq);
+      if (zoom && uniq.length) void this.zoomToFragments(uniq);
     },
 
     /** Центрировать карту на охвате фрагментов (QA F25); ошибки не мешают выбору */

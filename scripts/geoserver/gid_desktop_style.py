@@ -20,6 +20,9 @@
     set GEOSERVER_REST_USER / GEOSERVER_REST_PASSWORD
     python scripts/geoserver/gid_desktop_style.py --workspace AstanaGIS
 
+Подсветка участков ПТС: параметры view nach / ms / rs (0 — без подсветки) → поле warning,
+жёлтая подложка стиля. Только view, стили не трогать: --view-only.
+
 Откат участков: --restore-style AlmatyGIS_heatpipesections (стиль по умолчанию); узлов — перезалить
 стили из AlmatyGIS (clone_city_workspace.py --styles-only). Новые поля view ничему не мешают.
 """
@@ -329,12 +332,49 @@ def patch_view(gs: Gs, ws: str, store: str, layer: str) -> bool:
     if sql.count(ANCHOR) != 1:
         sys.exit(f'{ws}:{layer}: не найдено место вставки полей ({ANCHOR!r})')
     sql_el.text = sql.replace(ANCHOR, COLUMNS.strip('\n') + '\n\n' + ANCHOR)
-    # Без attributes GeoServer заново читает поля из SQL
-    for parent in ft.iter():
-        for child in list(parent):
-            if child.tag == 'attributes':
-                parent.remove(child)
-    gs.post_xml(path, ft, method='PUT')
+    put_featuretype(gs, path, ft)
+    return True
+
+
+# Подсветка участков ПТС (жёлтая подложка, слой «Выделенные (warning=1)») — как «Перейти к участку»
+# в доке ПТС десктопа (docks/DockPTS.cpp → CGraph2::vydMS/vydRS, isPjezo). Параметры view:
+# nach — начальник участка (все его участки МС и РС), ms / rs — один участок; 0 — без подсветки.
+# Раньше warning = начальник nach через join «ue.id = ms… or ue.id = rs…», который дублировал трубы
+# с участками МС и РС разных участков эксплуатации.
+HIGHLIGHT_SQL_EDITS = [
+    ('ue.nachalnik_uchastka = %nach%  as warning,',
+     f'{MARKER}: подсветка участков ПТС — начальник участка (nach), участок МС (ms) или РС (rs)\n'
+     'case when (%nach% > 0 and %nach% in (uem.nachalnik_uchastka, uer.nachalnik_uchastka))\n'
+     '       or (%ms% > 0 and hps.magistralSite = %ms%)\n'
+     '       or (%rs% > 0 and hps.distSite = %rs%) then 1 else 0 end as warning,'),
+    ('left join uchastki_ekspluatatsii ue on (ue.id=ms.nomer_uchastka or ue.id=rs.nomer_uchastka)',
+     'left join uchastki_ekspluatatsii uem on uem.id=ms.nomer_uchastka\n'
+     'left join uchastki_ekspluatatsii uer on uer.id=rs.nomer_uchastka'),
+]
+HIGHLIGHT_PARAMS = ('ms', 'rs')
+
+
+def patch_highlight(gs: Gs, ws: str, store: str, layer: str) -> bool:
+    path = f'/rest/workspaces/{ws}/datastores/{store}/featuretypes/{layer}.xml'
+    ft = gs.get_xml(path)
+    vt = ft.find('.//virtualTable')
+    sql_el = vt.find('sql')
+    sql = sql_el.text or ''
+    if 'подсветка участков ПТС' in sql:
+        return False
+    for old, new in HIGHLIGHT_SQL_EDITS:
+        if sql.count(old) != 1:
+            sys.exit(f'{ws}:{layer}: не найдено место правки ({old!r})')
+        sql = sql.replace(old, new)
+    sql_el.text = sql
+    have = {p.findtext('name') for p in vt.findall('parameter')}
+    for name in HIGHLIGHT_PARAMS:
+        if name not in have:
+            p = ET.SubElement(vt, 'parameter')
+            ET.SubElement(p, 'name').text = name
+            ET.SubElement(p, 'defaultValue').text = '0'
+            ET.SubElement(p, 'regexpValidator').text = '^[0-9]+$'
+    put_featuretype(gs, path, ft)
     return True
 
 
@@ -344,6 +384,7 @@ def main():
     ap.add_argument('--workspace', required=True)
     ap.add_argument('--layer', default='heatpipesections')
     ap.add_argument('--restore-style', help='Вернуть стиль по умолчанию (откат) и выйти')
+    ap.add_argument('--view-only', action='store_true', help='Только поля и подсветка в SQL-view, стили не трогать')
     args = ap.parse_args()
 
     gs = Gs(args.geoserver, os.environ.get('GEOSERVER_REST_USER', 'admin'), os.environ['GEOSERVER_REST_PASSWORD'])
@@ -364,6 +405,9 @@ def main():
     store = gs.get_xml(f'/rest/workspaces/{ws}/featuretypes/{layer}.xml').findtext('store/name').split(':')[-1]
 
     print(f'{ws}:{layer}: поля view', 'добавлены' if patch_view(gs, ws, store, layer) else 'уже есть')
+    print(f'{ws}:{layer}: подсветка nach/ms/rs', 'добавлена' if patch_highlight(gs, ws, store, layer) else 'уже есть')
+    if args.view_only:
+        return
 
     # Подписи участков — из прежнего стиля (MBStyle), чтобы не разошлись с Алматы
     labels: list[dict] = []

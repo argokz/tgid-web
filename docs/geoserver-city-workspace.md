@@ -110,6 +110,15 @@ python scripts/geoserver/gid_desktop_style.py --workspace AstanaGIS
   `nodes_internalnodeid_idx` (`H:\tgid-backups\2026-10-09_astana\05_nodes_internalnodeid_idx.sql`).
 - **Бэкапы до изменений:** `H:\tgid-backups\2026-10-09_astana\astanagis_*_before_2026-10-10`.
   Откат участков: `gid_desktop_style.py --workspace AstanaGIS --restore-style AlmatyGIS_heatpipesections`.
+- **Подсветка участков ПТС** (как «Перейти к участку» в доке ПТС десктопа: жёлтая подложка,
+  слой стиля «Выделенные (warning=1)»). Параметры view: `nach` — начальник участка (все его участки
+  МС и РС), `ms` / `rs` — один участок; 0 — без подсветки. Веб выбирает их на вкладке «ПТС» боковой
+  панели (`components/PtsHighlightPanel.vue`), охват и фрагменты даёт API `GET /api/v1/pts/highlight`.
+  Раньше веб всегда передавал `nach:2`, и участки начальника №2 были жёлтыми постоянно. Заодно убран
+  join `ue.id = ms… or ue.id = rs…`, который дублировал трубы. Только view, без стилей:
+  `gid_desktop_style.py --workspace AstanaGIS --view-only`; бэкап —
+  `H:	gid-backups6-10-09_astanastanagis_heatpipesections_before_highlight_2026-10-10`.
+  В AlmatyGIS view не менялся: там к участкам не привязано ни одной трубы.
 - **После правки стилей** кэш слоёв веба сбрасывает `GET <путь веба>/api/geoserver-layers?refresh=true`.
 
 ## Веб

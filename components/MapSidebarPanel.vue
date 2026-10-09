@@ -83,6 +83,17 @@
           {{ pendingLabels.length }}
         </v-chip>
       </v-tab>
+      <v-tab
+        value="pts"
+        density="compact"
+      >
+        <!-- жёлтая иконка — на карте есть подсветка участков -->
+        <v-icon
+          class="me-1"
+          size="16"
+          :color="layerStore.ptsHighlight ? 'amber-darken-3' : undefined"
+        >mdi-account-tie</v-icon>ПТС
+      </v-tab>
     </v-tabs>
     <v-divider />
 
@@ -696,6 +707,11 @@
         </div>
       </v-window-item>
 
+      <!-- ── ПТС: подсветка участков ── -->
+      <v-window-item value="pts">
+        <PtsHighlightPanel />
+      </v-window-item>
+
       <!-- ── ПОДПИСИ ── -->
       <v-window-item value="labels">
         <div class="tab-content">
@@ -1159,6 +1175,7 @@ const tabMeta: Record<string, { title: string; subtitle: string; icon: string }>
   layers:    { title: 'Слои',      subtitle: 'Видимость и порядок',    icon: 'mdi-layers' },
   fragments: { title: 'Фрагменты', subtitle: 'Фильтрация по участкам', icon: 'mdi-map-marker-multiple' },
   labels:    { title: 'Подписи',   subtitle: 'Атрибуты на карте',      icon: 'mdi-label-multiple' },
+  pts:       { title: 'Участки ПТС', subtitle: 'Подсветка на карте',   icon: 'mdi-account-tie' },
 }
 
 const sidebarTitle = computed(() => tabMeta[activeTabLocal.value]?.title    ?? 'Меню')
@@ -1262,6 +1279,18 @@ const getLabelIconColor = (id: string) => {
 
 .sidebar-tabs {
   flex-shrink: 0;
+}
+
+/* четыре вкладки в ширину панели (340 px) без прокрутки */
+.sidebar-tabs :deep(.v-tab) {
+  min-width: 0 !important; /* у v-tab своё min-width: 90px */
+  padding: 0 5px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+}
+.sidebar-tabs :deep(.v-tab .v-icon.me-1) {
+  margin-inline-end: 2px !important;
 }
 
 .sidebar-window {
