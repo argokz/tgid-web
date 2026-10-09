@@ -95,6 +95,8 @@ export default defineNuxtConfig({
       mapCenter: process.env.NUXT_PUBLIC_MAP_CENTER || env.NUXT_PUBLIC_MAP_CENTER || '',
       // Префикс ключей localStorage (utils/appStorage.ts): города на одном домене не делят настройки
       storagePrefix: process.env.NUXT_PUBLIC_STORAGE_PREFIX || env.NUXT_PUBLIC_STORAGE_PREFIX || '',
+      // Фрагменты, видимые при открытии карты: "2-46,48,3179" (utils/cityConfig.ts); пусто — все
+      defaultFragments: process.env.NUXT_PUBLIC_DEFAULT_FRAGMENTS || env.NUXT_PUBLIC_DEFAULT_FRAGMENTS || '',
       geoserver: {
         url:
           process.env.NUXT_PUBLIC_GEOSERVER_URL ||

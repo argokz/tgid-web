@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { ALMATY_BBOX, ALMATY_CENTER, getCityConfig, parseBbox, parseCenter, readCityConfig } from '~/utils/cityConfig'
+import { ALMATY_BBOX, ALMATY_CENTER, getCityConfig, parseBbox, parseCenter, parseFragmentIds, readCityConfig } from '~/utils/cityConfig'
 
 describe('настройки города стенда', () => {
   it('по умолчанию — Алматы и AlmatyGIS', () => {
-    expect(readCityConfig({})).toEqual({ bbox: ALMATY_BBOX, center: ALMATY_CENTER, workspace: 'AlmatyGIS' })
+    expect(readCityConfig({})).toEqual({ bbox: ALMATY_BBOX, center: ALMATY_CENTER, workspace: 'AlmatyGIS', defaultFragments: [] })
     // вне Nuxt (useRuntimeConfig нет) — то же
     expect(getCityConfig().workspace).toBe('AlmatyGIS')
   })
@@ -23,5 +23,13 @@ describe('настройки города стенда', () => {
     expect(parseCenter('abc,51')).toBeNull()
     expect(parseCenter('200,51')).toBeNull()
     expect(readCityConfig({ cityBbox: 'x', mapCenter: '' }).bbox).toEqual(ALMATY_BBOX)
+  })
+
+  it('фрагменты по умолчанию: id и диапазоны', () => {
+    expect(parseFragmentIds('')).toEqual([])
+    expect(parseFragmentIds('4-6, 3179,2,5')).toEqual([2, 4, 5, 6, 3179])
+    expect(parseFragmentIds(['7', 3])).toEqual([3, 7])
+    expect(parseFragmentIds('x,0,9-8,1-99999,12')).toEqual([12])
+    expect(readCityConfig({ defaultFragments: '2-3,3179' }).defaultFragments).toEqual([2, 3, 3179])
   })
 })

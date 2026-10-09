@@ -9,7 +9,8 @@ import { getCityConfig } from '~/utils/cityConfig';
 export const useFragmentStore = defineStore('fragment', {
   state: () => ({
     fragments: [] as Fragment[],
-    visibleFragments: [] as number[],
+    // При открытии карты — фрагменты города по умолчанию (NUXT_PUBLIC_DEFAULT_FRAGMENTS), иначе все
+    visibleFragments: [...getCityConfig().defaultFragments] as number[],
     selectedFragmentId: null as number | null,
   }),
 

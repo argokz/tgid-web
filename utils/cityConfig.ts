@@ -6,6 +6,9 @@
  *   NUXT_PUBLIC_MAP_CENTER="71.43,51.13"             — стартовый центр и «Домой» (иначе — центр охвата)
  *   GEOSERVER_LAYER_CATALOG                          — первый workspace каталога (AstanaGIS);
  *                                                      в сборке — NUXT_PUBLIC_GEOSERVER_LAYER_CATALOG
+ *   NUXT_PUBLIC_DEFAULT_FRAGMENTS="2-46,3179"        — фрагменты, видимые при открытии карты (id и диапазоны);
+ *                                                      пусто — все. В Астане варианты магистралей лежат
+ *                                                      друг на друге, без выбора карта показывает все копии
  * Переменные NUXT_PUBLIC_* читаются при запуске сервера, пересборка не нужна.
  * Прод с двумя городами на одном домене — docs/geoserver-city-workspace.md.
  */
@@ -33,10 +36,27 @@ export function parseCenter(raw: unknown): [number, number] | null {
   return n && Math.abs(n[0]) <= 180 && Math.abs(n[1]) <= 90 ? (n as [number, number]) : null
 }
 
+/** Список id фрагментов: "2-5,48, 3179" или массив; ошибочные части пропускаются, итог — по возрастанию */
+export function parseFragmentIds(raw: unknown): number[] {
+  const parts = Array.isArray(raw) ? raw : String(raw ?? '').split(',')
+  const ids = new Set<number>()
+  for (const part of parts) {
+    const m = String(part).trim().match(/^(\d+)(?:\s*-\s*(\d+))?$/)
+    if (!m) continue
+    const from = Number(m[1])
+    const to = m[2] ? Number(m[2]) : from
+    if (from < 1 || to < from || to - from > 10000) continue
+    for (let id = from; id <= to; id++) ids.add(id)
+  }
+  return [...ids].sort((a, b) => a - b)
+}
+
 export interface CityConfig {
   bbox: LonLatBBox
   center: [number, number]
   workspace: string
+  /** Фрагменты, видимые при открытии карты; пусто — все */
+  defaultFragments: number[]
 }
 
 export function readCityConfig(pub: Record<string, any>): CityConfig {
@@ -47,6 +67,7 @@ export function readCityConfig(pub: Record<string, any>): CityConfig {
     bbox: bbox ?? ALMATY_BBOX,
     center,
     workspace: String(pub.geoserver?.workspace || DEFAULT_WORKSPACE),
+    defaultFragments: parseFragmentIds(pub.defaultFragments),
   }
 }
 

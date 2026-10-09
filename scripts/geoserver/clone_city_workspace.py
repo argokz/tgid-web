@@ -12,6 +12,9 @@
     python scripts/geoserver/clone_city_workspace.py --dst AstanaGIS --database astanagid_2026_09_22 --srid 9995
 
 Повторный запуск с --replace удаляет рабочую область --dst целиком и создаёт заново.
+--styles-only перезаливает только стили (SVG уже скопированы):
+
+    python scripts/geoserver/clone_city_workspace.py --dst AstanaGIS --styles-only
 """
 from __future__ import annotations
 
@@ -45,6 +48,34 @@ class Gs:
         body = el if isinstance(el, str) else ET.tostring(el, encoding='unicode')
         return self.req(method, path, data=body.encode('utf-8'),
                         headers={'Content-Type': 'application/xml; charset=utf-8'})
+
+
+def copy_style(gs: Gs, src: str, dst: str, name: str, create: bool):
+    """Стиль workspace src → dst исходным файлом.
+
+    Файл берётся через /rest/resource: GET /rest/workspaces/…/styles/x.sld отдаёт SLD с уже
+    разрешёнными ссылками (file:/…/workspaces/src/styles/svg/is.svg). Скопированный так стиль
+    ссылался бы на SVG исходной рабочей области, и веб рисовал бы узлы кружками
+    (utils/sldToMapLibre.ts берёт иконки только из рабочей области слоя).
+    """
+    info = gs.get_xml(f'/rest/workspaces/{src}/styles/{name}.xml')
+    fmt = info.findtext('format') or 'sld'
+    version = info.findtext('languageVersion/version') or '1.0.0'
+    if fmt == 'sld':
+        filename = info.findtext('filename') or f'{name}.sld'
+        body = gs.req('GET', f'/rest/resource/workspaces/{src}/styles/{filename}').content
+    else:
+        # .json через /rest/resource GeoServer отдаёт ошибкой 500 (путь с .json считает запросом JSON);
+        # ссылок на файлы в MBStyle нет, поэтому берём как раньше
+        body = gs.req('GET', f'/rest/workspaces/{src}/styles/{name}.{fmt}').content
+    ctype = 'application/vnd.ogc.se+xml' if version.startswith('1.1') else 'application/vnd.ogc.sld+xml'
+    if fmt != 'sld':
+        ctype = 'application/vnd.geoserver.mbstyle+json' if fmt == 'mbstyle' else 'application/octet-stream'
+    if create:
+        gs.req('POST', f'/rest/workspaces/{dst}/styles', params={'name': name}, data=body,
+               headers={'Content-Type': ctype})
+    else:
+        gs.req('PUT', f'/rest/workspaces/{dst}/styles/{name}', data=body, headers={'Content-Type': ctype})
 
 
 ATOM = '{http://www.w3.org/2005/Atom}'
@@ -87,18 +118,30 @@ def main():
     ap.add_argument('--geoserver', default=os.environ.get('GEOSERVER_REST_URL', 'http://127.0.0.1:8085/geoserver'))
     ap.add_argument('--src', default='AlmatyGIS')
     ap.add_argument('--dst', required=True)
-    ap.add_argument('--database', required=True)
-    ap.add_argument('--srid', type=int, required=True, help='EPSG местной системы города в GeoServer')
+    ap.add_argument('--database', help='База города (не нужна с --styles-only)')
+    ap.add_argument('--srid', type=int, help='EPSG местной системы города в GeoServer (не нужен с --styles-only)')
     ap.add_argument('--src-srid', type=int, default=9998)
     ap.add_argument('--db-host', default=os.environ.get('DB_HOST', 'localhost'))
     ap.add_argument('--db-port', default=os.environ.get('DB_PORT', '5440'))
     ap.add_argument('--db-user', default=os.environ.get('DB_USER', 'postgres'))
     ap.add_argument('--skip', default='', help='Ещё слои, которые не копировать (через запятую)')
     ap.add_argument('--replace', action='store_true', help='Удалить --dst, если уже есть')
+    ap.add_argument('--styles-only', action='store_true',
+                    help='Только перезалить стили src в уже созданную --dst (исходными файлами)')
     args = ap.parse_args()
+    if not args.styles_only and (not args.database or not args.srid):
+        ap.error('нужны --database и --srid')
 
     gs = Gs(args.geoserver, os.environ.get('GEOSERVER_REST_USER', 'admin'), os.environ['GEOSERVER_REST_PASSWORD'])
     src, dst = args.src, args.dst
+
+    if args.styles_only:
+        names = [s.findtext('name') for s in gs.get_xml(f'/rest/workspaces/{src}/styles.xml').findall('style')]
+        have = {s.findtext('name') for s in gs.get_xml(f'/rest/workspaces/{dst}/styles.xml').findall('style')}
+        for name in names:
+            copy_style(gs, src, dst, name, create=name not in have)
+        print(f'стили {dst} перезалиты: {", ".join(names)}')
+        return
     skip = SKIP_ALWAYS | {s.strip() for s in args.skip.split(',') if s.strip()}
 
     exists = gs.req('GET', f'/rest/workspaces/{dst}.xml', ok=(200, 404)).status_code == 200
@@ -124,15 +167,7 @@ def main():
             gs.req('PUT', f'/rest/resource/workspaces/{dst}/styles/svg/{name}', data=data,
                    headers={'Content-Type': 'image/svg+xml'})
     for name in styles:
-        info = gs.get_xml(f'/rest/workspaces/{src}/styles/{name}.xml')
-        fmt = info.findtext('format') or 'sld'
-        version = info.findtext('languageVersion/version') or '1.0.0'
-        body = gs.req('GET', f'/rest/workspaces/{src}/styles/{name}.{"sld" if fmt == "sld" else fmt}').content
-        ctype = 'application/vnd.ogc.se+xml' if version.startswith('1.1') else 'application/vnd.ogc.sld+xml'
-        if fmt != 'sld':
-            ctype = 'application/vnd.geoserver.mbstyle+json' if fmt == 'mbstyle' else 'application/octet-stream'
-        gs.req('POST', f'/rest/workspaces/{dst}/styles', params={'name': name}, data=body,
-               headers={'Content-Type': ctype})
+        copy_style(gs, src, dst, name, create=True)
     print(f'стили: {", ".join(styles)}')
 
     # Хранилища: те же параметры, другая база; пароль — из окружения (в GET он зашифрован)
