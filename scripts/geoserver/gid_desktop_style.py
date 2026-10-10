@@ -24,6 +24,8 @@
 Подсветка участков ПТС: параметры view nach / ms / rs (0 — без подсветки) → поле warning,
 жёлтая подложка стиля. Только view, стили не трогать: --view-only.
 
+Вспомогательные участки (узлы П1/П2) скрыты параметром view rezhim (0 — скрыть), см. REZHIM_SQL_EDITS.
+
 Откат участков: --restore-style AlmatyGIS_heatpipesections (стиль по умолчанию); узлов — перезалить
 стили из AlmatyGIS (clone_city_workspace.py --styles-only). Новые поля view ничему не мешают.
 """
@@ -410,6 +412,46 @@ def patch_highlight(gs: Gs, ws: str, store: str, layer: str) -> bool:
     return True
 
 
+# Вспомогательные участки расчётной схемы (десктоп: «Отображать вспомогательные участки»,
+# gidview/geodraw.cpp GidWidget::isRezhim) — узлы с кодом П1/П2 и участки, у которых такой код хотя
+# бы у одного из узлов. Параметр view rezhim: 0 (по умолчанию) — скрыть, 1 — показать.
+REZHIM_MARK = f'{MARKER}: вспомогательные участки'
+REZHIM_SQL_EDITS = {
+    'heatpipesections': (
+        'where l.removed=0\nand n1.internalnodeid is null',
+        'where l.removed=0\nand n1.internalnodeid is null\n'
+        f'{REZHIM_MARK} (П1/П2) — только при rezhim=1\n'
+        "and (%rezhim% = 1 or not (coalesce(trim(ec1.name), '') in ('П1', 'П2')\n"
+        "                          or coalesce(trim(ec2.name), '') in ('П1', 'П2')))"),
+    'uzel': (
+        'where n.removed=0\nand n.internalnodeid is null',
+        'where n.removed=0\nand n.internalnodeid is null\n'
+        f'{REZHIM_MARK} (П1/П2) — только при rezhim=1\n'
+        "and (%rezhim% = 1 or coalesce(trim(ec.name), '') not in ('П1', 'П2'))"),
+}
+
+
+def patch_rezhim(gs: Gs, ws: str, store: str, layer: str) -> bool:
+    path = f'/rest/workspaces/{ws}/datastores/{store}/featuretypes/{layer}.xml'
+    ft = gs.get_xml(path)
+    vt = ft.find('.//virtualTable')
+    sql_el = vt.find('sql')
+    sql = sql_el.text or ''
+    if REZHIM_MARK in sql:
+        return False
+    old, new = REZHIM_SQL_EDITS[layer]
+    if sql.count(old) != 1:
+        sys.exit(f'{ws}:{layer}: не найдено место правки ({old!r})')
+    sql_el.text = sql.replace(old, new)
+    if 'rezhim' not in {p.findtext('name') for p in vt.findall('parameter')}:
+        p = ET.SubElement(vt, 'parameter')
+        ET.SubElement(p, 'name').text = 'rezhim'
+        ET.SubElement(p, 'defaultValue').text = '0'
+        ET.SubElement(p, 'regexpValidator').text = '^[01]$'
+    put_featuretype(gs, path, ft)
+    return True
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--geoserver', default=os.environ.get('GEOSERVER_REST_URL', 'http://127.0.0.1:8085/geoserver'))
@@ -438,6 +480,8 @@ def main():
 
     print(f'{ws}:{layer}: поля view', 'добавлены' if patch_view(gs, ws, store, layer) else 'уже есть')
     print(f'{ws}:{layer}: подсветка nach/ms/rs', 'добавлена' if patch_highlight(gs, ws, store, layer) else 'уже есть')
+    for lay in REZHIM_SQL_EDITS:
+        print(f'{ws}:{lay}: вспомогательные участки П1/П2', 'скрыты' if patch_rezhim(gs, ws, store, lay) else 'уже скрыты')
     if args.view_only:
         return
 

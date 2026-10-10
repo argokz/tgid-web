@@ -115,6 +115,14 @@ python scripts/geoserver/gid_desktop_style.py --workspace AstanaGIS
   `nodes_internalnodeid_idx` (`H:\tgid-backups\2026-10-09_astana\05_nodes_internalnodeid_idx.sql`).
 - **Бэкапы до изменений:** `H:\tgid-backups\2026-10-09_astana\astanagis_*_before_2026-10-10`.
   Откат участков: `gid_desktop_style.py --workspace AstanaGIS --restore-style AlmatyGIS_heatpipesections`.
+- **Вспомогательные участки расчётной схемы скрыты.** Это узлы с кодом (`externalcodes`) П1 или П2
+  и участки, у которых такой код хотя бы у одного из узлов. Так же делает десктоп при выключенном
+  «Отображать вспомогательные участки» (`gidview/geodraw.cpp`, `GidWidget::isRezhim`).
+  - В view `heatpipesections` и `uzel` добавлен параметр `rezhim`: 0 (по умолчанию) — скрыть,
+    1 — показать (`viewparams=…;rezhim:1;`).
+  - На магистралях 3179 скрыто 1613 участков из 4590 и 1454 узла из 4237.
+  - В Алматы узлов П1/П2 нет.
+  - Бэкап view до правки: `H:\tgid-backups\2026-10-10_astana_labels\featuretype_*_before_rezhim.xml`.
 - **Подсветка участков ПТС** (как «Перейти к участку» в доке ПТС десктопа: жёлтая подложка,
   слой стиля «Выделенные (warning=1)»). Параметры view: `nach` — начальник участка (все его участки
   МС и РС), `ms` / `rs` — один участок; 0 — без подсветки. Веб выбирает их на вкладке «ПТС» боковой
