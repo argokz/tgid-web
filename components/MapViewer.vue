@@ -507,7 +507,8 @@ import { useOverlayLayer } from '~/composables/useOverlayLayer';
 import type { RegimePointsResult } from '~/utils/regimeMapPoints';
 import { useLocateMarkers } from '~/composables/useLocateMarkers';
 import type { LocatePoint } from '~/composables/useLocateMarkers';
-import { pickNetworkFeature } from '~/utils/networkFeature';
+import { getNetworkFeatureKind, pickNetworkFeature } from '~/utils/networkFeature';
+import { nearestGroup, queryRenderedNear } from '~/utils/mapPick';
 import type { PickCandidate } from '~/utils/networkFeature';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
@@ -1196,7 +1197,9 @@ const onMapClickForTrace = async (e: any) => {
   // Узлы фрагментов лежат друг на друге: берём узел фрагмента предыдущей точки маршрута,
   // иначе активного фрагмента; несколько — меню выбора (QA F28)
   const prevFragment = traceNodeFragments[traceNodeFragments.length - 1] ?? null;
-  const res = pickNetworkFeature(mapStore.map?.queryRenderedFeatures(e.point), {
+  // Узлы в допуске вокруг курсора, ближайшие первыми
+  const nearNodes = queryRenderedNear(mapStore.map, e.point).filter((f) => getNetworkFeatureKind(f) === 'node');
+  const res = pickNetworkFeature(nearestGroup(nearNodes), {
     kind: 'node',
     fragmentIds: prevFragment ? [prevFragment] : fragmentStore.activeFragmentIds,
   });

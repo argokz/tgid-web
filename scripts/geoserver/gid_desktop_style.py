@@ -9,8 +9,9 @@
   - надземная прокладка (tubingtypeid = 4) — пунктир;
   - закрытая труба (pipesectstateidflow / pipesectstateidret = 2) — оливковая #808000.
 Скрипт дописывает в SQL-view поля pod, obr, zakr_p, zakr_o, mag_gid, nadz_gid (0/1, без NULL —
-фильтры MBStyle сравнивают с "0"/"1"), создаёт MBStyle heatpipesections_gid (подписи участков —
-из прежнего стиля слоя) и делает его стилем по умолчанию; прежний остаётся в списке стилей слоя.
+фильтры MBStyle сравнивают с "0"/"1") и du (Ду для подписи), создаёт MBStyle heatpipesections_gid
+(подписи участков — диаметр и значения «Подписей», см. pipe_labels) и делает его стилем по умолчанию;
+прежний остаётся в списке стилей слоя.
 
 Узлы (слой uzel). Обычный узел с внутренней схемой (камера, ЦТРП, павильон) десктоп рисует знаком
 камеры (gidr_draw.cpp drawNode0: isP && TIP_US → picKAM). В view такой узел получает code = 'TK',
@@ -52,6 +53,11 @@ case when hps.diameterInternal >= 400 then 1 else 0 end as mag_gid,
 case when hps.tubingTypeID = 4 then 1 else 0 end as nadz_gid,
 """
 ANCHOR = 'l.shape\nfrom linesobj l'
+# Диаметр на подписи участка — Ду, мм (0 — не задан)
+DIAM_MARK = f'{MARKER}: подпись диаметра'
+DIAM_EDIT = ('case when hps.tubingTypeID = 4 then 1 else 0 end as nadz_gid,',
+             'case when hps.tubingTypeID = 4 then 1 else 0 end as nadz_gid,\n'
+             f'{DIAM_MARK}\ncoalesce(round(hps.diameterCondit), 0)::int as du,')
 
 SUPPLY, RETURN, CLOSED = '#7f0000', '#00007f', '#808000'
 
@@ -76,7 +82,7 @@ DIST_OFFSET = ((12, 0), (13, 0.3), (15, 0.9), (17, 1.3), (20, 1.9))
 DIST_OPACITY = ((12, 0.55), (14, 0.9), (15, 1))
 
 
-def build_style(label_layers: list[dict]) -> dict:
+def build_style() -> dict:
     layers: list[dict] = [{
         'id': 'Выделенные (warning=1)',
         'type': 'line',
@@ -117,13 +123,74 @@ def build_style(label_layers: list[dict]) -> dict:
                         'layout': {'line-cap': 'butt', 'line-join': 'round'},
                         'paint': paint,
                     })
-    layers.extend(label_layers)
+    layers.extend(pipe_labels())
     return {
         'version': 8,
         'name': 'Участки теплосети как в программе (gid8)',
         'sources': {'pipelines': {'type': 'vector', 'url': 'mapbox://heatpipesections'}},
         'layers': layers,
     }
+
+
+# Подписи участков. Диаметр «Ду 150» вдоль трубы: магистрали — с района (14), жирным, остальные — с
+# улицы (16). Значения, выбранные в «Подписях» (поле text: расход, скорость, длина…), — синим по
+# середине участка, как значения у узлов. Шрифт веб уменьшает на 20%: 13 → 10,4 px на экране.
+# Фильтры — выражения MapLibre без «==»: веб дописывает к «==» сравнения с "1"/true (legacy-синтаксис),
+# а смешивать его с выражениями нельзя.
+DIAM_COLOR = '#3a3a3a'
+PIPE_TEXT_COLOR = '#0b4fb3'
+
+
+def _num(field: str) -> list:
+    return ['to-number', ['get', field], 0]
+
+
+def pipe_labels() -> list[dict]:
+    common_layout = {
+        'symbol-placement': 'line',
+        'symbol-spacing': 320,
+        'text-field': 'Ду {du}',
+        'text-keep-upright': True,
+        'text-max-angle': 35,
+        'text-padding': 4,
+        'text-allow-overlap': False,
+    }
+    paint = {'text-color': DIAM_COLOR, 'text-halo-color': '#ffffff', 'text-halo-width': 2}
+    has_diam = ['>', _num('du'), 0]
+    return [
+        {
+            'id': 'Диаметр магистрали',
+            'type': 'symbol', 'source': 'pipelines', 'source-layer': 'heatpipesections',
+            'minzoom': 14,
+            'filter': ['all', ['>', _num('mag_gid'), 0], has_diam],
+            'layout': {**common_layout, 'text-size': 14, 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold']},
+            'paint': paint,
+        },
+        {
+            'id': 'Диаметр',
+            'type': 'symbol', 'source': 'pipelines', 'source-layer': 'heatpipesections',
+            'minzoom': 16,
+            'filter': ['all', ['<', _num('mag_gid'), 1], has_diam],
+            'layout': {**common_layout, 'text-size': 13},
+            'paint': paint,
+        },
+        {
+            'id': 'Значения на участке',
+            'type': 'symbol', 'source': 'pipelines', 'source-layer': 'heatpipesections',
+            'minzoom': 15,
+            'filter': ['>', ['length', ['to-string', ['coalesce', ['get', 'text'], '']]], 0],
+            'layout': {
+                'symbol-placement': 'line-center',
+                'text-field': '{text}',
+                'text-size': 14,
+                'text-justify': 'center',
+                'text-max-width': 12,
+                'text-padding': 4,
+                'text-allow-overlap': False,
+            },
+            'paint': {'text-color': PIPE_TEXT_COLOR, 'text-halo-color': '#ffffff', 'text-halo-width': 2.5},
+        },
+    ]
 
 
 def put_featuretype(gs: Gs, path: str, ft: ET.Element):
@@ -187,23 +254,26 @@ NODE_SIZES = {
 }
 NODE_ICONS = {'IS': 'is', 'NS': 'ns', 'TK': 'tk', 'PR': 'pr', 'EL': 'el', 'NZ': 'nz', 'PO': 'po', 'US': 'us'}
 CONSUMERS = ('PR', 'EL', 'NZ', 'PO', 'US')
-# Подписи: (коды, с какого зума, до какого, шрифт, жирный, поле, только «подписывать»). Подпись —
-# поле label view (название без технических «#…»). Все узлы подписаны с 16, как в Алматы (1:7000);
-# узлы с признаком «подписывать» десктопа (nodes.displaySign → podp) — раньше. С TEXT_ZOOM под
-# названием — выбранные в «Подписях» значения (поле text) у узлов всех видов. Веб уменьшает шрифт
-# стилей на 20% (services/mapService.ts), на экране 15 → 12 px, 13 → 10,4 px.
+# Подписи: (коды, с какого зума, до какого, шрифт, жирный, только «подписывать»). Подпись — поле
+# label view (название без технических «#…») над значком, цвет — по виду узла (источник — тёмно-
+# красный, как подача; насосная — тёмно-синий, как обратка). Все узлы подписаны с 16, как в Алматы
+# (1:7000); узлы с признаком «подписывать» десктопа (nodes.displaySign → podp) — раньше.
+# С TEXT_ZOOM под значком синим — выбранные в «Подписях» значения (поле text) у узлов всех видов:
+# отдельной подписью, чтобы название и значения различались цветом. Веб уменьшает шрифт стилей
+# на 20% (services/mapService.ts): на экране 17 → 13,6 px, 14 → 11,2 px.
 TEXT_ZOOM = 17
 NODE_LABELS = [
-    (('IS',), 12, TEXT_ZOOM, 15, True, 'label', False),
-    (('IS',), TEXT_ZOOM, None, 15, True, 'label+text', False),
-    (('NS',), 14, TEXT_ZOOM, 14, True, 'label', False),
-    (('NS',), TEXT_ZOOM, None, 14, True, 'label+text', False),
-    (('TK',), 14, TEXT_ZOOM, 13, False, 'label', False),
-    (('TK',), TEXT_ZOOM, None, 13, False, 'label+text', False),
-    (CONSUMERS, 14, 16, 12, False, 'label', True),
-    (CONSUMERS, 16, TEXT_ZOOM, 12, False, 'label', False),
-    (CONSUMERS, TEXT_ZOOM, None, 13, False, 'label+text', False),
+    (('IS',), 12, None, 17, True, False),
+    (('NS',), 14, None, 16, True, False),
+    (('TK',), 14, None, 15, True, False),
+    (CONSUMERS, 14, 16, 14, False, True),
+    (CONSUMERS, 16, None, 14, False, False),
 ]
+NAME_COLORS = {'IS': SUPPLY, 'NS': RETURN, 'TK': '#1a1a1a'}
+NAME_COLOR = '#2b2b2b'
+VALUES_COLOR = '#0b4fb3'
+VALUES_FONT = 13
+VALUE_GROUPS = (('IS',), ('NS',), ('TK',), CONSUMERS)
 SCALE_AT_ZOOM_ZERO = 559082264.0287178  # как в utils/sldToMapLibre.ts: правила SLD → minzoom/maxzoom
 
 
@@ -231,7 +301,29 @@ def _code_filter(codes: tuple[str, ...], podp: bool = False) -> str:
     return f'<ogc:Filter>{cond}</ogc:Filter>'
 
 
-NEWLINE_LITERAL = '<ogc:Literal><![CDATA[\n]]></ogc:Literal>'
+def _text_rule(title: str, flt: str, scale: str, field: str, font: int, bold: bool, color: str,
+               above: bool, icon: int) -> str:
+    """Подпись узла над значком (above) или под ним. Смещение — в пикселях экрана веба: веб
+    (utils/sldToMapLibre.ts) переносит Displacement в text-offset без смены знака, минус — вверх."""
+    weight = '<se:SvgParameter name="font-weight">bold</se:SvgParameter>' if bold else ''
+    anchor_y, dy = ('1.0', -(icon // 2 + 2)) if above else ('0.0', icon // 2 + 2)
+    return (
+        f'<se:Rule><se:Name>{title}</se:Name>{flt}{scale}'
+        '<se:TextSymbolizer uom="http://www.opengeospatial.org/se/units/pixel">'
+        f'<se:Label><ogc:PropertyName>{field}</ogc:PropertyName></se:Label>'
+        '<se:Font><se:SvgParameter name="font-family">Arial, sans-serif</se:SvgParameter>'
+        f'<se:SvgParameter name="font-size">{font}</se:SvgParameter>{weight}</se:Font>'
+        '<se:LabelPlacement><se:PointPlacement><se:AnchorPoint><se:AnchorPointX>0.5</se:AnchorPointX>'
+        f'<se:AnchorPointY>{anchor_y}</se:AnchorPointY></se:AnchorPoint><se:Displacement>'
+        f'<se:DisplacementX>0</se:DisplacementX><se:DisplacementY>{dy}</se:DisplacementY>'
+        '</se:Displacement></se:PointPlacement></se:LabelPlacement>'
+        '<se:Halo><se:Radius>2</se:Radius><se:Fill><se:SvgParameter name="fill">#ffffff</se:SvgParameter>'
+        '</se:Fill></se:Halo>'
+        f'<se:Fill><se:SvgParameter name="fill">{color}</se:SvgParameter></se:Fill>'
+        '<se:VendorOption name="partials">true</se:VendorOption>'
+        '<se:VendorOption name="spaceAround">10</se:VendorOption>'
+        '<se:VendorOption name="conflictResolution">true</se:VendorOption>'
+        '</se:TextSymbolizer></se:Rule>')
 
 
 def build_uzel_sld() -> str:
@@ -256,31 +348,18 @@ def build_uzel_sld() -> str:
                 f'<se:ExternalGraphic><se:OnlineResource xlink:type="simple" xlink:href="svg/{NODE_ICONS[code]}.svg"/>'
                 f'<se:Format>image/svg+xml</se:Format></se:ExternalGraphic><se:Size>{size}</se:Size>'
                 '</se:Graphic></se:PointSymbolizer></se:Rule>')
-    for codes, zmin, zmax, font, bold, field, podp in NODE_LABELS:
+    for codes, zmin, zmax, font, bold, podp in NODE_LABELS:
         size = max(NODE_SIZES[c][min(zmin, 19) - 11] for c in codes) or 10
-        if field == 'label':
-            label = '<ogc:PropertyName>label</ogc:PropertyName>'
-        else:
-            label = ('<ogc:Function name="Concatenate"><ogc:PropertyName>label</ogc:PropertyName>'
-                     f'{NEWLINE_LITERAL}<ogc:PropertyName>text</ogc:PropertyName></ogc:Function>')
-        weight = '<se:SvgParameter name="font-weight">bold</se:SvgParameter>' if bold else ''
+        color = NAME_COLORS.get(codes[0], NAME_COLOR) if len(codes) == 1 else NAME_COLOR
         title = f'Подпись {",".join(codes)} {zmin}' + (' (подписывать)' if podp else '')
-        rules.append(
-            f'<se:Rule><se:Name>{title}</se:Name>{_code_filter(codes, podp)}{_scale_range(zmin, zmax)}'
-            f'<se:TextSymbolizer uom="http://www.opengeospatial.org/se/units/pixel"><se:Label>{label}</se:Label>'
-            f'<se:Font><se:SvgParameter name="font-family">Arial, sans-serif</se:SvgParameter>'
-            f'<se:SvgParameter name="font-size">{font}</se:SvgParameter>{weight}</se:Font>'
-            '<se:LabelPlacement><se:PointPlacement><se:AnchorPoint><se:AnchorPointX>0.5</se:AnchorPointX>'
-            '<se:AnchorPointY>1.0</se:AnchorPointY></se:AnchorPoint><se:Displacement>'
-            f'<se:DisplacementX>0</se:DisplacementX><se:DisplacementY>-{size // 2 + 3}</se:DisplacementY>'
-            '</se:Displacement></se:PointPlacement></se:LabelPlacement>'
-            '<se:Halo><se:Radius>2</se:Radius><se:Fill><se:SvgParameter name="fill">#ffffff</se:SvgParameter>'
-            '</se:Fill></se:Halo>'
-            '<se:Fill><se:SvgParameter name="fill">#000000</se:SvgParameter></se:Fill>'
-            '<se:VendorOption name="partials">true</se:VendorOption>'
-            '<se:VendorOption name="spaceAround">10</se:VendorOption>'
-            '<se:VendorOption name="conflictResolution">true</se:VendorOption>'
-            '</se:TextSymbolizer></se:Rule>')
+        rules.append(_text_rule(title, _code_filter(codes, podp), _scale_range(zmin, zmax), 'label',
+                                font, bold, color, above=True, icon=size))
+    # Значения «Подписей» — под значком; значок к этому зуму уже своего крупного размера
+    for codes in VALUE_GROUPS:
+        size = max(NODE_SIZES[c][TEXT_ZOOM - 11] for c in codes)
+        rules.append(_text_rule(f'Значения {",".join(codes)} {TEXT_ZOOM}', _code_filter(codes),
+                                _scale_range(TEXT_ZOOM, None), 'text', VALUES_FONT, False, VALUES_COLOR,
+                                above=False, icon=size))
     body = '\n'.join(rules)
     return ('<?xml version="1.0" encoding="UTF-8"?>\n'
             '<!-- Сгенерирован scripts/geoserver/gid_desktop_style.py: размеры значков и подписи по зуму -->\n'
@@ -361,11 +440,18 @@ def patch_view(gs: Gs, ws: str, store: str, layer: str) -> bool:
     ft = gs.get_xml(path)
     sql_el = ft.find('.//virtualTable/sql')
     sql = sql_el.text or ''
-    if 'отрисовка как в десктопе' in sql:
+    if 'отрисовка как в десктопе' in sql and DIAM_MARK in sql:
         return False
-    if sql.count(ANCHOR) != 1:
-        sys.exit(f'{ws}:{layer}: не найдено место вставки полей ({ANCHOR!r})')
-    sql_el.text = sql.replace(ANCHOR, COLUMNS.strip('\n') + '\n\n' + ANCHOR)
+    if 'отрисовка как в десктопе' not in sql:
+        if sql.count(ANCHOR) != 1:
+            sys.exit(f'{ws}:{layer}: не найдено место вставки полей ({ANCHOR!r})')
+        sql = sql.replace(ANCHOR, COLUMNS.strip('\n') + '\n\n' + ANCHOR)
+    if DIAM_MARK not in sql:
+        old, new = DIAM_EDIT
+        if sql.count(old) != 1:
+            sys.exit(f'{ws}:{layer}: не найдено место правки ({old!r})')
+        sql = sql.replace(old, new)
+    sql_el.text = sql
     put_featuretype(gs, path, ft)
     return True
 
@@ -475,7 +561,6 @@ def main():
     current = bare(info.findtext('defaultStyle/name'))
     styles = info.find('styles')
     others = [bare(s.findtext('name')) for s in styles.findall('style')] if styles is not None else []
-    previous = current if current != STYLE_NAME else next((n for n in others if n != STYLE_NAME), '')
     store = gs.get_xml(f'/rest/workspaces/{ws}/featuretypes/{layer}.xml').findtext('store/name').split(':')[-1]
 
     print(f'{ws}:{layer}: поля view', 'добавлены' if patch_view(gs, ws, store, layer) else 'уже есть')
@@ -485,23 +570,17 @@ def main():
     if args.view_only:
         return
 
-    # Подписи участков — из прежнего стиля (MBStyle), чтобы не разошлись с Алматы
-    labels: list[dict] = []
-    if previous:
-        prev = gs.req('GET', f'/rest/workspaces/{ws}/styles/{previous}.mbstyle', ok=(200, 404))
-        if prev.status_code == 200:
-            labels = [l for l in prev.json().get('layers', []) if l.get('type') == 'symbol']
-
-    body = json.dumps(build_style(labels), ensure_ascii=False, indent=2).encode('utf-8')
+    style = build_style()
+    body = json.dumps(style, ensure_ascii=False, indent=2).encode('utf-8')
     exists = gs.req('GET', f'/rest/workspaces/{ws}/styles/{STYLE_NAME}.xml', ok=(200, 404)).status_code == 200
     ctype = {'Content-Type': 'application/vnd.geoserver.mbstyle+json'}
     if not exists:
-        stub = json.dumps(build_style([]), ensure_ascii=False).encode('utf-8')
+        stub = json.dumps({**style, 'layers': style['layers'][:1]}, ensure_ascii=False).encode('utf-8')
         gs.req('POST', f'/rest/workspaces/{ws}/styles', params={'name': STYLE_NAME}, data=stub, headers=ctype)
     # raw=true: без него GeoServer перечитывает стиль и отвечает 400 на слой подписей
     # (тот же слой лежит в стиле Алматы и работает)
     gs.req('PUT', f'/rest/workspaces/{ws}/styles/{STYLE_NAME}', params={'raw': 'true'}, data=body, headers=ctype)
-    print(f'стиль {ws}:{STYLE_NAME}', 'обновлён' if exists else 'создан', f'({len(labels)} слоя подписей)')
+    print(f'стиль {ws}:{STYLE_NAME}', 'обновлён' if exists else 'создан', f'({len(pipe_labels())} слоя подписей)')
 
     if current != STYLE_NAME:
         extra = ''.join(f'<style><name>{n}</name><workspace>{ws}</workspace></style>'

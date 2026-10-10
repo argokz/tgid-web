@@ -17,6 +17,7 @@ import { useLabelStore, TECHNICAL_LABELS } from '~/stores/labelStore';
 import { usePopupStore } from '~/stores/popupStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { escapeHtml } from '~/utils/escapeHtml';
+import { nearestGroup, pickRadius, queryRenderedNear } from '~/utils/mapPick';
 import { getCityConfig } from '~/utils/cityConfig';
 import { BUILDING_CARD_TABLES, QUERY_LAYER_KEY_TABLE, mergeQueryLayerProperties } from '~/utils/networkFeature';
 import {
@@ -811,7 +812,8 @@ export const useMapStore = defineStore('map', {
           (id) => Boolean(this.map?.getLayer(id)) && !isContextMapLayerId(id)
         );
         if (uniqueLayerIds.length > 0) {
-          const mvtFeatures = this.map.queryRenderedFeatures(e.point, { layers: uniqueLayerIds });
+          // Допуск вокруг курсора, ближайший объект первым: участок не надо «ловить» в пиксель
+          const mvtFeatures = nearestGroup(queryRenderedNear(this.map, e.point, { layers: uniqueLayerIds }));
           mvtFeatures.forEach((f: any) => {
             allFoundFeatures.push(this.normalizeFeatureForState({
               ...f,
@@ -883,7 +885,9 @@ export const useMapStore = defineStore('map', {
         }
       }
 
-      if (uniqueWmsTargets.size > 0) {
+      // Рядом с курсором есть объект сети (MVT) — он и выбирается; здания и прочие WMS-слои
+      // под ним спрашиваем, только если рядом ничего нет (иначе меню «участок или здание?»)
+      if (uniqueWmsTargets.size > 0 && allFoundFeatures.length === 0) {
         const wmsTasks = Array.from(uniqueWmsTargets.values()).map(async (target) => {
           try {
             const result = await Promise.race([
@@ -1275,8 +1279,9 @@ export const useMapStore = defineStore('map', {
       const baseInspectLayerIds = this.getBaseHoverInspectLayerIds();
 
       try {
+        const r = pickRadius();
         const features = allLayerIds.length > 0
-          ? this.map.queryRenderedFeatures(e.point, { layers: allLayerIds })
+          ? this.map.queryRenderedFeatures([[e.point.x - r, e.point.y - r], [e.point.x + r, e.point.y + r]], { layers: allLayerIds })
           : [];
         const contextFeatures = (this.contextHoverInspectEnabled && contextLayerIds.length > 0)
           ? this.map.queryRenderedFeatures(e.point, { layers: contextLayerIds })
