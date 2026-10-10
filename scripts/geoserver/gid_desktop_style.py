@@ -15,7 +15,8 @@
 Узлы (слой uzel). Обычный узел с внутренней схемой (камера, ЦТРП, павильон) десктоп рисует знаком
 камеры (gidr_draw.cpp drawNode0: isP && TIP_US → picKAM). В view такой узел получает code = 'TK',
 в стиль uzel добавляются правила TK со значком svg/tk.svg. Нужен индекс nodes(internalnodeid)
-в базе города, иначе каждый тайл перебирает все узлы.
+в базе города, иначе каждый тайл перебирает все узлы. Подписи узлов — поле label (название без
+технических «#…») и podp (displaySign десктопа), см. NODE_LABELS.
 
     set GEOSERVER_REST_USER / GEOSERVER_REST_PASSWORD
     python scripts/geoserver/gid_desktop_style.py --workspace AstanaGIS
@@ -184,15 +185,22 @@ NODE_SIZES = {
 }
 NODE_ICONS = {'IS': 'is', 'NS': 'ns', 'TK': 'tk', 'PR': 'pr', 'EL': 'el', 'NZ': 'nz', 'PO': 'po', 'US': 'us'}
 CONSUMERS = ('PR', 'EL', 'NZ', 'PO', 'US')
-# Подписи: (коды, с какого зума, до какого, шрифт, жирный, поле). На крупном масштабе у узла под
-# названием — результаты расчёта (поле text), как в Алматы. Веб уменьшает шрифт стилей на 20%
-# (services/mapService.ts), на экране 15 → 12 px, 13 → 10,4 px.
+# Подписи: (коды, с какого зума, до какого, шрифт, жирный, поле, только «подписывать»). Подпись —
+# поле label view (название без технических «#…»). Все узлы подписаны с 16, как в Алматы (1:7000);
+# узлы с признаком «подписывать» десктопа (nodes.displaySign → podp) — раньше. С TEXT_ZOOM под
+# названием — выбранные в «Подписях» значения (поле text) у узлов всех видов. Веб уменьшает шрифт
+# стилей на 20% (services/mapService.ts), на экране 15 → 12 px, 13 → 10,4 px.
+TEXT_ZOOM = 17
 NODE_LABELS = [
-    (('IS',), 12, None, 15, True, 'name'),
-    (('NS',), 14, None, 14, True, 'name'),
-    (('TK',), 15, None, 13, False, 'name'),
-    (CONSUMERS, 17, 18, 13, False, 'name'),
-    (CONSUMERS, 18, None, 14, False, 'name+text'),
+    (('IS',), 12, TEXT_ZOOM, 15, True, 'label', False),
+    (('IS',), TEXT_ZOOM, None, 15, True, 'label+text', False),
+    (('NS',), 14, TEXT_ZOOM, 14, True, 'label', False),
+    (('NS',), TEXT_ZOOM, None, 14, True, 'label+text', False),
+    (('TK',), 14, TEXT_ZOOM, 13, False, 'label', False),
+    (('TK',), TEXT_ZOOM, None, 13, False, 'label+text', False),
+    (CONSUMERS, 14, 16, 12, False, 'label', True),
+    (CONSUMERS, 16, TEXT_ZOOM, 12, False, 'label', False),
+    (CONSUMERS, TEXT_ZOOM, None, 13, False, 'label+text', False),
 ]
 SCALE_AT_ZOOM_ZERO = 559082264.0287178  # как в utils/sldToMapLibre.ts: правила SLD → minzoom/maxzoom
 
@@ -208,10 +216,17 @@ def _scale_range(zmin: float, zmax: float | None) -> str:
     return out
 
 
-def _code_filter(codes: tuple[str, ...]) -> str:
-    eqs = ''.join(f'<ogc:PropertyIsEqualTo><ogc:PropertyName>code</ogc:PropertyName>'
-                  f'<ogc:Literal>{c}</ogc:Literal></ogc:PropertyIsEqualTo>' for c in codes)
-    return f'<ogc:Filter>{eqs if len(codes) == 1 else f"<ogc:Or>{eqs}</ogc:Or>"}</ogc:Filter>'
+def _eq(field: str, value: str | int) -> str:
+    return (f'<ogc:PropertyIsEqualTo><ogc:PropertyName>{field}</ogc:PropertyName>'
+            f'<ogc:Literal>{value}</ogc:Literal></ogc:PropertyIsEqualTo>')
+
+
+def _code_filter(codes: tuple[str, ...], podp: bool = False) -> str:
+    eqs = ''.join(_eq('code', c) for c in codes)
+    cond = eqs if len(codes) == 1 else f'<ogc:Or>{eqs}</ogc:Or>'
+    if podp:
+        cond = f'<ogc:And>{cond}{_eq("podp", 1)}</ogc:And>'
+    return f'<ogc:Filter>{cond}</ogc:Filter>'
 
 
 NEWLINE_LITERAL = '<ogc:Literal><![CDATA[\n]]></ogc:Literal>'
@@ -239,16 +254,17 @@ def build_uzel_sld() -> str:
                 f'<se:ExternalGraphic><se:OnlineResource xlink:type="simple" xlink:href="svg/{NODE_ICONS[code]}.svg"/>'
                 f'<se:Format>image/svg+xml</se:Format></se:ExternalGraphic><se:Size>{size}</se:Size>'
                 '</se:Graphic></se:PointSymbolizer></se:Rule>')
-    for codes, zmin, zmax, font, bold, field in NODE_LABELS:
+    for codes, zmin, zmax, font, bold, field, podp in NODE_LABELS:
         size = max(NODE_SIZES[c][min(zmin, 19) - 11] for c in codes) or 10
-        if field == 'name':
-            label = '<ogc:PropertyName>name</ogc:PropertyName>'
+        if field == 'label':
+            label = '<ogc:PropertyName>label</ogc:PropertyName>'
         else:
-            label = ('<ogc:Function name="Concatenate"><ogc:PropertyName>name</ogc:PropertyName>'
+            label = ('<ogc:Function name="Concatenate"><ogc:PropertyName>label</ogc:PropertyName>'
                      f'{NEWLINE_LITERAL}<ogc:PropertyName>text</ogc:PropertyName></ogc:Function>')
         weight = '<se:SvgParameter name="font-weight">bold</se:SvgParameter>' if bold else ''
+        title = f'Подпись {",".join(codes)} {zmin}' + (' (подписывать)' if podp else '')
         rules.append(
-            f'<se:Rule><se:Name>Подпись {",".join(codes)} {zmin}</se:Name>{_code_filter(codes)}{_scale_range(zmin, zmax)}'
+            f'<se:Rule><se:Name>{title}</se:Name>{_code_filter(codes, podp)}{_scale_range(zmin, zmax)}'
             f'<se:TextSymbolizer uom="http://www.opengeospatial.org/se/units/pixel"><se:Label>{label}</se:Label>'
             f'<se:Font><se:SvgParameter name="font-family">Arial, sans-serif</se:SvgParameter>'
             f'<se:SvgParameter name="font-size">{font}</se:SvgParameter>{weight}</se:Font>'
@@ -287,6 +303,16 @@ NODE_SQL_EDITS = [
      "left join lateral (select c.internalnodeid as id from nodes c\n"
      "                   where c.internalnodeid = n.id and c.removed = 0 limit 1) sch on true"),
 ]
+# Поля подписи: label — название без технических имён «#…» (в Астане так названа половина проходных
+# узлов, импорт ArcGIS); podp — признак «подписывать» десктопа (gidr_draw.cpp drawNode: node.isPodp).
+# «%» в SQL-view GeoServer — параметры, поэтому left(…, 1), а не like '#%'.
+NODE_LABEL_EDIT = (
+    "n.externalnodename as name,",
+    "n.externalnodename as name,\n"
+    "-- gid_desktop_style.py: подпись на карте\n"
+    "case when left(n.externalnodename, 1) = '#' then '' else n.externalnodename end as label,\n"
+    "coalesce(n.displaysign, 0) as podp,",
+)
 
 
 def patch_uzel(gs: Gs, ws: str, store: str, layer: str = 'uzel') -> list[str]:
@@ -295,14 +321,20 @@ def patch_uzel(gs: Gs, ws: str, store: str, layer: str = 'uzel') -> list[str]:
     ft = gs.get_xml(path)
     sql_el = ft.find('.//virtualTable/sql')
     sql = sql_el.text or ''
+    edits = []
     if "then 'TK'" not in sql:
-        for old, new in NODE_SQL_EDITS:
+        edits += NODE_SQL_EDITS
+        done.append('view: code TK')
+    if ' as label,' not in sql:
+        edits.append(NODE_LABEL_EDIT)
+        done.append('view: label, podp')
+    if edits:
+        for old, new in edits:
             if sql.count(old) != 1:
                 sys.exit(f'{ws}:{layer}: не найдено место правки ({old!r})')
             sql = sql.replace(old, new)
         sql_el.text = sql
         put_featuretype(gs, path, ft)
-        done.append('view: code TK')
 
     for name, svg in NODE_SVGS.items():
         gs.req('PUT', f'/rest/resource/workspaces/{ws}/styles/svg/{name}', data=svg.encode('utf-8'),
