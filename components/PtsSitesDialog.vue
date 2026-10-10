@@ -381,6 +381,7 @@ import {
 } from '~/services/ptsService';
 import { useAuthStore } from '~/stores/authStore';
 import { useNotificationStore } from '~/stores/notificationStore';
+import { useFragmentStore } from '~/stores/fragmentStore';
 import { apiErrorText } from '~/utils/groupSetters';
 import { cardPayload, describePipesChange, groupSitesByChief, inputType, siteTitle, toFormValue } from '~/utils/ptsSites';
 
@@ -569,7 +570,9 @@ const downloadPassport = async () => {
   if (!card.value) return;
   downloading.value = true;
   try {
-    const { blob, filename } = await fastApiService.downloadPassport(kind.value, card.value.id);
+    const { blob, filename } = await fastApiService.downloadPassport(kind.value, card.value.id, {
+      fragments: useFragmentStore().visibleFragments,
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

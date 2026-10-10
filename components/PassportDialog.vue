@@ -38,6 +38,10 @@
             {{ diagnostics.counts?.heatpipesections_with_dist_site || 0 }}
           </div>
         </v-alert>
+        <div class="px-4 pt-3 pb-1 text-caption text-medium-emphasis">
+          Паспорт строится по фрагментам, включённым на карте ({{ fragmentsText }}), как в программе.
+          У начальника участка — кнопка архива: паспорта всех его участков и перечень.
+        </div>
         <v-container
           v-if="loading"
           class="d-flex justify-center align-center h-100"
@@ -75,7 +79,32 @@
                       v-bind="props"
                       prepend-icon="mdi-account-tie"
                       :title="nach.name"
-                    />
+                      :subtitle="downloadingChiefId === nach.id ? progressText : undefined"
+                    >
+                      <template #append>
+                        <v-progress-circular
+                          v-if="downloadingChiefId === nach.id"
+                          indeterminate
+                          color="success"
+                          size="20"
+                          width="2"
+                          class="me-2"
+                        />
+                        <v-btn
+                          v-else-if="nach.nach_id"
+                          icon="mdi-folder-zip"
+                          color="success"
+                          size="small"
+                          variant="text"
+                          :disabled="Boolean(downloadingChiefId)"
+                          :title="`Паспорта всех участков ${kindTitle(item.id)} начальника — архив`"
+                          :aria-label="`Паспорта всех участков ${kindTitle(item.id)} начальника ${nach.name}`"
+                          @click.stop="downloadChief(item.id, nach)"
+                        />
+                        <!-- стрелка группы: свой слот append заменяет её -->
+                        <v-icon :icon="(props.appendIcon as string | undefined)" />
+                      </template>
+                    </v-list-item>
                   </template>
 
                   <v-list-item
@@ -117,8 +146,9 @@
 
 <script setup lang="ts">
 import { formatApiErrorWith } from '~/utils/apiError'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useNotificationStore } from '~/stores/notificationStore'
+import { useFragmentStore } from '~/stores/fragmentStore'
 import {
   describeFileJobProgress,
   fastApiService,
@@ -138,6 +168,27 @@ const diagnostics = ref<{
   counts: Record<string, number>
 } | null>(null)
 const notificationStore = useNotificationStore()
+const fragmentStore = useFragmentStore()
+const downloadingChiefId = ref<string | null>(null)
+
+const fragmentsText = computed(() => {
+  const n = fragmentStore.visibleFragments.length
+  return n ? `${n}` : 'все'
+})
+/** Ветка дерева: root_ms — магистральные сети, root_rs — распределительные */
+const kindOf = (rootId: string): 'ms' | 'rs' => (rootId.endsWith('_rs') ? 'rs' : 'ms')
+const kindTitle = (rootId: string) => (kindOf(rootId) === 'ms' ? 'МС' : 'РС')
+
+const saveBlob = (blob: Blob, filename: string) => {
+  const objectUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(objectUrl)
+}
 
 const fetchHierarchy = async () => {
   loading.value = true
@@ -168,23 +219,38 @@ const downloadPassport = async (msRs: PassportSite['ms_rs'], id: number) => {
   try {
     progressText.value = ''
     const { blob, filename } = await fastApiService.downloadPassport(msRs, id, {
+      fragments: fragmentStore.visibleFragments,
       onProgress: (p) => {
         progressText.value = describeFileJobProgress(p)
       },
     })
-    const objectUrl = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = objectUrl
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(objectUrl)
+    saveBlob(blob, filename)
     notificationStore.showSuccess(`Паспорт «${filename}» сформирован`)
   } catch (e: any) {
     notificationStore.showError(formatApiErrorWith('Ошибка формирования паспорта', e))
   } finally {
     downloadingSiteId.value = null
+  }
+}
+
+/** Паспорта всех участков начальника в ветке МС или РС — архив (фоновая задача passport_chief) */
+const downloadChief = async (rootId: string, nach: { id: string; nach_id?: number; name: string }) => {
+  if (!nach.nach_id) return
+  downloadingChiefId.value = nach.id
+  progressText.value = ''
+  try {
+    const { blob, filename } = await fastApiService.downloadChiefPassports(nach.nach_id, [kindOf(rootId)], {
+      fragments: fragmentStore.visibleFragments,
+      onProgress: (p) => {
+        progressText.value = describeFileJobProgress(p)
+      },
+    })
+    saveBlob(blob, filename)
+    notificationStore.showSuccess(`Паспорта участков ${kindTitle(rootId)} начальника ${nach.name} сформированы`)
+  } catch (e: any) {
+    notificationStore.showError(formatApiErrorWith('Ошибка формирования паспортов', e))
+  } finally {
+    downloadingChiefId.value = null
   }
 }
 

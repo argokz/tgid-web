@@ -1163,6 +1163,7 @@ import { getFeatureFragmentId, getSectionRowId, resolveCardObject, type CardObje
 import { canEditFragment } from '~/utils/permissions'
 import { useAuthStore } from '~/stores/authStore'
 import { useNotificationStore } from '~/stores/notificationStore'
+import { useFragmentStore } from '~/stores/fragmentStore'
 
 
 const componentProps = withDefaults(defineProps<{
@@ -1785,7 +1786,10 @@ const downloadPassport = async () => {
 
   try {
 
-    const { blob, filename } = await fastApiService.downloadObjectPassport(target.table, target.id)
+    // фрагменты карты — как десктоп (-fragments): без них в паспорт попадают копии труб из вариантов
+    const { blob, filename } = await fastApiService.downloadObjectPassport(target.table, target.id, {
+      fragments: useFragmentStore().visibleFragments,
+    })
 
     saveBlob(blob, filename)
 

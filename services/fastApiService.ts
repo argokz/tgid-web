@@ -302,6 +302,9 @@ export interface PassportSite {
   is_leaf?: boolean;
 }
 
+/** Паспорт: фрагменты карты — как -fragments десктопа (без них — копии труб из фрагментов-вариантов) */
+export type PassportOptions = FileJobOptions & { fragments?: readonly number[] };
+
 export interface PassportHierarchyGroup {
   id: string;
   name: string;
@@ -1458,6 +1461,7 @@ const isMissingRoute = (error: unknown): boolean =>
 /** Виды фоновых файлов API (database/file_jobs.py) */
 export type FileJobKind =
   | 'passport'
+  | 'passport_chief'
   | 'report_excel'
   | 'catalog_report'
   | 'alseko_reconciliation'
@@ -2897,7 +2901,7 @@ export const fastApiService = {
   async downloadPassport(
     msRs: PassportSite['ms_rs'],
     id: number,
-    options: FileJobOptions = {},
+    options: PassportOptions = {},
   ): Promise<{ blob: Blob; filename: string }> {
     return fastApiService.downloadObjectPassport(`uchastok_${msRs}`, id, options);
   },
@@ -2905,18 +2909,35 @@ export const fastApiService = {
   async downloadObjectPassport(
     table: string,
     id: number,
-    options: FileJobOptions = {},
+    options: PassportOptions = {},
   ): Promise<{ blob: Blob; filename: string }> {
+    const { fragments, ...jobOptions } = options;
+    const frags = fragments?.length ? [...fragments] : null;
     const sync = async () => ({
       blob: await request<Blob>(`api/db/object/${encodePath(table)}/${encodePath(id)}`, {
         method: 'POST',
         responseType: 'blob',
         timeout: REPORT_TIMEOUT_MS,
+        query: frags ? { fragments: frags.join(',') } : undefined,
       }),
       filename: `Passport_${table}_${id}.xlsx`,
     });
     // имя с сервера — по участку (Passport_ms_12.xlsx), даже если паспорт открыт по трубе/узлу
-    return runFileJob('passport', { table, obj_id: id }, sync, options);
+    return runFileJob('passport', { table, obj_id: id, ...(frags ? { fragments: frags } : {}) }, sync, jobOptions);
+  },
+
+  /**
+   * Паспорта всех участков начальника участка (МС и/или РС) — ZIP: паспорт каждого участка в формате
+   * десктопа и «Перечень участков.xlsx». Только фоном: десятки участков строятся минутами.
+   */
+  async downloadChiefPassports(
+    nachId: number,
+    kinds: ReadonlyArray<'ms' | 'rs'>,
+    options: PassportOptions = {},
+  ): Promise<{ blob: Blob; filename: string }> {
+    const { fragments, ...jobOptions } = options;
+    const params = { nach_id: nachId, kinds: [...kinds], ...(fragments?.length ? { fragments: [...fragments] } : {}) };
+    return runFileJob('passport_chief', params, null, { timeoutMs: 60 * 60_000, ...jobOptions });
   },
 
   formatAttributeValue(value: any): string {

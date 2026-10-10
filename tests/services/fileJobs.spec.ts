@@ -54,6 +54,42 @@ describe('fastApiService: фоновые файлы (задача → стату
     await expect(fastApiService.downloadObjectPassport('nodes', 1, { pollMs: 0 })).rejects.toThrow('Узел не найден')
   })
 
+  it('паспорт по фрагментам карты (как -fragments десктопа): в задачу и в синхронный эндпоинт', async () => {
+    const blob = new Blob(['p'])
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith('api/v1/file-jobs')) throw Object.assign(new Error('nf'), { status: 404, response: { status: 404 } })
+      if (url.endsWith('api/db/object/uchastok_rs/227')) return blob
+      throw new Error(`unexpected ${url}`)
+    })
+    await fastApiService.downloadPassport('rs', 227, { pollMs: 0, fragments: [2, 3179] })
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      body: { kind: 'passport', params: { table: 'uchastok_rs', obj_id: 227, fragments: [2, 3179] } },
+    })
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'POST', query: { fragments: '2,3179' } })
+  })
+
+  it('паспорта по начальнику участка — архив фоновой задачей passport_chief, без синхронного запасного пути', async () => {
+    const blob = new Blob(['PK'])
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === `${BASE}api/v1/file-jobs`) return { task_id: 'c1' }
+      if (url === `${BASE}api/v1/file-jobs/c1`) {
+        return { task_id: 'c1', state: 'SUCCESS', ready: true, success: true, message: null, filename: 'Паспорта.zip' }
+      }
+      if (url === `${BASE}api/v1/file-jobs/c1/download`) return blob
+      throw new Error(`unexpected ${url}`)
+    })
+    const res = await fastApiService.downloadChiefPassports(2, ['rs'], { pollMs: 0, fragments: [5] })
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      body: { kind: 'passport_chief', params: { nach_id: 2, kinds: ['rs'], fragments: [5] } },
+    })
+    expect(res).toEqual({ blob, filename: 'Паспорта.zip' })
+
+    fetchMock.mockImplementation(async () => {
+      throw Object.assign(new Error('nf'), { status: 404, response: { status: 404 } })
+    })
+    await expect(fastApiService.downloadChiefPassports(2, ['ms'], { pollMs: 0 })).rejects.toThrow()
+  })
+
   it('старый API без file-jobs (404) — синхронный эндпоинт', async () => {
     const blob = new Blob(['x'])
     fetchMock.mockImplementation(async (url: string) => {
