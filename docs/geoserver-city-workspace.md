@@ -14,9 +14,12 @@
 | `sql/migrations/20260927_topology_undo_log.sql`, `20260928_heat_losses_report_out.sql` | отмена в редакторе топологии, листы нормативных теплопотерь |
 
 **После переконвертации базы из десктопа** все правки пропадают (12.10 база пересоздана, слои `uzel` и
-`heatpipesections` падали без `tg_format*` — карта пустая). Вернуть одним скриптом (идемпотентный,
-одна транзакция, включает и индекс `nodes_internalnodeid_idx`):
-`H:\tgid-backups\2026-10-12_astana_reconvert\astana_after_reconvert.sql`. Перезапуск служб не нужен.
+`heatpipesections` падали без `tg_format*` — карта пустая). Возвращает их скрипт API
+`scripts/astana_after_reconvert.py --db <база>` (`sql/astana/*.sql` + миграции, одна транзакция;
+`--check` — только проверить). На сервере он запускается сам: задача планировщика
+`tgid-astana-db-watch` раз в 10 минут (`H:\deploy\install-astana-db-watch.ps1`, ставится от
+администратора), пока идёт конвертация — ждёт. Журнал `H:\deploy\logs\astana-db-watch.log`.
+Перезапуск служб не нужен.
 
 В остальном схема совпадает с `almatygid`. В Астане нет `zdaniya_2` (здания с нагрузками), поэтому
 и слоя такого нет.
