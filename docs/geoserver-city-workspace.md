@@ -13,6 +13,11 @@
 | функции `tg_format*` (`02_tg_format_functions.sql`, из `almatygid`) | подписи слоёв `uzel`/`heatpipesections` (`NAPOR`, `DLINA`…) |
 | `sql/migrations/20260927_topology_undo_log.sql`, `20260928_heat_losses_report_out.sql` | отмена в редакторе топологии, листы нормативных теплопотерь |
 
+**После переконвертации базы из десктопа** все правки пропадают (12.10 база пересоздана, слои `uzel` и
+`heatpipesections` падали без `tg_format*` — карта пустая). Вернуть одним скриптом (идемпотентный,
+одна транзакция, включает и индекс `nodes_internalnodeid_idx`):
+`H:\tgid-backups\2026-10-12_astana_reconvert\astana_after_reconvert.sql`. Перезапуск служб не нужен.
+
 В остальном схема совпадает с `almatygid`. В Астане нет `zdaniya_2` (здания с нагрузками), поэтому
 и слоя такого нет.
 
