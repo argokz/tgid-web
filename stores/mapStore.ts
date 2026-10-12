@@ -20,6 +20,7 @@ import { escapeHtml } from '~/utils/escapeHtml';
 import { nearestGroup, pickRadius, queryRenderedNear } from '~/utils/mapPick';
 import { getCityConfig } from '~/utils/cityConfig';
 import { BUILDING_CARD_TABLES, QUERY_LAYER_KEY_TABLE, mergeQueryLayerProperties } from '~/utils/networkFeature';
+import { desktopCardKind, desktopCardProps } from '~/utils/desktopCard';
 import {
   getMapTilerGlyphsUrl,
   getMapTilerHybridTilesUrl,
@@ -1078,6 +1079,20 @@ export const useMapStore = defineStore('map', {
           if (wfsData && wfsData.properties) {
             properties = mergeQueryLayerProperties(properties, wfsData.properties, table, lookupId);
             if (import.meta.dev) console.debug('[Select] Augmented selection via WFS table:', table, 'id:', wfsId);
+          }
+        }
+
+        // Карточка объекта сети — из API, как в десктопе gid8 (tab/gid8, видимость полей по схеме,
+        // подписи): у id_* GeoServer старые описания. Не ответил API — остаётся карточка GeoServer.
+        const cardKind = desktopCardKind(table);
+        if (cardKind && lookupId !== null) {
+          try {
+            const card = desktopCardProps((await fastApiService.getObjectData(cardKind, table, lookupId))?.data?.tabs);
+            if (card) {
+              properties = { ...properties, ...card.values, tg_tabs: card.tg_tabs, tg_names: card.tg_names };
+            }
+          } catch (err) {
+            console.warn('[Select] карточка API недоступна, показываю карточку GeoServer', table, lookupId, err);
           }
         }
       } catch (err) {
