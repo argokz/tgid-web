@@ -108,6 +108,10 @@ export interface Field {
   code?: number | null;
   type: 'text' | 'select';
   select?: string;
+  /** Участок-пара (подача и обратка): значение второй колонки */
+  value2?: string | number | null;
+  code2?: number | null;
+  id2?: number | null;
 }
 
 export interface Subsection {
@@ -130,6 +134,8 @@ export interface FeatureData {
   workspace?: string;
   data?: {
     tabs: Tab[];
+    /** Заголовки колонок карточки участка-пары («Подача», «Обратка») */
+    columns?: string[];
   };
 }
 

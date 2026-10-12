@@ -1087,9 +1087,11 @@ export const useMapStore = defineStore('map', {
         const cardKind = desktopCardKind(table);
         if (cardKind && lookupId !== null) {
           try {
-            const card = desktopCardProps((await fastApiService.getObjectData(cardKind, table, lookupId))?.data?.tabs);
+            const cardData = (await fastApiService.getObjectData(cardKind, table, lookupId))?.data;
+            const card = desktopCardProps(cardData?.tabs, cardData?.columns);
             if (card) {
               properties = { ...properties, ...card.values, tg_tabs: card.tg_tabs, tg_names: card.tg_names };
+              if (card.tg_pair) properties.tg_pair = card.tg_pair;
             }
           } catch (err) {
             console.warn('[Select] карточка API недоступна, показываю карточку GeoServer', table, lookupId, err);

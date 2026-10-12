@@ -935,6 +935,20 @@
 
                       <div class="ap-fields">
 
+                        <!-- участок-пара, как в десктопе: подача и обратка в две колонки -->
+                        <div
+                          v-if="cardPair"
+                          class="ap-field-row ap-pair-head"
+                        >
+                          <div class="ap-field-value-wrap">
+                            <span
+                              v-for="col in cardPair.columns"
+                              :key="col"
+                              class="ap-pair-col"
+                            >{{ col }}</span>
+                          </div>
+                        </div>
+
                         <div
 
                           v-for="field in section.fields"
@@ -958,6 +972,12 @@
                               {{ hasValue(field.value) ? formatValue(field.value) : '—' }}
 
                             </span>
+
+                            <span
+                              v-if="cardPair && cardPair.keys[field.key]"
+                              class="ap-field-value"
+                              :class="{ 'ap-field-value--empty': !hasValue(attributes[cardPair.keys[field.key]]) }"
+                            >{{ hasValue(attributes[cardPair.keys[field.key]]) ? formatValue(attributes[cardPair.keys[field.key]]) : '—' }}</span>
 
                             <v-btn
 
@@ -1157,6 +1177,7 @@ import { ref, computed, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 
 import { useAttributeTabs, type TabData } from '~/composables/useAttributeTabs'
+import { parseDesktopCardPair, type DesktopCardPair } from '~/utils/desktopCard'
 
 import { ApiError, fastApiService, type ReverseLineReport } from '~/services/fastApiService'
 import { getFeatureFragmentId, getSectionRowId, resolveCardObject, type CardObject } from '~/utils/networkFeature'
@@ -1262,6 +1283,8 @@ const objectTitle = ref('')
 const objectTabsData = ref<any[] | null>(null)
 
 const objectNamesData = ref<Record<string, string> | null>(null)
+/** Участок-пара из карточки API: колонки «Подача», «Обратка» и ключи вторых значений */
+const cardPair = ref<DesktopCardPair | null>(null)
 
 const isEditTopologyMode = computed(() => componentProps.isEditTopologyMode)
 
@@ -1589,7 +1612,9 @@ const show = (props: Record<string, any>) => {
   }
 
 
-  const { tg_tabs, tg_names, ...cleanProps } = props
+  const { tg_tabs, tg_names, tg_pair, ...cleanProps } = props
+
+  cardPair.value = parseDesktopCardPair(tg_pair)
 
 
   console.log('[AttributePanel] cleanProps keys count:', Object.keys(cleanProps).length)
@@ -2268,6 +2293,20 @@ defineExpose({ show, close })
   word-break: break-word;
 
   flex: 1;
+
+}
+
+.ap-pair-head .ap-field-value-wrap { justify-content: flex-start; }
+
+.ap-pair-col {
+
+  flex: 1;
+
+  font-size: 0.68rem;
+
+  font-weight: 600;
+
+  color: #546e7a;
 
 }
 
