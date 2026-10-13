@@ -17,6 +17,8 @@ export interface LayerConfig {
   url?: string;
   styleUrl?: string;
   mvtUrl?: string;
+  /** Границы тайлов [west, south, east, north] (кеш GWC: за ними 400 TileOutOfRange) */
+  tileBounds?: [number, number, number, number];
   paint: Record<string, any>;
   layout?: Record<string, any>;
   filter?: any[];

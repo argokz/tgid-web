@@ -21,6 +21,21 @@ export function wmtsLayerHasGwcMvt(wmtsLayer: any): boolean {
   return asArray(wmtsLayer.TileMatrixSetLink).some((link: any) => String(link?.TileMatrixSet ?? '') === GWC_MVT_GRIDSET)
 }
 
+/**
+ * Границы слоя из WMTS GetCapabilities (ows:WGS84BoundingBox) — [west, south, east, north].
+ * Кеш GWC за ними отвечает 400 TileOutOfRange (WMS отдавал пустой тайл): карте их запрашивать незачем.
+ */
+export function wmtsLayerBounds(wmtsLayer: any): [number, number, number, number] | null {
+  const box = wmtsLayer?.['ows:WGS84BoundingBox']
+  const lower = String(box?.['ows:LowerCorner'] ?? '').trim().split(/\s+/).map(Number)
+  const upper = String(box?.['ows:UpperCorner'] ?? '').trim().split(/\s+/).map(Number)
+  if (lower.length !== 2 || upper.length !== 2 || ![...lower, ...upper].every(Number.isFinite)) return null
+  const [w, s] = lower
+  const [e, n] = upper
+  if (w >= e || s >= n) return null
+  return [w, s, e, n]
+}
+
 /** Шаблон XYZ-тайла MVT из кеша GWC (WMTS рабочей области) */
 export function gwcMvtTileUrl(baseUrl: string, workspace: string, layerName: string): string {
   const base = baseUrl.replace(/\/$/, '')

@@ -147,6 +147,8 @@ export const mapService = {
           tiles: [layer.mvtUrl],
           minzoom: 0,
           maxzoom: 22,
+          // Кеш GWC за границами слоя отвечает 400 TileOutOfRange — такие тайлы не запрашиваем
+          ...(layer.tileBounds ? { bounds: layer.tileBounds } : {}),
         });
       }
 

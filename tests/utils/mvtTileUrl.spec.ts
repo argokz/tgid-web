@@ -4,6 +4,7 @@ import {
   mergeViewparamFields,
   tileUrlWithViewparams,
   withTileRevision,
+  wmtsLayerBounds,
   wmtsLayerHasGwcMvt,
 } from '~/utils/mvtTileUrl'
 
@@ -18,6 +19,16 @@ describe('mvtTileUrl', () => {
     expect(wmtsLayerHasGwcMvt({ Format: formats })).toBe(false)
     expect(wmtsLayerHasGwcMvt({ Format: 'image/png', TileMatrixSetLink: { TileMatrixSet: 'EPSG:900913' } })).toBe(false)
     expect(wmtsLayerHasGwcMvt(undefined)).toBe(false)
+  })
+
+  it('границы слоя из ows:WGS84BoundingBox', () => {
+    const box = (lower: string, upper: string) => ({
+      'ows:WGS84BoundingBox': { 'ows:LowerCorner': lower, 'ows:UpperCorner': upper },
+    })
+    expect(wmtsLayerBounds(box('71.32 51.03', '71.66 51.22'))).toEqual([71.32, 51.03, 71.66, 51.22])
+    expect(wmtsLayerBounds(box('71.66 51.03', '71.32 51.22'))).toBeNull()
+    expect(wmtsLayerBounds(box('x 51', '71 52'))).toBeNull()
+    expect(wmtsLayerBounds({})).toBeNull()
   })
 
   it('WMTS рабочей области с шаблоном XYZ', () => {

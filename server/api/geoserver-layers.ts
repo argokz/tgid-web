@@ -15,7 +15,7 @@ import {
   nodeKindCodes,
   withCqlParam
 } from '~/utils/nodeKindLayers';
-import { gwcMvtTileUrl, wmtsLayerHasGwcMvt } from '~/utils/mvtTileUrl';
+import { gwcMvtTileUrl, wmtsLayerBounds, wmtsLayerHasGwcMvt } from '~/utils/mvtTileUrl';
 import { readCityConfig } from '~/utils/cityConfig';
 
 /** Тестовый BBOX Web Mercator (±40 км от центра города), чтобы подставить вместо {bbox-epsg-3857}. */
@@ -462,11 +462,13 @@ export default defineEventHandler(async (event) => {
 
       let mvtPack: Awaited<ReturnType<typeof fetchMvtStylePack>> = null;
       let mvtUrl = '';
+      let tileBounds: [number, number, number, number] | undefined;
 
       if (le.mvt && wmtsXml) {
         // Кеш GWC, если у слоя на GeoServer настроены сетка и MVT (scripts/geoserver/gwc_mvt_cache.py),
         // иначе WMS GetMap — тайл строится заново на каждый запрос
         const useGwc = gwcMvtEnabled && wmtsLayerHasGwcMvt(wmtsXml);
+        if (useGwc) tileBounds = wmtsLayerBounds(wmtsXml) ?? undefined;
         const baseMvtUrl = useGwc
           ? gwcMvtTileUrl(le.workspaceBaseUrl || defaultPublicUrl, le.workspace, tileSource)
           : mvtTemplateUrl.replace('{layerName}', qualified);
@@ -547,6 +549,7 @@ export default defineEventHandler(async (event) => {
         workspaceBaseUrl: le.workspaceBaseUrl,
         type: mvtPack.type,
         mvtUrl,
+        tileBounds,
         paint: mvtPack.paint,
         layout: mvtPack.layout,
         mbLayers: mvtPack.mbLayers,
