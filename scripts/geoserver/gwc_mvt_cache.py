@@ -173,7 +173,9 @@ def fix_bounds(gwc: Gwc, layer: str, backup: Path):
     (backup / f'{layer.replace(":", "__")}.featuretype-{stamp}.xml').write_text(
         gwc.req('GET', f'{path}.xml').text, encoding='utf-8')
     before = native_bbox(gwc, layer)
-    gwc.req('PUT', f'{path}?recalculate=nativebbox,latlonbbox',
+    # PUT принимается только по пути через хранилище (без него — 404 «No such feature type»)
+    store = gwc.req('GET', f'{path}.json').json()['featureType']['store']['name'].split(':', 1)[-1]
+    gwc.req('PUT', f'/rest/workspaces/{ws}/datastores/{store}/featuretypes/{name}?recalculate=nativebbox,latlonbbox',
             data='<featureType><enabled>true</enabled></featureType>'.encode('utf-8'),
             headers={'Content-Type': 'text/xml'})
     gwc.put_layer(layer, gwc.get_layer(layer))
