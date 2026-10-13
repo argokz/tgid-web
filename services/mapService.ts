@@ -140,13 +140,15 @@ export const mapService = {
       // источник, и слой ждал «тишины» на карте до таймаута.
       await waitForStyleMutable(map);
 
-      // Добавляем источник данных
-      map.addSource(layer.sourceId, {
-        type: 'vector',
-        tiles: [layer.mvtUrl],
-        minzoom: 0,
-        maxzoom: 22,
-      });
+      // Источник данных; слои узлов (uzel, источники, НС, потребители) делят один источник тайлов uzel
+      if (!map.getSource(layer.sourceId)) {
+        map.addSource(layer.sourceId, {
+          type: 'vector',
+          tiles: [layer.mvtUrl],
+          minzoom: 0,
+          maxzoom: 22,
+        });
+      }
 
       const styleImages = new globalThis.Map<string, string>();
       for (const mbLayer of layer.mbLayers || []) {

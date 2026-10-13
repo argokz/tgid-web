@@ -19,6 +19,7 @@ import { buildMvtLayerIdentifiers, buildWmsOnlyLayerIdentifiers, buildWmsRasterS
 import { combineWithFragmentFilter, fragmentFilterFor } from '~/utils/mapFragmentFilter';
 import { combineCql } from '~/utils/nodeKindLayers';
 import { buildViewparams, type PtsHighlight } from '~/utils/ptsHighlight';
+import { mergeViewparamFields, tileUrlWithViewparams, withTileRevision } from '~/utils/mvtTileUrl';
 
 const pbfAttributeRequests = new globalThis.Map<string, Promise<string[]>>();
 
@@ -40,6 +41,8 @@ export const useLayerStore = defineStore('layer', {
     visibleContextLayers: [] as ContextLayerKey[],
     /** Подсветка участков ПТС (начальник / участок МС / РС) — параметры view слоя участков */
     ptsHighlight: null as PtsHighlight | null,
+    /** Версия данных в VIEWPARAMS тайлов (0 — нет); новая после расчёта/правки — мимо кеша GWC */
+    tileRevision: 0,
   }),
 
   actions: {
@@ -281,17 +284,7 @@ export const useLayerStore = defineStore('layer', {
       try {
         if (!layer.renderFormat || layer.renderFormat === 'mvt') {
           // Construct MVT URL with viewparams
-          let mvtUrl = layer.mvtUrl;
-          if (mvtUrl && mapStore.map) {
-            const fragmentStore = useFragmentStore();
-            
-            const fieldsPart = this.getLayerVisibleFields(layer);
-            const viewparams = buildViewparams(fragmentStore.visibleFragments, fieldsPart, this.ptsHighlight);
-            
-            // CRITICAL: Don't use URL object as it encodes {z}/{x}/{y} placeholders
-            const separator = mvtUrl.includes('?') ? '&' : '?';
-            mvtUrl = `${mvtUrl}${separator}viewparams=${viewparams}`;
-          }
+          const mvtUrl = layer.mvtUrl ? this.mvtSourceTileUrl(layer) : layer.mvtUrl;
 
           if (import.meta.dev) console.debug(`Loading MVT layer: ${layer.layerId}, URL: ${mvtUrl}`);
           if (!mvtUrl) {
@@ -586,8 +579,10 @@ export const useLayerStore = defineStore('layer', {
         const vecSid = buildMvtLayerIdentifiers(ws, sl).sourceId;
         const rastSid = layer.wmsRasterSourceId || buildWmsRasterSourceId(ws, sl);
         const wmsOnly = buildWmsOnlyLayerIdentifiers(ws, sl);
+        // Общий источник тайлов uzel остаётся, пока его рисуют другие слои узлов
+        const inUse = new Set((map.getStyle()?.layers || []).map((l: any) => l.source).filter(Boolean));
         for (const sid of new Set([layer.sourceId, vecSid, rastSid, wmsOnly.sourceId])) {
-          if (sid && map.getSource(sid)) map.removeSource(sid);
+          if (sid && map.getSource(sid) && !inUse.has(sid)) map.removeSource(sid);
         }
       }
       
@@ -717,25 +712,19 @@ export const useLayerStore = defineStore('layer', {
 
       const sourceId = layer.sourceId;
       const source = mapStore.map.getSource(sourceId) as any;
-      
+
       if (source && source.tiles) {
-        const originalUrl = layer.mvtUrl || '';
-        
-        // Build new viewparams
-        const fragmentStore = useFragmentStore();
-        const fieldsPart = this.getLayerVisibleFields(layer);
-        const viewparams = buildViewparams(fragmentStore.visibleFragments, fieldsPart, this.ptsHighlight);
-        
-        const separator = originalUrl.includes('?') ? '&' : '?';
-        const cacheBust = force ? `&_=${Date.now()}` : '';
-        const newTileUrl = `${originalUrl}${separator}viewparams=${viewparams}${cacheBust}`;
-        
+        // Новые данные (расчёт, правка): новая версия в VIEWPARAMS, иначе кеш GWC отдаст прежние тайлы
+        if (force) this.tileRevision = Date.now();
+        const newTileUrl = this.mvtSourceTileUrl(layer);
+
+        // Слои одного источника (узлы) обновляют его один раз: у остальных адрес уже совпадает
         const prev = Array.isArray(source.tiles) ? source.tiles[0] : '';
-        if (prev === newTileUrl && !force) {
+        if (prev === newTileUrl) {
           return;
         }
 
-        console.log(`[layerStore] Refreshing source ${sourceId} with params: ${viewparams}`);
+        console.log(`[layerStore] Refreshing source ${sourceId}: ${newTileUrl.slice(newTileUrl.indexOf('viewparams='))}`);
         source.tiles = [newTileUrl];
         
         // Clear cache and refresh
@@ -753,8 +742,10 @@ export const useLayerStore = defineStore('layer', {
       this.applyFragmentFilter();
     },
 
+    /** Перезагрузить тайлы видимых слоёв после изменения данных (расчёт, правка сети, импорт) */
     refreshVisibleDataLayers() {
-      this.visibleGeoServerLayers.forEach(layerId => this.refreshLayerSource(layerId, true));
+      this.tileRevision = Date.now();
+      this.visibleGeoServerLayers.forEach(layerId => this.refreshLayerSource(layerId));
       const mapStore = useMapStore();
       mapStore.map?.triggerRepaint();
     },
@@ -1106,6 +1097,23 @@ export const useLayerStore = defineStore('layer', {
       this.saveLayerStyles();
     },
 
+    /**
+     * URL тайлов MVT-источника слоя: поля подписей всех MVT-слоёв этого источника (слои узлов делят
+     * тайлы uzel), фрагменты, подсветка ПТС и версия данных (сброс кеша GWC после изменений).
+     */
+    mvtSourceTileUrl(layer: ExtendedLayerConfig): string {
+      const fragmentStore = useFragmentStore();
+      const sharing = this.geoServerLayers.filter(
+        (l) => l.sourceId === layer.sourceId && (l.renderFormat || 'mvt') === 'mvt'
+      );
+      const fields = mergeViewparamFields((sharing.length ? sharing : [layer]).map((l) => this.getLayerVisibleFields(l)));
+      const viewparams = withTileRevision(
+        buildViewparams(fragmentStore.visibleFragments, fields, this.ptsHighlight),
+        this.tileRevision
+      );
+      return tileUrlWithViewparams(layer.mvtUrl || '', viewparams);
+    },
+
     getLayerVisibleFields(layer: ExtendedLayerConfig): string {
       const labelStore = useLabelStore();
       const globalLabels = labelStore.globalLabels;
@@ -1181,8 +1189,9 @@ export const useLayerStore = defineStore('layer', {
       // Apply filter to each visible GeoServer layer appropriately based on renderFormat
       for (const layer of this.geoServerLayers) {
         if (layer.renderFormat === 'wms') {
-          // WMS layers use VIEWPARAMS via source URL recreation
-          const sourceId = layer.sourceId;
+          // WMS layers use VIEWPARAMS via source URL recreation.
+          // Растровый источник слоя (как в loadLayer): sourceId слоя узлов — общий векторный источник uzel
+          const sourceId = layer.wmsRasterSourceId || layer.sourceId;
           const mapLayerId = layer.layerId;
           
           if (mapStore.map.getSource(sourceId)) {
@@ -1212,19 +1221,10 @@ export const useLayerStore = defineStore('layer', {
              // In MapLibre, we must update the 'tiles' property. 
              // Simplest way is to remove and re-add the layer/source, but loadLayer already handles checking exists.
              // We'll update the Tile source if possible, or trigger reload.
-             const fragmentStore = useFragmentStore();
-             
-             const fieldsPart = this.getLayerVisibleFields(layer);
-             const viewparams = buildViewparams(fragmentStore.visibleFragments, fieldsPart, this.ptsHighlight);
-             
              const source = mapStore.map.getSource(sourceId) as any;
              if (source && source.tiles) {
-                const originalUrl = layer.mvtUrl || '';
-                
-                // CRITICAL: Don't use URL object as it encodes {z}/{x}/{y} placeholders
-                const separator = originalUrl.includes('?') ? '&' : '?';
-                const newTileUrl = `${originalUrl}${separator}viewparams=${viewparams}`;
-                
+                const newTileUrl = this.mvtSourceTileUrl(layer);
+
                 const prev = Array.isArray(source.tiles) ? source.tiles[0] : '';
                 if (prev !== newTileUrl) {
                   source.tiles = [newTileUrl];

@@ -15,6 +15,7 @@ import {
   nodeKindCodes,
   withCqlParam
 } from '~/utils/nodeKindLayers';
+import { gwcMvtTileUrl, wmtsLayerHasGwcMvt } from '~/utils/mvtTileUrl';
 import { readCityConfig } from '~/utils/cityConfig';
 
 /** Тестовый BBOX Web Mercator (±40 км от центра города), чтобы подставить вместо {bbox-epsg-3857}. */
@@ -28,6 +29,16 @@ async function verifyMvtTileUrl(urlTemplate: string, center: [number, number]): 
   let url = urlTemplate;
   if (url.includes('{bbox-epsg-3857}')) {
     url = url.replace('{bbox-epsg-3857}', mvtProbeBbox3857(center));
+  }
+  if (url.includes('{z}')) {
+    // Тайл XYZ (кеш GWC) с центром города на 14-м зуме
+    const z = 14;
+    const n = 2 ** z;
+    const [lon, lat] = center;
+    const x = Math.floor(((lon + 180) / 360) * n);
+    const latRad = (lat * Math.PI) / 180;
+    const y = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n);
+    url = url.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y));
   }
   try {
     const buf = await $fetch<ArrayBuffer>(url, {
@@ -171,6 +182,8 @@ export default defineEventHandler(async (event) => {
     const mvtTemplateUrl =
       runtimeConfig.geoserverMvtTemplateUrl ||
       `${defaultPublicUrl}/gwc/service/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER={layerName}&STYLE=&TILEMATRIXSET=EPSG:900913&TILEMATRIX=EPSG:900913:{z}&TILEROW={y}&TILECOL={x}&FORMAT=application/vnd.mapbox-vector-tile`;
+    // GEOSERVER_MVT_GWC=false — всегда шаблон выше, даже если у слоя настроен кеш GWC
+    const gwcMvtEnabled = String(process.env.GEOSERVER_MVT_GWC ?? '').trim().toLowerCase() !== 'false';
 
     // Явная сигнатура вместо типизированного $fetch: динамический URL заставляет TS
     // перебирать все nitro-маршруты и падать с "Excessive stack depth".
@@ -451,9 +464,15 @@ export default defineEventHandler(async (event) => {
       let mvtUrl = '';
 
       if (le.mvt && wmtsXml) {
-        const baseMvtUrl = mvtTemplateUrl.replace('{layerName}', qualified);
-        // CQL_FILTER работает у MVT через WMS GetMap; у тайлов GWC остаётся фильтр MapLibre ниже
-        mvtUrl = withCqlParam(baseMvtUrl, cqlFilter) ?? baseMvtUrl;
+        // Кеш GWC, если у слоя на GeoServer настроены сетка и MVT (scripts/geoserver/gwc_mvt_cache.py),
+        // иначе WMS GetMap — тайл строится заново на каждый запрос
+        const useGwc = gwcMvtEnabled && wmtsLayerHasGwcMvt(wmtsXml);
+        const baseMvtUrl = useGwc
+          ? gwcMvtTileUrl(le.workspaceBaseUrl || defaultPublicUrl, le.workspace, tileSource)
+          : mvtTemplateUrl.replace('{layerName}', qualified);
+        // Все слои узлов (uzel и выборки по типу) берут одни и те же тайлы uzel — один источник
+        // на карте и один поток запросов; тип узла отделяет фильтр MapLibre ниже (CQL_FILTER не нужен)
+        mvtUrl = nodeCodes ? baseMvtUrl : (withCqlParam(baseMvtUrl, cqlFilter) ?? baseMvtUrl);
         mvtPack = await fetchMvtStylePack(le.workspace, tileSource, wmtsXml, sanitizeFilterTypeCoercion);
         if (mvtPack && nodeCodes) {
           mvtPack.mbLayers = mvtPack.mbLayers
@@ -519,7 +538,7 @@ export default defineEventHandler(async (event) => {
         id: ids.id,
         label,
         displayName: label,
-        sourceId: ids.sourceId,
+        sourceId: nodeCodes ? buildMvtLayerIdentifiers(le.workspace, NODE_BASE_LAYER).sourceId : ids.sourceId,
         layerId: ids.layerId,
         sourceLayer: tileSource,
         idSource: kindCodes ? le.source : undefined,

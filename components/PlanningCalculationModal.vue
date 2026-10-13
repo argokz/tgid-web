@@ -660,7 +660,8 @@ const pollTask = async (taskId: string) => {
       if (finalResult.output) addProtocolLog(finalResult.output, ok ? 'success' : 'info', true);
       if (finalResult.error) addProtocolLog(finalResult.error, 'error', true);
       const layerStore = useLayerStore();
-      layerStore.visibleGeoServerLayers.forEach(id => layerStore.refreshLayerSource(id));
+      // Новые результаты: тайлы с новой версией данных (мимо кеша GWC)
+      layerStore.refreshVisibleDataLayers();
       return;
     }
     if (statusResponse.status === 'FAILURE') {
