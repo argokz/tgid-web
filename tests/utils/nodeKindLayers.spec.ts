@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   combineCql,
   combineWithNodeCodes,
+  filterCodeSet,
+  layerCanMatchNodeCodes,
   nodeCodesCql,
   nodeKindCodes,
   withCqlParam,
@@ -40,5 +42,23 @@ describe('слои по типу узла (uzel.code)', () => {
     expect(withCqlParam(getMap, "code IN ('IS')")).toBe(`${getMap}&CQL_FILTER=code%20IN%20('IS')`)
     expect(withCqlParam('https://gs/gwc/service/wmts?REQUEST=GetTile', "code IN ('IS')")).toBeNull()
     expect(withCqlParam(getMap, undefined)).toBe(getMap)
+  })
+  it('подслои стиля uzel, которые не могут показать узлы источника, отсеиваются', () => {
+    expect(filterCodeSet(['==', 'code', 'IS'])).toEqual(new Set(['IS']))
+    expect(filterCodeSet(['in', ['get', 'code'], ['literal', ['PR', 'EL']]])).toEqual(new Set(['PR', 'EL']))
+    expect(filterCodeSet(['all', ['==', 'code', 'TK'], ['>', 'du', 100]])).toEqual(new Set(['TK']))
+    expect(filterCodeSet(['>', 'du', 100])).toBeNull()
+    // «Источники» (только IS): правило ТК пустое, правило IS и подпись без кода — остаются
+    expect(layerCanMatchNodeCodes(['==', 'code', 'TK'], ['IS'])).toBe(false)
+    expect(layerCanMatchNodeCodes(['==', 'code', 'IS'], ['IS'])).toBe(true)
+    expect(layerCanMatchNodeCodes(['has', 'name'], ['IS'])).toBe(true)
+    // подпись «PR-EL-NZ-PO-US»: у потребителей нужна, у источников — нет
+    const text = ['in', 'code', 'PR', 'EL', 'NZ', 'PO', 'US']
+    expect(layerCanMatchNodeCodes(text, ['PR', 'EL', 'NZ'])).toBe(true)
+    expect(layerCanMatchNodeCodes(text, ['IS'])).toBe(false)
+    // uzel без IS/NS/PR/EL/NZ/PO: правило IS пустое, US в подписи остаётся
+    const excluded = ['IS', 'NS', 'PR', 'EL', 'NZ', 'PO']
+    expect(layerCanMatchNodeCodes(['==', 'code', 'IS'], excluded, true)).toBe(false)
+    expect(layerCanMatchNodeCodes(text, excluded, true)).toBe(true)
   })
 })

@@ -17,10 +17,11 @@ import { useLabelStore, TECHNICAL_LABELS } from '~/stores/labelStore';
 import { usePopupStore } from '~/stores/popupStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { escapeHtml } from '~/utils/escapeHtml';
-import { nearestGroup, pickRadius, queryRenderedNear } from '~/utils/mapPick';
+import { nearestGroup, queryRenderedNear } from '~/utils/mapPick';
 import { getCityConfig } from '~/utils/cityConfig';
 import { BUILDING_CARD_TABLES, QUERY_LAYER_KEY_TABLE, mergeQueryLayerProperties } from '~/utils/networkFeature';
 import { desktopCardKind, desktopCardProps } from '~/utils/desktopCard';
+import { highlightKey, type HighlightTarget } from '~/utils/selectionHighlight';
 import {
   getMapTilerGlyphsUrl,
   getMapTilerHybridTilesUrl,
@@ -155,6 +156,9 @@ export const useMapStore = defineStore('map', {
     planetLayerStyleOverrides: {} as Record<string, PlanetLayerStyleOverride>,
     layerStyles: {} as Record<string, any>,
     selectedFeatureData: null as FeatureData | null,
+    /** Что подсветить на карте: выбранный объект и объект под курсором (useSelectionHighlight) */
+    selectionTarget: null as HighlightTarget | null,
+    hoverTarget: null as HighlightTarget | null,
     objectDataLoading: false,
     handleMapClickBound: null as any,
     handleMouseMoveBound: null as any,
@@ -279,6 +283,8 @@ export const useMapStore = defineStore('map', {
 
       this.map.on('click', this.handleMapClickBound);
       this.map.on('mousemove', this.handleMouseMoveBound);
+      // Курсор ушёл с карты — подсветка под курсором снимается
+      this.map.on('mouseout', () => this.setHoverTarget(null));
     },
 
     async addBaseLayer() {
@@ -818,6 +824,8 @@ export const useMapStore = defineStore('map', {
           mvtFeatures.forEach((f: any) => {
             allFoundFeatures.push(this.normalizeFeatureForState({
               ...f,
+              // geometry у объекта MapLibre — геттер прототипа, при «...f» терялась (нечем подсветить)
+              geometry: f.geometry,
               sourceType: 'mvt'
             }));
           });
@@ -955,6 +963,7 @@ export const useMapStore = defineStore('map', {
       this.objectDataLoading = true;
 
       const normalizedFeature = this.normalizeFeatureForState(feature);
+      this.selectionTarget = this.toHighlightTarget(normalizedFeature);
       let properties = { ...normalizedFeature.properties };
       const featureId = properties.id ?? normalizedFeature.id ?? properties.fileid;
 
@@ -1283,6 +1292,7 @@ export const useMapStore = defineStore('map', {
       if (!this.identifyModeEnabled && !this.contextHoverInspectEnabled) {
         this.map.getCanvas().style.cursor = '';
         this.hideContextHoverPopup();
+        this.setHoverTarget(null);
         return;
       }
 
@@ -1296,10 +1306,13 @@ export const useMapStore = defineStore('map', {
       const baseInspectLayerIds = this.getBaseHoverInspectLayerIds();
 
       try {
-        const r = pickRadius();
+        // Ближайший объект первым — он же подсвечивается под курсором
         const features = allLayerIds.length > 0
-          ? this.map.queryRenderedFeatures([[e.point.x - r, e.point.y - r], [e.point.x + r, e.point.y + r]], { layers: allLayerIds })
+          ? queryRenderedNear(this.map, e.point, { layers: allLayerIds })
           : [];
+        this.setHoverTarget(this.identifyModeEnabled && features[0]
+          ? this.toHighlightTarget({ ...features[0], geometry: features[0].geometry })
+          : null);
         const contextFeatures = (this.contextHoverInspectEnabled && contextLayerIds.length > 0)
           ? this.map.queryRenderedFeatures(e.point, { layers: contextLayerIds })
           : [];
@@ -1321,7 +1334,26 @@ export const useMapStore = defineStore('map', {
         this.hoverLayerIdsCacheKey = '';
         this.map.getCanvas().style.cursor = '';
         this.hideContextHoverPopup();
+        this.setHoverTarget(null);
       }
+    },
+
+    /** Объект MapLibre / нормализованный объект → цель подсветки (геометрия и где искать остальные куски) */
+    toHighlightTarget(feature: any): HighlightTarget | null {
+      const geometry = this.toPlainGeometry(feature?.geometry);
+      if (!geometry) return null;
+      const layer = feature?.layer || {};
+      return markRaw({
+        geometry,
+        source: typeof layer.source === 'string' ? layer.source : feature?.source,
+        sourceLayer: layer['source-layer'] || feature?.sourceLayer || undefined,
+        featureId: feature?._sourceId ?? feature?.id,
+      });
+    },
+
+    setHoverTarget(target: HighlightTarget | null) {
+      if (highlightKey(target) === highlightKey(this.hoverTarget)) return;
+      this.hoverTarget = target;
     },
 
     setContextHoverInspectMode(enabled: boolean) {

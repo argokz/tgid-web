@@ -108,7 +108,6 @@ export const useLayerStore = defineStore('layer', {
       const mapStore = useMapStore();
       const map = mapStore.map;
       if (!map) return;
-      if (!ensureContextMapLayers(map as any)) return;
       const had = this.visibleContextLayers.includes(key);
       if (visible && !had) {
         this.visibleContextLayers = [...this.visibleContextLayers, key];
@@ -116,8 +115,9 @@ export const useLayerStore = defineStore('layer', {
         this.visibleContextLayers = this.visibleContextLayers.filter((k) => k !== key);
       }
       this.saveVisibleContextLayers();
-      applyContextLayersVisibility(map as any, new Set(this.visibleContextLayers));
-      restackContextMapLayers(map as any);
+      // Пока стиль грузится, addSource бросает «Style is not done loading» —
+      // выбор сохранён, на карту он ляжет после загрузки
+      this.syncContextLayersToMap();
     },
 
     toggleContextLayer(key: ContextLayerKey) {

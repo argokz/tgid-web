@@ -26,6 +26,11 @@ export const CONTEXT_SOURCE_IDS = {
 export const CONTEXT_MAP_LAYER_IDS = {
   contours: 'context-contours-line',
   buildings: 'context-buildings-fill',
+  /**
+   * Плоские контуры зданий — вместо объёмов при рельефе 3D. С рельефом MapLibre натягивает
+   * плоские слои (линии сети, растры) на поверхность и рисует объёмы поверх — здания закрывали трубы.
+   */
+  buildingsFlat: 'context-buildings-flat',
   /** Подписи/номера на 3D-зданиях (тот же vector source, что и extrusion) */
   buildingsLabel: 'context-buildings-label',
   hillshade: 'context-hillshade',
@@ -132,6 +137,22 @@ export function ensureContextMapLayers(map: Map): boolean {
         'fill-extrusion-opacity': 0.78,
         'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 12],
         'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
+      },
+    })
+  }
+
+  if (!map.getLayer(CONTEXT_MAP_LAYER_IDS.buildingsFlat)) {
+    map.addLayer({
+      id: CONTEXT_MAP_LAYER_IDS.buildingsFlat,
+      type: 'fill',
+      source: CONTEXT_SOURCE_IDS.buildings,
+      'source-layer': 'building',
+      minzoom: 12,
+      layout: { visibility: 'none' },
+      paint: {
+        'fill-color': '#aeb8d8',
+        'fill-opacity': 0.6,
+        'fill-outline-color': '#7d88ad',
       },
     })
   }
@@ -259,11 +280,12 @@ export function restackContextMapLayers(map: Map): void {
 
   const contoursId = CONTEXT_MAP_LAYER_IDS.contours
   const buildingsId = CONTEXT_MAP_LAYER_IDS.buildings
+  const buildingsFlatId = CONTEXT_MAP_LAYER_IDS.buildingsFlat
   const buildingsLabelId = CONTEXT_MAP_LAYER_IDS.buildingsLabel
   const hillId = CONTEXT_MAP_LAYER_IDS.hillshade
 
   if (!map.getLayer(contoursId) || !map.getLayer(buildingsId) || !map.getLayer(hillId)) return
-  if (!map.getLayer(buildingsLabelId)) return
+  if (!map.getLayer(buildingsLabelId) || !map.getLayer(buildingsFlatId)) return
 
   const baseIdx = style.layers.findIndex((l) => l.id === BASE_MAP_LAYER_ID)
   if (baseIdx < 0) return
@@ -285,10 +307,26 @@ export function restackContextMapLayers(map: Map): void {
       map.moveLayer(buildingsLabelId)
     }
     map.moveLayer(buildingsId, buildingsLabelId)
-    map.moveLayer(hillId, buildingsId)
+    map.moveLayer(buildingsFlatId, buildingsId)
+    map.moveLayer(hillId, buildingsFlatId)
     map.moveLayer(contoursId, hillId)
   } catch (e) {
     console.warn('[contextMapLayers] restackContextMapLayers:', e)
+  }
+}
+
+/** Какие слои зданий видны: объёмы (без рельефа) или плоские контуры (с рельефом), подписи — в обоих */
+export function buildingsLayerVisibility(buildingsOn: boolean, terrainOn: boolean): Record<string, boolean> {
+  return {
+    [CONTEXT_MAP_LAYER_IDS.buildings]: buildingsOn && !terrainOn,
+    [CONTEXT_MAP_LAYER_IDS.buildingsFlat]: buildingsOn && terrainOn,
+    [CONTEXT_MAP_LAYER_IDS.buildingsLabel]: buildingsOn,
+  }
+}
+
+function applyBuildingsMode(map: Map, buildingsOn: boolean, terrainOn: boolean): void {
+  for (const [lid, on] of Object.entries(buildingsLayerVisibility(buildingsOn, terrainOn))) {
+    if (map.getLayer(lid)) map.setLayoutProperty(lid, 'visibility', on ? 'visible' : 'none')
   }
 }
 
@@ -303,14 +341,16 @@ export function setContextLayerVisibility(map: Map, layerKey: ContextLayerKey, v
     } else {
       map.setTerrain(null)
     }
+    // Здания: объёмы без рельефа, плоские контуры с рельефом
+    const buildingsOn = map.getLayer(CONTEXT_MAP_LAYER_IDS.buildingsLabel)
+      ? map.getLayoutProperty(CONTEXT_MAP_LAYER_IDS.buildingsLabel, 'visibility') === 'visible'
+      : false
+    applyBuildingsMode(map, buildingsOn, visible)
     return
   }
 
   if (layerKey === 'buildings') {
-    const vis = visible ? 'visible' : 'none'
-    for (const lid of [CONTEXT_MAP_LAYER_IDS.buildings, CONTEXT_MAP_LAYER_IDS.buildingsLabel]) {
-      if (map.getLayer(lid)) map.setLayoutProperty(lid, 'visibility', vis)
-    }
+    applyBuildingsMode(map, visible, Boolean(map.getTerrain()))
     return
   }
 

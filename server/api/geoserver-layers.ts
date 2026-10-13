@@ -10,6 +10,7 @@ import { convertSldToMapLibre } from '~/utils/sldToMapLibre';
 import {
   NODE_BASE_LAYER,
   combineWithNodeCodes,
+  layerCanMatchNodeCodes,
   nodeCodesCql,
   nodeKindCodes,
   withCqlParam
@@ -455,10 +456,12 @@ export default defineEventHandler(async (event) => {
         mvtUrl = withCqlParam(baseMvtUrl, cqlFilter) ?? baseMvtUrl;
         mvtPack = await fetchMvtStylePack(le.workspace, tileSource, wmtsXml, sanitizeFilterTypeCoercion);
         if (mvtPack && nodeCodes) {
-          mvtPack.mbLayers = mvtPack.mbLayers.map((l: any) => ({
-            ...l,
-            filter: combineWithNodeCodes(l.filter, nodeCodes, excludeCodes)
-          }));
+          mvtPack.mbLayers = mvtPack.mbLayers
+            .filter((l: any) => layerCanMatchNodeCodes(l.filter, nodeCodes, excludeCodes))
+            .map((l: any) => ({
+              ...l,
+              filter: combineWithNodeCodes(l.filter, nodeCodes, excludeCodes)
+            }));
         }
         if (mvtPack && mvtProbeTiles) {
           const ok = await verifyMvtTileUrl(mvtUrl, readCityConfig(runtimeConfig.public as any).center);

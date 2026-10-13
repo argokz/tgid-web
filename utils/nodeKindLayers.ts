@@ -47,6 +47,70 @@ export function combineWithNodeCodes(original: unknown, codes: string[], exclude
   return original != null ? ['all', original, codeFilter] : codeFilter
 }
 
+/**
+ * Коды узла, которыми фильтр подслоя ограничивает `code` (null — не ограничивает).
+ * Понимает legacy (`["==","code","IS"]`, `["in","code",...]`) и выражения
+ * (`["==",["get","code"],"IS"]`, `["in",["get","code"],["literal",[...]]]`), `all` — пересечение, `any` — объединение.
+ */
+export function filterCodeSet(filter: unknown): Set<string> | null {
+  if (!Array.isArray(filter) || filter.length === 0) return null
+  const [op, a, b] = filter
+  const isCodeRef = (x: unknown) => x === 'code' || (Array.isArray(x) && x[0] === 'get' && x[1] === 'code' && x.length === 2)
+  if (op === '==' && filter.length === 3) {
+    if (isCodeRef(a) && (typeof b === 'string' || typeof b === 'number')) return new Set([String(b)])
+    if (isCodeRef(b) && (typeof a === 'string' || typeof a === 'number')) return new Set([String(a)])
+    return null
+  }
+  if (op === 'in' && isCodeRef(a)) {
+    if (a === 'code') return new Set(filter.slice(2).map(String))
+    if (Array.isArray(b) && b[0] === 'literal' && Array.isArray(b[1])) return new Set(b[1].map(String))
+    return null
+  }
+  if (op === 'all') {
+    let acc: Set<string> | null = null
+    for (const part of filter.slice(1)) {
+      const s = filterCodeSet(part)
+      if (!s) continue
+      const prev: Set<string> | null = acc
+      if (!prev) {
+        acc = s
+        continue
+      }
+      const both = new Set<string>()
+      prev.forEach((c) => {
+        if (s.has(c)) both.add(c)
+      })
+      acc = both
+    }
+    return acc
+  }
+  if (op === 'any') {
+    const acc = new Set<string>()
+    for (const part of filter.slice(1)) {
+      const s = filterCodeSet(part)
+      if (!s) return null
+      s.forEach((c) => acc.add(c))
+    }
+    return acc
+  }
+  return null
+}
+
+/**
+ * Может ли подслой стиля uzel показать хоть один узел источника: у «Источников» (только IS)
+ * правила ТК, НС, потребителей пустые, у uzel (без IS/NS/…) — пустые правила этих типов.
+ * Такие подслои не создаются: стиль uzel даёт 63 подслоя на каждый из 5 источников узлов.
+ */
+export function layerCanMatchNodeCodes(filter: unknown, codes: string[], exclude = false): boolean {
+  const own = filterCodeSet(filter)
+  if (!own) return true
+  let can = false
+  own.forEach((c) => {
+    if (exclude ? !codes.includes(c) : codes.includes(c)) can = true
+  })
+  return can
+}
+
 /** Добавить CQL_FILTER к URL тайлов (MVT через WMS GetMap). У WMTS/GWC параметр не поддержан — null */
 export function withCqlParam(url: string, cql: string | undefined): string | null {
   if (!cql) return url

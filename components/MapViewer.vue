@@ -504,11 +504,13 @@ import maplibregl from 'maplibre-gl';
 import { useTopologyEditor } from '~/composables/useTopologyEditor';
 import { useJournalContourLayer } from '~/composables/useJournalContourLayer';
 import { useOverlayLayer } from '~/composables/useOverlayLayer';
+import { useSelectionHighlight } from '~/composables/useSelectionHighlight';
 import type { RegimePointsResult } from '~/utils/regimeMapPoints';
 import { useLocateMarkers } from '~/composables/useLocateMarkers';
 import type { LocatePoint } from '~/composables/useLocateMarkers';
 import { getNetworkFeatureKind, pickNetworkFeature } from '~/utils/networkFeature';
 import { nearestGroup, queryRenderedNear } from '~/utils/mapPick';
+import { highlightKey } from '~/utils/selectionHighlight';
 import type { PickCandidate } from '~/utils/networkFeature';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
@@ -756,6 +758,16 @@ const locate = locateMarkers.handlers({
   elevator: { zoom: 19, color: '#263238', popupText: labelOr('Элеватор №'), syncLayerId: 'elevators' },
   // Диагностики топологии, запросы по сети, анализ режима: { lat, lng } без подсказки
   fault: { zoom: 18, element: faultMarkerElement },
+});
+
+// === Подсветка выбранного объекта и объекта под курсором ===
+const selectionHighlight = useSelectionHighlight(() => mapStore.map, 'tgid-selection', 'selection');
+const hoverHighlight = useSelectionHighlight(() => mapStore.map, 'tgid-hover', 'hover');
+watch(() => mapStore.selectionTarget, (target) => selectionHighlight.show(target));
+watch(() => mapStore.hoverTarget, (target) => {
+  // Под курсором выбранный объект — второй ореол не нужен
+  const same = target && mapStore.selectionTarget && highlightKey(target) === highlightKey(mapStore.selectionTarget);
+  hoverHighlight.show(same ? null : target);
 });
 
 // === Outage Simulation Map Visualization ===

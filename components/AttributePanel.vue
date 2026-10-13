@@ -1178,6 +1178,7 @@ import { useMobile } from '~/composables/useMobile'
 
 import { useAttributeTabs, type TabData } from '~/composables/useAttributeTabs'
 import { parseDesktopCardPair, type DesktopCardPair } from '~/utils/desktopCard'
+import { formatDesktopNumber } from '~/utils/desktopNumber'
 
 import { ApiError, fastApiService, type ReverseLineReport } from '~/services/fastApiService'
 import { getFeatureFragmentId, getSectionRowId, resolveCardObject, type CardObject } from '~/utils/networkFeature'
@@ -1185,6 +1186,7 @@ import { canEditFragment } from '~/utils/permissions'
 import { useAuthStore } from '~/stores/authStore'
 import { useNotificationStore } from '~/stores/notificationStore'
 import { useFragmentStore } from '~/stores/fragmentStore'
+import { useMapStore } from '~/stores/mapStore'
 
 
 const componentProps = withDefaults(defineProps<{
@@ -1250,6 +1252,12 @@ const { getAttributeLabel, groupAttributesByTabs, getUncategorizedAttributes } =
 
 
 const visible = ref(false)
+
+// Карточка закрыта — выбранный объект на карте больше не подсвечивается
+const mapStoreForHighlight = useMapStore()
+watch(visible, (open) => {
+  if (!open) mapStoreForHighlight.selectionTarget = null
+})
 
 const attributes = ref<Record<string, any>>({})
 
@@ -1698,6 +1706,9 @@ const hasValue = (v: unknown) => v !== null && v !== undefined && v !== ''
 const formatValue = (value: any): string => {
 
   if (value === null || value === undefined || value === '') return ''
+
+  // Дробные — как в карточке десктопа (6 значащих цифр, запятая)
+  if (typeof value === 'number') return formatDesktopNumber(value)
 
   const s = String(value)
 
