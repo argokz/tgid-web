@@ -126,20 +126,21 @@ def native_bbox(gwc: Gwc, layer: str) -> dict:
     return gwc.req('GET', f'/rest/workspaces/{ws}/featuretypes/{name}.json').json()['featureType']['nativeBoundingBox']
 
 
-def outside_bbox(gwc: Gwc, layer: str, sample: int = 5) -> list:
+def outside_bbox(gwc: Gwc, layer: str, sample: int = 5, bbox: dict | None = None) -> list:
     """Объекты слоя (все фрагменты, параметры view по умолчанию) хотя бы частично за его границами.
 
     Кеш GWC покрывает только границы слоя (latLonBoundingBox — их GeoServer считает по данным при
     публикации), за ними отвечает 400 TileOutOfRange, а веб такие тайлы не запрашивает: объект там
     на карте не появится.
     """
-    b = native_bbox(gwc, layer)
+    b = bbox or native_bbox(gwc, layer)
     x0, y0 = b['minx'] - BOUNDS_EPS, b['miny'] - BOUNDS_EPS
     x1, y1 = b['maxx'] + BOUNDS_EPS, b['maxy'] + BOUNDS_EPS
     cql = f'NOT WITHIN(shape, POLYGON(({x0} {y0}, {x1} {y0}, {x1} {y1}, {x0} {y1}, {x0} {y0})))'
     r = gwc.req('GET', '/wfs', params={
         'SERVICE': 'WFS', 'VERSION': '2.0.0', 'REQUEST': 'GetFeature', 'typeNames': layer,
         'count': sample, 'outputFormat': 'application/json', 'CQL_FILTER': cql,
+        **({'propertyName': 'shape'} if sample > 5 else {}),
     })
     if not r.headers.get('content-type', '').startswith('application/json'):
         raise RuntimeError(f'{layer}: WFS ответил не JSON: {r.text[:300]}')
@@ -165,23 +166,78 @@ def check_bounds(gwc: Gwc, layers: list) -> list:
     return bad
 
 
-def fix_bounds(gwc: Gwc, layer: str, backup: Path):
-    """Пересчитать границы слоя по данным и перечитать тайловый слой GWC (его сетка — по границам слоя)"""
+# Запас при расширении границ по объектам за ними (метры): чтобы соседние новые здания не выпадали сразу
+BOUNDS_MARGIN = 200.0
+
+
+def coords(geom) -> list:
+    """Все точки GeoJSON-геометрии [[x, y], ...]"""
+    out = []
+
+    def walk(c):
+        if c and isinstance(c[0], (int, float)):
+            out.append(c)
+        else:
+            for item in c or []:
+                walk(item)
+
+    if geom:
+        walk(geom.get('coordinates'))
+    return out
+
+
+def expanded_bbox(gwc: Gwc, layer: str) -> dict:
+    """Границы слоя, расширенные по всем объектам за ними (координаты WFS — в системе слоя)"""
+    b = dict(native_bbox(gwc, layer))
+    for _ in range(5):
+        found = outside_bbox(gwc, layer, sample=100000, bbox=b)
+        if not found:
+            return b
+        pts = [pt for f in found for pt in coords(f.get('geometry'))]
+        if not pts:
+            raise RuntimeError(f'{layer}: объекты за границами без геометрии')
+        b['minx'] = min(b['minx'], min(p[0] for p in pts) - BOUNDS_MARGIN)
+        b['maxx'] = max(b['maxx'], max(p[0] for p in pts) + BOUNDS_MARGIN)
+        b['miny'] = min(b['miny'], min(p[1] for p in pts) - BOUNDS_MARGIN)
+        b['maxy'] = max(b['maxy'], max(p[1] for p in pts) + BOUNDS_MARGIN)
+    raise RuntimeError(f'{layer}: границы не сходятся за 5 шагов')
+
+
+def fmt_bbox(b: dict) -> str:
+    return f"{b['minx']:.1f}..{b['maxx']:.1f} x {b['miny']:.1f}..{b['maxy']:.1f}"
+
+
+def fix_bounds(gwc: Gwc, layer: str, backup: Path | None, dry_run: bool = False):
+    """Границы слоя — по данным, затем перечитать тайловый слой GWC (его сетка — по границам слоя).
+
+    Сначала пересчёт GeoServer (recalculate). У обычной таблицы PostGIS он берёт ST_EstimatedExtent —
+    оценку по выборке статистики, отдельные объекты на окраинах в неё не попадают (13.10: 429 зданий
+    AlmatyGIS:zdaniya_2). Тогда границы расширяются по объектам за ними (WFS) и задаются явно.
+    """
     ws, name = layer.split(':', 1)
     path = f'/rest/workspaces/{ws}/featuretypes/{name}'
+    before = native_bbox(gwc, layer)
+    if dry_run:
+        print(f'{layer}: границы {fmt_bbox(before)} -> {fmt_bbox(expanded_bbox(gwc, layer))} (пробный прогон)')
+        return
     stamp = time.strftime('%Y%m%d-%H%M%S')
     (backup / f'{layer.replace(":", "__")}.featuretype-{stamp}.xml').write_text(
         gwc.req('GET', f'{path}.xml').text, encoding='utf-8')
-    before = native_bbox(gwc, layer)
     # PUT принимается только по пути через хранилище (без него — 404 «No such feature type»)
-    store = gwc.req('GET', f'{path}.json').json()['featureType']['store']['name'].split(':', 1)[-1]
-    gwc.req('PUT', f'/rest/workspaces/{ws}/datastores/{store}/featuretypes/{name}?recalculate=nativebbox,latlonbbox',
-            data='<featureType><enabled>true</enabled></featureType>'.encode('utf-8'),
-            headers={'Content-Type': 'text/xml'})
+    ft = gwc.req('GET', f'{path}.json').json()['featureType']
+    store = ft['store']['name'].split(':', 1)[-1]
+    put_path = f'/rest/workspaces/{ws}/datastores/{store}/featuretypes/{name}'
+    xml_headers = {'Content-Type': 'text/xml'}
+    gwc.req('PUT', f'{put_path}?recalculate=nativebbox,latlonbbox',
+            data='<featureType><enabled>true</enabled></featureType>'.encode('utf-8'), headers=xml_headers)
+    if outside_bbox(gwc, layer, sample=1):
+        b = expanded_bbox(gwc, layer)
+        body = ('<featureType><nativeBoundingBox>'
+                f"<minx>{b['minx']}</minx><maxx>{b['maxx']}</maxx><miny>{b['miny']}</miny><maxy>{b['maxy']}</maxy>"
+                f"<crs>{ft['srs']}</crs></nativeBoundingBox></featureType>")
+        gwc.req('PUT', f'{put_path}?recalculate=latlonbbox', data=body.encode('utf-8'), headers=xml_headers)
     gwc.put_layer(layer, gwc.get_layer(layer))
-    after = native_bbox(gwc, layer)
-    fmt = lambda b: f"{b['minx']:.1f}..{b['maxx']:.1f} x {b['miny']:.1f}..{b['maxy']:.1f}"
-    print(f'{layer}: границы {fmt(before)} -> {fmt(after)}')
+    print(f'{layer}: границы {fmt_bbox(before)} -> {fmt_bbox(native_bbox(gwc, layer))}')
 
 
 def main() -> int:
@@ -205,6 +261,10 @@ def main() -> int:
         bad = check_bounds(gwc, layers)
         if not args.fix_bounds or not bad:
             return 2 if bad else 0
+        if args.dry_run:
+            for layer in bad:
+                fix_bounds(gwc, layer, None, dry_run=True)
+            return 2
         if not args.backup_dir:
             ap.error('для --fix-bounds нужен --backup-dir')
         backup = Path(args.backup_dir)
