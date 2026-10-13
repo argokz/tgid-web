@@ -17,12 +17,21 @@ requested TILEMATRIXSET»), формат MVT, параметр VIEWPARAMS (фр�
 
 Бэкап — исходный XML тайлового слоя (GET /gwc/rest/layers/<слой>.xml); --restore возвращает его
 и очищает кеш слоя.
+
+Границы. Кеш покрывает только границы слоя (их GeoServer считает по данным при публикации слоя);
+за ними GWC отвечает 400, и веб туда не ходит — объект, появившийся за границами (новый район после
+переконвертации базы, импорт), на карте не виден. Проверка (только чтение, код выхода 2 — есть такие)
+и пересчёт границ по данным:
+
+    python scripts/geoserver/gwc_mvt_cache.py --check-bounds
+    python scripts/geoserver/gwc_mvt_cache.py --fix-bounds --backup-dir H:/tgid-backups/<дата>_gwc
 """
 from __future__ import annotations
 
 import argparse
 import os
 import sys
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -107,6 +116,72 @@ def backup_name(layer: str) -> str:
     return layer.replace(':', '__') + '.xml'
 
 
+# Запас к границам (единицы системы координат слоя — метры): крайние объекты лежат ровно на границе,
+# а WITHIN границу не включает
+BOUNDS_EPS = 1.0
+
+
+def native_bbox(gwc: Gwc, layer: str) -> dict:
+    ws, name = layer.split(':', 1)
+    return gwc.req('GET', f'/rest/workspaces/{ws}/featuretypes/{name}.json').json()['featureType']['nativeBoundingBox']
+
+
+def outside_bbox(gwc: Gwc, layer: str, sample: int = 5) -> list:
+    """Объекты слоя (все фрагменты, параметры view по умолчанию) хотя бы частично за его границами.
+
+    Кеш GWC покрывает только границы слоя (latLonBoundingBox — их GeoServer считает по данным при
+    публикации), за ними отвечает 400 TileOutOfRange, а веб такие тайлы не запрашивает: объект там
+    на карте не появится.
+    """
+    b = native_bbox(gwc, layer)
+    x0, y0 = b['minx'] - BOUNDS_EPS, b['miny'] - BOUNDS_EPS
+    x1, y1 = b['maxx'] + BOUNDS_EPS, b['maxy'] + BOUNDS_EPS
+    cql = f'NOT WITHIN(shape, POLYGON(({x0} {y0}, {x1} {y0}, {x1} {y1}, {x0} {y1}, {x0} {y0})))'
+    r = gwc.req('GET', '/wfs', params={
+        'SERVICE': 'WFS', 'VERSION': '2.0.0', 'REQUEST': 'GetFeature', 'typeNames': layer,
+        'count': sample, 'outputFormat': 'application/json', 'CQL_FILTER': cql,
+    })
+    if not r.headers.get('content-type', '').startswith('application/json'):
+        raise RuntimeError(f'{layer}: WFS ответил не JSON: {r.text[:300]}')
+    return r.json().get('features', [])
+
+
+def describe(feature: dict) -> str:
+    props = feature.get('properties') or {}
+    name = props.get('name') or props.get('nam') or ''
+    fid = feature.get('id') or props.get('id')
+    return f'{fid} {name}'.strip()
+
+
+def check_bounds(gwc: Gwc, layers: list) -> list:
+    bad = []
+    for layer in layers:
+        found = outside_bbox(gwc, layer)
+        if found:
+            bad.append(layer)
+            print(f'{layer}: ЕСТЬ объекты за границами кеша, например: {", ".join(describe(f) for f in found)}')
+        else:
+            print(f'{layer}: все объекты внутри границ')
+    return bad
+
+
+def fix_bounds(gwc: Gwc, layer: str, backup: Path):
+    """Пересчитать границы слоя по данным и перечитать тайловый слой GWC (его сетка — по границам слоя)"""
+    ws, name = layer.split(':', 1)
+    path = f'/rest/workspaces/{ws}/featuretypes/{name}'
+    stamp = time.strftime('%Y%m%d-%H%M%S')
+    (backup / f'{layer.replace(":", "__")}.featuretype-{stamp}.xml').write_text(
+        gwc.req('GET', f'{path}.xml').text, encoding='utf-8')
+    before = native_bbox(gwc, layer)
+    gwc.req('PUT', f'{path}?recalculate=nativebbox,latlonbbox',
+            data='<featureType><enabled>true</enabled></featureType>'.encode('utf-8'),
+            headers={'Content-Type': 'text/xml'})
+    gwc.put_layer(layer, gwc.get_layer(layer))
+    after = native_bbox(gwc, layer)
+    fmt = lambda b: f"{b['minx']:.1f}..{b['maxx']:.1f} x {b['miny']:.1f}..{b['maxy']:.1f}"
+    print(f'{layer}: границы {fmt(before)} -> {fmt(after)}')
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--geoserver', default=os.environ.get('GEOSERVER_REST_URL', 'http://127.0.0.1:8085/geoserver'))
@@ -115,10 +190,30 @@ def main() -> int:
     ap.add_argument('--backup-dir', help='куда сохранить исходный XML слоёв (обязателен без --dry-run)')
     ap.add_argument('--restore', help='вернуть XML слоёв из каталога бэкапа')
     ap.add_argument('--dry-run', action='store_true', help='только показать изменения')
+    ap.add_argument('--check-bounds', action='store_true',
+                    help='только проверить, нет ли объектов за границами кеша (код выхода 2 — есть)')
+    ap.add_argument('--fix-bounds', action='store_true',
+                    help='пересчитать границы слоёв, у которых есть объекты за ними (нужен --backup-dir)')
     args = ap.parse_args()
 
     gwc = Gwc(args.geoserver, os.environ.get('GEOSERVER_REST_USER', 'admin'), os.environ['GEOSERVER_REST_PASSWORD'])
     layers = [s.strip() for s in args.layers.split(',') if s.strip()]
+
+    if args.check_bounds or args.fix_bounds:
+        bad = check_bounds(gwc, layers)
+        if not args.fix_bounds or not bad:
+            return 2 if bad else 0
+        if not args.backup_dir:
+            ap.error('для --fix-bounds нужен --backup-dir')
+        backup = Path(args.backup_dir)
+        backup.mkdir(parents=True, exist_ok=True)
+        for layer in bad:
+            fix_bounds(gwc, layer, backup)
+        still = check_bounds(gwc, bad)
+        print('Веб увидит новые границы, когда обновит список слоёв: nginx хранит WMTS GetCapabilities до часа,\n'
+              'сервер веба — список слоёв до часа (сразу: перезапуск служб веба или '
+              '/tgid/<город>/api/geoserver-layers?refresh=true после истечения кеша nginx).')
+        return 2 if still else 0
 
     if args.restore:
         src = Path(args.restore)
