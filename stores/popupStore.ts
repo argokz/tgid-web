@@ -4,6 +4,7 @@ import type { PopupOptions } from 'maplibre-gl';
 import { getMaplibreDefault } from '~/utils/maplibreLoader';
 import { markRaw } from 'vue';
 import { escapeHtml } from '~/utils/escapeHtml';
+import { isMapMeasureActive } from '~/composables/useMapDraw';
 
 interface PopupConfig {
   layerId: string;
@@ -59,7 +60,7 @@ export const usePopupStore = defineStore('popup', {
       const { layerId, fields, title, options } = popup;
 
       this.map.on('click', layerId, async (e: any) => {
-        if (!e.features?.[0]) return;
+        if (!e.features?.[0] || isMapMeasureActive()) return;
 
         const properties = e.features[0].properties;
         const content = fields

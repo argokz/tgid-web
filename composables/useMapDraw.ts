@@ -1,39 +1,71 @@
 /**
- * Рисование и измерения на карте поверх MapLibre.
+ * Измерения на карте (линейка и площадь) поверх MapLibre.
  *
  * Реализовано на нативных источниках/слоях MapLibre, без mapbox-gl-draw:
  * та библиотека рассчитана на mapbox-gl и работает с MapLibre только через
- * прослойку, которая ломается при обновлениях. Здесь — полный контроль над
- * поведением и никаких дополнительных зависимостей.
+ * прослойку, которая ломается при обновлениях.
+ *
+ * Пока идёт измерение, клик по карте не выбирает объекты сети (mapStore и другие обработчики
+ * смотрят isMapMeasureActive()). Управление: клик — точка (с привязкой к узлу сети), двойной клик /
+ * Enter / правая кнопка — завершить, Backspace — убрать последнюю точку, Esc — отменить текущее
+ * измерение (второй Esc — выйти из режима). Вершины готовых измерений можно перетаскивать.
  */
 import { computed, ref, shallowRef } from 'vue';
-import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
+import type { Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent } from 'maplibre-gl';
 import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
+import { sampleElevation } from '~/utils/terrainSample';
 
-export type DrawMode = 'none' | 'point' | 'line' | 'polygon' | 'measure-distance' | 'measure-area';
+export type DrawMode = 'none' | 'measure-distance' | 'measure-area';
 
-/** Текущий режим панели рисования — чтобы редактор сети не принимал её клики за свои */
+/** Текущий режим измерения — чтобы клики по карте не выбирали объекты и не правили сеть */
 export const activeDrawMode = ref<DrawMode>('none');
 
-export interface DrawFeature {
-  id: string;
-  type: 'point' | 'line' | 'polygon';
-  coordinates: number[][];
-  /** Длина в метрах (линия) либо периметр (полигон) */
-  length?: number;
-  /** Площадь в м² (полигон) */
-  area?: number;
-  label?: string;
+/** Идёт измерение: обработчики кликов карты (выбор объекта, трассировка, редактор) пропускают клик */
+export const isMapMeasureActive = (): boolean => activeDrawMode.value !== 'none';
+
+export interface ProfilePoint {
+  /** Расстояние от начала, м */
+  d: number;
+  /** Высота земли, м (null — нет данных) */
+  h: number | null;
 }
 
-const SOURCE_ID = 'draw-source';
-const SOURCE_DRAFT_ID = 'draw-draft-source';
-const LAYER_FILL = 'draw-fill';
-const LAYER_LINE = 'draw-line';
-const LAYER_POINT = 'draw-point';
-const LAYER_VERTEX = 'draw-vertex';
-const LAYER_DRAFT_LINE = 'draw-draft-line';
-const LAYER_LABEL = 'draw-label';
+export interface ElevationProfile {
+  status: 'loading' | 'ready' | 'error';
+  points: ProfilePoint[];
+}
+
+export interface Measurement {
+  id: string;
+  kind: 'distance' | 'area';
+  coordinates: number[][];
+  /** Длина линии либо периметр, м */
+  length: number;
+  /** Площадь, м² */
+  area?: number;
+  /** Профиль высот вдоль линии (только расстояние) */
+  profile?: ElevationProfile;
+}
+
+const SOURCE_ID = 'measure-source';
+const SOURCE_DRAFT_ID = 'measure-draft-source';
+const LAYER_FILL = 'measure-fill';
+const LAYER_LINE = 'measure-line';
+const LAYER_VERTEX = 'measure-vertex';
+const LAYER_SEGMENT_LABEL = 'measure-segment-label';
+const LAYER_TOTAL_LABEL = 'measure-total-label';
+const LAYER_DRAFT_FILL = 'measure-draft-fill';
+const LAYER_DRAFT_LINE = 'measure-draft-line';
+const LAYER_DRAFT_VERTEX = 'measure-draft-vertex';
+const LAYER_SNAP = 'measure-snap';
+const LAYER_CURSOR_LABEL = 'measure-cursor-label';
+const ALL_LAYERS = [
+  LAYER_CURSOR_LABEL, LAYER_SNAP, LAYER_DRAFT_VERTEX, LAYER_DRAFT_LINE, LAYER_DRAFT_FILL,
+  LAYER_TOTAL_LABEL, LAYER_SEGMENT_LABEL, LAYER_VERTEX, LAYER_LINE, LAYER_FILL,
+];
+
+const COLOR = '#0d6efd';
+const DRAFT_COLOR = '#ff6f00';
 
 const EARTH_RADIUS = 6371008.8;
 const toRad = (deg: number) => (deg * Math.PI) / 180;
@@ -72,100 +104,261 @@ export function polygonArea(coords: number[][]): number {
   return Math.abs((total * EARTH_RADIUS * EARTH_RADIUS) / 2);
 }
 
+/** Азимут отрезка от севера по часовой стрелке, градусы 0..360 */
+export function bearing(a: number[], b: number[]): number {
+  const lat1 = toRad(a[1]);
+  const lat2 = toRad(b[1]);
+  const dLon = toRad(b[0] - a[0]);
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+const decimal = (v: number, digits: number) => v.toFixed(digits).replace('.', ',');
+
 export function formatLength(meters: number): string {
   if (!Number.isFinite(meters)) return '—';
-  return meters >= 1000 ? `${(meters / 1000).toFixed(2)} км` : `${meters.toFixed(1)} м`;
+  return meters >= 1000 ? `${decimal(meters / 1000, 2)} км` : `${decimal(meters, 1)} м`;
 }
 
 export function formatArea(sqMeters: number): string {
   if (!Number.isFinite(sqMeters)) return '—';
-  if (sqMeters >= 1_000_000) return `${(sqMeters / 1_000_000).toFixed(3)} км²`;
-  if (sqMeters >= 10_000) return `${(sqMeters / 10_000).toFixed(2)} га`;
-  return `${sqMeters.toFixed(1)} м²`;
+  if (sqMeters >= 1_000_000) return `${decimal(sqMeters / 1_000_000, 3)} км²`;
+  if (sqMeters >= 10_000) return `${decimal(sqMeters / 10_000, 2)} га`;
+  return `${decimal(sqMeters, 1)} м²`;
 }
+
+export function formatBearing(deg: number): string {
+  return `${Math.round(deg) % 360}°`;
+}
+
+/** Точки вдоль линии с шагом по длине: [{ d, lng, lat }] — для профиля высот */
+export function pointsAlong(coords: number[][], count: number): Array<{ d: number; lng: number; lat: number }> {
+  const total = lineLength(coords);
+  if (coords.length < 2 || total === 0) return coords.slice(0, 1).map((c) => ({ d: 0, lng: c[0], lat: c[1] }));
+  const out: Array<{ d: number; lng: number; lat: number }> = [];
+  const n = Math.max(2, count);
+  let seg = 0;
+  let segStart = 0;
+  for (let k = 0; k < n; k += 1) {
+    const d = (total * k) / (n - 1);
+    while (seg < coords.length - 2 && segStart + haversine(coords[seg], coords[seg + 1]) < d) {
+      segStart += haversine(coords[seg], coords[seg + 1]);
+      seg += 1;
+    }
+    const segLen = haversine(coords[seg], coords[seg + 1]) || 1;
+    const t = Math.min(1, Math.max(0, (d - segStart) / segLen));
+    const [x0, y0] = coords[seg];
+    const [x1, y1] = coords[seg + 1];
+    out.push({ d, lng: x0 + (x1 - x0) * t, lat: y0 + (y1 - y0) * t });
+  }
+  return out;
+}
+
+export interface ProfileStats {
+  start: number;
+  end: number;
+  min: number;
+  max: number;
+  /** Суммарный подъём / спуск по профилю, м */
+  gain: number;
+  loss: number;
+  /** Средний уклон начало → конец, ‰ */
+  slopePermille: number;
+}
+
+export function profileStats(points: ProfilePoint[]): ProfileStats | null {
+  const valid = points.filter((p): p is { d: number; h: number } => p.h != null && Number.isFinite(p.h));
+  if (valid.length < 2) return null;
+  let gain = 0;
+  let loss = 0;
+  for (let i = 1; i < valid.length; i += 1) {
+    const dh = valid[i].h - valid[i - 1].h;
+    if (dh > 0) gain += dh;
+    else loss -= dh;
+  }
+  const first = valid[0];
+  const last = valid[valid.length - 1];
+  const dist = last.d - first.d;
+  return {
+    start: first.h,
+    end: last.h,
+    min: Math.min(...valid.map((p) => p.h)),
+    max: Math.max(...valid.map((p) => p.h)),
+    gain,
+    loss,
+    slopePermille: dist > 0 ? ((last.h - first.h) / dist) * 1000 : 0,
+  };
+}
+
+const closeRing = (coords: number[][]) => {
+  if (coords.length < 3) return coords;
+  const first = coords[0];
+  const last = coords[coords.length - 1];
+  return first[0] === last[0] && first[1] === last[1] ? coords : [...coords, first];
+};
+
+const midpoint = (a: number[], b: number[]) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+
+/** Подписи длин отрезков (на середине каждого) */
+function segmentLabels(coords: number[][], closed: boolean, extra: Record<string, unknown> = {}) {
+  const pts = closed ? closeRing(coords) : coords;
+  const out: any[] = [];
+  for (let i = 1; i < pts.length; i += 1) {
+    const len = haversine(pts[i - 1], pts[i]);
+    if (len <= 0) continue;
+    out.push({
+      type: 'Feature',
+      properties: { segmentLabel: formatLength(len), ...extra },
+      geometry: { type: 'Point', coordinates: midpoint(pts[i - 1], pts[i]) },
+    });
+  }
+  return out;
+}
+
+export function measurementLabel(m: Pick<Measurement, 'kind' | 'length' | 'area'>): string {
+  return m.kind === 'area' ? `${formatArea(m.area || 0)} · периметр ${formatLength(m.length)}` : formatLength(m.length);
+}
+
+/** Слои сети (узлы) — к ним привязываются точки измерения; не к подписям подложки */
+const isNetworkLayer = (id: string) => id.startsWith('mvt__');
+
+const PROFILE_SAMPLES = 120;
 
 export function useMapDraw() {
   const mode = ref<DrawMode>('none');
-  const features = ref<DrawFeature[]>([]);
+  const measurements = ref<Measurement[]>([]);
   const draftPoints = ref<number[][]>([]);
   const mapRef = shallowRef<MapLibreMap | null>(null);
   const snapEnabled = ref<boolean>(true);
-  const snapRadiusPx = ref<number>(15);
-  let hoverPoint: number[] | null = null;
+  const snapRadiusPx = ref<number>(12);
+  /** Курсор (для текущего отрезка и подсказки) */
+  const hoverPoint = shallowRef<number[] | null>(null);
+  const hoverSnapped = ref(false);
+  let dragging: { id: string; index: number } | null = null;
+  let suppressNextClick = false;
 
   const findSnapPoint = (screenPoint: { x: number; y: number }): number[] | null => {
     const map = mapRef.value;
     if (!map || !snapEnabled.value) return null;
     const r = snapRadiusPx.value;
     try {
-      const rendered = map.queryRenderedFeatures([
-        [screenPoint.x - r, screenPoint.y - r],
-        [screenPoint.x + r, screenPoint.y + r],
-      ]);
+      const layers = (map.getStyle()?.layers || []).map((l) => l.id).filter(isNetworkLayer);
+      if (!layers.length) return null;
+      const rendered = map.queryRenderedFeatures(
+        [[screenPoint.x - r, screenPoint.y - r], [screenPoint.x + r, screenPoint.y + r]],
+        { layers },
+      );
+      let best: number[] | null = null;
+      let bestDist = Infinity;
       for (const f of rendered) {
-        if (f.geometry?.type === 'Point' && Array.isArray(f.geometry.coordinates)) {
-          return f.geometry.coordinates as number[];
+        if (f.geometry?.type !== 'Point') continue;
+        const c = f.geometry.coordinates as number[];
+        const p = map.project(c as [number, number]);
+        const dist = Math.hypot(p.x - screenPoint.x, p.y - screenPoint.y);
+        if (dist < bestDist) {
+          best = c;
+          bestDist = dist;
         }
       }
+      return best;
     } catch {
       // MapLibre may throw if query outside viewport
+      return null;
     }
-    return null;
   };
 
-  const isDrawing = computed(() => mode.value !== 'none');
-  const isMeasuring = computed(
-    () => mode.value === 'measure-distance' || mode.value === 'measure-area'
-  );
-  const draftLength = computed(() => lineLength(draftPoints.value));
-  const draftArea = computed(() =>
-    draftPoints.value.length >= 3 ? polygonArea(draftPoints.value) : 0
-  );
+  const isMeasuring = computed(() => mode.value !== 'none');
+  const isArea = computed(() => mode.value === 'measure-area');
 
-  const featureCollection = () => ({
-    type: 'FeatureCollection' as const,
-    features: features.value.map((f) => ({
-      type: 'Feature' as const,
-      id: f.id,
-      properties: {
-        kind: f.type,
-        label: f.label || '',
-      },
-      geometry:
-        f.type === 'point'
-          ? { type: 'Point' as const, coordinates: f.coordinates[0] }
-          : f.type === 'line'
-            ? { type: 'LineString' as const, coordinates: f.coordinates }
-            : { type: 'Polygon' as const, coordinates: [closeRing(f.coordinates)] },
-    })),
+  /** Точки текущего измерения вместе с курсором */
+  const livePoints = computed(() =>
+    hoverPoint.value && draftPoints.value.length > 0 ? [...draftPoints.value, hoverPoint.value] : draftPoints.value
+  );
+  const draftLength = computed(() => lineLength(isArea.value ? closeRing(livePoints.value) : livePoints.value));
+  const draftArea = computed(() => (livePoints.value.length >= 3 ? polygonArea(livePoints.value) : 0));
+  /** Текущий отрезок (последняя точка → курсор): длина и азимут */
+  const currentSegment = computed(() => {
+    const pts = draftPoints.value;
+    const h = hoverPoint.value;
+    if (!pts.length || !h) return null;
+    const last = pts[pts.length - 1];
+    return { length: haversine(last, h), bearing: bearing(last, h) };
   });
 
-  const closeRing = (coords: number[][]) => {
-    if (coords.length < 3) return coords;
-    const first = coords[0];
-    const last = coords[coords.length - 1];
-    return first[0] === last[0] && first[1] === last[1] ? coords : [...coords, first];
+  const featureCollection = () => {
+    const features: any[] = [];
+    for (const m of measurements.value) {
+      const closed = m.kind === 'area';
+      features.push({
+        type: 'Feature',
+        properties: { measureId: m.id, kind: m.kind },
+        geometry: closed
+          ? { type: 'Polygon', coordinates: [closeRing(m.coordinates)] }
+          : { type: 'LineString', coordinates: m.coordinates },
+      });
+      m.coordinates.forEach((c, index) => features.push({
+        type: 'Feature',
+        properties: { vertex: true, measureId: m.id, index },
+        geometry: { type: 'Point', coordinates: c },
+      }));
+      if (m.coordinates.length > 2 || closed) features.push(...segmentLabels(m.coordinates, closed, { measureId: m.id }));
+      const anchor = closed ? centroid(m.coordinates) : m.coordinates[m.coordinates.length - 1];
+      features.push({
+        type: 'Feature',
+        properties: { totalLabel: measurementLabel(m), measureId: m.id },
+        geometry: { type: 'Point', coordinates: anchor },
+      });
+    }
+    return { type: 'FeatureCollection' as const, features };
+  };
+
+  const centroid = (coords: number[][]) => {
+    const n = coords.length || 1;
+    return [coords.reduce((s, c) => s + c[0], 0) / n, coords.reduce((s, c) => s + c[1], 0) / n];
   };
 
   const draftCollection = () => {
-    const pts = [...draftPoints.value];
-    if (hoverPoint && pts.length > 0) pts.push(hoverPoint);
-    const geoFeatures: any[] = pts.map((p, i) => ({
+    const pts = livePoints.value;
+    const features: any[] = draftPoints.value.map((p, i) => ({
       type: 'Feature',
       properties: { vertex: true, index: i + 1 },
       geometry: { type: 'Point', coordinates: p },
     }));
-    if (pts.length >= 2) {
-      const coords = mode.value === 'polygon' || mode.value === 'measure-area'
-        ? closeRing(pts)
-        : pts;
-      geoFeatures.push({
+    if (pts.length >= 3 && isArea.value) {
+      features.push({
         type: 'Feature',
-        properties: { draft: true },
-        geometry: { type: 'LineString', coordinates: coords },
+        properties: { draftFill: true },
+        geometry: { type: 'Polygon', coordinates: [closeRing(pts)] },
       });
     }
-    return { type: 'FeatureCollection' as const, features: geoFeatures };
+    if (pts.length >= 2) {
+      features.push({
+        type: 'Feature',
+        properties: { draft: true },
+        geometry: { type: 'LineString', coordinates: isArea.value ? closeRing(pts) : pts },
+      });
+      features.push(...segmentLabels(pts, isArea.value && pts.length >= 3));
+    }
+    const h = hoverPoint.value;
+    if (h && isMeasuring.value) {
+      if (hoverSnapped.value) {
+        features.push({ type: 'Feature', properties: { snap: true }, geometry: { type: 'Point', coordinates: h } });
+      }
+      const seg = currentSegment.value;
+      const lines = seg
+        ? [
+          isArea.value && draftArea.value > 0 ? formatArea(draftArea.value) : `Всего ${formatLength(draftLength.value)}`,
+          `${formatLength(seg.length)} · азимут ${formatBearing(seg.bearing)}`,
+        ]
+        : [hoverSnapped.value ? 'Узел сети — кликните, чтобы начать' : 'Кликните, чтобы начать'];
+      features.push({
+        type: 'Feature',
+        properties: { cursorLabel: lines.join('\n') },
+        geometry: { type: 'Point', coordinates: h },
+      });
+    }
+    return { type: 'FeatureCollection' as const, features };
   };
 
   const refresh = () => {
@@ -179,20 +372,33 @@ export function useMapDraw() {
     if (map.getSource(SOURCE_ID)) return;
     // isStyleLoaded() иногда возвращает true, пока стиль ещё диффится (HMR,
     // смена подложки) — addSource в этот момент бросает. Ловим и повторяем
-    // на следующем idle, чтобы не терять инициализацию слоёв рисования.
+    // на следующем idle, чтобы не терять инициализацию слоёв.
     if (!isStyleMutable(map)) {
       void waitForStyleMutable(map).then(() => { if (mapRef.value === map) ensureLayers(map); }, () => {});
       return;
     }
 
     try {
-      addDrawLayers(map);
+      addMeasureLayers(map);
     } catch {
       map.once('idle', () => { if (mapRef.value === map) ensureLayers(map); });
     }
   };
 
-  const addDrawLayers = (map: MapLibreMap) => {
+  const labelLayout = (field: string, size: number): any => ({
+    'text-field': ['get', field],
+    'text-size': size,
+    'text-font': ['Open Sans Semibold', 'Arial Unicode MS Regular'],
+    'text-allow-overlap': true,
+    'text-ignore-placement': true,
+  });
+  const labelPaint = (color: string): any => ({
+    'text-color': color,
+    'text-halo-color': '#ffffff',
+    'text-halo-width': 2,
+  });
+
+  const addMeasureLayers = (map: MapLibreMap) => {
     map.addSource(SOURCE_ID, { type: 'geojson', data: featureCollection() });
     map.addSource(SOURCE_DRAFT_ID, { type: 'geojson', data: draftCollection() });
 
@@ -200,131 +406,290 @@ export function useMapDraw() {
       id: LAYER_FILL,
       type: 'fill',
       source: SOURCE_ID,
-      filter: ['==', ['get', 'kind'], 'polygon'],
-      paint: { 'fill-color': '#1976d2', 'fill-opacity': 0.18 },
+      filter: ['==', ['get', 'kind'], 'area'],
+      paint: { 'fill-color': COLOR, 'fill-opacity': 0.15 },
     });
     map.addLayer({
       id: LAYER_LINE,
       type: 'line',
       source: SOURCE_ID,
-      filter: ['in', ['get', 'kind'], ['literal', ['line', 'polygon']]],
-      paint: { 'line-color': '#1976d2', 'line-width': 3 },
+      filter: ['has', 'kind'],
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': COLOR, 'line-width': 3 },
     });
     map.addLayer({
-      id: LAYER_POINT,
+      id: LAYER_VERTEX,
       type: 'circle',
       source: SOURCE_ID,
-      filter: ['==', ['get', 'kind'], 'point'],
+      filter: ['==', ['get', 'vertex'], true],
       paint: {
-        'circle-radius': 6,
-        'circle-color': '#1976d2',
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#fff',
+        'circle-radius': 5,
+        'circle-color': '#ffffff',
+        'circle-stroke-width': 2.5,
+        'circle-stroke-color': COLOR,
       },
     });
     map.addLayer({
-      id: LAYER_LABEL,
+      id: LAYER_SEGMENT_LABEL,
       type: 'symbol',
       source: SOURCE_ID,
-      filter: ['!=', ['get', 'label'], ''],
-      layout: {
-        'text-field': ['get', 'label'],
-        'text-size': 12,
-        'text-offset': [0, 1.2],
-        'text-anchor': 'top',
-      },
-      paint: { 'text-color': '#0d47a1', 'text-halo-color': '#fff', 'text-halo-width': 2 },
+      filter: ['has', 'segmentLabel'],
+      minzoom: 13,
+      layout: labelLayout('segmentLabel', 11),
+      paint: labelPaint('#1d3f73'),
+    });
+    map.addLayer({
+      id: LAYER_TOTAL_LABEL,
+      type: 'symbol',
+      source: SOURCE_ID,
+      filter: ['has', 'totalLabel'],
+      layout: { ...labelLayout('totalLabel', 13), 'text-anchor': 'left', 'text-offset': [0.8, 0] },
+      paint: labelPaint(COLOR),
+    });
+    map.addLayer({
+      id: LAYER_DRAFT_FILL,
+      type: 'fill',
+      source: SOURCE_DRAFT_ID,
+      filter: ['==', ['get', 'draftFill'], true],
+      paint: { 'fill-color': DRAFT_COLOR, 'fill-opacity': 0.12 },
     });
     map.addLayer({
       id: LAYER_DRAFT_LINE,
       type: 'line',
       source: SOURCE_DRAFT_ID,
       filter: ['==', ['get', 'draft'], true],
-      paint: { 'line-color': '#ff6f00', 'line-width': 2, 'line-dasharray': [2, 1.5] },
+      paint: { 'line-color': DRAFT_COLOR, 'line-width': 2.5, 'line-dasharray': [2, 1.5] },
     });
     map.addLayer({
-      id: LAYER_VERTEX,
+      id: LAYER_DRAFT_VERTEX,
       type: 'circle',
       source: SOURCE_DRAFT_ID,
       filter: ['==', ['get', 'vertex'], true],
       paint: {
-        'circle-radius': 5,
-        'circle-color': '#ff6f00',
+        'circle-radius': 4.5,
+        'circle-color': DRAFT_COLOR,
         'circle-stroke-width': 2,
         'circle-stroke-color': '#fff',
       },
     });
+    map.addLayer({
+      id: LAYER_SNAP,
+      type: 'circle',
+      source: SOURCE_DRAFT_ID,
+      filter: ['==', ['get', 'snap'], true],
+      paint: {
+        'circle-radius': 10,
+        'circle-color': 'rgba(0,0,0,0)',
+        'circle-stroke-width': 2.5,
+        'circle-stroke-color': '#00a86b',
+      },
+    });
+    map.addLayer({
+      id: LAYER_CURSOR_LABEL,
+      type: 'symbol',
+      source: SOURCE_DRAFT_ID,
+      filter: ['has', 'cursorLabel'],
+      layout: {
+        ...labelLayout('cursorLabel', 12),
+        'text-anchor': 'top-left',
+        'text-offset': [1.2, 1.2],
+        'text-justify': 'left',
+      },
+      paint: { ...labelPaint('#202124'), 'text-halo-width': 2.5 },
+    });
+  };
+
+  const pointFromEvent = (e: MapMouseEvent): number[] => {
+    const snapped = findSnapPoint(e.point);
+    hoverSnapped.value = Boolean(snapped);
+    return snapped || [e.lngLat.lng, e.lngLat.lat];
   };
 
   const onMapClick = (e: MapMouseEvent) => {
     if (mode.value === 'none') return;
-    const snapped = findSnapPoint(e.point);
-    const point = snapped || [e.lngLat.lng, e.lngLat.lat];
-
-    if (mode.value === 'point') {
-      features.value = [
-        ...features.value,
-        { id: `f${Date.now()}`, type: 'point', coordinates: [point] },
-      ];
-      refresh();
+    if (suppressNextClick) {
+      suppressNextClick = false;
       return;
     }
-
-    draftPoints.value = [...draftPoints.value, point];
+    const point = pointFromEvent(e);
+    const pts = draftPoints.value;
+    // Двойной клик даёт два click подряд в той же точке — повтор не добавляем
+    const last = pts[pts.length - 1];
+    if (last && last[0] === point[0] && last[1] === point[1]) return;
+    draftPoints.value = [...pts, point];
     refresh();
   };
 
   const onMapMove = (e: MapMouseEvent) => {
-    if (mode.value === 'none' || mode.value === 'point' || draftPoints.value.length === 0) return;
-    const snapped = findSnapPoint(e.point);
-    hoverPoint = snapped || [e.lngLat.lng, e.lngLat.lat];
+    if (dragging) {
+      moveVertex(e);
+      return;
+    }
+    if (mode.value === 'none') return;
+    hoverPoint.value = pointFromEvent(e);
     refresh();
   };
 
-  /** Завершить текущую фигуру (двойной клик / кнопка «Готово») */
+  const onMapOut = () => {
+    hoverPoint.value = null;
+    hoverSnapped.value = false;
+    refresh();
+  };
+
+  /** Профиль высот вдоль линии (модель рельефа MapTiler) */
+  const loadProfile = async (id: string) => {
+    const m = measurements.value.find((x) => x.id === id);
+    if (!m || m.kind !== 'distance') return;
+    const coords = m.coordinates.map((c) => [...c]);
+    m.profile = { status: 'loading', points: [] };
+    measurements.value = [...measurements.value];
+    try {
+      const samples = pointsAlong(coords, PROFILE_SAMPLES);
+      const heights = await Promise.all(samples.map((s) => sampleElevation(s.lng, s.lat)));
+      const current = measurements.value.find((x) => x.id === id);
+      // Вершины могли перетащить, пока грузились тайлы — тогда профиль уже пересчитывается
+      if (!current || JSON.stringify(current.coordinates) !== JSON.stringify(coords)) return;
+      current.profile = {
+        status: heights.some((h) => h != null) ? 'ready' : 'error',
+        points: samples.map((s, i) => ({ d: s.d, h: heights[i] })),
+      };
+    } catch {
+      const current = measurements.value.find((x) => x.id === id);
+      if (current) current.profile = { status: 'error', points: [] };
+    }
+    measurements.value = [...measurements.value];
+  };
+
+  /** Завершить текущее измерение (двойной клик / Enter / правая кнопка / «Готово») */
   const finishShape = () => {
     const pts = draftPoints.value;
-    hoverPoint = null;
-    if (pts.length < 2) {
-      draftPoints.value = [];
+    const area = isArea.value;
+    hoverPoint.value = null;
+    draftPoints.value = [];
+    if (pts.length < (area ? 3 : 2)) {
       refresh();
       return;
     }
-
-    const isArea = mode.value === 'polygon' || mode.value === 'measure-area';
-    const type: DrawFeature['type'] = isArea ? 'polygon' : 'line';
-    const length = lineLength(isArea ? closeRing(pts) : pts);
-    const area = isArea ? polygonArea(pts) : undefined;
-
-    let label = '';
-    if (mode.value === 'measure-distance') label = formatLength(length);
-    else if (mode.value === 'measure-area') label = `${formatArea(area || 0)} · ${formatLength(length)}`;
-
-    features.value = [
-      ...features.value,
-      { id: `f${Date.now()}`, type, coordinates: pts, length, area, label },
-    ];
-    draftPoints.value = [];
+    const m: Measurement = {
+      id: `m${Date.now()}`,
+      kind: area ? 'area' : 'distance',
+      coordinates: pts,
+      length: lineLength(area ? closeRing(pts) : pts),
+      area: area ? polygonArea(pts) : undefined,
+    };
+    measurements.value = [...measurements.value, m];
     refresh();
+    if (m.kind === 'distance') void loadProfile(m.id);
   };
 
   const undoPoint = () => {
     if (draftPoints.value.length > 0) {
       draftPoints.value = draftPoints.value.slice(0, -1);
-    } else if (features.value.length > 0) {
-      features.value = features.value.slice(0, -1);
+    } else if (measurements.value.length > 0) {
+      measurements.value = measurements.value.slice(0, -1);
     }
+    refresh();
+  };
+
+  /** Esc: отменить текущее измерение; если его нет — выйти из режима */
+  const cancel = () => {
+    if (draftPoints.value.length) {
+      draftPoints.value = [];
+      refresh();
+    } else {
+      setMode('none');
+    }
+  };
+
+  const removeMeasurement = (id: string) => {
+    measurements.value = measurements.value.filter((m) => m.id !== id);
     refresh();
   };
 
   const clearAll = () => {
     draftPoints.value = [];
-    features.value = [];
-    hoverPoint = null;
+    measurements.value = [];
+    hoverPoint.value = null;
     refresh();
   };
 
-  // Двойной клик завершает фигуру — во время рисования он не должен зумить карту (QA F25)
+  /** Показать измерение целиком */
+  const zoomTo = (id: string) => {
+    const map = mapRef.value;
+    const m = measurements.value.find((x) => x.id === id);
+    if (!map || !m) return;
+    const xs = m.coordinates.map((c) => c[0]);
+    const ys = m.coordinates.map((c) => c[1]);
+    map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: 80, maxZoom: 18 });
+  };
+
+  // --- перетаскивание вершин готовых измерений ---
+  const onVertexDown = (e: MapLayerMouseEvent) => {
+    const f = e.features?.[0];
+    const id = f?.properties?.measureId;
+    const index = Number(f?.properties?.index);
+    if (!id || !Number.isInteger(index)) return;
+    e.preventDefault();
+    dragging = { id: String(id), index };
+    mapRef.value?.dragPan.disable();
+  };
+
+  const moveVertex = (e: MapMouseEvent) => {
+    if (!dragging) return;
+    const point = pointFromEvent(e);
+    const m = measurements.value.find((x) => x.id === dragging!.id);
+    if (!m) return;
+    m.coordinates = m.coordinates.map((c, i) => (i === dragging!.index ? point : c));
+    m.length = lineLength(m.kind === 'area' ? closeRing(m.coordinates) : m.coordinates);
+    if (m.kind === 'area') m.area = polygonArea(m.coordinates);
+    hoverPoint.value = null;
+    refresh();
+  };
+
+  const onVertexUp = () => {
+    if (!dragging) return;
+    const { id } = dragging;
+    dragging = null;
+    suppressNextClick = true;
+    setTimeout(() => { suppressNextClick = false; }, 0);
+    mapRef.value?.dragPan.enable();
+    measurements.value = [...measurements.value];
+    void loadProfile(id);
+  };
+
+  const onVertexEnter = () => {
+    const map = mapRef.value;
+    if (map && !dragging) map.getCanvas().style.cursor = 'move';
+  };
+  const onVertexLeave = () => {
+    const map = mapRef.value;
+    if (map && !dragging) map.getCanvas().style.cursor = mode.value === 'none' ? '' : 'crosshair';
+  };
+
+  const onContextMenu = (e: MapMouseEvent) => {
+    if (mode.value === 'none') return;
+    e.preventDefault();
+    finishShape();
+  };
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (mode.value === 'none') return;
+    const target = e.target as HTMLElement | null;
+    if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+    if (e.key === 'Escape') {
+      cancel();
+    } else if (e.key === 'Enter') {
+      finishShape();
+    } else if (e.key === 'Backspace' || e.key === 'Delete') {
+      if (!draftPoints.value.length) return;
+      undoPoint();
+    } else {
+      return;
+    }
+    e.preventDefault();
+  };
+
+  // Двойной клик завершает измерение — во время измерения он не должен зумить карту (QA F25)
   const syncDoubleClickZoom = (map: MapLibreMap, drawMode: DrawMode) => {
     const handler = (map as any).doubleClickZoom;
     if (!handler) return;
@@ -333,10 +698,11 @@ export function useMapDraw() {
   };
 
   const setMode = (next: DrawMode) => {
-    // Смена режима завершает незакрытую фигуру, чтобы точки не «перетекали»
+    // Смена режима завершает незакрытое измерение, чтобы точки не «перетекали»
     if (draftPoints.value.length >= 2) finishShape();
     draftPoints.value = [];
-    hoverPoint = null;
+    hoverPoint.value = null;
+    hoverSnapped.value = false;
     mode.value = next;
     activeDrawMode.value = next;
     const map = mapRef.value;
@@ -361,20 +727,37 @@ export function useMapDraw() {
     }
     map.on('click', onMapClick);
     map.on('mousemove', onMapMove);
+    map.on('mouseout', onMapOut);
+    map.on('mouseup', onVertexUp);
     map.on('dblclick', finishShape);
+    map.on('contextmenu', onContextMenu);
+    map.on('mousedown', LAYER_VERTEX, onVertexDown);
+    map.on('mouseenter', LAYER_VERTEX, onVertexEnter);
+    map.on('mouseleave', LAYER_VERTEX, onVertexLeave);
+    if (typeof window !== 'undefined') window.addEventListener('keydown', onKeyDown);
     syncDoubleClickZoom(map, mode.value);
   };
 
   const detach = () => {
     activeDrawMode.value = 'none';
+    mode.value = 'none';
+    if (typeof window !== 'undefined') window.removeEventListener('keydown', onKeyDown);
     const map = mapRef.value;
     if (!map) return;
     map.off('click', onMapClick);
     map.off('mousemove', onMapMove);
+    map.off('mouseout', onMapOut);
+    map.off('mouseup', onVertexUp);
     map.off('dblclick', finishShape);
+    map.off('contextmenu', onContextMenu);
+    map.off('mousedown', LAYER_VERTEX, onVertexDown);
+    map.off('mouseenter', LAYER_VERTEX, onVertexEnter);
+    map.off('mouseleave', LAYER_VERTEX, onVertexLeave);
+    if (dragging) map.dragPan?.enable();
+    dragging = null;
     syncDoubleClickZoom(map, 'none');
     map.getCanvas().style.cursor = '';
-    for (const id of [LAYER_LABEL, LAYER_VERTEX, LAYER_DRAFT_LINE, LAYER_POINT, LAYER_LINE, LAYER_FILL]) {
+    for (const id of ALL_LAYERS) {
       if (map.getLayer(id)) map.removeLayer(id);
     }
     for (const id of [SOURCE_DRAFT_ID, SOURCE_ID]) {
@@ -383,21 +766,35 @@ export function useMapDraw() {
     mapRef.value = null;
   };
 
-  /** Выгрузка нарисованного в GeoJSON */
-  const exportGeoJson = () => JSON.stringify(featureCollection(), null, 2);
+  /** Выгрузка измерений в GeoJSON (длина, площадь — в свойствах) */
+  const exportGeoJson = () => JSON.stringify({
+    type: 'FeatureCollection',
+    features: measurements.value.map((m) => ({
+      type: 'Feature',
+      properties: { kind: m.kind, length_m: Math.round(m.length * 10) / 10, area_m2: m.area != null ? Math.round(m.area) : undefined },
+      geometry: m.kind === 'area'
+        ? { type: 'Polygon', coordinates: [closeRing(m.coordinates)] }
+        : { type: 'LineString', coordinates: m.coordinates },
+    })),
+  }, null, 2);
 
   return {
     mode,
-    features,
+    measurements,
     draftPoints,
-    isDrawing,
     isMeasuring,
+    isArea,
     draftLength,
     draftArea,
+    currentSegment,
+    hoverSnapped,
     setMode,
     finishShape,
     undoPoint,
+    cancel,
+    removeMeasurement,
     clearAll,
+    zoomTo,
     attach,
     detach,
     exportGeoJson,

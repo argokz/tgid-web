@@ -484,7 +484,7 @@
 <script setup lang="ts">
 import { appStorage } from '~/utils/appStorage';
 import { formatApiError } from '~/utils/apiError';
-import { activeDrawMode } from '~/composables/useMapDraw';
+import { activeDrawMode, isMapMeasureActive } from '~/composables/useMapDraw';
 import { useMapStore } from '~/stores/mapStore';
 import { usePopupStore } from '~/stores/popupStore';
 import { useLayerStore } from '~/stores/layerStore';
@@ -1205,7 +1205,7 @@ const chooseNetworkCandidate = async (
 };
 
 const onMapClickForTrace = async (e: any) => {
-  if (!isTraceMode.value) return;
+  if (!isTraceMode.value || isMapMeasureActive()) return;
   // Узлы фрагментов лежат друг на друге: берём узел фрагмента предыдущей точки маршрута,
   // иначе активного фрагмента; несколько — меню выбора (QA F28)
   const prevFragment = traceNodeFragments[traceNodeFragments.length - 1] ?? null;

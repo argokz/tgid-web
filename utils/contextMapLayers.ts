@@ -7,6 +7,7 @@ import {
   getMapTilerTerrainRgbTilesUrl,
 } from '~/utils/maptiler'
 import { reorderPlanetBaseLayersOnMap } from '~/utils/planetV4Layers'
+import { BUILDING_FILTER, BUILDING_OPACITY, buildingExtrusionPaint } from '~/utils/buildingStyle'
 
 /** Логические ключи для UI и localStorage */
 export type ContextLayerKey = 'contours' | 'buildings' | 'hillshade' | 'terrain3d'
@@ -25,43 +26,26 @@ export const CONTEXT_SOURCE_IDS = {
 /** Id слоёв MapLibre (для identify / moveLayer) */
 export const CONTEXT_MAP_LAYER_IDS = {
   contours: 'context-contours-line',
-  buildings: 'context-buildings-fill',
+  /** Подписи высот на основных изолиниях (каждая 5-я и 10-я) */
+  contoursLabel: 'context-contours-label',
   /**
-   * Плоские контуры зданий — вместо объёмов при рельефе 3D. С рельефом MapLibre натягивает
-   * плоские слои (линии сети, растры) на поверхность и рисует объёмы поверх — здания закрывали трубы.
+   * Объёмы зданий. С рельефом 3D MapLibre натягивает плоские слои (линии сети) на поверхность и рисует
+   * объёмы поверх — здания тогда полупрозрачные, чтобы трубы под ними оставались видны.
    */
-  buildingsFlat: 'context-buildings-flat',
-  /** Подписи/номера на 3D-зданиях (тот же vector source, что и extrusion) */
+  buildings: 'context-buildings-fill',
+  /** Названия зданий (слой building_label тех же тайлов) */
   buildingsLabel: 'context-buildings-label',
   hillshade: 'context-hillshade',
 } as const
 
-const ALL_CONTEXT_MAP_LAYER_ID_SET = new Set<string>(Object.values(CONTEXT_MAP_LAYER_IDS))
-
-/** Актуальные paint/layout для подписей 3D-зданий (подхватывается и для уже созданного слоя). */
-function refreshContextBuildingsLabelStyle(map: Map): void {
-  const id = CONTEXT_MAP_LAYER_IDS.buildingsLabel
-  if (!map.getLayer(id)) return
-  try {
-    map.setLayoutProperty(id, 'text-size', [
-      'interpolate', ['linear'], ['zoom'],
-      13, 12,
-      15, 14,
-      17, 16,
-      19, 17,
-    ])
-    map.setLayoutProperty(id, 'text-font', ['Open Sans Bold', 'Arial Unicode MS Regular'])
-    map.setLayoutProperty(id, 'text-allow-overlap', true)
-    map.setLayoutProperty(id, 'text-ignore-placement', true)
-    map.setPaintProperty(id, 'text-color', '#0a0a0a')
-    map.setPaintProperty(id, 'text-halo-color', '#ffffff')
-    map.setPaintProperty(id, 'text-halo-width', 2.75)
-    map.setPaintProperty(id, 'text-halo-blur', 0.35)
-    map.setPaintProperty(id, 'text-opacity', 1)
-  } catch {
-    /* ignore */
-  }
+/** Подслои ключа панели «Контекст» (видимость включается вместе) */
+const CONTEXT_KEY_LAYERS: Record<Exclude<ContextLayerKey, 'terrain3d'>, string[]> = {
+  contours: [CONTEXT_MAP_LAYER_IDS.contours, CONTEXT_MAP_LAYER_IDS.contoursLabel],
+  buildings: [CONTEXT_MAP_LAYER_IDS.buildings, CONTEXT_MAP_LAYER_IDS.buildingsLabel],
+  hillshade: [CONTEXT_MAP_LAYER_IDS.hillshade],
 }
+
+const ALL_CONTEXT_MAP_LAYER_ID_SET = new Set<string>(Object.values(CONTEXT_MAP_LAYER_IDS))
 
 export function getAllContextMapLayerIds(): string[] {
   return [...ALL_CONTEXT_MAP_LAYER_ID_SET]
@@ -71,13 +55,8 @@ export function isContextMapLayerId(id: string): boolean {
   return ALL_CONTEXT_MAP_LAYER_ID_SET.has(id)
 }
 
-function mapKeyToLayerId(key: ContextLayerKey): string {
-  if (key === 'terrain3d') return ''
-  return CONTEXT_MAP_LAYER_IDS[key]
-}
-
 /**
- * Идемпотентно добавляет источники и слои контекста (порядок снизу вверх: контуры, здания, hillshade).
+ * Идемпотентно добавляет источники и слои контекста (порядок снизу вверх: hillshade, изолинии, здания).
  */
 export function ensureContextMapLayers(map: Map): boolean {
   const key = getMapTilerKey()
@@ -108,8 +87,40 @@ export function ensureContextMapLayers(map: Map): boolean {
       layout: { visibility: 'none' },
       paint: {
         'line-color': '#8b7355',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.4, 14, 1, 18, 1.5],
+        // Основные изолинии (каждая 5-я и 10-я, nth_line ≥ 5) толще — по ним подписи высот
+        'line-width': [
+          'interpolate', ['linear'], ['zoom'],
+          10, ['case', ['>=', ['get', 'nth_line'], 5], 0.9, 0.35],
+          14, ['case', ['>=', ['get', 'nth_line'], 5], 1.8, 0.8],
+          18, ['case', ['>=', ['get', 'nth_line'], 5], 2.4, 1.2],
+        ],
         'line-opacity': 0.75,
+      },
+    })
+  }
+
+  if (!map.getLayer(CONTEXT_MAP_LAYER_IDS.contoursLabel)) {
+    map.addLayer({
+      id: CONTEXT_MAP_LAYER_IDS.contoursLabel,
+      type: 'symbol',
+      source: CONTEXT_SOURCE_IDS.contours,
+      'source-layer': 'contour',
+      minzoom: 12,
+      filter: ['>=', ['get', 'nth_line'], 5],
+      layout: {
+        visibility: 'none',
+        'symbol-placement': 'line',
+        'text-field': ['concat', ['to-string', ['get', 'height']], ' м'],
+        'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 12],
+        'symbol-spacing': 320,
+        'text-max-angle': 30,
+        'text-padding': 4,
+      },
+      paint: {
+        'text-color': '#6b5236',
+        'text-halo-color': 'rgba(255,255,255,0.9)',
+        'text-halo-width': 1.6,
       },
     })
   }
@@ -130,30 +141,11 @@ export function ensureContextMapLayers(map: Map): boolean {
       type: 'fill-extrusion',
       source: CONTEXT_SOURCE_IDS.buildings,
       'source-layer': 'building',
-      minzoom: 12,
+      minzoom: 13,
+      filter: BUILDING_FILTER,
       layout: { visibility: 'none' },
-      paint: {
-        'fill-extrusion-color': '#aeb8d8',
-        'fill-extrusion-opacity': 0.78,
-        'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 12],
-        'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
-      },
-    })
-  }
-
-  if (!map.getLayer(CONTEXT_MAP_LAYER_IDS.buildingsFlat)) {
-    map.addLayer({
-      id: CONTEXT_MAP_LAYER_IDS.buildingsFlat,
-      type: 'fill',
-      source: CONTEXT_SOURCE_IDS.buildings,
-      'source-layer': 'building',
-      minzoom: 12,
-      layout: { visibility: 'none' },
-      paint: {
-        'fill-color': '#aeb8d8',
-        'fill-opacity': 0.6,
-        'fill-outline-color': '#7d88ad',
-      },
+      // Высота (height) в тайлах только с z15, до этого — условная; цвет — по назначению (class)
+      paint: buildingExtrusionPaint(buildingsOpacity(Boolean(map.getTerrain()))) as any,
     })
   }
 
@@ -162,37 +154,26 @@ export function ensureContextMapLayers(map: Map): boolean {
       id: CONTEXT_MAP_LAYER_IDS.buildingsLabel,
       type: 'symbol',
       source: CONTEXT_SOURCE_IDS.buildings,
-      'source-layer': 'building',
-      minzoom: 13,
+      // Названия — в отдельном слое тайлов зданий (в building их нет); rank — важность
+      'source-layer': 'building_label',
+      minzoom: 15,
       layout: {
         visibility: 'none',
         'symbol-placement': 'point',
-        'text-field': [
-          'coalesce',
-          ['get', 'housenumber'],
-          ['get', 'addr:housenumber'],
-          ['get', 'name:ru'],
-          ['get', 'name'],
-          ['get', 'ref'],
-        ],
-        'text-size': ['interpolate', ['linear'], ['zoom'], 13, 12, 15, 14, 17, 16, 19, 17],
-        'text-font': ['Open Sans Bold', 'Arial Unicode MS Regular'],
-        'text-max-angle': 45,
-        'text-padding': 2,
-        'text-allow-overlap': true,
-        'text-ignore-placement': true,
+        'symbol-sort-key': ['coalesce', ['get', 'rank'], 99],
+        'text-field': ['coalesce', ['get', 'name:ru'], ['get', 'name']],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 15, 11, 18, 13],
+        'text-font': ['Open Sans Semibold', 'Arial Unicode MS Regular'],
+        'text-max-width': 9,
+        'text-padding': 3,
       },
       paint: {
-        'text-color': '#0a0a0a',
+        'text-color': '#3a3f4b',
         'text-halo-color': '#ffffff',
-        'text-halo-width': 2.75,
-        'text-halo-blur': 0.35,
-        'text-opacity': 1,
+        'text-halo-width': 1.6,
       },
     })
   }
-
-  refreshContextBuildingsLabelStyle(map)
 
   if (!map.getSource(CONTEXT_SOURCE_IDS.hillshade)) {
     map.addSource(CONTEXT_SOURCE_IDS.hillshade, {
@@ -278,21 +259,15 @@ export function restackContextMapLayers(map: Map): void {
   const style = map.getStyle()
   if (!style?.layers?.length) return
 
-  const contoursId = CONTEXT_MAP_LAYER_IDS.contours
-  const buildingsId = CONTEXT_MAP_LAYER_IDS.buildings
-  const buildingsFlatId = CONTEXT_MAP_LAYER_IDS.buildingsFlat
-  const buildingsLabelId = CONTEXT_MAP_LAYER_IDS.buildingsLabel
-  const hillId = CONTEXT_MAP_LAYER_IDS.hillshade
-
-  if (!map.getLayer(contoursId) || !map.getLayer(buildingsId) || !map.getLayer(hillId)) return
-  if (!map.getLayer(buildingsLabelId) || !map.getLayer(buildingsFlatId)) return
+  const ids = CONTEXT_MAP_LAYER_IDS
+  if (!Object.values(ids).every((id) => map.getLayer(id))) return
 
   const baseIdx = style.layers.findIndex((l) => l.id === BASE_MAP_LAYER_ID)
   if (baseIdx < 0) return
 
   /**
    * Первый слой над подложкой (base + planet), не входящий в блок контекста —
-   * перед ним заканчивается стек контекста: контуры → hillshade → 3D-здания → подписи зданий.
+   * перед ним заканчивается стек контекста: hillshade → изолинии → подписи высот → здания → названия.
    * Так экструзия и подписи остаются поверх Planet V4 и затенения, но под рабочими MVT.
    */
   const anchorLayer = style.layers.slice(baseIdx + 1).find(
@@ -302,32 +277,27 @@ export function restackContextMapLayers(map: Map): void {
 
   try {
     if (beforeId !== undefined) {
-      map.moveLayer(buildingsLabelId, beforeId)
+      map.moveLayer(ids.buildingsLabel, beforeId)
     } else {
-      map.moveLayer(buildingsLabelId)
+      map.moveLayer(ids.buildingsLabel)
     }
-    map.moveLayer(buildingsId, buildingsLabelId)
-    map.moveLayer(buildingsFlatId, buildingsId)
-    map.moveLayer(hillId, buildingsFlatId)
-    map.moveLayer(contoursId, hillId)
+    map.moveLayer(ids.buildings, ids.buildingsLabel)
+    map.moveLayer(ids.contoursLabel, ids.buildings)
+    map.moveLayer(ids.contours, ids.contoursLabel)
+    map.moveLayer(ids.hillshade, ids.contours)
   } catch (e) {
     console.warn('[contextMapLayers] restackContextMapLayers:', e)
   }
 }
 
-/** Какие слои зданий видны: объёмы (без рельефа) или плоские контуры (с рельефом), подписи — в обоих */
-export function buildingsLayerVisibility(buildingsOn: boolean, terrainOn: boolean): Record<string, boolean> {
-  return {
-    [CONTEXT_MAP_LAYER_IDS.buildings]: buildingsOn && !terrainOn,
-    [CONTEXT_MAP_LAYER_IDS.buildingsFlat]: buildingsOn && terrainOn,
-    [CONTEXT_MAP_LAYER_IDS.buildingsLabel]: buildingsOn,
-  }
+/** Прозрачность объёмов зданий: с рельефом 3D сеть натянута на рельеф, и здания закрывали бы её */
+export function buildingsOpacity(terrainOn: boolean): number {
+  return terrainOn ? BUILDING_OPACITY.terrain : BUILDING_OPACITY.flat
 }
 
-function applyBuildingsMode(map: Map, buildingsOn: boolean, terrainOn: boolean): void {
-  for (const [lid, on] of Object.entries(buildingsLayerVisibility(buildingsOn, terrainOn))) {
-    if (map.getLayer(lid)) map.setLayoutProperty(lid, 'visibility', on ? 'visible' : 'none')
-  }
+/** Подслои MapLibre ключа панели «Контекст» (рельеф 3D — не слой, а terrain карты) */
+export function contextKeyLayerIds(key: ContextLayerKey): string[] {
+  return key === 'terrain3d' ? [] : CONTEXT_KEY_LAYERS[key]
 }
 
 export function setContextLayerVisibility(map: Map, layerKey: ContextLayerKey, visible: boolean): void {
@@ -341,23 +311,14 @@ export function setContextLayerVisibility(map: Map, layerKey: ContextLayerKey, v
     } else {
       map.setTerrain(null)
     }
-    // Здания: объёмы без рельефа, плоские контуры с рельефом
-    const buildingsOn = map.getLayer(CONTEXT_MAP_LAYER_IDS.buildingsLabel)
-      ? map.getLayoutProperty(CONTEXT_MAP_LAYER_IDS.buildingsLabel, 'visibility') === 'visible'
-      : false
-    applyBuildingsMode(map, buildingsOn, visible)
+    if (map.getLayer(CONTEXT_MAP_LAYER_IDS.buildings)) {
+      map.setPaintProperty(CONTEXT_MAP_LAYER_IDS.buildings, 'fill-extrusion-opacity', buildingsOpacity(visible))
+    }
     return
   }
-
-  if (layerKey === 'buildings') {
-    applyBuildingsMode(map, visible, Boolean(map.getTerrain()))
-    return
+  for (const id of contextKeyLayerIds(layerKey)) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none')
   }
-
-  const id = mapKeyToLayerId(layerKey)
-  if (!id) return
-  if (!map.getLayer(id)) return
-  map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none')
 }
 
 export function applyContextLayersVisibility(map: Map, visibleKeys: Set<ContextLayerKey>): void {

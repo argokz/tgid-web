@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { highlightData, highlightKey, highlightLayers, isLngLatGeometry, mergeGeometries } from '~/utils/selectionHighlight'
-import { buildingsLayerVisibility, CONTEXT_MAP_LAYER_IDS } from '~/utils/contextMapLayers'
 
 describe('подсветка объекта на карте', () => {
   it('куски участка из разных тайлов собираются в одну линию', () => {
@@ -29,18 +28,5 @@ describe('подсветка объекта на карте', () => {
     const g = { type: 'Point', coordinates: [71.4, 51.1] }
     expect(highlightKey({ geometry: g, source: 'src', sourceLayer: 'uzel', featureId: 5 })).toBe('src|uzel|5')
     expect(highlightKey(null)).toBe('')
-  })
-})
-
-describe('здания MapTiler и рельеф', () => {
-  it('без рельефа — объёмы, с рельефом — плоские контуры под сетью', () => {
-    expect(buildingsLayerVisibility(true, false)).toEqual({
-      [CONTEXT_MAP_LAYER_IDS.buildings]: true,
-      [CONTEXT_MAP_LAYER_IDS.buildingsFlat]: false,
-      [CONTEXT_MAP_LAYER_IDS.buildingsLabel]: true,
-    })
-    expect(buildingsLayerVisibility(true, true)[CONTEXT_MAP_LAYER_IDS.buildings]).toBe(false)
-    expect(buildingsLayerVisibility(true, true)[CONTEXT_MAP_LAYER_IDS.buildingsFlat]).toBe(true)
-    expect(Object.values(buildingsLayerVisibility(false, true)).every((v) => !v)).toBe(true)
   })
 })

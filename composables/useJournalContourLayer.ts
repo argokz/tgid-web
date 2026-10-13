@@ -8,6 +8,7 @@ import type maplibregl from 'maplibre-gl';
 import { useJournalMapBridge } from '~/composables/useJournalMapBridge';
 import { useMapStore } from '~/stores/mapStore';
 import { pickNetworkFeature } from '~/utils/networkFeature';
+import { isMapMeasureActive } from '~/composables/useMapDraw';
 
 const OVERLAY_SOURCE = 'journal-contour';
 const OVERLAY_LAYER = 'journal-contour-line';
@@ -114,7 +115,7 @@ export function useJournalContourLayer(getMap: () => maplibregl.Map | null | und
   };
 
   const onClick = (e: any) => {
-    if (!bridge.state.pick.active) return;
+    if (!bridge.state.pick.active || isMapMeasureActive()) return;
     const map = getMap();
     if (!map) return;
     const r = 6;

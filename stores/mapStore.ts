@@ -49,6 +49,8 @@ import {
   getPlanetMapLayerInsertBeforeId,
   type PlanetLayerStyleOverride,
 } from '~/utils/planetV4Layers';
+import { isMapMeasureActive } from '~/composables/useMapDraw';
+import { contextHoverSummary } from '~/utils/buildingStyle';
 
 interface LayerStyle {
   color: string;
@@ -517,6 +519,7 @@ export const useMapStore = defineStore('map', {
             this.map.getCanvas().style.cursor = '';
           });
           this.map.on('click', 'calculation-lines-layer', (e: any) => {
+            if (isMapMeasureActive()) return;
             if (e.features && e.features.length > 0 && this._attributePanelShow) {
               const feature = e.features[0];
               this._attributePanelShow({
@@ -784,7 +787,8 @@ export const useMapStore = defineStore('map', {
     },
 
     async handleMapClick(e: MapMouseEvent) {
-      if (!this.identifyModeEnabled) return;
+      // Во время измерения клик ставит точку линейки, а не выбирает объект
+      if (!this.identifyModeEnabled || isMapMeasureActive()) return;
       this.identifyFeature(e);
     },
 
@@ -1289,6 +1293,12 @@ export const useMapStore = defineStore('map', {
 
     async handleMouseMove(e: MapMouseEvent) {
       if (!this.map) return;
+      if (isMapMeasureActive()) {
+        // Курсор (прицел) ведёт линейка; подсветка и подсказки объектов не мешают измерять
+        this.hideContextHoverPopup();
+        this.setHoverTarget(null);
+        return;
+      }
       if (!this.identifyModeEnabled && !this.contextHoverInspectEnabled) {
         this.map.getCanvas().style.cursor = '';
         this.hideContextHoverPopup();
@@ -1381,17 +1391,33 @@ export const useMapStore = defineStore('map', {
 
       const feature = features[0];
       const properties = feature.properties || {};
-      const entries = Object.entries(properties)
-        .filter(([, value]) => value !== null && value !== undefined && String(value).length > 0)
-        .slice(0, 10);
-
-      const rows = entries.length > 0
-        ? entries.map(([k, v]) => `<div><strong>${escapeHtml(k)}:</strong> ${escapeHtml(String(v))}</div>`).join('')
-        : '<div>Нет атрибутов</div>';
+      // Здания и изолинии MapTiler — по-русски (назначение, высота, этажность); прочее — атрибуты как есть
+      const summary = contextHoverSummary(feature as any);
+      let title: string;
+      let rows: string;
+      let note = '';
+      if (summary) {
+        title = summary.title;
+        rows = summary.rows.map((r) => {
+          const swatch = r.color && /^#[0-9a-f]{3,8}$/i.test(r.color)
+            ? `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25);background:${r.color}"></span>`
+            : '';
+          return `<div><strong>${escapeHtml(r.label)}:</strong> ${swatch}${escapeHtml(r.value)}</div>`;
+        }).join('');
+        if (summary.note) note = `<div style="margin-top:4px; color:#666; font-size:11px;">${escapeHtml(summary.note)}</div>`;
+      } else {
+        const entries = Object.entries(properties)
+          .filter(([, value]) => value !== null && value !== undefined && String(value).length > 0)
+          .slice(0, 10);
+        title = feature.layer.id;
+        rows = entries.length > 0
+          ? entries.map(([k, v]) => `<div><strong>${escapeHtml(k)}:</strong> ${escapeHtml(String(v))}</div>`).join('')
+          : '<div>Нет атрибутов</div>';
+      }
       const html = `
         <div style="font-size:12px; line-height:1.35; max-width:280px;">
-          <div style="font-weight:600; margin-bottom:4px;">${escapeHtml(feature.layer.id)}</div>
-          ${rows}
+          <div style="font-weight:600; margin-bottom:4px;">${escapeHtml(title)}</div>
+          ${rows}${note}
         </div>
       `;
 

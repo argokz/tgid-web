@@ -178,6 +178,22 @@
                 <v-list-item-subtitle class="text-caption text-grey compact-subtitle">
                   {{ row.subtitle }}
                 </v-list-item-subtitle>
+                <!-- Легенда цвета зданий по назначению -->
+                <div
+                  v-if="row.key === 'buildings' && isPendingContextLayerVisible('buildings')"
+                  class="building-legend"
+                >
+                  <span
+                    v-for="item in buildingLegend"
+                    :key="item.label"
+                    class="building-legend__item"
+                  >
+                    <span
+                      class="building-legend__swatch"
+                      :style="{ background: item.color }"
+                    />{{ item.label }}
+                  </span>
+                </div>
               </v-list-item>
             </v-list>
 
@@ -815,6 +831,7 @@
 </template>
 
 <script setup lang="ts">
+import { BUILDING_CLASS_COLORS, BUILDING_CLASS_LABELS, BUILDING_DEFAULT_COLOR } from '~/utils/buildingStyle'
 import { ref, computed, watch } from 'vue'
 import { useDisplay } from 'vuetify'
 import { storeToRefs } from 'pinia'
@@ -865,11 +882,16 @@ const planetLayerStyleOverrides = computed(() => mapStore.planetLayerStyleOverri
 const mapTilerReady = computed(() => Boolean(getMapTilerKey()))
 
 const contextLayerRows: { key: ContextLayerKey; title: string; subtitle: string }[] = [
-  { key: 'contours', title: 'Контуры', subtitle: 'MapTiler · изолинии рельефа' },
-  { key: 'buildings', title: 'Здания', subtitle: 'MapTiler · объёмы зданий' },
+  { key: 'contours', title: 'Изолинии', subtitle: 'MapTiler · рельеф, подписи высот (±5 м)' },
+  { key: 'buildings', title: 'Здания', subtitle: 'MapTiler · высота и назначение (цвет)' },
   { key: 'hillshade', title: 'Затенение рельефа', subtitle: 'MapTiler · рельеф (hillshade)' },
   { key: 'terrain3d', title: 'Рельеф и 3D', subtitle: 'MapTiler · Terrain RGB' },
 ]
+
+/** Легенда зданий MapTiler: основные назначения (цвета — utils/buildingStyle.ts) */
+const buildingLegend = ['residential', 'commercial', 'industrial', 'education', 'medical', 'civic', 'religious', 'transportation', 'outbuilding']
+  .map((cls) => ({ label: BUILDING_CLASS_LABELS[cls], color: BUILDING_CLASS_COLORS[cls] }))
+  .concat([{ label: 'Прочие', color: BUILDING_DEFAULT_COLOR }])
 
 const contextSectionCollapsed = ref(false)
 const planetSectionCollapsed = ref(false)
@@ -1471,5 +1493,24 @@ const getLabelIconColor = (id: string) => {
   border-radius: 6px;
   cursor: pointer;
   flex-shrink: 0;
+}
+.building-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+}
+
+.building-legend__swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 3px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  vertical-align: -1px;
 }
 </style>

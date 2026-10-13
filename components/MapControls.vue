@@ -233,9 +233,9 @@
         </template>
       </v-tooltip>
 
-      <!-- Рисование и измерения — отдельная панель на карте -->
+      <!-- Измерения (линейка, площадь) — отдельная панель на карте -->
       <v-tooltip
-        text="Рисование и измерения"
+        text="Измерения: расстояние и площадь"
         location="left"
       >
         <template #activator="{ props: tp }">
@@ -246,10 +246,10 @@
             elevation="4"
             :color="uiStore.drawPanelOpen ? 'primary' : 'white'"
             class="control-btn"
-            aria-label="Рисование и измерения"
+            aria-label="Измерения"
             @click="uiStore.toggleDrawPanel()"
           >
-            <v-icon :color="uiStore.drawPanelOpen ? 'white' : 'primary'">mdi-draw</v-icon>
+            <v-icon :color="uiStore.drawPanelOpen ? 'white' : 'primary'">mdi-ruler</v-icon>
           </v-btn>
         </template>
       </v-tooltip>
