@@ -137,15 +137,21 @@
               @click="showLogin = true"
             />
             <v-list-item
-              v-if="authStore.pgUser"
+              prepend-icon="mdi-card-account-details-outline"
+              title="Личный кабинет"
+              @click="openAccount('profile')"
+            />
+            <v-list-item
+              v-if="authStore.isAdmin && !authStore.authDisabled"
+              prepend-icon="mdi-account-cog"
+              title="Пользователи"
+              @click="openAccount('users')"
+            />
+            <v-list-item
+              v-if="authStore.canChangeOwnPassword"
               prepend-icon="mdi-lock-reset"
               title="Сменить пароль"
               @click="showChangePassword = true"
-            />
-            <v-list-item
-              prepend-icon="mdi-account-outline"
-              title="Профиль"
-              disabled
             />
             <v-list-item
               prepend-icon="mdi-cog-outline"
@@ -158,7 +164,7 @@
               title="Выйти"
               color="error"
               :disabled="!authStore.isAuthenticated"
-              @click="authStore.logout()"
+              @click="logout"
             />
           </v-list>
         </v-card>
@@ -242,11 +248,25 @@
     </v-alert>
 
     <v-main class="app-main">
-      <slot />
+      <!-- Сервер требует вход: до входа карту не монтируем — она запрашивала бы данные без токена -->
+      <slot v-if="!appLocked" />
+      <div
+        v-else
+        class="login-required-backdrop"
+      />
     </v-main>
 
-    <LoginDialog v-model="showLogin" />
+    <LoginDialog
+      v-model="showLogin"
+      :required="authStore.loginRequired"
+    />
     <ChangePasswordDialog v-model="showChangePassword" />
+    <AccountDialog
+      v-model="showAccount"
+      :initial-tab="accountTab"
+      @change-password="showChangePassword = true"
+      @logout="logout"
+    />
     <ConfirmDialogHost />
 
     <!-- Модальное окно расчёта -->
@@ -313,6 +333,7 @@ import PlanningCalculationModal from '~/components/PlanningCalculationModal.vue'
 import CalculationProtocol from '~/components/CalculationProtocol.vue';
 import LoginDialog from '~/components/LoginDialog.vue';
 import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue';
+import AccountDialog from '~/components/AccountDialog.vue';
 import ConfirmDialogHost from '~/components/ConfirmDialogHost.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { ROLE_LABELS, type Role } from '~/utils/permissions';
@@ -352,7 +373,32 @@ watch(() => authStore.loginPrompt, () => {
   showLogin.value = true;
 });
 
-// Смена пароля (AUTH_BACKEND=pg); временный пароль от администратора — предложить сразу после входа
+// Сервер требует вход (AUTH_REQUIRED_GET), а сессии нет: форма входа без «Отмены».
+// Карту не монтируем, пока не было ни одного входа; истёкшая сессия карту не сбрасывает.
+const appUnlocked = ref(false);
+const appLocked = computed(() => authStore.loginRequired && !appUnlocked.value);
+watch(() => [authStore.configLoaded, authStore.loginRequired] as const, ([loaded, required]) => {
+  if (loaded && !required) appUnlocked.value = true;
+  if (required) showLogin.value = true;
+}, { immediate: true });
+
+// Личный кабинет: профиль, права, смена пароля; администратору — пользователи
+const showAccount = ref(false);
+const accountTab = ref<'profile' | 'users'>('profile');
+const openAccount = (tab: 'profile' | 'users') => {
+  accountTab.value = tab;
+  showAccount.value = true;
+};
+
+/** Выход; если без входа сервер данных не отдаёт — перезагрузить, чтобы не оставлять их на экране */
+const logout = () => {
+  const reload = authStore.authRequiredGet && !authStore.authDisabled;
+  authStore.logout();
+  showAccount.value = false;
+  if (reload && process.client) window.location.reload();
+};
+
+// Смена пароля; временный пароль от администратора (AUTH_BACKEND=pg) — предложить сразу после входа
 const showChangePassword = ref(false);
 watch(() => authStore.mustChangePassword, (must) => {
   if (must) showChangePassword.value = true;
@@ -584,5 +630,9 @@ const downloadExcel = async (docType: string) => {
 }
 .app-main {
   min-height: calc(100vh - 56px);
+}
+.login-required-backdrop {
+  min-height: calc(100vh - 56px);
+  background: linear-gradient(135deg, rgb(var(--v-theme-primary), 0.08), rgb(var(--v-theme-surface)));
 }
 </style>

@@ -94,7 +94,7 @@ import { useAuthStore } from '~/stores/authStore'
 import { useNotificationStore } from '~/stores/notificationStore'
 import { formatApiError } from '~/utils/apiError'
 
-/** Смена своего пароля (AUTH_BACKEND=pg): пароль роли PostgreSQL — общий для веба и десктопа. */
+/** Смена своего пароля. У пользователя PostgreSQL (AUTH_BACKEND=pg) пароль общий для веба и десктопа. */
 const visible = defineModel<boolean>({ default: false })
 const authStore = useAuthStore()
 const notificationStore = useNotificationStore()
@@ -133,7 +133,7 @@ const save = async () => {
   try {
     await fastApiService.changeOwnPassword(current.value, next.value)
     authStore.mustChangePassword = false
-    notificationStore.showSuccess('Пароль изменён — он действует и в десктопе')
+    notificationStore.showSuccess(authStore.pgUser ? 'Пароль изменён — он действует и в десктопе' : 'Пароль изменён')
     visible.value = false
   } catch (e: any) {
     error.value = formatApiError(e, 'Не удалось сменить пароль')

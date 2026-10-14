@@ -1045,6 +1045,8 @@ export interface AdminUsersResponse {
   items: AdminUser[];
   can_write: boolean;
   note: string | null;
+  /** Логин мастер-учётки владельца (вне списка; удалить и заблокировать нельзя); null — не настроена */
+  master_login?: string | null;
 }
 
 export interface AdminRole {
@@ -1732,6 +1734,8 @@ export const fastApiService = {
 
   async getAuthConfig(): Promise<{
     auth_disabled: boolean;
+    /** Без входа данные карты не отдаются — показать форму входа сразу */
+    auth_required_get?: boolean;
     dev_login_enabled: boolean;
     strict_auth: boolean;
     mutations_enabled: boolean;
@@ -1755,11 +1759,13 @@ export const fastApiService = {
     caps?: string[];
     fragments?: number[] | null;
     must_change_password?: boolean;
+    /** Мастер-учётка владельца (MASTER_LOGIN): пароль меняется только на сервере */
+    is_master?: boolean;
   }> {
     return request('api/v1/auth/me', mutationOptions('GET'));
   },
 
-  /** Смена своего пароля (AUTH_BACKEND=pg): тот же пароль у веба и десктопа */
+  /** Смена своего пароля (UsersDB или роль PostgreSQL — тогда тот же пароль у десктопа) */
   async changeOwnPassword(currentPassword: string, newPassword: string): Promise<{ success: boolean }> {
     return request('api/v1/auth/password', mutationOptions('POST', {
       current_password: currentPassword,
@@ -2581,6 +2587,11 @@ export const fastApiService = {
 
   async setAdminUserPassword(userId: number | string, password: string): Promise<{ success: boolean; id: number | string }> {
     return request(`api/v1/admin/users/${encodePath(userId)}/password`, mutationOptions('PUT', { password }));
+  },
+
+  /** Удалить пользователя UsersDB (пользователей PostgreSQL только блокируют) */
+  async deleteAdminUser(userId: number | string): Promise<{ success: boolean; id: number | string }> {
+    return request(`api/v1/admin/users/${encodePath(userId)}`, mutationOptions('DELETE'));
   },
 
   /** История правок audit_log с фильтрами */

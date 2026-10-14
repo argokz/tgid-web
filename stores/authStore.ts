@@ -21,6 +21,8 @@ export const useAuthStore = defineStore('auth', {
     /** Флаги сервера (/auth/config, /auth/me). До ответа — самый строгий вариант. */
     configLoaded: false,
     authDisabled: false as boolean,
+    /** AUTH_REQUIRED_GET: без входа данные карты не отдаются — сначала форма входа */
+    authRequiredGet: false as boolean,
     mutationsEnabledServer: false as boolean,
     topologyMutationsEnabledServer: false as boolean,
     /** Счётчик запросов открыть форму входа (истёкшая сессия); layout открывает LoginDialog */
@@ -33,9 +35,16 @@ export const useAuthStore = defineStore('auth', {
     fragments: null as number[] | null,
     displayName: '' as string,
     mustChangePassword: false as boolean,
+    /** Мастер-учётка владельца: пароль меняется только на сервере */
+    isMaster: false as boolean,
   }),
   getters: {
     isAuthenticated: (state) => Boolean(state.accessToken),
+    /** Сервер требует вход, а сессии нет (до ответа /auth/config — не требует) */
+    loginRequired: (state) =>
+      state.configLoaded && !state.authDisabled && state.authRequiredGet && !state.accessToken,
+    /** Свой пароль меняется из веба (не мастер-учётка, вход по паролю) */
+    canChangeOwnPassword: (state) => Boolean(state.accessToken) && !state.authDisabled && !state.isMaster,
     permissions: (state): Permissions =>
       computePermissions({
         // Роль без токена не в счёт (в localStorage могла остаться от прошлой сессии),
@@ -137,6 +146,7 @@ export const useAuthStore = defineStore('auth', {
         const { fastApiService } = await import('~/services/fastApiService')
         const config = await fastApiService.getAuthConfig()
         this.authDisabled = Boolean(config.auth_disabled)
+        this.authRequiredGet = Boolean(config.auth_required_get)
         this.mutationsEnabledServer = Boolean(config.mutations_enabled)
         this.topologyMutationsEnabledServer = Boolean(config.topology_mutations_enabled)
         this.configLoaded = true
@@ -163,6 +173,7 @@ export const useAuthStore = defineStore('auth', {
       this.fragments = null
       this.displayName = ''
       this.mustChangePassword = false
+      this.isMaster = false
       if (process.client) {
         appStorage.removeItem(TOKEN_KEY)
         appStorage.removeItem(USER_KEY)
@@ -180,6 +191,7 @@ export const useAuthStore = defineStore('auth', {
         this.fragments = me.fragments ?? null
         this.displayName = me.display_name || me.username
         this.mustChangePassword = Boolean(me.must_change_password)
+        this.isMaster = Boolean(me.is_master)
         this.authDisabled = Boolean(me.auth_disabled)
         this.mutationsEnabledServer = Boolean(me.mutations_enabled)
         this.topologyMutationsEnabledServer = Boolean(me.topology_mutations_enabled)

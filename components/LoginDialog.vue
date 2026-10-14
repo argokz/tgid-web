@@ -3,13 +3,20 @@
     v-model="visible"
     max-width="420"
     persistent
+    :scrim="required ? 'rgba(20, 30, 50, 0.55)' : true"
   >
     <v-card rounded="lg">
       <v-card-title class="d-flex align-center ga-2">
         <v-icon>mdi-login</v-icon>
-        Вход
+        {{ required ? 'Вход в ТГИД' : 'Вход' }}
       </v-card-title>
       <v-card-text>
+        <div
+          v-if="required"
+          class="text-body-2 text-medium-emphasis mb-3"
+        >
+          Доступ только для пользователей. Учётную запись выдаёт администратор.
+        </div>
         <v-text-field
           v-model="username"
           label="Логин"
@@ -53,6 +60,7 @@
       <v-card-actions class="px-4 pb-4">
         <v-spacer />
         <v-btn
+          v-if="!required"
           variant="text"
           @click="close"
         >Отмена</v-btn>
@@ -72,11 +80,13 @@ import { fastApiService } from '~/services/fastApiService'
 import { formatApiError } from '~/utils/apiError'
 
 const visible = defineModel<boolean>({ default: false })
+/** Сервер не отдаёт данные без входа: форму нельзя закрыть */
+const props = defineProps<{ required?: boolean }>()
 
 const authStore = useAuthStore()
 const notify = useNotificationStore()
 
-const username = ref(authStore.username || 'editor')
+const username = ref(authStore.username || '')
 const password = ref('')
 const role = ref('editor')
 const loading = ref(false)
@@ -93,16 +103,18 @@ watch(visible, async (open) => {
   if (!open) return
   error.value = ''
   password.value = ''
-  username.value = authStore.username || authStore.lastUsername || 'editor'
+  username.value = authStore.username || authStore.lastUsername || ''
   try {
     const cfg = await fastApiService.getAuthConfig()
     allowRolePick.value = Boolean(cfg.dev_login_enabled || cfg.auth_disabled)
+    if (allowRolePick.value && !username.value) username.value = 'editor'
   } catch {
     allowRolePick.value = false
   }
 })
 
 const close = () => {
+  if (props.required && !authStore.isAuthenticated) return
   visible.value = false
 }
 

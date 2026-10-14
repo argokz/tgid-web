@@ -14,12 +14,13 @@ export const BAD_CREDENTIALS_TEXT = 'Неверный логин или паро
 export function statusMessage(status: number, detail = ''): string {
   if (status === 0) return NETWORK_ERROR_TEXT;
   if (status === 401) return 'Требуется вход в систему.';
-  if (status === 403) return 'Недостаточно прав для этой операции.';
+  // русский текст сервера («Нет права …», «Объект вне вашей территории», «Текущий пароль указан неверно») — как есть
+  if (status === 403) return /[а-яё]/i.test(detail) ? detail : 'Недостаточно прав для этой операции.';
   if (status === 404) return detail || 'Запись не найдена.';
   if (status === 408 || status === 504) return 'Сервер не ответил вовремя. Попробуйте ещё раз.';
   if (status === 409) return detail || 'Конфликт: данные изменены другим пользователем. Обновите и повторите.';
   if (status === 422) return detail ? `Некорректные параметры запроса: ${detail}` : 'Некорректные параметры запроса.';
-  if (status === 429) return 'Слишком много запросов, попробуйте позже.';
+  if (status === 429) return detail || 'Слишком много запросов, попробуйте позже.';
   if (status >= 500) return detail ? `Ошибка на сервере: ${detail}` : `Ошибка на сервере (${status}). Попробуйте позже.`;
   return detail || `Ошибка запроса (${status}).`;
 }
