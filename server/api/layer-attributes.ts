@@ -1,3 +1,4 @@
+import { toInternalGeoserverUrl } from '../utils/geoserverInternal';
 import { parseMvtLayerId } from '~/utils/geoserverMvtIds';
 
 const GLOBAL_KEY = '__layerAttributesPending__';
@@ -30,8 +31,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const loader = (async () => {
-    const geoserverBase =
-      String((runtimeConfig.public as any)?.geoserver?.url || 'https://itwin.kz/geoserver').replace(/\/$/, '');
+    // Сервер ходит в GeoServer напрямую (server/utils/geoserverInternal.ts)
+    const geoserverBase = toInternalGeoserverUrl(
+      String((runtimeConfig.public as any)?.geoserver?.url || 'https://itwin.kz/geoserver').replace(/\/$/, ''),
+      runtimeConfig,
+    );
     const fallbackWs =
       String((runtimeConfig.public as any)?.geoserver?.workspace || 'AlmatyGIS');
     const { workspace, sourceLayer } = parseMvtLayerId(layerId, fallbackWs);

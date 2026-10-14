@@ -1,4 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
+import { toInternalGeoserverUrl } from '../utils/geoserverInternal';
 import type { LayerConfig } from '~/types';
 import {
   buildMvtLayerIdentifiers,
@@ -41,7 +42,7 @@ async function verifyMvtTileUrl(urlTemplate: string, center: [number, number]): 
     url = url.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y));
   }
   try {
-    const buf = await $fetch<ArrayBuffer>(url, {
+    const buf = await $fetch<ArrayBuffer>(toInternalGeoserverUrl(url, useRuntimeConfig()), {
       responseType: 'arrayBuffer',
       timeout: 12000,
       headers: { Accept: '*/*' }
@@ -57,12 +58,14 @@ const pendingRequests: Map<string, Promise<LayerConfig[]>> = (globalThis as any)
 (globalThis as any)[GLOBAL_KEY] = pendingRequests;
 
 function resolveGeoserverRestBaseUrl(runtimeConfig: ReturnType<typeof useRuntimeConfig>): string {
-  const fallback =
-    String(runtimeConfig.public?.geoserver?.url || 'https://itwin.kz/geoserver').replace(/\/$/, '');
+  const fallback = toInternalGeoserverUrl(
+    String(runtimeConfig.public?.geoserver?.url || 'https://itwin.kz/geoserver').replace(/\/$/, ''),
+    runtimeConfig,
+  );
   const explicit = String((runtimeConfig as any).geoserverRestUrl || '').trim().replace(/\/$/, '');
   if (explicit) return explicit;
 
-  const capUrl = String(runtimeConfig.geoserverCapabilitiesUrl || '');
+  const capUrl = toInternalGeoserverUrl(String(runtimeConfig.geoserverCapabilitiesUrl || ''), runtimeConfig);
   if (!capUrl) return fallback;
   try {
     const u = new URL(capUrl);
@@ -176,8 +179,11 @@ export default defineEventHandler(async (event) => {
 
     const defaultPublicUrl = String(geoserverPublic.url || 'https://itwin.kz/geoserver').replace(/\/$/, '');
     const geoserverRestBaseUrl = resolveGeoserverRestBaseUrl(runtimeConfig);
-    const capabilitiesUrl =
-      runtimeConfig.geoserverCapabilitiesUrl || `${defaultPublicUrl}/gwc/service/wmts?REQUEST=GetCapabilities`;
+    // запросы самого сервера — на внутренний адрес GeoServer (публичный закрыт входом)
+    const capabilitiesUrl = toInternalGeoserverUrl(
+      runtimeConfig.geoserverCapabilitiesUrl || `${defaultPublicUrl}/gwc/service/wmts?REQUEST=GetCapabilities`,
+      runtimeConfig,
+    );
 
     const mvtTemplateUrl =
       runtimeConfig.geoserverMvtTemplateUrl ||
@@ -377,7 +383,7 @@ export default defineEventHandler(async (event) => {
       });
     }
     try {
-      const wmsCapsUrl = `${defaultPublicUrl}/ows?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities`;
+      const wmsCapsUrl = toInternalGeoserverUrl(`${defaultPublicUrl}/ows?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities`, runtimeConfig);
       const wmsCapsText = await fetchText(wmsCapsUrl);
       const wmsParsed = parser.parse(wmsCapsText);
       const wmsRoot = wmsParsed?.WMT_MS_Capabilities?.Capability?.Layer;

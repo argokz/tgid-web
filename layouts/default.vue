@@ -375,6 +375,7 @@ watch(() => authStore.loginPrompt, () => {
 
 // Сервер требует вход (AUTH_REQUIRED_GET), а сессии нет: форма входа без «Отмены».
 // Карту не монтируем, пока не было ни одного входа; истёкшая сессия карту не сбрасывает.
+// Cookie доступа к GeoServer выдаёт /auth/me до того, как вход откроет карту (authStore.login).
 const appUnlocked = ref(false);
 const appLocked = computed(() => authStore.loginRequired && !appUnlocked.value);
 watch(() => [authStore.configLoaded, authStore.loginRequired] as const, ([loaded, required]) => {

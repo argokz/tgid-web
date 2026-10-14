@@ -48,6 +48,9 @@ export default defineNuxtConfig({
       process.env.GEOSERVER_REST_URL ||
       env.GEOSERVER_REST_URL ||
       '',
+    /** Адрес GeoServer для запросов самого сервера веба (публичный /geoserver закрыт входом), см. server/utils/geoserverInternal.ts */
+    geoserverInternalUrl:
+      process.env.GEOSERVER_INTERNAL_URL || env.GEOSERVER_INTERNAL_URL || '',
     /** Автообнаружение слоёв: workspace через запятую или '*' (все опубликованные) */
     geoserverDiscoverWorkspaces:
       process.env.GEOSERVER_DISCOVER_WORKSPACES || env.GEOSERVER_DISCOVER_WORKSPACES || '',

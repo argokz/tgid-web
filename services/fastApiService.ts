@@ -1,3 +1,4 @@
+import { appStorage } from '~/utils/appStorage';
 import { reactive } from 'vue';
 import { BAD_CREDENTIALS_TEXT, SESSION_EXPIRED_TEXT, serverDetailText, statusMessage } from '~/utils/apiError';
 import type { FeatureData, Fragment } from '~/types';
@@ -1342,7 +1343,8 @@ const ACCESS_TOKEN_KEY = 'itwin_access_token';
 
 const authHeaders = (): Record<string, string> => {
   if (typeof localStorage === 'undefined') return {};
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  // тот же ключ, что у authStore: с префиксом города (Астана — astana:itwin_access_token)
+  const token = appStorage.getItem(ACCESS_TOKEN_KEY);
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
@@ -1763,6 +1765,11 @@ export const fastApiService = {
     is_master?: boolean;
   }> {
     return request('api/v1/auth/me', mutationOptions('GET'));
+  },
+
+  /** Выход: сервер удаляет cookie доступа к GeoServer */
+  async logout(): Promise<{ success: boolean }> {
+    return request('api/v1/auth/logout', { method: 'POST' });
   },
 
   /** Смена своего пароля (UsersDB или роль PostgreSQL — тогда тот же пароль у десктопа) */

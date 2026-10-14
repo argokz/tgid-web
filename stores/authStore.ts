@@ -165,6 +165,12 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     logout() {
+      // cookie доступа к GeoServer (HttpOnly) удаляет только сервер; сбой сети не мешает выходу
+      if (this.accessToken && process.client) {
+        void import('~/services/fastApiService')
+          .then(({ fastApiService }) => fastApiService.logout())
+          .catch(() => undefined)
+      }
       this.accessToken = ''
       this.username = ''
       this.role = ''
@@ -210,6 +216,10 @@ export const useAuthStore = defineStore('auth', {
     async login(username: string, password: string, role?: string) {
       const { fastApiService } = await import('~/services/fastApiService')
       const result = await fastApiService.login(username, password, role)
+      // Сначала /auth/me с новым токеном — он выдаёт cookie доступа к GeoServer; только потом сессия
+      // в состоянии: она открывает карту, и её первые тайлы уже идут с cookie (иначе 401)
+      if (process.client) appStorage.setItem(TOKEN_KEY, result.access_token)
+      await this.refreshMe()
       this.setSession(result.access_token, result.username, result.role)
       await this.refreshMe()
       return result

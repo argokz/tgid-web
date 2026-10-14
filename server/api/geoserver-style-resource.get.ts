@@ -1,9 +1,13 @@
 import { createError, getQuery, setHeader } from 'h3'
+import { toInternalGeoserverUrl } from '../utils/geoserverInternal'
 
 function resolveGeoserverRestBaseUrl(runtimeConfig: ReturnType<typeof useRuntimeConfig>): string {
   const explicit = String((runtimeConfig as any).geoserverRestUrl || '').trim().replace(/\/$/, '')
   if (explicit) return explicit
-  const fallback = String((runtimeConfig.public as any)?.geoserver?.url || '').trim().replace(/\/$/, '')
+  const fallback = toInternalGeoserverUrl(
+    String((runtimeConfig.public as any)?.geoserver?.url || '').trim().replace(/\/$/, ''),
+    runtimeConfig,
+  )
   if (fallback) return fallback
   throw createError({ statusCode: 503, statusMessage: 'GeoServer URL is not configured' })
 }
