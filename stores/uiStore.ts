@@ -14,6 +14,8 @@ export const useUiStore = defineStore('ui', {
     toolsPanelOpen: false,
     /** Панель рисования на карте */
     drawPanelOpen: false,
+    /** Запрос открыть диалог инструментов из-за пределов карты (протокол расчёта → журнал) */
+    toolDialogRequest: null as { key: string; scope?: unknown; seq: number } | null,
   }),
 
   actions: {
@@ -26,6 +28,11 @@ export const useUiStore = defineStore('ui', {
     toggleDrawPanel(value?: boolean) {
       this.drawPanelOpen = value ?? !this.drawPanelOpen;
       if (this.drawPanelOpen) this.toolsPanelOpen = false;
+    },
+
+    /** Открыть диалог инструментов (ключ toolDialogs в MapViewer) с параметрами */
+    requestToolDialog(key: string, scope?: unknown) {
+      this.toolDialogRequest = { key, scope, seq: (this.toolDialogRequest?.seq ?? 0) + 1 };
     },
 
     closeAll() {

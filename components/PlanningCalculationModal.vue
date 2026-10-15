@@ -359,7 +359,10 @@
       </v-card-actions>
     </v-card>
 
-    <CalculationsDialog v-model="calculationsOpen" />
+    <CalculationsDialog
+      v-model="calculationsOpen"
+      @open-protocol="openSavedProtocol"
+    />
 
     <!-- -save_po: подтверждение перезаписи нагрузок обобщённых потребителей -->
     <v-dialog
@@ -463,6 +466,10 @@ const emit = defineEmits<{
   'calculate': []
   'protocol-log': [{ timestamp: string; message: string; type: string; html: boolean }]
   'show-protocol': [value: boolean]
+  /** Протоколы запуска сохранены (id calculation_protocol) — панель анализа их загрузит */
+  'protocol-ready': [ids: number[]]
+  /** Открыть сохранённый протокол расчёта calculation.id */
+  'open-protocol': [calculationId: number]
 }>();
 
 const isOpen = computed({
@@ -659,6 +666,9 @@ const pollTask = async (taskId: string) => {
       if (finalResult.message) addProtocolLog(finalResult.message, outcome.type);
       if (finalResult.output) addProtocolLog(finalResult.output, ok ? 'success' : 'info', true);
       if (finalResult.error) addProtocolLog(finalResult.error, 'error', true);
+      const protocolIds: number[] = (finalResult.protocol_ids
+        ?? (finalResult.protocol_id ? [finalResult.protocol_id] : [])).filter((id: unknown) => Number.isInteger(id));
+      if (protocolIds.length) emit('protocol-ready', protocolIds);
       const layerStore = useLayerStore();
       // Новые результаты: тайлы с новой версией данных (мимо кеша GWC)
       layerStore.refreshVisibleDataLayers();
@@ -696,6 +706,14 @@ const calculate = async () => {
   }
 
   isOpen.value = false;
+  await submit(body);
+};
+
+/** Установки последнего запуска — для «Пересчитать» из протокола */
+const lastRequest = ref<SetyRunRequest | null>(null);
+
+const submit = async (body: SetyRunRequest) => {
+  lastRequest.value = body;
   addProtocolLog('Отправка запроса на расчёт...', 'info');
 
   calculating.value = true;
@@ -717,6 +735,28 @@ const calculate = async () => {
   }
   emit('calculate');
 };
+
+/** «Пересчитать» из протокола: те же установки и фрагменты, без открытия окна */
+const rerun = async () => {
+  if (!lastRequest.value || calculating.value) return false;
+  emit('show-protocol', true);
+  if (requestSavesPo(lastRequest.value) && !(await askSavePoConfirm())) {
+    addProtocolLog('Расчёт не запущен: запись нагрузок в обобщённые потребители не подтверждена', 'info');
+    return false;
+  }
+  await submit({ ...lastRequest.value });
+  return true;
+};
+
+const canRerun = computed(() => !!lastRequest.value && !calculating.value);
+
+const openSavedProtocol = (calculationId: number) => {
+  calculationsOpen.value = false;
+  isOpen.value = false;
+  emit('open-protocol', calculationId);
+};
+
+defineExpose({ rerun, canRerun });
 </script>
 
 <style scoped>

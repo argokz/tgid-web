@@ -20,11 +20,35 @@
             density="compact"
             class="protocol-tabs"
           >
+            <v-tab value="analysis">
+              <v-icon class="mr-2">
+                mdiFormatListChecks
+              </v-icon>
+              Анализ
+              <v-chip
+                v-if="summary && summary.errors"
+                size="x-small"
+                color="error"
+                variant="flat"
+                class="ml-2"
+              >
+                {{ summary.errors }}
+              </v-chip>
+              <v-chip
+                v-if="summary && summary.warnings"
+                size="x-small"
+                color="warning"
+                variant="flat"
+                class="ml-1"
+              >
+                {{ summary.warnings }}
+              </v-chip>
+            </v-tab>
             <v-tab value="calculation">
               <v-icon class="mr-2">
                 mdiCalculator
               </v-icon>
-              Расчёт
+              Текст расчёта
             </v-tab>
             <v-tab value="system">
               <v-icon class="mr-2">
@@ -40,7 +64,7 @@
             density="compact"
             class="mr-2"
             variant="text"
-            aria-label="Удалить"
+            aria-label="Очистить"
             @click="clear"
           >
             <v-icon>mdiDelete</v-icon>
@@ -80,15 +104,250 @@
       <!-- Контент -->
       <div v-if="!isMinimized">
         <v-window v-model="activeTab">
+          <v-window-item value="analysis">
+            <div class="protocol-window analysis-window">
+              <div
+                v-if="loading"
+                class="analysis-empty"
+              >
+                <v-progress-circular
+                  indeterminate
+                  size="20"
+                  class="mr-2"
+                />
+                Загрузка протокола…
+              </div>
+              <div
+                v-else-if="!records.length"
+                class="analysis-empty"
+              >
+                {{ loadError || 'Протокол появится после расчёта. Сохранённые протоколы — кнопка «История».' }}
+                <v-btn
+                  size="small"
+                  variant="text"
+                  color="primary"
+                  class="ml-2"
+                  @click="openHistory"
+                >
+                  <v-icon
+                    size="small"
+                    class="mr-1"
+                  >
+                    mdiHistory
+                  </v-icon>
+                  История
+                </v-btn>
+              </div>
+              <template v-else>
+                <!-- Сводка и фильтры -->
+                <div class="analysis-toolbar">
+                  <span
+                    class="analysis-title"
+                    :title="recordsTitle"
+                  >{{ recordsLabel }}</span>
+                  <v-chip
+                    size="small"
+                    :variant="severity === 'error' ? 'flat' : 'tonal'"
+                    color="error"
+                    class="mr-1"
+                    :disabled="!summary?.errors"
+                    @click="toggleSeverity('error')"
+                  >
+                    Ошибки {{ summary?.errors ?? 0 }}
+                  </v-chip>
+                  <v-chip
+                    size="small"
+                    :variant="severity === 'warning' ? 'flat' : 'tonal'"
+                    color="warning"
+                    class="mr-2"
+                    :disabled="!summary?.warnings"
+                    @click="toggleSeverity('warning')"
+                  >
+                    Предупреждения {{ summary?.warnings ?? 0 }}
+                  </v-chip>
+                  <v-chip
+                    v-for="c in chips"
+                    :key="c.code"
+                    size="small"
+                    :variant="category === c.code ? 'flat' : 'outlined'"
+                    :color="c.error ? 'error' : 'warning'"
+                    class="mr-1"
+                    @click="category = category === c.code ? null : c.code"
+                  >
+                    {{ c.label }} {{ c.error + c.warning }}
+                  </v-chip>
+                  <v-spacer />
+                  <span
+                    v-if="comparison"
+                    class="analysis-compare mr-2"
+                    :class="comparisonClass"
+                  >{{ comparison }}</span>
+                  <v-text-field
+                    v-model="query"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                    clearable
+                    placeholder="Поиск"
+                    prepend-inner-icon="mdiMagnify"
+                    class="analysis-search mr-1"
+                  />
+                  <v-btn
+                    icon
+                    density="compact"
+                    variant="text"
+                    title="Предыдущая проблема"
+                    aria-label="Предыдущая проблема"
+                    :disabled="!filtered.length"
+                    @click="step(-1)"
+                  >
+                    <v-icon>mdiChevronUp</v-icon>
+                  </v-btn>
+                  <v-btn
+                    icon
+                    density="compact"
+                    variant="text"
+                    title="Следующая проблема"
+                    aria-label="Следующая проблема"
+                    :disabled="!filtered.length"
+                    @click="step(1)"
+                  >
+                    <v-icon>mdiChevronDown</v-icon>
+                  </v-btn>
+                  <v-btn
+                    size="small"
+                    variant="text"
+                    :color="markersShown ? 'primary' : undefined"
+                    title="Отметить объекты отфильтрованных сообщений на карте"
+                    @click="toggleMarkers"
+                  >
+                    <v-icon
+                      size="small"
+                      class="mr-1"
+                    >
+                      mdiMapMarkerMultiple
+                    </v-icon>
+                    {{ markersShown ? 'Скрыть на карте' : 'Все на карте' }}
+                  </v-btn>
+                  <v-btn
+                    size="small"
+                    variant="text"
+                    title="Сохранённые протоколы"
+                    @click="openHistory"
+                  >
+                    <v-icon size="small">
+                      mdiHistory
+                    </v-icon>
+                  </v-btn>
+                  <v-btn
+                    v-if="canRecalculate"
+                    size="small"
+                    variant="tonal"
+                    color="primary"
+                    title="Повторить расчёт с теми же установками"
+                    @click="emit('recalculate')"
+                  >
+                    <v-icon
+                      size="small"
+                      class="mr-1"
+                    >
+                      mdiRefresh
+                    </v-icon>
+                    Пересчитать
+                  </v-btn>
+                </div>
+
+                <!-- Записи -->
+                <div
+                  v-if="!filtered.length"
+                  class="analysis-empty"
+                >
+                  {{ entries.length ? 'Нет сообщений по фильтру' : 'Ошибок и предупреждений нет' }}
+                </div>
+                <div
+                  v-for="(e, i) in filtered"
+                  :key="entryKey(e)"
+                  :ref="(el) => setRowRef(entryKey(e), el)"
+                  class="entry"
+                  :class="[`entry--${e.severity}`, { 'entry--active': activeKey === entryKey(e) }]"
+                  @click="activate(i)"
+                >
+                  <v-icon
+                    size="16"
+                    class="entry-icon"
+                    :color="e.severity === 'error' ? 'error' : 'warning'"
+                  >
+                    {{ e.severity === 'error' ? 'mdiAlertCircle' : 'mdiAlert' }}
+                  </v-icon>
+                  <div class="entry-body">
+                    <div class="entry-meta">
+                      <span>{{ categoryLabel(e.category) }}</span>
+                      <span v-if="fragmentLabel(e)"> · {{ fragmentLabel(e) }}</span>
+                      <span v-if="e.component && e.component.total > 1"> · подсеть {{ e.component.index }}/{{ e.component.total }}</span>
+                      <span v-if="e.count > 1"> · повторов {{ e.count }}</span>
+                    </div>
+                    <div class="entry-text">
+                      {{ e.text }}
+                    </div>
+                    <div
+                      v-if="e.objects.length || e.fix"
+                      class="entry-actions"
+                    >
+                      <v-chip
+                        v-for="o in e.objects.slice(0, 6)"
+                        :key="objectKey(o)"
+                        size="x-small"
+                        variant="outlined"
+                        class="mr-1 mb-1"
+                        :title="o.context ? 'Узел подсети, где возникло сообщение' : 'Показать на карте и открыть карточку'"
+                        @click.stop="goTo(o, e)"
+                      >
+                        <v-icon
+                          size="12"
+                          class="mr-1"
+                        >
+                          mdiCrosshairsGps
+                        </v-icon>
+                        {{ o.label || objectKey(o) }}
+                      </v-chip>
+                      <span
+                        v-if="e.objects.length > 6"
+                        class="entry-more mr-2"
+                      >… ещё {{ e.objects.length - 6 }}</span>
+                      <v-btn
+                        v-if="e.fix"
+                        size="x-small"
+                        variant="tonal"
+                        color="primary"
+                        :title="fixInfo(e).hint"
+                        @click.stop="runFix(e)"
+                      >
+                        <v-icon
+                          size="12"
+                          class="mr-1"
+                        >
+                          mdiHammerWrench
+                        </v-icon>
+                        Исправить: {{ fixInfo(e).label }}
+                      </v-btn>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </v-window-item>
           <v-window-item value="calculation">
-            <v-card-text class="protocol-window">
+            <v-card-text
+              class="protocol-window"
+              @click="onRawClick"
+            >
               <div
                 v-for="log in logs"
                 :key="log.id"
                 class="protocol-line"
               >
                 <span class="protocol-timestamp">{{ log.timestamp }}</span>
-                <!-- Вывод расчёта с бэкенда — HTML (цвета, ссылки); прочие строки остаются текстом -->
+                <!-- Вывод расчёта с бэкенда — HTML (цвета, ссылки на объекты — переход на карте) -->
                 <div
                   v-if="log.html"
                   class="protocol-message protocol-html"
@@ -128,24 +387,132 @@
         </v-window>
       </div>
     </v-card>
+
+    <!-- Сохранённые протоколы -->
+    <v-dialog
+      v-model="historyOpen"
+      max-width="760"
+      scrollable
+    >
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          Протоколы расчётов
+          <v-spacer />
+          <v-btn
+            icon="mdi-close"
+            variant="text"
+            size="small"
+            aria-label="Закрыть"
+            @click="historyOpen = false"
+          />
+        </v-card-title>
+        <v-card-text>
+          <div
+            v-if="historyLoading"
+            class="analysis-empty"
+          >
+            <v-progress-circular
+              indeterminate
+              size="20"
+              class="mr-2"
+            />
+            Загрузка…
+          </div>
+          <div
+            v-else-if="!historyItems.length"
+            class="analysis-empty"
+          >
+            Сохранённых протоколов нет
+          </div>
+          <v-table
+            v-else
+            density="compact"
+            hover
+          >
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Фрагмент</th>
+                <th>Режим</th>
+                <th>Автор</th>
+                <th>Ошибки</th>
+                <th>Предупр.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="h in historyItems"
+                :key="h.id"
+                class="history-row"
+                @click="openFromHistory(h)"
+              >
+                <td>{{ formatDate(h.created_at) }}</td>
+                <td>{{ h.fragment_name || h.fileid || '—' }}</td>
+                <td>{{ h.mode === 'emergency' ? 'аварийный' : 'плановый' }}</td>
+                <td>{{ h.author || '—' }}</td>
+                <td :class="{ 'text-error': h.errors }">
+                  {{ h.errors }}
+                </td>
+                <td>{{ h.warnings }}</td>
+              </tr>
+            </tbody>
+          </v-table>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { fastApiService } from '~/services/fastApiService';
+import { useMapStore } from '~/stores/mapStore';
+import { useNotificationStore } from '~/stores/notificationStore';
+import { useUiStore } from '~/stores/uiStore';
+import { useFragmentStore } from '~/stores/fragmentStore';
+import { formatApiErrorWith } from '~/utils/apiError';
+import {
+  FIX_HINTS,
+  FIX_LABELS,
+  categoryChips,
+  compareSummaries,
+  deviceJournal,
+  filterEntries,
+  geometryView,
+  mergeEntries,
+  mergeSummaries,
+  objectFromAnchor,
+  objectKey,
+  primaryObject,
+  protocolTarget,
+  type CalcProtocolRecord,
+  type ProtocolEntry,
+  type ProtocolLocateResult,
+  type ProtocolObject,
+  type ProtocolSeverity,
+  type ProtocolTarget,
+} from '~/utils/calcProtocol';
 
 const props = defineProps<{
   show: boolean
+  /** Можно повторить расчёт (есть права и известны установки последнего запуска) */
+  canRecalculate?: boolean
 }>();
 
 const emit = defineEmits<{
   'update:show': [value: boolean]
   'open-calculation': []
+  'recalculate': []
 }>();
+
+const mapStore = useMapStore();
+const uiStore = useUiStore();
+const fragmentStore = useFragmentStore();
+const notify = useNotificationStore();
 
 const logs = ref<Array<{ id: string; timestamp: string; message: string; type: string; html: boolean }>>([]);
 const protocolHeight = ref(300);
-const activeTab = ref('calculation');
+const activeTab = ref('analysis');
 const isMinimized = ref(false);
 const isFullscreen = ref(false);
 const systemTime = ref('');
@@ -160,6 +527,7 @@ watch(() => props.show, (newValue) => {
     isMinimized.value = false;
     protocolHeight.value = 300;
     isFullscreen.value = false;
+    hideMarkers();
   }
 });
 
@@ -170,7 +538,7 @@ const startResize = (e: MouseEvent) => {
 
   const handleMouseMove = (e: MouseEvent) => {
     const deltaY = startY - e.clientY;
-    protocolHeight.value = Math.max(40, Math.min(300, startHeight + deltaY));
+    protocolHeight.value = Math.max(40, Math.min(window.innerHeight - 64, startHeight + deltaY));
     if (protocolHeight.value > 40) {
       isMinimized.value = false;
     }
@@ -194,6 +562,11 @@ const addLog = (log: { timestamp: string; message: string; type: string; html: b
 
 const clear = () => {
   logs.value = [];
+  records.value = [];
+  located.value = null;
+  previousTotals.value = null;
+  activeKey.value = null;
+  hideMarkers();
 };
 
 const minimize = () => {
@@ -219,9 +592,432 @@ const toggleFullscreen = () => {
   }
 };
 
+// === Анализ: разобранный протокол (API calculation_protocol) ===
+
+const records = ref<CalcProtocolRecord[]>([]);
+const loading = ref(false);
+const loadError = ref('');
+const located = ref<ProtocolLocateResult | null>(null);
+/** Итоги предыдущего протокола тех же фрагментов — для «было → стало» после пересчёта */
+const previousTotals = ref<{ errors: number; warnings: number; files: string } | null>(null);
+
+const severity = ref<ProtocolSeverity | null>(null);
+const category = ref<string | null>(null);
+const query = ref('');
+const activeKey = ref<string | null>(null);
+
+const entries = computed(() => mergeEntries(records.value));
+const summary = computed(() => (records.value.length ? mergeSummaries(records.value) : null));
+const chips = computed(() => categoryChips(summary.value));
+const filtered = computed(() => filterEntries(entries.value, {
+  severity: severity.value, category: category.value, query: query.value || '',
+}));
+
+const filesKey = (rs: CalcProtocolRecord[]) => rs.map((r) => r.fileid ?? '').sort().join(',');
+
+const comparison = computed(() => {
+  const prev = previousTotals.value;
+  const s = summary.value;
+  if (!prev || !s || prev.files !== filesKey(records.value)) return null;
+  return compareSummaries(prev, s);
+});
+const comparisonClass = computed(() => {
+  const prev = previousTotals.value;
+  const s = summary.value;
+  if (!prev || !s) return '';
+  if (s.errors < prev.errors || (s.errors === prev.errors && s.warnings < prev.warnings)) return 'text-success';
+  if (s.errors > prev.errors) return 'text-error';
+  return '';
+});
+
+const fragmentName = (id: number | null | undefined) => {
+  if (id == null) return '';
+  const rec = records.value.find((r) => r.fileid === id);
+  return rec?.fragment_name || fragmentStore.fragments.find((f: any) => f.id === id)?.name || `фрагмент ${id}`;
+};
+const fragmentLabel = (e: ProtocolEntry) => (records.value.length > 1 ? fragmentName(e.fragment_id) : '');
+const categoryLabel = (code: string) => summary.value?.category_labels?.[code] || 'Прочее';
+
+const formatDate = (iso: string | null) => (iso ? new Date(iso).toLocaleString('ru-RU') : '—');
+
+const recordsLabel = computed(() => {
+  const rs = records.value;
+  if (!rs.length) return '';
+  const first = rs[0];
+  const what = rs.length > 1 ? `${rs.length} фрагментов` : fragmentName(first.fileid) || 'расчёт';
+  return `${what} · ${formatDate(first.created_at)}`;
+});
+const recordsTitle = computed(() => [
+  ...(summary.value?.header || []),
+  records.value[0]?.params ? `Параметры: ${records.value[0].params}` : '',
+].filter(Boolean).join('\n'));
+
+const toggleSeverity = (s: ProtocolSeverity) => {
+  severity.value = severity.value === s ? null : s;
+};
+
+// фильтр сменился — подсветка остаётся только у видимой записи
+watch(filtered, (list) => {
+  if (activeKey.value && !list.some((e) => entryKey(e) === activeKey.value)) activeKey.value = null;
+  if (markersShown.value) void showMarkers();
+});
+
+const entryKey = (e: ProtocolEntry) => `${e.fragment_id ?? ''}:${e.seq}`;
+const rowRefs = new Map<string, Element>();
+const setRowRef = (key: string, el: any) => {
+  if (el) rowRefs.set(key, el as Element);
+  else rowRefs.delete(key);
+};
+
+/** Загрузить протоколы (id из результата задачи); keepPrevious — сравнить с текущими */
+const loadProtocols = async (ids: number[], opts: { keepPrevious?: boolean } = {}) => {
+  if (!ids.length) return;
+  loading.value = true;
+  loadError.value = '';
+  try {
+    const items = await Promise.all(ids.map((id) => fastApiService.getCalcProtocol(id)));
+    setRecords(items, opts.keepPrevious);
+  } catch (err) {
+    loadError.value = formatApiErrorWith('Протокол не загружен', err);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const loadByRequest = async (requestId: string) => {
+  loading.value = true;
+  loadError.value = '';
+  try {
+    const items = (await fastApiService.getCalcProtocolsByRequest(requestId, true)).items;
+    showSavedOutput(items);
+    setRecords(items, true);
+  } catch (err) {
+    loadError.value = formatApiErrorWith('Протокол не загружен', err);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const loadByCalculation = async (calculationId: number) => {
+  emit('update:show', true);
+  activeTab.value = 'analysis';
+  loading.value = true;
+  loadError.value = '';
+  try {
+    const rec = await fastApiService.getCalculationProtocol(calculationId, true);
+    // расчёт по списку: весь запрос
+    const all = rec.request_id ? (await fastApiService.getCalcProtocolsByRequest(rec.request_id, true)).items : [];
+    const items = all.length ? all : [rec];
+    showSavedOutput(items);
+    setRecords(items, false);
+  } catch (err) {
+    loadError.value = formatApiErrorWith('Протокол этого расчёта не найден', err);
+    records.value = [];
+  } finally {
+    loading.value = false;
+  }
+};
+
+/** Сохранённый протокол: его исходный текст — во вкладку «Текст расчёта» (ссылки кликабельны) */
+const showSavedOutput = (items: CalcProtocolRecord[]) => {
+  logs.value = [];
+  for (const r of items) {
+    const timestamp = r.created_at ? new Date(r.created_at).toLocaleTimeString('ru-RU') : '';
+    addLog({ timestamp, message: `Протокол №${r.id}: ${r.fragment_name || fragmentName(r.fileid) || 'расчёт'}`, type: 'info', html: false });
+    if (r.output) addLog({ timestamp, message: r.output, type: r.status === 'success' ? 'success' : 'info', html: true });
+  }
+};
+
+const setRecords = (items: CalcProtocolRecord[], keepPrevious = false) => {
+  const prev = summary.value;
+  previousTotals.value = keepPrevious && prev
+    ? { errors: prev.errors, warnings: prev.warnings, files: filesKey(records.value) }
+    : null;
+  records.value = items;
+  located.value = null;
+  activeKey.value = null;
+  severity.value = null;
+  category.value = null;
+  query.value = '';
+  activeTab.value = 'analysis';
+  void locateAll();
+};
+
+/** Геометрия всех объектов протокола одним-двумя запросами (не более 500 в запросе) */
+const locateAll = async (): Promise<ProtocolLocateResult | null> => {
+  if (located.value) return located.value;
+  const seen = new Set<string>();
+  const objects: ProtocolObject[] = [];
+  for (const e of entries.value) {
+    for (const o of e.objects) {
+      const k = objectKey(o);
+      if (!seen.has(k)) {
+        seen.add(k);
+        objects.push(o);
+      }
+    }
+  }
+  const result: ProtocolLocateResult = { nodes: {}, lines: {}, pairs: {} };
+  try {
+    for (let i = 0; i < objects.length; i += 500) {
+      const part = await fastApiService.locateProtocolObjects(objects.slice(i, i + 500));
+      Object.assign(result.nodes, part.nodes);
+      Object.assign(result.lines, part.lines);
+      Object.assign(result.pairs, part.pairs);
+    }
+  } catch (err) {
+    console.warn('[CalculationProtocol] locate', err);
+    return null;
+  }
+  located.value = result;
+  return result;
+};
+
+const flyTo = (target: ProtocolTarget) => {
+  const map = mapStore.map;
+  const view = geometryView(target.geometry);
+  if (!map || !view) return;
+  if (view.bounds) {
+    map.fitBounds(view.bounds, { padding: 80, maxZoom: 18, duration: 800 });
+  } else {
+    map.flyTo({ center: view.center, zoom: Math.max(map.getZoom(), 17), duration: 800 });
+  }
+};
+
+/** Устройство (регулятор, насос) на участке: исправляется в журнале, карточки участка у него нет */
+const deviceOnLine = (e: ProtocolEntry, target: ProtocolTarget | null) =>
+  (target?.table === 'heatpipesections' ? deviceJournal(e) : null);
+
+const entryTarget = (e: ProtocolEntry) => {
+  const o = primaryObject(e);
+  return o ? protocolTarget(o, located.value) : null;
+};
+
+const fixInfo = (e: ProtocolEntry) => {
+  const journal = e.fix === 'object' ? deviceOnLine(e, entryTarget(e)) : null;
+  if (journal) return { label: journal.label, hint: `Открыть ${journal.label.toLowerCase()} по этому участку` };
+  return { label: e.fix ? FIX_LABELS[e.fix] : '', hint: e.fix ? FIX_HINTS[e.fix] : '' };
+};
+
+/** Перелёт к объекту, подсветка и карточка (устройство на участке — только подсветка) */
+const goTo = async (o: ProtocolObject, e?: ProtocolEntry) => {
+  const loc = await locateAll();
+  const target = protocolTarget(o, loc);
+  if (!target) {
+    notify.showWarning(`Нет координат объекта «${o.label || objectKey(o)}» (удалён или без геометрии)`);
+    return null;
+  }
+  flyTo(target);
+  if (e && deviceOnLine(e, target)) {
+    mapStore.selectionTarget = { geometry: target.geometry };
+    return target;
+  }
+  const sourceId = `${target.table}.${target.id}`;
+  await mapStore.selectFeature({
+    type: 'Feature',
+    id: sourceId,
+    _sourceId: sourceId,
+    geometry: target.geometry,
+    properties: { id: target.id, tab: target.table },
+    sourceType: 'protocol',
+  });
+  return target;
+};
+
+const activate = (index: number) => {
+  const e = filtered.value[index];
+  if (!e) return;
+  activeKey.value = entryKey(e);
+  void nextTick(() => rowRefs.get(entryKey(e))?.scrollIntoView({ block: 'nearest' }));
+  const o = primaryObject(e);
+  if (o) void goTo(o, e);
+};
+
+const step = (delta: number) => {
+  const list = filtered.value;
+  if (!list.length) return;
+  const cur = list.findIndex((e) => entryKey(e) === activeKey.value);
+  const next = cur < 0 ? (delta > 0 ? 0 : list.length - 1) : (cur + delta + list.length) % list.length;
+  activate(next);
+};
+
+/** «Исправить»: открыть то, где задаются исходные данные сообщения */
+const runFix = async (e: ProtocolEntry) => {
+  activeKey.value = entryKey(e);
+  const o = primaryObject(e);
+  switch (e.fix) {
+    case 'calc_params':
+      emit('open-calculation');
+      return;
+    case 'temp_graph': {
+      const target = o ? protocolTarget(o, await locateAll()) : null;
+      if (target?.table === 'nodes') uiStore.requestToolDialog('temperatureGraph', { nodeId: target.id });
+      else uiStore.requestToolDialog('temperatureGraph');
+      return;
+    }
+    default:
+      if (o) {
+        const target = await goTo(o, e);
+        const journal = deviceOnLine(e, target);
+        if (journal && target) {
+          uiStore.requestToolDialog(journal.key, { lineId: target.id });
+          return;
+        }
+        if (e.fix === 'fixed_head') {
+          notify.showInfo('Задайте в подсети узел с заданным напором (карточка узла → гидравлика) и пересчитайте');
+        }
+      } else {
+        emit('open-calculation');
+      }
+  }
+};
+
+// Ссылки в тексте расчёта: переход на карте вместо перехода браузера
+const onRawClick = (event: MouseEvent) => {
+  const a = (event.target as Element | null)?.closest?.('a[name]');
+  if (!a) return;
+  event.preventDefault();
+  const o = objectFromAnchor(a);
+  if (!o) return;
+  if (!records.value.length) {
+    void goToDirect(o);
+    return;
+  }
+  void goTo(o);
+};
+
+/** Переход без загруженного протокола (старый текст): locate только этого объекта */
+const goToDirect = async (o: ProtocolObject) => {
+  try {
+    const loc = await fastApiService.locateProtocolObjects([o]);
+    const target = protocolTarget(o, loc);
+    if (!target) {
+      notify.showWarning(`Нет координат объекта «${o.label}»`);
+      return;
+    }
+    flyTo(target);
+    const sourceId = `${target.table}.${target.id}`;
+    await mapStore.selectFeature({
+      type: 'Feature', id: sourceId, _sourceId: sourceId, geometry: target.geometry,
+      properties: { id: target.id, tab: target.table }, sourceType: 'protocol',
+    });
+  } catch (err) {
+    notify.showError(formatApiErrorWith('Не удалось найти объект', err));
+  }
+};
+
+// === «Все на карте»: точки объектов отфильтрованных сообщений ===
+const MARKER_SOURCE = 'calc-protocol-markers';
+const MARKER_LAYER = 'calc-protocol-markers-circle';
+const markersShown = ref(false);
+
+const onMarkerClick = (ev: any) => {
+  const key = ev?.features?.[0]?.properties?.key;
+  const index = filtered.value.findIndex((e) => entryKey(e) === key);
+  if (index >= 0) {
+    activeKey.value = key;
+    void nextTick(() => rowRefs.get(key)?.scrollIntoView({ block: 'nearest' }));
+  }
+};
+
+const showMarkers = async () => {
+  const map = mapStore.map;
+  const loc = await locateAll();
+  if (!map || !loc) return;
+  const features: any[] = [];
+  let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
+  for (const e of filtered.value) {
+    const o = primaryObject(e);
+    const target = o ? protocolTarget(o, loc) : null;
+    const view = target ? geometryView(target.geometry) : null;
+    if (!view) continue;
+    const [x, y] = view.center;
+    minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: view.center },
+      properties: { key: entryKey(e), severity: e.severity },
+    });
+  }
+  const data = { type: 'FeatureCollection', features };
+  const source = map.getSource(MARKER_SOURCE);
+  if (source) {
+    source.setData(data);
+  } else {
+    map.addSource(MARKER_SOURCE, { type: 'geojson', data });
+    map.addLayer({
+      id: MARKER_LAYER,
+      type: 'circle',
+      source: MARKER_SOURCE,
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 4, 16, 8],
+        'circle-color': ['match', ['get', 'severity'], 'error', '#d32f2f', '#f9a825'],
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': 2,
+      },
+    });
+    map.on('click', MARKER_LAYER, onMarkerClick);
+  }
+  if (!markersShown.value && features.length) {
+    markersShown.value = true;
+    if (features.length === 1) map.flyTo({ center: features[0].geometry.coordinates, zoom: 16, duration: 800 });
+    else map.fitBounds([[minX, minY], [maxX, maxY]], { padding: 80, maxZoom: 17, duration: 800 });
+  }
+  markersShown.value = true;
+  if (!features.length) notify.showInfo('У отфильтрованных сообщений нет объектов с координатами');
+};
+
+function hideMarkers() {
+  markersShown.value = false;
+  const map = mapStore.map;
+  if (!map) return;
+  try {
+    if (map.getLayer(MARKER_LAYER)) {
+      map.off('click', MARKER_LAYER, onMarkerClick);
+      map.removeLayer(MARKER_LAYER);
+    }
+    if (map.getSource(MARKER_SOURCE)) map.removeSource(MARKER_SOURCE);
+  } catch {
+    // карта уже уничтожена
+  }
+}
+
+const toggleMarkers = () => {
+  if (markersShown.value) hideMarkers();
+  else void showMarkers();
+};
+
+onBeforeUnmount(hideMarkers);
+
+// === История ===
+const historyOpen = ref(false);
+const historyLoading = ref(false);
+const historyItems = ref<CalcProtocolRecord[]>([]);
+
+const openHistory = async () => {
+  historyOpen.value = true;
+  historyLoading.value = true;
+  try {
+    historyItems.value = (await fastApiService.listCalcProtocols(null, 100)).items;
+  } catch (err) {
+    historyItems.value = [];
+    notify.showError(formatApiErrorWith('Список протоколов не загружен', err));
+  } finally {
+    historyLoading.value = false;
+  }
+};
+
+const openFromHistory = (h: CalcProtocolRecord) => {
+  historyOpen.value = false;
+  void loadByRequest(h.request_id);
+};
+
 defineExpose({
   addLog,
-  clear
+  clear,
+  loadProtocols,
+  loadByRequest,
+  loadByCalculation,
 });
 </script>
 
@@ -271,6 +1067,7 @@ defineExpose({
 
 .protocol-tabs-container {
   flex: 1;
+  min-width: 0;
 }
 
 .protocol-tabs {
@@ -305,6 +1102,112 @@ defineExpose({
   overflow-y: auto;
   border: 1px solid #e0e0e0;
   transition: height 0.2s ease;
+}
+
+.analysis-window {
+  font-family: inherit;
+  padding: 0 0 8px;
+}
+
+.analysis-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
+  padding: 6px 8px;
+  background: #fafafa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.analysis-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-right: 10px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-search {
+  max-width: 220px;
+  min-width: 160px;
+}
+
+.analysis-compare {
+  font-size: 0.8rem;
+}
+
+.analysis-empty {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  color: #666;
+}
+
+.entry {
+  display: flex;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+.entry:hover {
+  background: #f7f9fc;
+}
+
+.entry--error {
+  border-left-color: #d32f2f;
+}
+
+.entry--warning {
+  border-left-color: #f9a825;
+}
+
+.entry--active {
+  background: #e3f2fd;
+}
+
+.entry-icon {
+  margin-top: 2px;
+}
+
+.entry-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.entry-meta {
+  font-size: 0.72rem;
+  color: #777;
+}
+
+.entry-text {
+  font-family: 'Consolas', monospace;
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.entry-more {
+  font-size: 0.72rem;
+  color: #777;
+}
+
+.history-row {
+  cursor: pointer;
 }
 
 .protocol-line {
@@ -355,11 +1258,11 @@ defineExpose({
 }
 
 /* Стили для кнопок в светлой теме */
-:deep(.v-btn) {
+.protocol-header :deep(.v-btn) {
   color: #666;
 }
 
-:deep(.v-btn:hover) {
+.protocol-header :deep(.v-btn:hover) {
   color: #333;
   background-color: rgba(0, 0, 0, 0.04);
 }
@@ -376,27 +1279,4 @@ defineExpose({
 :deep(.v-tab:hover) {
   color: #333;
 }
-
-/* Добавляем стили для полноэкранного режима */
-:deep(.v-card) {
-  transition: all 0.2s ease;
-}
-
-:deep(.v-card.v-card--fullscreen) {
-  border-radius: 0;
-  margin: 0;
-  max-width: 100%;
-  max-height: 100%;
-  width: 100%;
-  height: 100%;
-}
-
-/* Улучшаем стили для кнопок в полноэкранном режиме */
-:deep(.v-btn) {
-  transition: all 0.2s ease;
-}
-
-:deep(.v-btn:hover) {
-  transform: scale(1.1);
-}
-</style> 
+</style>

@@ -289,15 +289,21 @@
     <!-- Модальное окно расчёта -->
     <PlanningCalculationModal
       v-if="isHydrated && authStore.canCalculate"
+      ref="calculationModalRef"
       v-model="showCalculationModal"
       @protocol-log="onCalculationLog"
       @show-protocol="showProtocol = $event"
+      @protocol-ready="onProtocolReady"
+      @open-protocol="protocolRef?.loadByCalculation($event)"
     />
 
-    <!-- Окно протокола -->
+    <!-- Окно протокола: анализ ошибок с переходом к объектам, «Исправить», «Пересчитать» -->
     <CalculationProtocol
       ref="protocolRef"
       v-model:show="showProtocol"
+      :can-recalculate="!!calculationModalRef?.canRerun"
+      @open-calculation="showCalculationModal = true"
+      @recalculate="calculationModalRef?.rerun()"
     />
 
     <!-- Глобальные уведомления (notificationStore); с действием — дольше и с кнопкой -->
@@ -375,7 +381,8 @@ const showProtocol = ref(false);
 const exportingShp = ref(false);
 const exportingDxf = ref(false);
 const exportingGeoJson = ref(false);
-const protocolRef = ref<{ addLog: (log: any) => void } | null>(null);
+const protocolRef = ref<InstanceType<typeof CalculationProtocol> | null>(null);
+const calculationModalRef = ref<InstanceType<typeof PlanningCalculationModal> | null>(null);
 
 onMounted(() => {
   isHydrated.value = true;
@@ -530,6 +537,12 @@ const onCalculationLog = (log: any) => {
   if (protocolRef.value) {
     protocolRef.value.addLog(log);
   }
+};
+
+/** Расчёт сохранил протоколы — панель переходит к анализу (сравнение с прошлым запуском тех же фрагментов) */
+const onProtocolReady = (ids: number[]) => {
+  showProtocol.value = true;
+  void protocolRef.value?.loadProtocols(ids, { keepPrevious: true });
 };
 
 const resolveExportFragmentIds = (): number[] | undefined => {

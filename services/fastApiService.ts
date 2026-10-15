@@ -2,6 +2,7 @@ import { appStorage } from '~/utils/appStorage';
 import { reactive } from 'vue';
 import { BAD_CREDENTIALS_TEXT, SESSION_EXPIRED_TEXT, serverDetailText, statusMessage } from '~/utils/apiError';
 import type { FeatureData, Fragment } from '~/types';
+import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
 import type {
   NetworkImportInspect,
   NetworkImportMode,
@@ -2595,6 +2596,29 @@ export const fastApiService = {
       if (value !== null && value !== undefined && value !== '') query[key] = value as string | number;
     }
     return request<CalculationListResponse>('api/v1/calculations', { query });
+  },
+
+  /** Протоколы расчётов (разобранный вывод sety): список, по запросу, по расчёту */
+  async listCalcProtocols(fileId?: number | null, limit = 50): Promise<{ items: CalcProtocolRecord[] }> {
+    return request('api/v1/calculations/protocols', { query: fileId ? { file_id: fileId, limit } : { limit } });
+  },
+
+  async getCalcProtocol(id: number, output = false): Promise<CalcProtocolRecord> {
+    return request(`api/v1/calculations/protocols/${id}`, output ? { query: { output: true } } : undefined);
+  },
+
+  async getCalcProtocolsByRequest(requestId: string, output = false): Promise<{ items: CalcProtocolRecord[] }> {
+    return request(`api/v1/calculations/protocols/by-request/${encodePath(requestId)}`,
+      output ? { query: { output: true } } : undefined);
+  },
+
+  async getCalculationProtocol(calculationId: number, output = false): Promise<CalcProtocolRecord> {
+    return request(`api/v1/calculations/${calculationId}/protocol`, output ? { query: { output: true } } : undefined);
+  },
+
+  /** Геометрия (WGS84) объектов протокола для перехода на карте */
+  async locateProtocolObjects(objects: ProtocolObject[]): Promise<ProtocolLocateResult> {
+    return request('api/v1/calculations/protocols/locate', { method: 'POST', body: { objects } });
   },
 
   /** Администрирование пользователей UsersDB (только admin) */

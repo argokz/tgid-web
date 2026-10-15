@@ -129,6 +129,14 @@
           </template>
           <template #[`item.actions`]="{ item }">
             <v-btn
+              icon="mdi-format-list-checks"
+              variant="text"
+              size="small"
+              title="Протокол расчёта: ошибки и предупреждения с переходом к объектам"
+              aria-label="Протокол расчёта"
+              @click="emit('open-protocol', item.id)"
+            />
+            <v-btn
               v-if="authStore.canRunWritingCalc"
               icon="mdi-delete"
               variant="text"
@@ -209,7 +217,7 @@ import { useFragmentStore } from '~/stores/fragmentStore';
 import { useNotificationStore } from '~/stores/notificationStore';
 
 const props = defineProps<{ modelValue: boolean }>();
-const emit = defineEmits<{ 'update:modelValue': [value: boolean]; 'deleted': [id: number] }>();
+const emit = defineEmits<{ 'update:modelValue': [value: boolean]; 'deleted': [id: number]; 'open-protocol': [id: number] }>();
 
 const isOpen = computed({
   get: () => props.modelValue,
@@ -239,7 +247,7 @@ const headers = [
   { title: 'Tн, °C', key: 'tn', sortable: false },
   { title: 'Наименование', key: 'name', sortable: false },
   { title: 'Автор', key: 'user_gid', sortable: false },
-  { title: '', key: 'actions', sortable: false, width: 56 },
+  { title: '', key: 'actions', sortable: false, width: 96 },
 ];
 
 const filter = reactive<{

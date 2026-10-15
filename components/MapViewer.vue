@@ -718,6 +718,11 @@ const openLazyDialog = (key: LazyDialogKey, scope?: unknown) => {
   });
 };
 
+// Диалог по запросу извне карты (протокол расчёта: «Исправить» → журнал температурных графиков)
+watch(() => uiStore.toolDialogRequest, (req) => {
+  if (req && toolDialogs.some((d) => d.key === req.key)) openLazyDialog(req.key as ToolDialogKey, req.scope);
+});
+
 // === «Показать на карте»: маркер + перелёт, один слот на источник ===
 const locateMarkers = useLocateMarkers(() => mapStore.map, {
   onSync: (selection) => cesiumStore.setSyncedSelection(selection),
