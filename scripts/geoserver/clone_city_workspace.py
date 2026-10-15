@@ -211,6 +211,10 @@ def main():
                 g = ET.fromstring(gwc.content)
                 drop(g, 'id')
                 g.find('name').text = f'{dst}:{name}'
+                # явный охват сетки — исходного города: с ним кеш нового города отвечает TileOutOfRange,
+                # и веб тайлы не запрашивает. Без него GWC берёт охват слоя.
+                for subset in g.iter('gridSubset'):
+                    drop(subset, 'extent')
                 gs.post_xml(f'/gwc/rest/layers/{dst}:{name}.xml', g, method='PUT')
             copied.append(name)
             print(f'  {new_store}:{name}')
