@@ -206,6 +206,16 @@ function textAnchor(pointPlacement: any): string | undefined {
   return [vertical, horizontal].filter(Boolean).join('-') || 'center'
 }
 
+/** VendorOption GeoServer: имя → значение */
+function vendorOptions(symbolizer: any): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const option of asArray(symbolizer?.VendorOption)) {
+    const name = String(option?.['@_name'] || '').trim()
+    if (name) out[name] = textValue(option).trim()
+  }
+  return out
+}
+
 function textLayer(symbolizer: any): any {
   const font = cssParameters(symbolizer?.Font)
   const fill = cssParameters(symbolizer?.Fill)
@@ -223,6 +233,14 @@ function textLayer(symbolizer: any): any {
     'text-ignore-placement': false
   }
   if (dx || dy) layout['text-offset'] = [dx / size, dy / size]
+  // spaceAround — отступ между подписями (как text-padding); conflictResolution=false — без отсева
+  const vendor = vendorOptions(symbolizer)
+  const spaceAround = numberValue(vendor.spaceAround)
+  if (spaceAround != null) layout['text-padding'] = Math.max(0, spaceAround)
+  if (vendor.conflictResolution === 'false') {
+    layout['text-allow-overlap'] = true
+    layout['text-ignore-placement'] = true
+  }
   if (String(font['font-weight'] || '').toLowerCase() === 'bold') {
     layout['text-font'] = ['Open Sans Bold', 'Arial Unicode MS Bold']
   }
@@ -288,5 +306,44 @@ export function convertSldToMapLibre(
     asArray(rule?.TextSymbolizer).forEach((symbolizer, index) => add('text', textLayer(symbolizer), index))
   })
 
-  return { layers }
+  return { layers: mergeIconLadders(layers) }
+}
+
+/**
+ * Размер значка по зуму в SLD задают лестницей правил: тот же фильтр и значок, соседние диапазоны
+ * масштаба, свой Size. Отдельные слои MapLibre дают скачок размера на каждом целом зуме; один слой
+ * с icon-size по зуму (interpolate) растёт плавно. Размер ступени — на её нижней границе.
+ */
+export function mergeIconLadders(layers: any[]): any[] {
+  const out: any[] = []
+  const stops = new Map<any, Array<[number, number]>>()
+  const keyOf = (layer: any) => (layer?.type === 'symbol' && layer.layout?.['icon-image'] && typeof layer.layout?.['icon-size'] === 'number'
+    ? `${layer.layout['icon-image']}|${JSON.stringify(layer.filter ?? null)}`
+    : null)
+  for (const layer of layers) {
+    const key = keyOf(layer)
+    const prev = out[out.length - 1]
+    if (key && prev && keyOf(prev) === key && prev.maxzoom != null && layer.minzoom != null
+      && Math.abs(prev.maxzoom - layer.minzoom) < 1e-6) {
+      const list = stops.get(prev) ?? [[prev.minzoom ?? 0, prev.layout['icon-size']]]
+      list.push([layer.minzoom, layer.layout['icon-size']])
+      stops.set(prev, list)
+      prev.maxzoom = layer.maxzoom
+      if (prev.maxzoom == null) delete prev.maxzoom
+      // следующая ступень сравнивается по icon-size последней
+      prev.layout = { ...prev.layout, 'icon-size': layer.layout['icon-size'] }
+      continue
+    }
+    out.push(layer)
+  }
+  for (const [layer, list] of stops) {
+    const uniq = list.filter(([z], i) => i === 0 || z > list[i - 1][0])
+    layer.layout = {
+      ...layer.layout,
+      'icon-size': uniq.length > 1
+        ? ['interpolate', ['linear'], ['zoom'], ...uniq.flatMap(([z, v]) => [Math.round(z * 1000) / 1000, v])]
+        : uniq[0][1]
+    }
+  }
+  return out
 }

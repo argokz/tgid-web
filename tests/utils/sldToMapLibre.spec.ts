@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { convertSldToMapLibre, scaleDenominatorToZoom } from '../../utils/sldToMapLibre'
+import { convertSldToMapLibre, mergeIconLadders, scaleDenominatorToZoom } from '../../utils/sldToMapLibre'
+import { scaleTextLayout, scaleZoomValue } from '../../utils/mapStyleScale'
 
 const wrapRules = (rules: string) => `
 <sld:StyledLayerDescriptor xmlns:sld="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc">
@@ -80,5 +81,62 @@ describe('SLD to MapLibre conversion', () => {
       'text-halo-color': '#ffffff',
       'text-halo-width': 3
     })
+  })
+
+  it('лестница размеров значка — один слой с плавным icon-size', () => {
+    const scale = (z: number) => (559082264.0287178 / 2 ** z).toFixed(2)
+    const rule = (zmin: number, zmax: number | null, size: number) => `
+      <sld:Rule>
+        <ogc:Filter><ogc:PropertyIsEqualTo><ogc:PropertyName>code</ogc:PropertyName><ogc:Literal>IS</ogc:Literal></ogc:PropertyIsEqualTo></ogc:Filter>
+        ${zmax != null ? `<sld:MinScaleDenominator>${scale(zmax)}</sld:MinScaleDenominator>` : ''}
+        <sld:MaxScaleDenominator>${scale(zmin)}</sld:MaxScaleDenominator>
+        <sld:PointSymbolizer><sld:Graphic><sld:ExternalGraphic>
+          <sld:OnlineResource href="file:/C:/gs/workspaces/AstanaGIS/styles/svg/is.svg" />
+        </sld:ExternalGraphic><sld:Size>${size}</sld:Size></sld:Graphic></sld:PointSymbolizer>
+      </sld:Rule>`
+    const sld = wrapRules(rule(9, 12, 16) + rule(12, 13, 18) + rule(13, null, 20))
+    const { layers } = convertSldToMapLibre(sld, { workspace: 'AstanaGIS', resourceUrl: (w, p) => `/${w}/${p}` })
+    expect(layers).toHaveLength(1)
+    expect(layers[0].minzoom).toBeCloseTo(9, 3)
+    expect(layers[0].maxzoom).toBeUndefined()
+    expect(layers[0].layout['icon-size']).toEqual(['interpolate', ['linear'], ['zoom'], 9, 0.16, 12, 0.18, 13, 0.2])
+  })
+
+  it('разные значки или разрыв диапазонов не склеиваются', () => {
+    const base = { type: 'symbol', filter: ['==', 'code', 'TK'] }
+    const a = { ...base, id: 'a', minzoom: 13, maxzoom: 14, layout: { 'icon-image': 'tk', 'icon-size': 0.1 } }
+    const b = { ...base, id: 'b', minzoom: 15, layout: { 'icon-image': 'tk', 'icon-size': 0.12 } }
+    const c = { ...base, id: 'c', minzoom: 14, layout: { 'icon-image': 'us', 'icon-size': 0.12 } }
+    expect(mergeIconLadders([a, b]).map((l) => l.id)).toEqual(['a', 'b'])
+    expect(mergeIconLadders([{ ...a }, c]).map((l) => l.id)).toEqual(['a', 'c'])
+  })
+
+  it('VendorOption подписи: spaceAround → text-padding, conflictResolution=false → без отсева', () => {
+    const sld = wrapRules(`
+      <sld:Rule><sld:TextSymbolizer>
+        <sld:Label><ogc:PropertyName>label</ogc:PropertyName></sld:Label>
+        <sld:VendorOption name="spaceAround">10</sld:VendorOption>
+        <sld:VendorOption name="conflictResolution">false</sld:VendorOption>
+      </sld:TextSymbolizer></sld:Rule>`)
+    const { layers } = convertSldToMapLibre(sld, { workspace: 'AlmatyGIS' })
+    expect(layers[0].layout).toMatchObject({ 'text-padding': 10, 'text-allow-overlap': true, 'text-ignore-placement': true })
+  })
+})
+
+describe('масштаб шрифта стилей', () => {
+  it('умножаются значения, а не ступени зума', () => {
+    expect(scaleZoomValue(15, 0.8)).toBe(12)
+    expect(scaleZoomValue(['interpolate', ['linear'], ['zoom'], 10, 12, 18, 16], 0.5))
+      .toEqual(['interpolate', ['linear'], ['zoom'], 10, 6, 18, 8])
+    expect(scaleZoomValue(['step', ['zoom'], 10, 14, 20], 0.5)).toEqual(['step', ['zoom'], 5, 14, 10])
+    expect(scaleZoomValue({ stops: [[12, 10], [16, 20]] }, 0.5)).toEqual({ stops: [[12, 5], [16, 10]] })
+    expect(scaleZoomValue(['get', 'size'], 0.5)).toEqual(['get', 'size'])
+  })
+
+  it('смещение подписи в пикселях сохраняется', () => {
+    const layout = scaleTextLayout({ 'text-size': 20, 'text-offset': [0, -1] }, 0.8)
+    expect(layout['text-size']).toBe(16)
+    expect(layout['text-offset'][1] * layout['text-size']).toBeCloseTo(-20, 6)
+    expect(scaleTextLayout({ 'text-field': 'x' }, 0.8)).toEqual({ 'text-field': 'x' })
   })
 })

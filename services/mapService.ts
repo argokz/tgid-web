@@ -1,5 +1,9 @@
 import type { Map } from 'maplibre-gl';
 import type { ExtendedLayerConfig } from '~/types';
+import { scaleTextLayout } from '~/utils/mapStyleScale';
+
+/** Шрифт подписей стилей GeoServer на экране веба (стили рассчитаны на крупный шрифт десктопа) */
+const TEXT_SIZE_SCALE = 0.8;
 
 const loadedSprites = new Set<string>();
 
@@ -212,14 +216,9 @@ export const mapService = {
           if (mbLayer.minzoom !== undefined) layerConfig.minzoom = mbLayer.minzoom;
           if (mbLayer.maxzoom !== undefined) layerConfig.maxzoom = mbLayer.maxzoom;
           
-          if (mbLayer.type === 'symbol' && mbLayer.layout?.['text-size']) {
-            const currentSize = mbLayer.layout['text-size'];
-            if (typeof currentSize === 'number') {
-              layerConfig.layout['text-size'] = currentSize * 0.8; // Reduce by 20%
-            } else if (Array.isArray(currentSize)) {
-              // Handle interpolated text size: ["interpolate", ["linear"], ["zoom"], 10, 12, 18, 16]
-              layerConfig.layout['text-size'] = currentSize.map(item => typeof item === 'number' ? item * 0.8 : item);
-            }
+          // Шрифт стилей GeoServer на экране веба на 20% меньше; размер по зуму — только значения
+          if (mbLayer.type === 'symbol' && mbLayer.layout?.['text-size'] != null) {
+            layerConfig.layout = scaleTextLayout(layerConfig.layout, TEXT_SIZE_SCALE);
           }
           
           map.addLayer(layerConfig);

@@ -327,8 +327,11 @@ def _text_rule(title: str, flt: str, scale: str, field: str, font: int, bold: bo
 
 
 def build_uzel_sld() -> str:
+    # Порядок правил — от проходных узлов к источникам: последнее правило рисуется поверх, а в вебе
+    # (MapLibre) верхний слой первым получает место для подписи — при тесноте пропадают подписи
+    # мелких узлов, а не источников и насосных.
     rules: list[str] = []
-    for code, sizes in NODE_SIZES.items():
+    for code, sizes in reversed(NODE_SIZES.items()):
         # соседние зумы с одинаковым размером — одно правило
         spans: list[list] = []
         for zoom, size in zip(NODE_ZOOMS, sizes):
@@ -348,14 +351,14 @@ def build_uzel_sld() -> str:
                 f'<se:ExternalGraphic><se:OnlineResource xlink:type="simple" xlink:href="svg/{NODE_ICONS[code]}.svg"/>'
                 f'<se:Format>image/svg+xml</se:Format></se:ExternalGraphic><se:Size>{size}</se:Size>'
                 '</se:Graphic></se:PointSymbolizer></se:Rule>')
-    for codes, zmin, zmax, font, bold, podp in NODE_LABELS:
+    for codes, zmin, zmax, font, bold, podp in reversed(NODE_LABELS):
         size = max(NODE_SIZES[c][min(zmin, 19) - 11] for c in codes) or 10
         color = NAME_COLORS.get(codes[0], NAME_COLOR) if len(codes) == 1 else NAME_COLOR
         title = f'Подпись {",".join(codes)} {zmin}' + (' (подписывать)' if podp else '')
         rules.append(_text_rule(title, _code_filter(codes, podp), _scale_range(zmin, zmax), 'label',
                                 font, bold, color, above=True, icon=size))
     # Значения «Подписей» — под значком; значок к этому зуму уже своего крупного размера
-    for codes in VALUE_GROUPS:
+    for codes in reversed(VALUE_GROUPS):
         size = max(NODE_SIZES[c][TEXT_ZOOM - 11] for c in codes)
         rules.append(_text_rule(f'Значения {",".join(codes)} {TEXT_ZOOM}', _code_filter(codes),
                                 _scale_range(TEXT_ZOOM, None), 'text', VALUES_FONT, False, VALUES_COLOR,
