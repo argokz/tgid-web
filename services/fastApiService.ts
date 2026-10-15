@@ -1025,6 +1025,15 @@ export interface AdminUser {
   password_set?: boolean;
   must_change_password?: boolean;
   legacy_right?: number | null;
+  /** UsersDB: коды городов с доступом; null — все города */
+  cities?: string[] | null;
+}
+
+/** Город (база ТГИД): код, название, путь веба (/tgid/astana/) */
+export interface CityItem {
+  code: string;
+  label: string;
+  path: string;
 }
 
 export interface AdminUserUpdate {
@@ -1035,6 +1044,8 @@ export interface AdminUserUpdate {
   display_name?: string | null;
   full_name?: string | null;
   web_access?: boolean;
+  /** null — все города */
+  cities?: string[] | null;
 }
 
 export interface AdminCap {
@@ -1048,6 +1059,9 @@ export interface AdminUsersResponse {
   note: string | null;
   /** Логин мастер-учётки владельца (вне списка; удалить и заблокировать нельзя); null — не настроена */
   master_login?: string | null;
+  /** Справочник городов и город этого API (доступ пользователей UsersDB к городам) */
+  cities_catalog?: CityItem[];
+  current_city?: string;
 }
 
 export interface AdminRole {
@@ -1742,6 +1756,9 @@ export const fastApiService = {
     strict_auth: boolean;
     mutations_enabled: boolean;
     topology_mutations_enabled: boolean;
+    /** Город этого API (код и название) */
+    city?: string;
+    city_label?: string;
   }> {
     return request('api/v1/auth/config');
   },
@@ -1763,6 +1780,11 @@ export const fastApiService = {
     must_change_password?: boolean;
     /** Мастер-учётка владельца (MASTER_LOGIN): пароль меняется только на сервере */
     is_master?: boolean;
+    /** Город этого API и города, доступные пользователю */
+    city?: string;
+    city_label?: string;
+    cities?: CityItem[];
+    all_cities?: boolean;
   }> {
     return request('api/v1/auth/me', mutationOptions('GET'));
   },
@@ -2584,7 +2606,13 @@ export const fastApiService = {
     return request<AdminUsersResponse>('api/v1/admin/users', mutationOptions('GET'));
   },
 
-  async createAdminUser(body: { username: string; password: string; role: UserRole }): Promise<AdminUser> {
+  async createAdminUser(body: {
+    username: string;
+    password: string;
+    role: UserRole;
+    /** null — все города */
+    cities?: string[] | null;
+  }): Promise<AdminUser> {
     return request<AdminUser>('api/v1/admin/users', mutationOptions('POST', body));
   },
 

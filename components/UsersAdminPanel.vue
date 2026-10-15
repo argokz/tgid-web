@@ -76,6 +76,22 @@
           density="compact"
           style="min-width: 150px; flex: 1 1 150px;"
         />
+        <v-select
+          v-if="showCities"
+          v-model="newUser.cities"
+          :items="cityItems"
+          item-title="title"
+          item-value="value"
+          label="Города"
+          placeholder="Все города"
+          persistent-placeholder
+          variant="outlined"
+          density="compact"
+          multiple
+          chips
+          closable-chips
+          style="min-width: 200px; flex: 2 1 200px;"
+        />
         <v-btn
           type="submit"
           color="primary"
@@ -117,6 +133,25 @@
             :disabled="!canWrite || busyId === item.id"
             style="min-width: 150px; max-width: 180px;"
             @update:model-value="(role: UserRole) => changeRole(item, role)"
+          />
+        </template>
+        <template #[`item.cities`]="{ item }">
+          <v-select
+            :model-value="item.cities || []"
+            :items="cityItems"
+            item-title="title"
+            item-value="value"
+            placeholder="Все города"
+            persistent-placeholder
+            variant="plain"
+            density="compact"
+            multiple
+            chips
+            hide-details
+            :disabled="!canWrite || busyId === item.id"
+            style="min-width: 190px; max-width: 280px;"
+            :aria-label="`Города пользователя ${item.username}`"
+            @update:model-value="(codes: string[]) => changeCities(item, codes)"
           />
         </template>
         <template #[`item.caps`]="{ item }">
@@ -223,8 +258,15 @@
           (как в десктопе) и территория — фрагменты, в которых разрешена правка; чтение — вся сеть.
           Права и территорию проверяет база данных.
         </div>
+        <div
+          v-if="showCities"
+          class="mt-1"
+        >
+          Города: без выбора — доступ ко всем городам (и к добавленным позже). Пользователь входит
+          только в отмеченные города; мастер-учётке доступны все.
+        </div>
         <div class="mt-1">
-          Блокировка и смена роли действуют на уже выданные токены в течение ~30 с.
+          Блокировка, смена роли и городов действуют на уже выданные токены в течение ~30 с.
         </div>
       </div>
     </template>
@@ -379,6 +421,7 @@ import {
   type AdminRole,
   type AdminUser,
   type AdminUserUpdate,
+  type CityItem,
   type UserRole,
 } from '~/services/fastApiService'
 import { useAuthStore } from '~/stores/authStore'
@@ -402,6 +445,14 @@ const caps = ref<AdminCap[]>([])
 /** AUTH_BACKEND=pg: пользователи — роли PostgreSQL (права, территория, профиль) */
 const pgBackend = ref(false)
 const busyId = ref<number | string | null>(null)
+/** Справочник городов (UsersDB); у пользователей PostgreSQL доступ к базам даёт сам PostgreSQL */
+const citiesCatalog = ref<CityItem[]>([])
+const currentCity = ref('')
+const showCities = computed(() => !pgBackend.value && citiesCatalog.value.length > 0)
+const cityItems = computed(() => citiesCatalog.value.map((c) => ({
+  value: c.code,
+  title: c.code === currentCity.value ? `${c.label} (этот)` : c.label,
+})))
 
 const roleItems = (Object.keys(ROLE_ORDER) as UserRole[]).map((value) => ({
   value,
@@ -429,6 +480,7 @@ const headers = computed(() => pgBackend.value
       { title: 'ID', key: 'id', width: 70 },
       { title: 'Логин', key: 'username' },
       { title: 'Роль', key: 'role', sortable: false },
+      ...(showCities.value ? [{ title: 'Города', key: 'cities', sortable: false }] : []),
       { title: 'Статус', key: 'is_active' },
       { title: '', key: 'actions', sortable: false, width: 150 },
     ])
@@ -444,10 +496,11 @@ const rules = {
     ((v || '').length >= 8 && new TextEncoder().encode(v).length <= 72) || 'От 8 символов, не длиннее 72 байт',
 }
 
-const newUser = reactive<{ username: string; password: string; role: UserRole }>({
+const newUser = reactive<{ username: string; password: string; role: UserRole; cities: string[] }>({
   username: '',
   password: '',
   role: 'viewer',
+  cities: [],
 })
 const creating = ref(false)
 const createForm = ref()
@@ -485,6 +538,8 @@ const load = async () => {
     canWrite.value = res.can_write
     note.value = res.note
     masterLogin.value = res.master_login ?? null
+    citiesCatalog.value = res.cities_catalog || []
+    currentCity.value = res.current_city || ''
     roles.value = roleRes.items
     caps.value = roleRes.caps || []
     pgBackend.value = roleRes.backend === 'pg'
@@ -505,12 +560,19 @@ const createUser = async () => {
   if (!valid) return
   creating.value = true
   try {
-    const created = await fastApiService.createAdminUser({ ...newUser, username: newUser.username.trim() })
+    const created = await fastApiService.createAdminUser({
+      username: newUser.username.trim(),
+      password: newUser.password,
+      role: newUser.role,
+      // без выбора — все города
+      ...(showCities.value ? { cities: newUser.cities.length ? [...newUser.cities] : null } : {}),
+    })
     users.value = [...users.value, created].sort((a, b) => a.username.localeCompare(b.username))
     notificationStore.showSuccess(`Пользователь ${created.username} создан (${ROLE_LABELS[created.role]})`)
     newUser.username = ''
     newUser.password = ''
     newUser.role = 'viewer'
+    newUser.cities = []
     // сброс подсветки — после того как правила пересчитались на пустые поля
     await nextTick()
     createForm.value?.resetValidation()
@@ -540,6 +602,18 @@ const update = async (item: AdminUser, body: AdminUserUpdate, done: string) => {
 const changeRole = (item: AdminUser, role: UserRole) => {
   if (role === item.role) return
   void update(item, { role }, `${item.username}: роль ${ROLE_LABELS[role]}`)
+}
+
+const cityNames = (codes: string[] | null | undefined) =>
+  codes?.length
+    ? codes.map((c) => citiesCatalog.value.find((x) => x.code === c)?.label || c).join(', ')
+    : 'все города'
+
+const changeCities = (item: AdminUser, codes: string[]) => {
+  const next = codes.length ? codes : null
+  const prev = item.cities?.length ? item.cities : null
+  if (JSON.stringify(next) === JSON.stringify(prev)) return
+  void update(item, { cities: next }, `${item.username}: ${cityNames(next)}`)
 }
 
 const toggleActive = (item: AdminUser) => {

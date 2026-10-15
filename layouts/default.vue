@@ -127,7 +127,7 @@
             <v-list-item
               v-if="authStore.isAuthenticated"
               :title="authStore.displayName || authStore.username"
-              :subtitle="roleLabel"
+              :subtitle="authStore.cityLabel ? `${roleLabel} · ${authStore.cityLabel}` : roleLabel"
               prepend-icon="mdi-account-check"
             />
             <v-list-item
@@ -140,6 +140,14 @@
               prepend-icon="mdi-card-account-details-outline"
               title="Личный кабинет"
               @click="openAccount('profile')"
+            />
+            <!-- Другие города, доступные пользователю: свой веб у каждого, вход — отдельно -->
+            <v-list-item
+              v-for="c in otherCities"
+              :key="c.code"
+              :href="c.path"
+              prepend-icon="mdi-swap-horizontal"
+              :title="`Перейти: ${c.label}`"
             />
             <v-list-item
               v-if="authStore.isAdmin && !authStore.authDisabled"
@@ -375,6 +383,9 @@ onMounted(() => {
   void refreshApiHealth();
 });
 
+const otherCities = computed(() =>
+  authStore.isAuthenticated ? authStore.cities.filter((c) => c.code !== authStore.city) : [],
+);
 const roleLabel = computed(() => ROLE_LABELS[authStore.role as Role] || authStore.role || 'пользователь');
 
 // Сессия истекла (exp или 401) — открыть форму входа (QA F71)

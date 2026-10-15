@@ -131,9 +131,8 @@ const props = defineProps<{ required?: boolean }>()
 const authStore = useAuthStore()
 const notify = useNotificationStore()
 
-/** Город стенда по NUXT_PUBLIC_STORAGE_PREFIX (на проде два города на одном домене) */
-const CITY_NAMES: Record<string, string> = { '': 'Алматы', almaty: 'Алматы', astana: 'Астана' }
-const cityName = CITY_NAMES[String(useRuntimeConfig().public?.storagePrefix || '').trim().toLowerCase()] || ''
+/** Город этого API (/auth/config: на проде два города на одном домене) */
+const cityName = computed(() => authStore.cityLabel)
 
 const username = ref(authStore.username || '')
 const password = ref('')

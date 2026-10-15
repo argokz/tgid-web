@@ -4,6 +4,7 @@ import { computePermissions, type Permissions } from '~/utils/permissions'
 import { isJwtExpired } from '~/utils/jwt'
 import { SESSION_EXPIRED_TEXT } from '~/utils/apiError'
 import { useNotificationStore } from '~/stores/notificationStore'
+import type { CityItem } from '~/services/fastApiService'
 
 const TOKEN_KEY = 'itwin_access_token'
 const ROLE_KEY = 'itwin_user_role'
@@ -39,6 +40,11 @@ export const useAuthStore = defineStore('auth', {
     mustChangePassword: false as boolean,
     /** Мастер-учётка владельца: пароль меняется только на сервере */
     isMaster: false as boolean,
+    /** Город этого API (из /auth/config, /auth/me) и города, доступные пользователю */
+    city: '' as string,
+    cityLabel: '' as string,
+    cities: [] as CityItem[],
+    allCities: true as boolean,
   }),
   getters: {
     isAuthenticated: (state) => Boolean(state.accessToken),
@@ -151,6 +157,8 @@ export const useAuthStore = defineStore('auth', {
         this.authRequiredGet = Boolean(config.auth_required_get)
         this.mutationsEnabledServer = Boolean(config.mutations_enabled)
         this.topologyMutationsEnabledServer = Boolean(config.topology_mutations_enabled)
+        this.city = config.city || ''
+        this.cityLabel = config.city_label || ''
         this.configLoaded = true
       } catch {
         // API недоступен — оставляем строгие значения (кнопки записи скрыты)
@@ -184,6 +192,8 @@ export const useAuthStore = defineStore('auth', {
       this.displayName = ''
       this.mustChangePassword = false
       this.isMaster = false
+      this.cities = []
+      this.allCities = true
       if (process.client) {
         appStorage.removeItem(TOKEN_KEY)
         appStorage.removeItem(USER_KEY)
@@ -202,6 +212,10 @@ export const useAuthStore = defineStore('auth', {
         this.displayName = me.display_name || me.username
         this.mustChangePassword = Boolean(me.must_change_password)
         this.isMaster = Boolean(me.is_master)
+        if (me.city) this.city = me.city
+        if (me.city_label) this.cityLabel = me.city_label
+        this.cities = me.cities || []
+        this.allCities = me.all_cities !== false
         this.authDisabled = Boolean(me.auth_disabled)
         this.mutationsEnabledServer = Boolean(me.mutations_enabled)
         this.topologyMutationsEnabledServer = Boolean(me.topology_mutations_enabled)

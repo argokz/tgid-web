@@ -121,6 +121,12 @@
               prepend-icon="mdi-login-variant"
             />
             <v-list-item
+              v-if="authStore.cityLabel"
+              title="Город"
+              :subtitle="cityAccess"
+              prepend-icon="mdi-city-variant-outline"
+            />
+            <v-list-item
               v-if="sessionUntil"
               title="Сессия действует до"
               :subtitle="sessionUntil"
@@ -216,6 +222,11 @@ watch(visible, (open) => {
   if (open) tab.value = props.initialTab === 'users' && authStore.isAdmin ? 'users' : 'profile'
 })
 
+/** «Алматы (доступны: Алматы, Астана)» — города пользователя UsersDB */
+const cityAccess = computed(() => {
+  const others = authStore.allCities ? 'все города' : authStore.cities.map((c) => c.label).join(', ')
+  return others ? `${authStore.cityLabel} · доступны: ${others}` : authStore.cityLabel
+})
 const roleLabel = computed(() => ROLE_LABELS[authStore.role as Role] || authStore.role || 'не вошёл')
 
 const sessionUntil = computed(() => {
