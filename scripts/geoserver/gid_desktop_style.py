@@ -27,8 +27,16 @@
 
 Вспомогательные участки (узлы П1/П2) скрыты параметром view rezhim (0 — скрыть), см. REZHIM_SQL_EDITS.
 
-Откат участков: --restore-style AlmatyGIS_heatpipesections (стиль по умолчанию); узлов — перезалить
-стили из AlmatyGIS (clone_city_workspace.py --styles-only). Новые поля view ничему не мешают.
+Узлы получают стиль uzel_gid (прежний стиль uzel остаётся в списке стилей слоя).
+
+Бэкап и откат. До первой записи скрипт проверяет все места правки SQL-view обоих слоёв (если view
+разошлись с генератором — выход без изменений) и с --backup-dir сохраняет featuretype, слои,
+файлы их стилей и SVG значков узлов; --restore <каталог> возвращает всё как было:
+
+    python scripts/geoserver/gid_desktop_style.py --workspace AlmatyGIS --backup-dir H:/tgid-backups/x
+    python scripts/geoserver/gid_desktop_style.py --workspace AlmatyGIS --restore H:/tgid-backups/x
+
+Быстрый откат только стиля участков: --restore-style <имя прежнего стиля>.
 """
 from __future__ import annotations
 
@@ -42,6 +50,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 from clone_city_workspace import Gs  # noqa: E402
 
 STYLE_NAME = 'heatpipesections_gid'
+UZEL_STYLE = 'uzel_gid'
+SLD_TYPE = {'Content-Type': 'application/vnd.ogc.se+xml'}
+LAYERS = ('heatpipesections', 'uzel')
 MARKER = '-- gid_desktop_style.py'
 COLUMNS = f"""
 {MARKER}: отрисовка как в десктопе (gid8 cxema/read_lines.cpp, gidview/colorgtd.h)
@@ -425,12 +436,148 @@ def patch_uzel(gs: Gs, ws: str, store: str, layer: str = 'uzel') -> list[str]:
                headers={'Content-Type': 'image/svg+xml'})
     done.append(f'значки: {len(NODE_SVGS)}')
 
-    style = bare(gs.get_xml(f'/rest/layers/{ws}:{layer}.xml').findtext('defaultStyle/name'))
     sld = build_uzel_sld()
-    gs.req('PUT', f'/rest/workspaces/{ws}/styles/{style}', params={'raw': 'true'},
-           data=sld.encode('utf-8'), headers={'Content-Type': 'application/vnd.ogc.se+xml'})
-    done.append(f'стиль {style}: {sld.count("<se:Rule>")} правил')
+    exists = gs.req('GET', f'/rest/workspaces/{ws}/styles/{UZEL_STYLE}.xml', ok=(200, 404)).status_code == 200
+    if not exists:
+        gs.req('POST', f'/rest/workspaces/{ws}/styles', params={'name': UZEL_STYLE, 'raw': 'true'},
+               data=sld.encode('utf-8'), headers=SLD_TYPE)
+    gs.req('PUT', f'/rest/workspaces/{ws}/styles/{UZEL_STYLE}', params={'raw': 'true'},
+           data=sld.encode('utf-8'), headers=SLD_TYPE)
+    done.append(f'стиль {UZEL_STYLE}: {sld.count("<se:Rule>")} правил')
+    previous = set_default_style(gs, ws, layer, UZEL_STYLE)
+    if previous:
+        done.append(f'стиль по умолчанию {UZEL_STYLE} (был {previous}, остался в списке стилей)')
     return done
+
+
+def set_default_style(gs: Gs, ws: str, layer: str, style: str) -> str | None:
+    """Стиль слоя по умолчанию; прежний остаётся в списке стилей. → прежнее имя (None — уже стоял)"""
+    path = f'/rest/layers/{ws}:{layer}.xml'
+    info = gs.get_xml(path)
+    current = bare(info.findtext('defaultStyle/name'))
+    if current == style:
+        return None
+    styles = info.find('styles')
+    others = {bare(s.findtext('name')) for s in styles.findall('style')} if styles is not None else set()
+    extra = ''.join(f'<style><name>{n}</name><workspace>{ws}</workspace></style>'
+                    for n in sorted((others | {current}) - {style, ''}))
+    gs.post_xml(path, f'<layer><defaultStyle><name>{style}</name><workspace>{ws}</workspace>'
+                      f'</defaultStyle><styles>{extra}</styles></layer>', method='PUT')
+    return current
+
+
+# --- проверка до записи, бэкап, откат ---
+
+def ft_path(gs: Gs, ws: str, layer: str) -> str:
+    store = gs.get_xml(f'/rest/workspaces/{ws}/featuretypes/{layer}.xml').findtext('store/name').split(':')[-1]
+    return f'/rest/workspaces/{ws}/datastores/{store}/featuretypes/{layer}.xml'
+
+
+def preflight(gs: Gs, ws: str) -> list[str]:
+    """Все места правки SQL-view, которые понадобятся, — до первой записи. → список ненайденных"""
+    missing: list[str] = []
+
+    def need(layer: str, sql: str, anchor: str):
+        if sql.count(anchor) != 1:
+            missing.append(f'{ws}:{layer}: {anchor.splitlines()[0]!r} (найдено {sql.count(anchor)})')
+
+    sqls = {lay: gs.get_xml(ft_path(gs, ws, lay)).findtext('.//virtualTable/sql') or '' for lay in LAYERS}
+    hp, uz = sqls['heatpipesections'], sqls['uzel']
+    if 'отрисовка как в десктопе' not in hp:
+        need('heatpipesections', hp, ANCHOR)
+    elif DIAM_MARK not in hp:
+        need('heatpipesections', hp, DIAM_EDIT[0])
+    if 'подсветка участков ПТС' not in hp:
+        for old, _ in HIGHLIGHT_SQL_EDITS:
+            need('heatpipesections', hp, old)
+    for lay, (old, _) in REZHIM_SQL_EDITS.items():
+        if REZHIM_MARK not in sqls[lay]:
+            need(lay, sqls[lay], old)
+    if "then 'TK'" not in uz:
+        for old, _ in NODE_SQL_EDITS:
+            need('uzel', uz, old)
+    if ' as label,' not in uz:
+        need('uzel', uz, NODE_LABEL_EDIT[0])
+    return missing
+
+
+def backup(gs: Gs, ws: str, folder: str):
+    """featuretype и слой (XML), исходные файлы их стилей, SVG значков → folder/manifest.json"""
+    os.makedirs(folder, exist_ok=True)
+    manifest: dict = {'workspace': ws, 'layers': {}, 'svg': {}}
+    for lay in LAYERS:
+        path = ft_path(gs, ws, lay)
+        ft_file = f'featuretype_{lay}.xml'
+        with open(os.path.join(folder, ft_file), 'wb') as f:
+            f.write(gs.req('GET', path).content)
+        layer_xml = gs.req('GET', f'/rest/layers/{ws}:{lay}.xml').content
+        with open(os.path.join(folder, f'layer_{lay}.xml'), 'wb') as f:
+            f.write(layer_xml)
+        info = gs.get_xml(f'/rest/layers/{ws}:{lay}.xml')
+        default = bare(info.findtext('defaultStyle/name'))
+        styles_el = info.find('styles')
+        others = [bare(s.findtext('name')) for s in styles_el.findall('style')] if styles_el is not None else []
+        files = {}
+        for name in [default, *others]:
+            if not name or name in files:
+                continue
+            sinfo = gs.get_xml(f'/rest/workspaces/{ws}/styles/{name}.xml')
+            fmt = sinfo.findtext('format') or 'sld'
+            fname = sinfo.findtext('filename') or f'{name}.{fmt}'
+            if fmt == 'sld':
+                # исходный файл: ссылки на SVG остаются относительными (как в clone_city_workspace.copy_style)
+                r = gs.req('GET', f'/rest/resource/workspaces/{ws}/styles/{fname}', ok=(200, 404))
+            else:
+                # .json через /rest/resource GeoServer отдаёт ошибкой 500
+                r = gs.req('GET', f'/rest/workspaces/{ws}/styles/{name}.{fmt}', ok=(200, 404))
+            if r.status_code == 200:
+                with open(os.path.join(folder, f'style_{fname}'), 'wb') as f:
+                    f.write(r.content)
+                files[name] = {'file': fname, 'format': fmt}
+        manifest['layers'][lay] = {'featuretype': path, 'default': default, 'styles': others, 'files': files}
+    for name in NODE_SVGS:
+        r = gs.req('GET', f'/rest/resource/workspaces/{ws}/styles/svg/{name}', ok=(200, 404))
+        if r.status_code == 200:
+            with open(os.path.join(folder, f'svg_{name}'), 'wb') as f:
+                f.write(r.content)
+        manifest['svg'][name] = r.status_code == 200
+    with open(os.path.join(folder, 'manifest.json'), 'w', encoding='utf-8') as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+    print(f'бэкап {ws}: {folder}')
+
+
+def restore(gs: Gs, ws: str, folder: str):
+    """Вернуть featuretype, файлы стилей, стиль по умолчанию и SVG из бэкапа"""
+    with open(os.path.join(folder, 'manifest.json'), encoding='utf-8') as f:
+        manifest = json.load(f)
+    if manifest['workspace'] != ws:
+        sys.exit(f'бэкап сделан для {manifest["workspace"]}, а не для {ws}')
+    for lay, item in manifest['layers'].items():
+        with open(os.path.join(folder, f'featuretype_{lay}.xml'), encoding='utf-8') as f:
+            gs.post_xml(item['featuretype'], f.read(), method='PUT')
+        for name, st in item['files'].items():
+            with open(os.path.join(folder, f'style_{st["file"]}'), 'rb') as f:
+                body = f.read()
+            if st['format'] == 'sld':
+                gs.req('PUT', f'/rest/resource/workspaces/{ws}/styles/{st["file"]}', data=body,
+                       headers={'Content-Type': 'application/octet-stream'})
+            else:
+                gs.req('PUT', f'/rest/workspaces/{ws}/styles/{name}', params={'raw': 'true'}, data=body,
+                       headers={'Content-Type': 'application/vnd.geoserver.mbstyle+json'})
+        extra = ''.join(f'<style><name>{n}</name><workspace>{ws}</workspace></style>' for n in item['styles'])
+        gs.post_xml(f'/rest/layers/{ws}:{lay}.xml',
+                    f'<layer><defaultStyle><name>{item["default"]}</name><workspace>{ws}</workspace>'
+                    f'</defaultStyle><styles>{extra}</styles></layer>', method='PUT')
+        print(f'{ws}:{lay}: view и стили из бэкапа, по умолчанию {item["default"]}')
+    for name, existed in manifest['svg'].items():
+        path = f'/rest/resource/workspaces/{ws}/styles/svg/{name}'
+        if existed:
+            with open(os.path.join(folder, f'svg_{name}'), 'rb') as f:
+                gs.req('PUT', path, data=f.read(), headers={'Content-Type': 'image/svg+xml'})
+        else:
+            gs.req('DELETE', path, ok=(200, 204, 404))
+    gs.req('POST', '/rest/reset', ok=(200, 201))
+    print(f'{ws}: значки узлов из бэкапа; кеши GeoServer сброшены')
 
 
 def bare(name: str | None) -> str:
@@ -548,6 +695,9 @@ def main():
     ap.add_argument('--layer', default='heatpipesections')
     ap.add_argument('--restore-style', help='Вернуть стиль по умолчанию (откат) и выйти')
     ap.add_argument('--view-only', action='store_true', help='Только поля и подсветка в SQL-view, стили не трогать')
+    ap.add_argument('--backup-dir', help='Сохранить view, стили и значки перед правкой (каталог)')
+    ap.add_argument('--restore', metavar='DIR', help='Вернуть всё из каталога бэкапа и выйти')
+    ap.add_argument('--check', action='store_true', help='Только проверить места правки SQL-view, ничего не менять')
     args = ap.parse_args()
 
     gs = Gs(args.geoserver, os.environ.get('GEOSERVER_REST_USER', 'admin'), os.environ['GEOSERVER_REST_PASSWORD'])
@@ -559,11 +709,19 @@ def main():
                                 f'<workspace>{ws}</workspace></defaultStyle></layer>', method='PUT')
         print(f'{ws}:{layer}: стиль по умолчанию {args.restore_style}')
         return
+    if args.restore:
+        restore(gs, ws, args.restore)
+        return
 
-    info = gs.get_xml(layer_path)
-    current = bare(info.findtext('defaultStyle/name'))
-    styles = info.find('styles')
-    others = [bare(s.findtext('name')) for s in styles.findall('style')] if styles is not None else []
+    missing = preflight(gs, ws)
+    if missing:
+        sys.exit('View разошлись с генератором, ничего не изменено:\n  ' + '\n  '.join(missing))
+    print(f'{ws}: места правки view найдены')
+    if args.check:
+        return
+    if args.backup_dir:
+        backup(gs, ws, args.backup_dir)
+
     store = gs.get_xml(f'/rest/workspaces/{ws}/featuretypes/{layer}.xml').findtext('store/name').split(':')[-1]
 
     print(f'{ws}:{layer}: поля view', 'добавлены' if patch_view(gs, ws, store, layer) else 'уже есть')
@@ -585,12 +743,9 @@ def main():
     gs.req('PUT', f'/rest/workspaces/{ws}/styles/{STYLE_NAME}', params={'raw': 'true'}, data=body, headers=ctype)
     print(f'стиль {ws}:{STYLE_NAME}', 'обновлён' if exists else 'создан', f'({len(pipe_labels())} слоя подписей)')
 
-    if current != STYLE_NAME:
-        extra = ''.join(f'<style><name>{n}</name><workspace>{ws}</workspace></style>'
-                        for n in sorted((set(others) | {current}) - {STYLE_NAME, ''}))
-        gs.post_xml(layer_path, f'<layer><defaultStyle><name>{STYLE_NAME}</name><workspace>{ws}</workspace>'
-                                f'</defaultStyle><styles>{extra}</styles></layer>', method='PUT')
-        print(f'{ws}:{layer}: стиль по умолчанию {STYLE_NAME} (был {current}, остался в списке стилей)')
+    previous = set_default_style(gs, ws, layer, STYLE_NAME)
+    if previous:
+        print(f'{ws}:{layer}: стиль по умолчанию {STYLE_NAME} (был {previous}, остался в списке стилей)')
 
     print(f'{ws}:uzel:', ', '.join(patch_uzel(gs, ws, store)) or 'уже настроен')
 
