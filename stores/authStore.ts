@@ -20,6 +20,8 @@ export const useAuthStore = defineStore('auth', {
     loaded: false,
     /** Флаги сервера (/auth/config, /auth/me). До ответа — самый строгий вариант. */
     configLoaded: false,
+    /** Первый запрос /auth/config завершён (успешно или нет) — layout решает, показывать ли карту */
+    configSettled: false,
     authDisabled: false as boolean,
     /** AUTH_REQUIRED_GET: без входа данные карты не отдаются — сначала форма входа */
     authRequiredGet: false as boolean,
@@ -152,6 +154,8 @@ export const useAuthStore = defineStore('auth', {
         this.configLoaded = true
       } catch {
         // API недоступен — оставляем строгие значения (кнопки записи скрыты)
+      } finally {
+        this.configSettled = true
       }
     },
     setSession(token: string, username: string, role: string) {

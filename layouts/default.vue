@@ -248,12 +248,21 @@
     </v-alert>
 
     <v-main class="app-main">
-      <!-- Сервер требует вход: до входа карту не монтируем — она запрашивала бы данные без токена -->
+      <!-- Карту монтируем, только когда ясно, что вход не нужен (или он уже выполнен): иначе она
+           успевала показаться (панель слоёв и т. п.) и исчезала за формой входа -->
       <slot v-if="!appLocked" />
       <div
         v-else
         class="login-required-backdrop"
-      />
+      >
+        <v-progress-circular
+          v-if="!authStore.loginRequired"
+          indeterminate
+          color="primary"
+          size="32"
+          width="3"
+        />
+      </div>
     </v-main>
 
     <LoginDialog
@@ -374,14 +383,21 @@ watch(() => authStore.loginPrompt, () => {
 });
 
 // Сервер требует вход (AUTH_REQUIRED_GET), а сессии нет: форма входа без «Отмены».
-// Карту не монтируем, пока не было ни одного входа; истёкшая сессия карту не сбрасывает.
+// Карта (client-only) монтируется после mount, когда известно, нужен ли вход: есть сохранённый
+// токен, или /auth/config ответил (или не ответил — тогда как раньше, с баннером недоступности API).
+// SSR и гидратация рисуют одинаковую заглушку. Истёкшая сессия карту не сбрасывает.
 // Cookie доступа к GeoServer выдаёт /auth/me до того, как вход откроет карту (authStore.login).
 const appUnlocked = ref(false);
-const appLocked = computed(() => authStore.loginRequired && !appUnlocked.value);
-watch(() => [authStore.configLoaded, authStore.loginRequired] as const, ([loaded, required]) => {
-  if (loaded && !required) appUnlocked.value = true;
-  if (required) showLogin.value = true;
-}, { immediate: true });
+const appLocked = computed(() => !appUnlocked.value);
+watch(
+  () => [isHydrated.value, authStore.accessToken, authStore.configSettled, authStore.loginRequired] as const,
+  ([hydrated, token, settled, required]) => {
+    if (!hydrated) return;
+    if (token || (settled && !required)) appUnlocked.value = true;
+    if (required) showLogin.value = true;
+  },
+  { immediate: true },
+);
 
 // Личный кабинет: профиль, права, смена пароля; администратору — пользователи
 const showAccount = ref(false);
@@ -634,6 +650,12 @@ const downloadExcel = async (docType: string) => {
 }
 .login-required-backdrop {
   min-height: calc(100vh - 56px);
-  background: linear-gradient(135deg, rgb(var(--v-theme-primary), 0.08), rgb(var(--v-theme-surface)));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 20% 20%, rgb(var(--v-theme-primary), 0.10), transparent 45%),
+    radial-gradient(circle at 80% 85%, rgb(var(--v-theme-primary), 0.08), transparent 40%),
+    rgb(var(--v-theme-surface));
 }
 </style>

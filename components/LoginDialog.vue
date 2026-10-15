@@ -1,76 +1,121 @@
 <template>
   <v-dialog
     v-model="visible"
-    max-width="420"
+    max-width="400"
     persistent
-    :scrim="required ? 'rgba(20, 30, 50, 0.55)' : true"
+    :scrim="required ? 'rgba(15, 23, 42, 0.35)' : true"
   >
-    <v-card rounded="lg">
-      <v-card-title class="d-flex align-center ga-2">
-        <v-icon>mdi-login</v-icon>
-        {{ required ? 'Вход в ТГИД' : 'Вход' }}
-      </v-card-title>
-      <v-card-text>
-        <div
-          v-if="required"
-          class="text-body-2 text-medium-emphasis mb-3"
-        >
-          Доступ только для пользователей. Учётную запись выдаёт администратор.
+    <v-card
+      rounded="xl"
+      class="login-card"
+      elevation="12"
+    >
+      <v-btn
+        v-if="!required"
+        icon="mdi-close"
+        variant="text"
+        size="small"
+        class="login-close"
+        aria-label="Закрыть"
+        @click="close"
+      />
+
+      <div class="login-head">
+        <div class="login-logo">
+          <v-icon
+            size="30"
+            color="primary"
+          >mdi-layers</v-icon>
         </div>
+        <div class="login-brand">
+          ITwin <span class="login-brand-sub">Map</span>
+        </div>
+        <div class="text-body-2 text-medium-emphasis">
+          {{ cityName ? `Вход · ${cityName}` : 'Вход в систему' }}
+        </div>
+      </div>
+
+      <v-form
+        class="login-form"
+        @submit.prevent="submit"
+      >
         <v-text-field
           v-model="username"
           label="Логин"
           autocomplete="username"
-          density="compact"
+          prepend-inner-icon="mdi-account-outline"
           variant="outlined"
+          density="comfortable"
+          rounded="lg"
           hide-details="auto"
           class="mb-3"
-          @keyup.enter="submit"
+          :autofocus="!username"
+          :disabled="loading"
         />
         <v-text-field
           v-model="password"
           label="Пароль"
-          type="password"
+          :type="showPassword ? 'text' : 'password'"
           autocomplete="current-password"
-          density="compact"
+          prepend-inner-icon="mdi-lock-outline"
+          :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
           variant="outlined"
+          density="comfortable"
+          rounded="lg"
           hide-details="auto"
-          class="mb-3"
-          @keyup.enter="submit"
+          :autofocus="Boolean(username)"
+          :disabled="loading"
+          @click:append-inner="showPassword = !showPassword"
+          @keydown="onPasswordKey"
+          @keyup="onPasswordKey"
         />
+        <div
+          class="caps-hint text-caption"
+          :class="{ 'caps-hint--on': capsLock }"
+        >
+          <v-icon
+            size="14"
+            class="me-1"
+          >mdi-apple-keyboard-caps</v-icon>
+          Включён Caps Lock
+        </div>
         <v-select
           v-if="allowRolePick"
           v-model="role"
           :items="roles"
           label="Роль (только DEV_LOGIN)"
-          density="compact"
           variant="outlined"
+          density="comfortable"
+          rounded="lg"
           hide-details
+          class="mb-3"
         />
-        <v-alert
-          v-if="error"
-          type="error"
-          variant="tonal"
-          density="compact"
-          class="mt-3"
-        >
-          {{ error }}
-        </v-alert>
-      </v-card-text>
-      <v-card-actions class="px-4 pb-4">
-        <v-spacer />
+        <v-expand-transition>
+          <v-alert
+            v-if="error"
+            type="error"
+            variant="tonal"
+            density="compact"
+            rounded="lg"
+            class="mb-3"
+          >
+            {{ error }}
+          </v-alert>
+        </v-expand-transition>
         <v-btn
-          v-if="!required"
-          variant="text"
-          @click="close"
-        >Отмена</v-btn>
-        <v-btn
+          type="submit"
           color="primary"
           variant="flat"
+          size="large"
+          rounded="lg"
+          block
           :loading="loading"
-          @click="submit"
         >Войти</v-btn>
-      </v-card-actions>
+      </v-form>
+
+      <div class="login-foot text-caption text-medium-emphasis">
+        Учётную запись выдаёт администратор
+      </div>
     </v-card>
   </v-dialog>
 </template>
@@ -86,8 +131,14 @@ const props = defineProps<{ required?: boolean }>()
 const authStore = useAuthStore()
 const notify = useNotificationStore()
 
+/** Город стенда по NUXT_PUBLIC_STORAGE_PREFIX (на проде два города на одном домене) */
+const CITY_NAMES: Record<string, string> = { '': 'Алматы', almaty: 'Алматы', astana: 'Астана' }
+const cityName = CITY_NAMES[String(useRuntimeConfig().public?.storagePrefix || '').trim().toLowerCase()] || ''
+
 const username = ref(authStore.username || '')
 const password = ref('')
+const showPassword = ref(false)
+const capsLock = ref(false)
 const role = ref('editor')
 const loading = ref(false)
 const error = ref('')
@@ -103,6 +154,7 @@ watch(visible, async (open) => {
   if (!open) return
   error.value = ''
   password.value = ''
+  showPassword.value = false
   username.value = authStore.username || authStore.lastUsername || ''
   try {
     const cfg = await fastApiService.getAuthConfig()
@@ -113,15 +165,24 @@ watch(visible, async (open) => {
   }
 })
 
+const onPasswordKey = (event: KeyboardEvent) => {
+  if (typeof event.getModifierState === 'function') capsLock.value = event.getModifierState('CapsLock')
+}
+
 const close = () => {
   if (props.required && !authStore.isAuthenticated) return
   visible.value = false
 }
 
 const submit = async () => {
+  if (loading.value) return
   error.value = ''
   if (!username.value.trim()) {
     error.value = 'Укажите логин'
+    return
+  }
+  if (!password.value && !allowRolePick.value) {
+    error.value = 'Укажите пароль'
     return
   }
   loading.value = true
@@ -137,3 +198,64 @@ const submit = async () => {
   }
 }
 </script>
+
+<style scoped>
+.login-card {
+  position: relative;
+  padding: 32px 28px 20px;
+}
+.login-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+.login-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.login-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(var(--v-theme-primary), 0.12);
+  margin-bottom: 8px;
+}
+.login-brand {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.login-brand-sub {
+  font-weight: 400;
+  opacity: 0.7;
+}
+.caps-hint {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 2px 4px 0;
+  margin-bottom: 6px;
+  color: rgb(var(--v-theme-warning));
+  visibility: hidden;
+}
+.caps-hint--on {
+  visibility: visible;
+}
+.login-foot {
+  text-align: center;
+  margin-top: 16px;
+}
+@media (max-width: 420px) {
+  .login-card {
+    padding: 28px 18px 16px;
+  }
+}
+</style>
