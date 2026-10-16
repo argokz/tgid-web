@@ -19,7 +19,7 @@ import { buildMvtLayerIdentifiers, buildWmsOnlyLayerIdentifiers, buildWmsRasterS
 import { combineWithFragmentFilter, fragmentFilterFor } from '~/utils/mapFragmentFilter';
 import { combineCql } from '~/utils/nodeKindLayers';
 import { buildViewparams, type PtsHighlight } from '~/utils/ptsHighlight';
-import { mergeViewparamFields, tileUrlWithViewparams, withTileRevision } from '~/utils/mvtTileUrl';
+import { dataVersionRevision, mergeViewparamFields, tileUrlWithViewparams, withTileRevision } from '~/utils/mvtTileUrl';
 
 const pbfAttributeRequests = new globalThis.Map<string, Promise<string[]>>();
 
@@ -43,6 +43,8 @@ export const useLayerStore = defineStore('layer', {
     ptsHighlight: null as PtsHighlight | null,
     /** Версия данных в VIEWPARAMS тайлов (0 — нет); новая после расчёта/правки — мимо кеша GWC */
     tileRevision: 0,
+    /** Версия данных базы города с сервера (useMapDataVersion); null — ещё не получена */
+    dataVersion: null as string | null,
   }),
 
   actions: {
@@ -740,6 +742,18 @@ export const useLayerStore = defineStore('layer', {
     setPtsHighlight(highlight: PtsHighlight | null) {
       this.ptsHighlight = highlight;
       this.applyFragmentFilter();
+    },
+
+    /**
+     * Версия данных с сервера: изменилась (правка у другого пользователя, в десктопе, расчёт) —
+     * тайлы всех слоёв по новым адресам. Одна версия у всех — общие тайлы в кешах GWC/nginx.
+     */
+    applyDataVersion(version: string) {
+      if (!version || version === this.dataVersion) return;
+      this.dataVersion = version;
+      this.tileRevision = dataVersionRevision(version);
+      this.geoServerLayers.forEach(layer => this.refreshLayerSource(layer.layerId));
+      useMapStore().map?.triggerRepaint();
     },
 
     /** Перезагрузить тайлы видимых слоёв после изменения данных (расчёт, правка сети, импорт) */

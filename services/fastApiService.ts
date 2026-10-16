@@ -1700,6 +1700,11 @@ export const fastApiService = {
     return request('api/v1/fragments/extent', { query: { fragments: ids.join(',') } });
   },
 
+  /** Версия данных карты (меняется при любой записи в базу города) — для сброса кеша тайлов */
+  async getMapDataVersion(): Promise<{ version: string }> {
+    return request('api/v1/map/data-version');
+  },
+
   /** Экспорт фрагмента в .tgid десктопа (zip с tgid.txt) */
   async exportFragmentTgid(fileId: number): Promise<Blob> {
     return request<Blob>(`api/v1/fragments/${encodePath(fileId)}/export`, {

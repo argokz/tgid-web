@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  dataVersionRevision,
   gwcMvtTileUrl,
   mergeViewparamFields,
   tileUrlWithViewparams,
@@ -53,5 +54,19 @@ describe('mvtTileUrl', () => {
   it('viewparams добавляется к адресу, шаблон не кодируется', () => {
     expect(tileUrlWithViewparams('https://gs/ows?A=1&B={z}', 'x:1;')).toBe('https://gs/ows?A=1&B={z}&viewparams=x:1;')
     expect(tileUrlWithViewparams('https://gs/t/{z}/{x}/{y}.pbf', 'x:1;')).toBe('https://gs/t/{z}/{x}/{y}.pbf?viewparams=x:1;')
+  })
+})
+
+describe('dataVersionRevision', () => {
+  it('число версии — как есть, разные версии — разные rev', () => {
+    expect(dataVersionRevision('123456')).toBe(123456)
+    expect(dataVersionRevision('123457')).not.toBe(dataVersionRevision('123456'))
+  })
+
+  it('не число или слишком большое — стабильный ненулевой хеш', () => {
+    const a = dataVersionRevision('99999999999999999999')
+    expect(a).toBeGreaterThan(0)
+    expect(dataVersionRevision('99999999999999999999')).toBe(a)
+    expect(dataVersionRevision('0')).toBeGreaterThan(0)
   })
 })

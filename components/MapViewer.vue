@@ -507,6 +507,7 @@ import { useOverlayLayer } from '~/composables/useOverlayLayer';
 import { useSelectionHighlight } from '~/composables/useSelectionHighlight';
 import type { RegimePointsResult } from '~/utils/regimeMapPoints';
 import { useLocateMarkers } from '~/composables/useLocateMarkers';
+import { useMapDataVersion } from '~/composables/useMapDataVersion';
 import type { LocatePoint } from '~/composables/useLocateMarkers';
 import { getNetworkFeatureKind, pickNetworkFeature } from '~/utils/networkFeature';
 import { nearestGroup, queryRenderedNear } from '~/utils/mapPick';
@@ -1245,6 +1246,9 @@ const onMapClickForTrace = async (e: any) => {
 };
 
 // === Topology Edit Mode (composables/useTopologyEditor) ===
+// Правки других пользователей и десктопа — на карте через 30–60 с (версия данных в адресе тайлов)
+useMapDataVersion();
+
 const topologyEditor = useTopologyEditor({
   getMap: () => mapStore.map,
   enabled: topologyEditingEnabled,

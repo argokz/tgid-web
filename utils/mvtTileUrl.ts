@@ -70,6 +70,18 @@ export function withTileRevision(viewparams: string, revision: number): string {
   return `${viewparams}${sep}rev:${revision};`
 }
 
+/**
+ * Версия данных сервера («12345» — сумма счётчиков изменений таблиц) → число для rev в VIEWPARAMS.
+ * Не число (или больше 2^53) — хеш строки, чтобы разные версии давали разные адреса тайлов.
+ */
+export function dataVersionRevision(version: string): number {
+  const n = Number(version)
+  if (Number.isSafeInteger(n) && n > 0) return n
+  let h = 0
+  for (let i = 0; i < version.length; i++) h = (h * 31 + version.charCodeAt(i)) >>> 0
+  return h || 1
+}
+
 /** URL источника тайлов с VIEWPARAMS (шаблон {z}/{x}/{y} не кодируется) */
 export function tileUrlWithViewparams(baseUrl: string, viewparams: string): string {
   const separator = baseUrl.includes('?') ? '&' : '?'
