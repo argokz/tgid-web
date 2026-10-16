@@ -5,13 +5,28 @@ import type { Fragment } from '~/types';
 import { useLayerStore } from './layerStore';
 import { useMapStore } from './mapStore';
 import { getCityConfig } from '~/utils/cityConfig';
+import { defaultFragments, keepExistingFragments, parseSavedFragments } from '~/utils/fragmentSelection';
+
+const SAVED_KEY = 'visibleFragments';
+
+/** Сохранённый выбор (только в браузере; на сервере и без localStorage — пусто) */
+function savedVisibleFragments(): number[] {
+  try {
+    return parseSavedFragments(appStorage.getItem(SAVED_KEY));
+  } catch {
+    return [];
+  }
+}
 
 export const useFragmentStore = defineStore('fragment', {
   state: () => ({
     fragments: [] as Fragment[],
-    // При открытии карты — фрагменты города по умолчанию (NUXT_PUBLIC_DEFAULT_FRAGMENTS), иначе все
+    // При открытии карты — сохранённый выбор, иначе фрагмент по умолчанию (initVisibleFragments).
+    // Состояние приходит с сервера (SSR), где сохранённого выбора нет, — его берёт initVisibleFragments
     visibleFragments: [...getCityConfig().defaultFragments] as number[],
     selectedFragmentId: null as number | null,
+    /** Фрагмент по умолчанию (utils/fragmentSelection.ts) — когда ничего не выбрано */
+    defaultFragmentIds: [] as number[],
   }),
 
   getters: {
@@ -69,11 +84,44 @@ export const useFragmentStore = defineStore('fragment', {
     },
 
     /**
-     * Разом применить выбор фрагментов (после кнопки «Применить» в UI).
+     * При открытии карты: сохранённый выбор без удалённых фрагментов; ничего не осталось —
+     * фрагмент по умолчанию (города, последнего расчёта, первый). Список фрагментов не загрузился —
+     * выбор не трогаем.
+     */
+    async initVisibleFragments() {
+      const saved = savedVisibleFragments();
+      if (saved.length && JSON.stringify(saved) !== JSON.stringify(this.visibleFragments)) {
+        this.visibleFragments = saved;
+        useLayerStore().applyFragmentFilter();
+      }
+      if (!this.fragments.length) await this.loadFragments();
+      const existing = this.fragments.map((f) => Number(f.id)).filter((id) => Number.isInteger(id) && id > 0);
+      if (!existing.length) return;
+      let calculations: { fileid: number | null; has_results?: boolean }[] = [];
+      if (!keepExistingFragments(getCityConfig().defaultFragments, existing).length) {
+        try {
+          calculations = (await fastApiService.listCalculations({ limit: 50 })).items ?? [];
+        } catch (e) {
+          console.warn('Не удалось получить расчёты для фрагмента по умолчанию:', e);
+        }
+      }
+      this.defaultFragmentIds = defaultFragments(existing, getCityConfig().defaultFragments, calculations);
+      const kept = keepExistingFragments(this.visibleFragments, existing);
+      const next = kept.length ? kept : [...this.defaultFragmentIds];
+      const changed = JSON.stringify(next) !== JSON.stringify([...this.visibleFragments].sort((a, b) => a - b));
+      this.visibleFragments = next;
+      this.saveVisibleFragments();
+      if (changed) useLayerStore().applyFragmentFilter();
+    },
+
+    /**
+     * Разом применить выбор фрагментов (после кнопки «Применить» в UI). Пустой выбор — фрагмент
+     * по умолчанию: карта всегда показывает какой-то фрагмент.
      * zoom=false — карту не двигать (подключение фрагментов подсветки участка: карта идёт к участку).
      */
     applyVisibleFragmentsSelection(ids: number[], zoom = true) {
-      const uniq = [...new Set(ids)].sort((a, b) => a - b);
+      const picked = ids.length ? ids : this.defaultFragmentIds;
+      const uniq = [...new Set(picked)].sort((a, b) => a - b);
       this.visibleFragments = uniq;
       this.saveVisibleFragments();
       useLayerStore().applyFragmentFilter();
@@ -93,16 +141,11 @@ export const useFragmentStore = defineStore('fragment', {
     },
 
     saveVisibleFragments() {
-      appStorage.setItem('visibleFragments', JSON.stringify(this.visibleFragments));
+      try {
+        appStorage.setItem(SAVED_KEY, JSON.stringify(this.visibleFragments));
+      } catch {
+        // localStorage недоступен — выбор живёт до перезагрузки
+      }
     },
-
-    loadVisibleFragments() {
-      const saved = appStorage.getItem('visibleFragments');
-      this.visibleFragments = saved ? JSON.parse(saved) : [];
-      
-      // Применяем фильтр через layerStore
-      const layerStore = useLayerStore();
-      layerStore.applyFragmentFilter();
-    }
   }
 }); 

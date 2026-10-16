@@ -1490,6 +1490,8 @@ onMounted(() => {
       }
     }
     initMap();
+    // Выбор фрагментов: сохранённый без удалённых, иначе фрагмент по умолчанию
+    void fragmentStore.initVisibleFragments();
     // Wire AttributePanel into mapStore so any click on a feature opens it.
     // Панель лениво монтируется при первом identify-клике, поэтому дожидаемся её загрузки.
     mapStore._attributePanelShow = (properties: Record<string, any>) => {
