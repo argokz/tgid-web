@@ -678,7 +678,11 @@ const waitForMapContainer = async (attempts = 20, delayMs = 50): Promise<boolean
   return false;
 };
 
-const attributePanelRef = ref<{ show: (props: Record<string, any>) => void; close: () => void } | null>(null);
+const attributePanelRef = ref<{
+  show: (props: Record<string, any>) => void;
+  close: () => void | Promise<void>;
+  confirmLeaveEditing?: () => Promise<boolean>;
+} | null>(null);
 
 /**
  * Ленивое монтирование диалогов: тяжёлые журналы не попадают в основной чанк карты,
@@ -1494,9 +1498,11 @@ onMounted(() => {
     void fragmentStore.initVisibleFragments();
     // Wire AttributePanel into mapStore so any click on a feature opens it.
     // Панель лениво монтируется при первом identify-клике, поэтому дожидаемся её загрузки.
-    mapStore._attributePanelShow = (properties: Record<string, any>) => {
+    mapStore._attributePanelShow = async (properties: Record<string, any>) => {
       mountedDialogs.attributePanel = true;
       if (attributePanelRef.value) {
+        // в карточке несохранённые правки — другой объект откроется, только если их можно потерять
+        if (attributePanelRef.value.confirmLeaveEditing && !(await attributePanelRef.value.confirmLeaveEditing())) return;
         attributePanelRef.value.show(properties);
         return;
       }

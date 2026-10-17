@@ -77,7 +77,7 @@ export const useMapStore = defineStore('map', {
     map: null as any,
     popup: null as any,
     highlightedFeature: null as string | null,
-    _attributePanelShow: null as ((properties: Record<string, any>) => void) | null,
+    _attributePanelShow: null as ((properties: Record<string, any>) => void | Promise<void>) | null,
     // Diagnostics Fault Layers
     isDefectsLayerVisible: false,
     isCorrosionLayerVisible: false,

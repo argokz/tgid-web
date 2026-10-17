@@ -2,19 +2,9 @@
 
   <Teleport to="body">
 
-    <v-dialog
-
+    <ObjectCardShell
       v-model="visible"
-
-      :max-width="isMobile ? '100vw' : '680'"
-
-      :fullscreen="isMobile"
-
-      scrollable
-
-      persistent
-
-      :transition="isMobile ? 'dialog-bottom-transition' : 'dialog-transition'"
+      :mobile="isMobile"
     >
 
       <v-card
@@ -23,9 +13,9 @@
 
         :class="{ 'ap-card--mobile': isMobile }"
 
-        elevation="8"
+        elevation="0"
 
-        :rounded="isMobile ? '0' : 'lg'"
+        rounded="0"
       >
 
         <!-- ── Шапка ── -->
@@ -33,6 +23,7 @@
         <div
           class="ap-header"
           :class="isMobile ? 'pa-3' : 'pa-4'"
+          data-card-drag
         >
 
           <div
@@ -675,6 +666,38 @@
             </v-btn>
 
             <v-btn
+              v-if="canEditCard && !editing"
+              icon
+              variant="text"
+              size="small"
+              color="primary"
+              aria-label="Редактировать свойства"
+              @click="startEditing"
+            >
+              <v-icon size="18">mdi-pencil</v-icon>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Редактировать свойства</v-tooltip>
+            </v-btn>
+
+            <v-btn
+              v-if="!isMobile"
+              icon
+              variant="text"
+              size="small"
+              color="grey-darken-1"
+              :aria-label="cardLayout.mode === 'panel' ? 'Открепить в отдельное окно' : 'Закрепить панелью справа'"
+              @click="toggleCardMode"
+            >
+              <v-icon size="18">{{ cardLayout.mode === 'panel' ? 'mdi-dock-window' : 'mdi-dock-right' }}</v-icon>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >{{ cardLayout.mode === 'panel' ? 'Открепить в отдельное окно' : 'Закрепить панелью справа' }}</v-tooltip>
+            </v-btn>
+
+            <v-btn
               icon
               variant="text"
               size="small"
@@ -695,6 +718,18 @@
         <v-divider />
 
 
+        <ObjectCardEdit
+          v-if="editing && editTarget"
+          ref="cardEditRef"
+          :kind="editTarget.kind"
+          :table="editTarget.table"
+          :object-id="editTarget.id"
+          @saved="onCardSaved"
+          @cancel="editing = false"
+          @dirty="editDirty = $event"
+        />
+
+        <template v-else>
         <!-- ── Поиск ── -->
 
         <div
@@ -1126,10 +1161,11 @@
           </div>
 
         </div>
+        </template>
 
       </v-card>
 
-    </v-dialog>
+    </ObjectCardShell>
 
 
     <!-- Превью разворота участка (dry-run → подтверждение) -->
@@ -1183,6 +1219,11 @@ import { formatDesktopNumber } from '~/utils/desktopNumber'
 import { ApiError, fastApiService, type ReverseLineReport } from '~/services/fastApiService'
 import { getFeatureFragmentId, getSectionRowId, resolveCardObject, type CardObject } from '~/utils/networkFeature'
 import { canEditFragment } from '~/utils/permissions'
+import ObjectCardShell from '~/components/objectCard/ObjectCardShell.vue'
+import ObjectCardEdit from '~/components/objectCard/ObjectCardEdit.vue'
+import { useObjectCardLayout } from '~/composables/useObjectCardLayout'
+import { confirmAction } from '~/composables/useConfirm'
+import { desktopCardKind, desktopCardProps } from '~/utils/desktopCard'
 import { useAuthStore } from '~/stores/authStore'
 import { useNotificationStore } from '~/stores/notificationStore'
 import { useFragmentStore } from '~/stores/fragmentStore'
@@ -1364,6 +1405,55 @@ const networkJournalScope = computed<{ lineId: number } | { nodeId: number } | n
 })
 
 const cardTable = computed(() => cardObject.value.table)
+
+// ── Окно свойств: размещение (панель/окно) и правка карточки (routers/card_edit.py) ──
+const cardLayout = useObjectCardLayout()
+const toggleCardMode = () => { cardLayout.mode = cardLayout.mode === 'panel' ? 'float' : 'panel' }
+// Что правится через карточку (этапы окна свойств: участки, затем узлы, потребители…).
+// Линия в десктопе — всегда карточка участка heatPipeSections (PropertyDial::init_gid)
+const CARD_EDIT_NODE_TABLES = new Set<string>([])
+const editing = ref(false)
+const editDirty = ref(false)
+const cardEditRef = ref<{ hasChanges: () => boolean } | null>(null)
+const editTarget = computed<{ kind: 'line' | 'node'; table: string; id: number } | null>(() => {
+  const { network, networkId, table } = cardObject.value
+  if (!network || !networkId) return null
+  if (network === 'line') return { kind: 'line', table: 'heatPipeSections', id: Number(networkId) }
+  if (!table || !CARD_EDIT_NODE_TABLES.has(String(table).toLowerCase())) return null
+  return { kind: 'node', table: String(table), id: Number(networkId) }
+})
+const canEditCard = computed(() => Boolean(editTarget.value) && authStore.canEditNetwork && cardInTerritory.value)
+const startEditing = () => {
+  if (canEditCard.value) editing.value = true
+}
+/** Несохранённые правки: спросить, можно ли их потерять (закрытие, другой объект) */
+const confirmLeaveEditing = async (): Promise<boolean> => {
+  if (!editing.value || !editDirty.value) return true
+  return confirmAction({ text: 'В карточке есть несохранённые изменения. Отменить их?', action: 'Отменить изменения' })
+}
+const onCardSaved = async ({ changed }: { changed: number }) => {
+  editing.value = false
+  editDirty.value = false
+  notificationError.value = false
+  notificationMessage.value = changed ? `Сохранено полей: ${changed}` : 'Изменений нет'
+  showNotification.value = true
+  emit('refresh-layers')
+  // просмотр — по свежей карточке API
+  const target = editTarget.value
+  const kind = target ? desktopCardKind(target.table) : null
+  if (!target || !kind) return
+  try {
+    const cardData = (await fastApiService.getObjectData(kind, target.table, target.id))?.data
+    const card = desktopCardProps(cardData?.tabs, cardData?.columns)
+    if (card) {
+      const next: Record<string, any> = { ...propsData.value, ...card.values, tg_tabs: card.tg_tabs, tg_names: card.tg_names }
+      if (card.tg_pair) next.tg_pair = card.tg_pair
+      show(next)
+    }
+  } catch {
+    // просмотр обновится при следующем выборе объекта
+  }
+}
 
 const canOpenDefectJournal = computed(() => Boolean(networkJournalScope.value) || (Boolean(cardRowId.value) && cardTable.value.includes('defect')))
 
@@ -1575,6 +1665,8 @@ const getObjectTitle = (props: Record<string, any>): string => {
 
 
 const show = (props: Record<string, any>) => {
+  editing.value = false
+  editDirty.value = false
 
   let objectTabs: any[] | null = null
 
@@ -1668,7 +1760,10 @@ const show = (props: Record<string, any>) => {
 }
 
 
-const close = () => {
+const close = async () => {
+  if (!(await confirmLeaveEditing())) return
+  editing.value = false
+  editDirty.value = false
 
   visible.value = false
 
@@ -2091,7 +2186,7 @@ const openNetworkDiaphragms = () => {
 }
 
 
-defineExpose({ show, close })
+defineExpose({ show, close, confirmLeaveEditing })
 
 </script>
 
@@ -2106,7 +2201,8 @@ defineExpose({ show, close })
 
   flex-direction: column;
 
-  max-height: 90vh;
+  height: 100%;
+  max-height: 100%;
 
   background: #fff;
 

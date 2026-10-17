@@ -3,6 +3,7 @@ import { reactive } from 'vue';
 import { BAD_CREDENTIALS_TEXT, SESSION_EXPIRED_TEXT, serverDetailText, statusMessage } from '~/utils/apiError';
 import type { FeatureData, Fragment } from '~/types';
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
+import type { CardChange, CardEditData, CardOption } from '~/utils/objectCard';
 import type {
   NetworkImportInspect,
   NetworkImportMode,
@@ -2444,6 +2445,27 @@ export const fastApiService = {
       `update/${safeTable}/${safeId}`,
       mutationOptions('PUT', { fields })
     );
+  },
+
+  /** Окно свойств: карточка объекта сети для правки (поля, списки, версии строк, правила видимости) */
+  async getCardEdit(kind: 'line' | 'node', table: string, id: number): Promise<CardEditData> {
+    return request(`api/v1/card-edit/${encodePath(kind)}/${encodePath(table)}/${encodePath(id)}`);
+  },
+
+  /** Варианты выпадающего списка поля — как в карточке десктопа */
+  async getCardOptions(params: { table: string; field: string; fileid?: number | null; row_id?: number | null; q?: string }):
+    Promise<{ source: 'list' | 'sql' | 'table'; items: CardOption[] }> {
+    const query: Record<string, string | number> = { table: params.table, field: params.field };
+    if (params.fileid) query.fileid = params.fileid;
+    if (params.row_id) query.row_id = params.row_id;
+    if (params.q) query.q = params.q;
+    return request('api/v1/card-edit/options', { query });
+  },
+
+  /** Сохранить изменения карточки (одна транзакция; версия строки изменилась — 409) */
+  async saveCardEdit(body: { changes: CardChange[]; versions: Record<string, string>; dry_run?: boolean }):
+    Promise<{ rows: { table: string; key: number; changed: Record<string, { old: unknown; new: unknown }>; version: string }[] }> {
+    return request('api/v1/card-edit', mutationOptions('PUT', body));
   },
 
   async deleteObject(table: string, id: string | number): Promise<any> {
