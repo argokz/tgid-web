@@ -42,6 +42,78 @@
           Поля с пометкой «разные» не меняются, пока не задано значение.
         </span>
       </div>
+      <!-- Заполнение: как у соседнего участка, из шаблона; сохранить значения как шаблон -->
+      <div
+        v-if="kind === 'line'"
+        class="oce-fill"
+      >
+        <v-btn
+          v-if="!card.batch"
+          size="small"
+          variant="text"
+          prepend-icon="mdi-content-duplicate"
+          :loading="neighborLoading"
+          @click="fillFromNeighbor"
+        >
+          Как у соседнего
+          <v-tooltip
+            activator="parent"
+            location="bottom"
+            max-width="300"
+          >Заполнить конструктив значениями смежного участка (общий узел; предпочтительно тот же Ду). Поля подсветятся — проверьте и сохраните.</v-tooltip>
+        </v-btn>
+        <v-menu location="bottom start">
+          <template #activator="{ props: menuProps }">
+            <v-btn
+              v-bind="menuProps"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-file-document-multiple-outline"
+              @click="loadTemplates"
+            >Шаблон</v-btn>
+          </template>
+          <v-list
+            density="compact"
+            min-width="260"
+            max-width="380"
+          >
+            <v-list-subheader>Применить шаблон</v-list-subheader>
+            <v-list-item
+              v-if="templatesLoading"
+              title="Загрузка…"
+            />
+            <v-list-item
+              v-else-if="!templates.length"
+              title="Шаблонов пока нет"
+              class="text-medium-emphasis"
+            />
+            <v-list-item
+              v-for="t in templates"
+              :key="t.id"
+              :title="t.name"
+              :subtitle="templateSubtitle(t)"
+              @click="applyTemplate(t)"
+            >
+              <template #append>
+                <v-btn
+                  v-if="t.author === currentUser"
+                  icon="mdi-delete-outline"
+                  size="x-small"
+                  variant="text"
+                  aria-label="Удалить шаблон"
+                  @click.stop="removeTemplate(t)"
+                />
+              </template>
+            </v-list-item>
+            <v-divider />
+            <v-list-item
+              prepend-icon="mdi-content-save-outline"
+              title="Сохранить как шаблон…"
+              @click="openSaveTemplate"
+            />
+          </v-list>
+        </v-menu>
+      </div>
       <v-tabs
         v-model="tab"
         density="compact"
@@ -161,6 +233,88 @@
         >{{ card.batch ? 'Применить…' : 'Сохранить' }}</v-btn>
       </div>
     </template>
+    <!-- Сохранить значения карточки как шаблон -->
+    <v-dialog
+      v-model="saveTplOpen"
+      max-width="560"
+      scrollable
+    >
+      <v-card>
+        <v-card-title class="text-subtitle-1">Сохранить как шаблон</v-card-title>
+        <v-divider />
+        <v-card-text class="oce-preview">
+          <v-text-field
+            v-model="tplName"
+            label="Название"
+            density="compact"
+            variant="outlined"
+            autofocus
+            :counter="200"
+          />
+          <v-checkbox
+            v-model="tplShared"
+            label="Общий — виден всем редакторам"
+            density="compact"
+            hide-details
+          />
+          <div
+            v-if="columns.length > 1"
+            class="d-flex align-center ga-2 my-2"
+          >
+            <span class="text-body-2">Значения колонки:</span>
+            <v-btn-toggle
+              v-model="tplColumn"
+              density="compact"
+              mandatory
+              divided
+              variant="outlined"
+            >
+              <v-btn
+                v-for="(c, ci) in columns"
+                :key="ci"
+                :value="ci"
+                size="small"
+              >{{ c }}</v-btn>
+            </v-btn-toggle>
+          </div>
+          <div class="text-caption text-medium-emphasis my-2">
+            Поля шаблона (длина, инвентарный номер и местные сопротивления — свои у каждого участка и не предлагаются):
+          </div>
+          <div
+            v-for="it in tplCandidates"
+            :key="it.table + it.field"
+            class="oce-tpl-row"
+          >
+            <v-checkbox
+              v-model="tplPicked"
+              :value="it.table + '.' + it.field"
+              density="compact"
+              hide-details
+            >
+              <template #label>
+                <span class="text-body-2">{{ it.label }}: <b>{{ shown(it.text ?? it.value) }}</b></span>
+              </template>
+            </v-checkbox>
+          </div>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions>
+          <span class="text-caption text-medium-emphasis ml-2">Выбрано полей: {{ tplPicked.length }}</span>
+          <v-spacer />
+          <v-btn
+            variant="text"
+            @click="saveTplOpen = false"
+          >Отмена</v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :loading="tplSaving"
+            :disabled="!tplName.trim() || !tplPicked.length"
+            @click="saveTemplate"
+          >Сохранить</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <!-- Несколько участков: предпросмотр «было → станет» перед применением -->
     <v-dialog
       v-model="previewOpen"
@@ -233,11 +387,13 @@ import CardHelperDialog from '~/components/objectCard/CardHelperDialog.vue';
 import { ApiError, fastApiService } from '~/services/fastApiService';
 import { confirmAction } from '~/composables/useConfirm';
 import { useNotificationStore } from '~/stores/notificationStore';
+import { useAuthStore } from '~/stores/authStore';
 import { formatApiError } from '~/utils/apiError';
 import { formatDesktopNumber } from '~/utils/desktopNumber';
 import {
-  applyFieldValues, draftChanges, draftKey, fieldColumns, hiddenByVis, initialDraft, ruleValues, validateDraft,
-  type CardBatchPreview, type CardEditData, type CardField, type CardHelper, type CardTab,
+  applyFieldValues, columnValues, draftChanges, draftKey, fieldColumns, hiddenByVis, initialDraft, ruleValues, validateDraft,
+  type CardBatchPreview, type CardEditData, type CardField, type CardHelper, type CardTab, type CardTemplate,
+  type CardValues,
 } from '~/utils/objectCard';
 
 const props = defineProps<{
@@ -339,6 +495,123 @@ const setValue = async (f: CardField, ci: number, value: unknown) => {
     titles.value = t;
   } catch (e) {
     useNotificationStore().showError(formatApiError(e, 'Не удалось заполнить связанные поля'));
+  }
+};
+
+// Значения по таблицам → черновик колонки (с подписями списков)
+const fillColumn = (column: number, values: CardValues, valueTitles: CardValues = {}) => {
+  if (!card.value) return;
+  const t = { ...titles.value };
+  for (const [table, fields] of Object.entries(values)) {
+    const { draft: next, applied } = applyFieldValues(card.value, draft.value, table, column, fields);
+    draft.value = next;
+    const tt = Object.fromEntries(Object.entries(valueTitles[table] ?? {}).map(([k, v]) => [k.toLowerCase(), v]));
+    for (const key of applied) {
+      const field = key.slice(key.lastIndexOf(':') + 1);
+      if (field in tt) t[key] = tt[field] == null ? null : String(tt[field]);
+    }
+  }
+  titles.value = t;
+};
+
+// --- как у соседнего ---
+const neighborLoading = ref(false);
+const fillFromNeighbor = async () => {
+  if (!card.value || card.value.batch) return;
+  neighborLoading.value = true;
+  try {
+    const res = await fastApiService.getCardNeighbor(props.objectId);
+    const before = changes.value.length;
+    const from = new Set<number>();
+    res.columns.forEach((c, ci) => {
+      if (!c.neighbor_line_id) return;
+      from.add(c.neighbor_line_id);
+      fillColumn(ci, c.values, c.titles);
+    });
+    const notify = useNotificationStore();
+    const diff = changes.value.length - before;
+    if (!from.size) notify.showWarning('Смежный участок с паспортом не найден');
+    else if (!diff) notify.showInfo(`Значения уже как у участка ${[...from].join(', ')}`);
+    else notify.showInfo(`Как у участка ${[...from].join(', ')}: изменено полей ${diff} (подсвечены). Проверьте и сохраните.`);
+  } catch (e) {
+    useNotificationStore().showError(formatApiError(e, 'Не удалось получить значения соседнего участка'));
+  } finally {
+    neighborLoading.value = false;
+  }
+};
+
+// --- шаблоны ---
+const authStore = useAuthStore();
+const currentUser = computed(() => authStore.username || null);
+const templates = ref<CardTemplate[]>([]);
+const templatesLoading = ref(false);
+const loadTemplates = async () => {
+  templatesLoading.value = true;
+  try {
+    templates.value = (await fastApiService.listCardTemplates('line')).items;
+  } catch (e) {
+    useNotificationStore().showError(formatApiError(e, 'Не удалось загрузить шаблоны'));
+  } finally {
+    templatesLoading.value = false;
+  }
+};
+const templateSubtitle = (t: CardTemplate) => {
+  const n = Object.values(t.values).reduce((acc, f) => acc + Object.keys(f).length, 0);
+  return `полей: ${n}${t.shared ? ' · общий' : ''}${t.author && t.author !== currentUser.value ? ` · ${t.author}` : ''}`;
+};
+const applyTemplate = (t: CardTemplate) => {
+  const before = changes.value.length;
+  columns.value.forEach((_, ci) => { fillColumn(ci, t.values, t.titles ?? {}); });
+  const diff = changes.value.length - before;
+  useNotificationStore().showInfo(diff
+    ? `Шаблон «${t.name}»: изменено полей ${diff} (подсвечены). Проверьте и ${card.value?.batch ? 'примените' : 'сохраните'}.`
+    : `Шаблон «${t.name}»: значения уже такие`);
+};
+const removeTemplate = async (t: CardTemplate) => {
+  if (!(await confirmAction({ text: `Удалить шаблон «${t.name}»?`, action: 'Удалить' }))) return;
+  try {
+    await fastApiService.deleteCardTemplate(t.id);
+    templates.value = templates.value.filter((x) => x.id !== t.id);
+  } catch (e) {
+    useNotificationStore().showError(formatApiError(e, 'Не удалось удалить шаблон'));
+  }
+};
+
+const saveTplOpen = ref(false);
+const tplName = ref('');
+const tplShared = ref(false);
+const tplColumn = ref(0);
+const tplPicked = ref<string[]>([]);
+const tplSaving = ref(false);
+const tplCandidates = computed(() => (card.value ? columnValues(card.value, draft.value, tplColumn.value) : []));
+watch(tplCandidates, (list) => {
+  // поля, которые есть в выбранной колонке, — отмечены по умолчанию
+  if (saveTplOpen.value) tplPicked.value = list.map((it) => `${it.table}.${it.field}`);
+});
+const openSaveTemplate = () => {
+  tplName.value = '';
+  tplShared.value = false;
+  tplColumn.value = 0;
+  saveTplOpen.value = true;
+  tplPicked.value = tplCandidates.value.map((it) => `${it.table}.${it.field}`);
+};
+const saveTemplate = async () => {
+  const values: CardValues = {};
+  const picked = new Set(tplPicked.value);
+  for (const it of tplCandidates.value) {
+    if (!picked.has(`${it.table}.${it.field}`)) continue;
+    (values[it.table] ??= {})[it.field] = it.value;
+  }
+  tplSaving.value = true;
+  try {
+    const t = await fastApiService.createCardTemplate({ kind: 'line', name: tplName.value.trim(), values, shared: tplShared.value });
+    templates.value = [...templates.value, t];
+    saveTplOpen.value = false;
+    useNotificationStore().showSuccess(`Шаблон «${t.name}» сохранён`);
+  } catch (e) {
+    useNotificationStore().showError(formatApiError(e, 'Не удалось сохранить шаблон'));
+  } finally {
+    tplSaving.value = false;
   }
 };
 
@@ -496,6 +769,16 @@ defineExpose({ hasChanges: () => changes.value.length > 0, reload: load });
 }
 .oce-preview {
   max-height: 60vh;
+}
+.oce-fill {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.oce-tpl-row :deep(.v-selection-control) {
+  min-height: 28px;
 }
 .oce-pv-field {
   padding: 6px 0;

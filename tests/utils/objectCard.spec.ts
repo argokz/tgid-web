@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  applyFieldValues, mestnResult, parseMestn,
+  applyFieldValues, columnValues, mestnResult, parseMestn,
   draftChanges, draftKey, fieldColumns, hiddenByVis, initialDraft, parseInput, ruleValues, validateDraft, visText,
   type CardField, type CardTab,
 } from '~/utils/objectCard'
@@ -120,5 +120,14 @@ describe('objectCard', () => {
     expect(mestnResult([{ id: 13, k: 2, v: 0.2 }, { id: 1, k: 0, v: 0.5 }, { id: 40, k: 4, v: 2 }]))
       .toEqual({ sum: 8.4, list: '13|2|0.2 40|4|2' })
     expect(mestnResult([])).toEqual({ sum: 0, list: '' })
+  })
+
+  it('columnValues: значения колонки для шаблона без своих у участка полей', () => {
+    const card = pairCard()
+    const draft = { ...initialDraft(card), [draftKey('heatPipeSections', 101, 'mestn')]: '1|2|0.5' }
+    const vals = columnValues(card, draft, 1)
+    // признак подачи в колонке обратки не правится, mestn — свой у участка, узел — только чтение
+    expect(vals.map((v) => [v.table, v.field, v.value])).toEqual([['heatpipesections', 'diameterCondit', 125]])
+    expect(columnValues(card, draft, 0).map((v) => v.field)).toEqual(['diameterCondit', 'pipeSectStateIDflow'])
   })
 })

@@ -344,3 +344,56 @@ export function mestnResult(rows: { id: number; k: number; v: number }[]): { sum
   }
   return { sum: Math.round(sum * 1e6) / 1e6, list: parts.join(' ') }
 }
+
+/** Значения полей по таблицам: {таблица: {поле: значение}} */
+export type CardValues = Record<string, Record<string, unknown>>
+
+/** Шаблон свойств (GET /api/v1/card-templates) */
+export interface CardTemplate {
+  id: number
+  kind: 'line'
+  name: string
+  values: CardValues
+  /** подписи значений списков */
+  titles?: CardValues
+  author: string | null
+  shared: boolean
+}
+
+/** «Как у соседнего»: по колонке карточки — участок-сосед и его значения */
+export interface CardNeighbor {
+  columns: { line_id: number; neighbor_line_id: number | null; values: CardValues; titles: CardValues }[]
+}
+
+/** Поля, которые не переносятся в шаблон по умолчанию: свои у каждого участка */
+export const TEMPLATE_SKIP_FIELDS: ReadonlySet<string> = new Set([
+  'pipesectlength', 'inventnumber', 'mestn', 'localressum', 'externalsignlineid',
+])
+
+/**
+ * Значения одной колонки черновика для шаблона: правимые поля с значением → {таблица: {поле: значение}}.
+ * skip — поля (lower), которые не берутся (длина, инвентарный номер и т.п.).
+ */
+export function columnValues(
+  card: Pick<CardEditData, 'tabs'>, draft: Record<string, unknown>, column: number,
+  skip: ReadonlySet<string> = TEMPLATE_SKIP_FIELDS,
+): { table: string; field: string; label: string; value: unknown; text: unknown }[] {
+  const out: { table: string; field: string; label: string; value: unknown; text: unknown }[] = []
+  const seen = new Set<string>()
+  for (const tab of card.tabs) {
+    if (tab.readonly) continue
+    for (const sub of tab.subsections) {
+      for (const f of sub.fields) {
+        const c = fieldColumns(f)[column]
+        if (!c || c.readonly || skip.has(f.field.toLowerCase())) continue
+        const key = draftKey(f.table, c.id, f.field)
+        if (seen.has(key)) continue
+        seen.add(key)
+        const value = normalizeValue(key in draft ? draft[key] : c.raw)
+        if (value === null) continue
+        out.push({ table: f.table.toLowerCase(), field: f.field, label: f.label, value, text: column === 0 ? f.value : f.value2 })
+      }
+    }
+  }
+  return out
+}

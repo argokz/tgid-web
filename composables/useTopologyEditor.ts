@@ -16,6 +16,8 @@ import { pickNetworkFeature } from '~/utils/networkFeature';
 import type { PickCandidate, PickOptions } from '~/utils/networkFeature';
 import { pickNetworkSnap } from '~/utils/networkSnap';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
+import { appStorage } from '~/utils/appStorage';
+import type { CardTemplate } from '~/utils/objectCard';
 
 export interface TopologyEditorOptions {
   getMap: () => maplibregl.Map | null | undefined;
@@ -73,6 +75,38 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   const DRAG_THRESHOLD_PX = 4;
   let dragStartPoint: { x: number; y: number } | null = null;
   let dragMoved = false;
+
+  // Шаблон свойств для новых участков (окно свойств): применяется сразу после создания участка
+  const NEW_LINE_TEMPLATE_KEY = 'topologyNewLineTemplate';
+  const readTemplateId = (): number | null => {
+    try {
+      const n = Number(appStorage.getItem(NEW_LINE_TEMPLATE_KEY));
+      return Number.isInteger(n) && n > 0 ? n : null;
+    } catch {
+      return null;
+    }
+  };
+  const newLineTemplateId = ref<number | null>(readTemplateId());
+  const lineTemplates = ref<CardTemplate[]>([]);
+  watch(newLineTemplateId, (id) => {
+    try {
+      if (id) appStorage.setItem(NEW_LINE_TEMPLATE_KEY, String(id));
+      else appStorage.removeItem(NEW_LINE_TEMPLATE_KEY);
+    } catch {
+      // выбор шаблона — удобство: без хранилища действует до перезагрузки
+    }
+  });
+  const loadLineTemplates = async () => {
+    try {
+      lineTemplates.value = (await fastApiService.listCardTemplates('line')).items;
+      if (newLineTemplateId.value && !lineTemplates.value.some((t) => t.id === newLineTemplateId.value)) {
+        newLineTemplateId.value = null;
+      }
+    } catch {
+      lineTemplates.value = [];
+    }
+  };
+  watch(isEditTopologyMode, (on) => { if (on) void loadLineTemplates(); });
 
   const isMergeMode = ref(false);
   const mergeTargetNodeId = ref<number | null>(null);
@@ -528,7 +562,17 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       const passportNote = templateLine
         ? `; паспорт трубы скопирован с участка ${templateLine}`
         : '; паспорт трубы по умолчанию — проверьте диаметр';
-      useNotificationStore().showSuccess(`Участок между ${startId} и ${id} создан${passportNote}`);
+      let templateNote = '';
+      const templateId = newLineTemplateId.value;
+      if (templateId && created?.id) {
+        try {
+          const applied = await fastApiService.applyCardTemplate(templateId, { ids: [Number(created.id)] });
+          templateNote = `; шаблон «${applied.template.name}»: изменено строк ${applied.changed}`;
+        } catch (e) {
+          templateNote = `; шаблон не применён: ${formatApiError(e, 'ошибка')}`;
+        }
+      }
+      useNotificationStore().showSuccess(`Участок между ${startId} и ${id} создан${passportNote}${templateNote}`);
       afterTopologyChange();
     } catch (err: any) {
       reportTopologyError(err, 'Ошибка создания участка');
@@ -672,6 +716,9 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     isEditTopologyMode,
     topologyStartNode,
     isMergeMode,
+    newLineTemplateId,
+    lineTemplates,
+    loadLineTemplates,
     mergeTargetNodeId,
     mergeSourceNodeId,
     mergeConfirmDialogOpen,

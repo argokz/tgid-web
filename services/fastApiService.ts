@@ -3,7 +3,9 @@ import { reactive } from 'vue';
 import { BAD_CREDENTIALS_TEXT, SESSION_EXPIRED_TEXT, serverDetailText, statusMessage } from '~/utils/apiError';
 import type { FeatureData, Fragment } from '~/types';
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
-import type { CardBatchPreview, CardChange, CardEditData, CardHelper, CardOption } from '~/utils/objectCard';
+import type {
+  CardBatchPreview, CardChange, CardEditData, CardHelper, CardNeighbor, CardOption, CardTemplate, CardValues,
+} from '~/utils/objectCard';
 import type {
   NetworkImportInspect,
   NetworkImportMode,
@@ -2491,6 +2493,30 @@ export const fastApiService = {
   async applyCardBatch(body: { ids: number[]; changes: CardChange[]; expected_changes?: number }):
     Promise<{ changed: number; applied: Record<string, number>; change_group_id: string | null }> {
     return request('api/v1/card-edit/batch/apply', mutationOptions('POST', body));
+  },
+
+  /** «Как у соседнего»: значения конструктива смежного участка по колонкам карточки */
+  async getCardNeighbor(lineId: number): Promise<CardNeighbor> {
+    return request(`api/v1/card-edit/neighbor/line/${encodePath(lineId)}`);
+  },
+
+  /** Шаблоны свойств: свои и общие */
+  async listCardTemplates(kind: 'line' = 'line'): Promise<{ items: CardTemplate[] }> {
+    return request('api/v1/card-templates', { query: { kind } });
+  },
+
+  async createCardTemplate(body: { kind: 'line'; name: string; values: CardValues; shared: boolean }): Promise<CardTemplate> {
+    return request('api/v1/card-templates', mutationOptions('POST', body));
+  },
+
+  async deleteCardTemplate(id: number): Promise<{ deleted: number }> {
+    return request(`api/v1/card-templates/${encodePath(id)}`, mutationOptions('DELETE'));
+  },
+
+  /** Применить шаблон к участкам (новым или выбранным); отмена — group-setters/undo */
+  async applyCardTemplate(id: number, body: { ids: number[]; expected_changes?: number }):
+    Promise<{ changed: number; change_group_id: string | null; template: { id: number; name: string } }> {
+    return request(`api/v1/card-templates/${encodePath(id)}/apply`, mutationOptions('POST', body));
   },
 
   /** Сохранить изменения карточки (одна транзакция; версия строки изменилась — 409) */

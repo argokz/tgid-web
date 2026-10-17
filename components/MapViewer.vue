@@ -436,6 +436,24 @@
                 {{ lastTopologyOperation ? `Отменить: ${topologyOperationLabel(lastTopologyOperation)}` : 'Нет операций для отмены' }}
               </v-tooltip>
             </v-btn>
+            <v-divider
+              vertical
+              class="mx-1"
+            />
+            <v-select
+              v-model="newLineTemplateId"
+              :items="lineTemplates"
+              item-title="name"
+              item-value="id"
+              label="Шаблон для новых участков"
+              density="compact"
+              variant="outlined"
+              hide-details
+              clearable
+              class="topology-template-select"
+              no-data-text="Шаблонов нет — сохраните в окне свойств участка"
+              @update:menu="(open: boolean) => { if (open) void loadLineTemplates(); }"
+            />
           </div>
         </div>
 
@@ -1268,6 +1286,9 @@ const topologyEditor = useTopologyEditor({
 const {
   isEditTopologyMode,
   isMergeMode,
+  newLineTemplateId,
+  lineTemplates,
+  loadLineTemplates,
   mergeTargetNodeId,
   mergeSourceNodeId,
   mergeConfirmDialogOpen,
@@ -1653,6 +1674,10 @@ watch(
   pointer-events: none;
 }
 
+.topology-template-select {
+  min-width: 220px;
+  max-width: 280px;
+}
 .topology-edit-toolbar {
   position: absolute;
   top: 72px;
