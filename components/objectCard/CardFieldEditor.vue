@@ -56,7 +56,27 @@
     @update:model-value="emit('update:modelValue', parseInput(edit.kind, $event))"
   >
     <template
-      v-if="funHint"
+      v-if="edit.helper"
+      #append-inner
+    >
+      <v-btn
+        :icon="helperIcon"
+        size="x-small"
+        variant="text"
+        density="comfortable"
+        color="primary"
+        :disabled="readonly"
+        :aria-label="helperTitle"
+        @click.stop="emit('helper')"
+      />
+      <v-tooltip
+        activator="parent"
+        location="top"
+        max-width="320"
+      >{{ helperTitle }}</v-tooltip>
+    </template>
+    <template
+      v-else-if="funHint"
       #append-inner
     >
       <v-icon
@@ -92,25 +112,31 @@ const props = defineProps<{
   /** у выбранных объектов значения различаются */
   mixed?: boolean
 }>();
-const emit = defineEmits<{ 'update:modelValue': [value: unknown] }>();
+const emit = defineEmits<{ 'update:modelValue': [value: unknown]; helper: [] }>();
 
 const loading = ref(false);
 const loaded = ref<CardOption[] | null>(null);
 const isNumber = computed(() => props.edit.kind === 'int' || props.edit.kind === 'float');
 const dateText = computed(() => (props.modelValue ? String(props.modelValue).slice(0, 10) : ''));
 
-// Функции полей десктопа (tab/<table>.fun), у которых в десктопе свой помощник
-const FUN_HINTS: Record<string, string> = {
-  diameter_std: 'В десктопе — выбор по сортаменту труб (Ду, внутренний и наружный диаметр, толщина стенки)',
-  Table: 'В десктопе — выбор значения из справочной таблицы',
-  heatTestsCoeff: 'В десктопе — расчёт коэффициента по результатам тепловых испытаний',
-  hydroRes: 'В десктопе — расчёт гидравлического сопротивления',
-  'Местные': 'В десктопе — расчёт суммы местных сопротивлений',
+// Помощники полей, как функции десктопа (tab/<table>.fun → окно выбора)
+const HELPER_TITLES: Record<string, string> = {
+  diameter_std: 'Выбрать по сортаменту труб (Ду, диаметры, толщина стенки)',
+  Table: 'Выбрать из справочной таблицы',
+  'Местные сопротивления': 'Местные сопротивления: количество по видам и сумма',
 };
+const helperTitle = computed(() => HELPER_TITLES[props.edit.fun_name ?? ''] ?? 'Выбрать');
+const helperIcon = computed(() => (props.edit.fun_name === 'Местные сопротивления' ? 'mdi-calculator' : 'mdi-table-search'));
+
+// Функции без помощника в вебе — подсказка, что делает десктоп (ReadOnly/NotNull обработаны сервером)
+const FUN_HINTS: Record<string, string> = {
+  heatTestsCoeff: 'В десктопе — калькулятор коэффициента по результатам тепловых испытаний',
+};
+const SILENT_FUNS = new Set(['ReadOnly', 'NotNull', 'hydroRes', 'ms_rs', 'Date', 'Hidden']);
 const funHint = computed(() => {
   const name = props.edit.fun_name;
-  if (!name) return '';
-  return FUN_HINTS[name] ?? FUN_HINTS[name.split(' ')[0]] ?? `Функция десктопа: ${props.edit.fun}`;
+  if (!name || SILENT_FUNS.has(name)) return '';
+  return FUN_HINTS[name] ?? `Функция десктопа: ${props.edit.fun}`;
 });
 
 const items = computed<CardOption[]>(() => {

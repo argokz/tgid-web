@@ -16,6 +16,10 @@ export interface CardFieldEdit {
   list: 'inline' | 'table' | null
   fun: string | null
   fun_name: string | null
+  /** у поля окно-помощник десктопа (сортамент, справочная таблица, местные сопротивления) */
+  helper?: boolean
+  /** после выбора значения меняются зависимые поля (ms_rs: магистраль / участок МС / участок РС) */
+  after?: boolean
   not_null: boolean
   readonly: boolean[]
   raw: unknown[]
@@ -232,4 +236,83 @@ export function parseInput(kind: FieldKind | null, text: unknown): unknown {
     return Number.isFinite(n) ? n : s
   }
   return s
+}
+
+/** Окно-помощник поля (GET card-edit/helper) */
+export interface CardHelperPick {
+  type: 'pick'
+  title: string
+  subtitle?: string
+  columns: { key: string; title: string }[]
+  rows: Record<string, unknown>[]
+  /** поле карточки → колонка выбранной строки */
+  set: Record<string, string>
+  /** можно взять значение любой числовой ячейки строки (min/max диапазона) */
+  cell_pick?: boolean
+}
+
+export interface CardHelperMestn {
+  type: 'mestn'
+  title: string
+  items: { id: number; name: string; min: number; max: number }[]
+  /** sum — поле суммы коэффициентов, list — поле списка «id|k|v …» */
+  set: { sum: string; list: string }
+}
+
+export type CardHelper = CardHelperPick | CardHelperMestn
+
+/**
+ * Значения полей одной колонки (0 — подача/единственная, 1 — обратка) из помощника → новый черновик.
+ * Поля ищутся по имени без учёта регистра; только правимые в этой колонке. → {draft, applied: ключи}
+ */
+export function applyFieldValues(
+  card: Pick<CardEditData, 'tabs'>, draft: Record<string, unknown>, table: string, column: number,
+  values: Record<string, unknown>,
+): { draft: Record<string, unknown>; applied: string[] } {
+  const want = new Map(Object.entries(values).map(([k, v]) => [k.toLowerCase(), v]))
+  const next = { ...draft }
+  const applied: string[] = []
+  const t = table.toLowerCase()
+  for (const tab of card.tabs) {
+    if (tab.readonly) continue
+    for (const sub of tab.subsections) {
+      for (const f of sub.fields) {
+        const name = f.field.toLowerCase()
+        if (f.table.toLowerCase() !== t || !want.has(name)) continue
+        const c = fieldColumns(f)[column]
+        if (!c || c.readonly) continue
+        const key = draftKey(f.table, c.id, f.field)
+        if (applied.includes(key)) continue
+        next[key] = normalizeValue(want.get(name))
+        applied.push(key)
+      }
+    }
+  }
+  return { draft: next, applied }
+}
+
+/** Местные сопротивления участка «id|k|v id|k|v» (поле mestn, MestSopr3::parse) → id → {k, v} */
+export function parseMestn(text: unknown): Map<number, { k: number; v: number }> {
+  const out = new Map<number, { k: number; v: number }>()
+  for (const part of String(text ?? '').split(' ')) {
+    const kv = part.split('|')
+    if (kv.length !== 3) continue
+    const id = Number(kv[0])
+    const k = Number(kv[1])
+    const v = Number(kv[2])
+    if (Number.isFinite(id) && Number.isFinite(k) && Number.isFinite(v)) out.set(id, { k, v })
+  }
+  return out
+}
+
+/** Сумма коэффициентов и строка списка (MestSopr3::calcSum): только виды с количеством > 0 */
+export function mestnResult(rows: { id: number; k: number; v: number }[]): { sum: number; list: string } {
+  let sum = 0
+  const parts: string[] = []
+  for (const r of rows) {
+    if (!(r.k > 0)) continue
+    sum += r.v * r.k
+    parts.push(`${r.id}|${r.k}|${r.v}`)
+  }
+  return { sum: Math.round(sum * 1e6) / 1e6, list: parts.join(' ') }
 }

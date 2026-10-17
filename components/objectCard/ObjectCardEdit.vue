@@ -105,11 +105,12 @@
                         :edit="f.edit!"
                         :table="f.table"
                         :field="f.field"
-                        :display-text="ci === 0 ? f.value : f.value2"
+                        :display-text="displayText(f, ci)"
                         :fileid="card.fileid"
                         :row-id="col.id"
                         :error="errors[draftKey(f.table, col.id, f.field)]"
-                        @update:model-value="setValue(f, col.id, $event)"
+                        @update:model-value="setValue(f, ci, $event)"
+                        @helper="openHelper(f, ci)"
                       />
                       <span
                         v-else
@@ -145,20 +146,29 @@
         >Сохранить</v-btn>
       </div>
     </template>
+    <CardHelperDialog
+      v-model="helperOpen"
+      :helper="helperData"
+      :loading="helperLoading"
+      :error="helperError"
+      :mestn-text="helperMestnText"
+      @apply="applyHelper"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import CardFieldEditor from '~/components/objectCard/CardFieldEditor.vue';
+import CardHelperDialog from '~/components/objectCard/CardHelperDialog.vue';
 import { ApiError, fastApiService } from '~/services/fastApiService';
 import { confirmAction } from '~/composables/useConfirm';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { formatApiError } from '~/utils/apiError';
 import { formatDesktopNumber } from '~/utils/desktopNumber';
 import {
-  draftChanges, draftKey, fieldColumns, hiddenByVis, initialDraft, ruleValues, validateDraft,
-  type CardEditData, type CardField, type CardTab,
+  applyFieldValues, draftChanges, draftKey, fieldColumns, hiddenByVis, initialDraft, ruleValues, validateDraft,
+  type CardEditData, type CardField, type CardHelper, type CardTab,
 } from '~/utils/objectCard';
 
 const props = defineProps<{ kind: 'line' | 'node'; table: string; objectId: number }>();
@@ -183,6 +193,7 @@ const load = async () => {
     const data = await fastApiService.getCardEdit(props.kind, props.table, props.objectId);
     card.value = data;
     draft.value = initialDraft(data);
+    titles.value = {};
     showErrors.value = false;
   } catch (e) {
     loadError.value = formatApiError(e, 'Не удалось загрузить карточку');
@@ -220,8 +231,73 @@ const isHidden = (f: CardField) => {
   return sets.every((s) => s.has(f.field.toLowerCase()));
 };
 
-const setValue = (f: CardField, id: number, value: unknown) => {
-  draft.value = { ...draft.value, [draftKey(f.table, id, f.field)]: value };
+// Подписи значений списков, поставленных не из самого списка (зависимые поля ms_rs)
+const titles = ref<Record<string, string | null>>({});
+const displayText = (f: CardField, ci: number) => {
+  const col = fieldColumns(f)[ci];
+  const key = col ? draftKey(f.table, col.id, f.field) : '';
+  if (key in titles.value) return titles.value[key] ?? undefined;
+  return ci === 0 ? f.value : f.value2;
+};
+
+const setValue = async (f: CardField, ci: number, value: unknown) => {
+  const col = fieldColumns(f)[ci];
+  if (!col || !card.value) return;
+  const key = draftKey(f.table, col.id, f.field);
+  draft.value = { ...draft.value, [key]: value };
+  const { [key]: _drop, ...rest } = titles.value;
+  titles.value = rest;
+  if (!f.edit?.after) return;
+  // как ms_rs десктопа: магистраль / участок МС / участок РС заполняют или сбрасывают друг друга
+  try {
+    const res = await fastApiService.getCardAfter({ table: f.table, field: f.field, value });
+    const values = Object.fromEntries(Object.entries(res.set).map(([k, v]) => [k, v?.value ?? null]));
+    const { draft: next, applied } = applyFieldValues(card.value, draft.value, f.table, ci, values);
+    draft.value = next;
+    const t = { ...titles.value };
+    for (const [k, v] of Object.entries(res.set)) {
+      const hit = applied.find((a) => a.endsWith(`:${k.toLowerCase()}`));
+      if (hit) t[hit] = v?.title ?? null;
+    }
+    titles.value = t;
+  } catch (e) {
+    useNotificationStore().showError(formatApiError(e, 'Не удалось заполнить связанные поля'));
+  }
+};
+
+// --- окно-помощник поля (сортамент, справочная таблица, местные сопротивления) ---
+const helperOpen = ref(false);
+const helperData = ref<CardHelper | null>(null);
+const helperLoading = ref(false);
+const helperError = ref('');
+const helperTarget = ref<{ table: string; column: number } | null>(null);
+const helperMestnText = ref<unknown>(null);
+
+const openHelper = async (f: CardField, ci: number) => {
+  if (!card.value) return;
+  const values = ruleValues(card.value, draft.value, f.table, ci);
+  helperTarget.value = { table: f.table, column: ci };
+  helperMestnText.value = values.mestn ?? null;
+  helperData.value = null;
+  helperError.value = '';
+  helperLoading.value = true;
+  helperOpen.value = true;
+  try {
+    const sid = Number(values.standardid);
+    helperData.value = await fastApiService.getCardHelper({
+      table: f.table, field: f.field, standard_id: Number.isFinite(sid) && sid > 0 ? sid : null,
+    });
+  } catch (e) {
+    helperError.value = formatApiError(e, 'Не удалось загрузить данные');
+  } finally {
+    helperLoading.value = false;
+  }
+};
+
+const applyHelper = (values: Record<string, unknown>) => {
+  if (!card.value || !helperTarget.value) return;
+  const { table, column } = helperTarget.value;
+  draft.value = applyFieldValues(card.value, draft.value, table, column, values).draft;
 };
 
 const shown = (v: unknown) => {

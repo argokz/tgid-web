@@ -3,7 +3,7 @@ import { reactive } from 'vue';
 import { BAD_CREDENTIALS_TEXT, SESSION_EXPIRED_TEXT, serverDetailText, statusMessage } from '~/utils/apiError';
 import type { FeatureData, Fragment } from '~/types';
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
-import type { CardChange, CardEditData, CardOption } from '~/utils/objectCard';
+import type { CardChange, CardEditData, CardHelper, CardOption } from '~/utils/objectCard';
 import type {
   NetworkImportInspect,
   NetworkImportMode,
@@ -2460,6 +2460,21 @@ export const fastApiService = {
     if (params.row_id) query.row_id = params.row_id;
     if (params.q) query.q = params.q;
     return request('api/v1/card-edit/options', { query });
+  },
+
+  /** Окно-помощник поля, как функция десктопа (сортамент труб, справочная таблица, местные сопротивления) */
+  async getCardHelper(params: { table: string; field: string; standard_id?: number | null }): Promise<CardHelper> {
+    const query: Record<string, string | number> = { table: params.table, field: params.field };
+    if (params.standard_id) query.standard_id = params.standard_id;
+    return request('api/v1/card-edit/helper', { query });
+  },
+
+  /** Зависимые поля после выбора значения (магистраль / участок МС / участок РС) */
+  async getCardAfter(params: { table: string; field: string; value: unknown }):
+    Promise<{ set: Record<string, { value: unknown; title: string | null }> }> {
+    const query: Record<string, string | number> = { table: params.table, field: params.field };
+    if (params.value !== null && params.value !== undefined && params.value !== '') query.value = String(params.value);
+    return request('api/v1/card-edit/after', { query });
   },
 
   /** Сохранить изменения карточки (одна транзакция; версия строки изменилась — 409) */

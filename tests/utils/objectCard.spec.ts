@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyFieldValues, mestnResult, parseMestn,
   draftChanges, draftKey, fieldColumns, hiddenByVis, initialDraft, parseInput, ruleValues, validateDraft, visText,
   type CardField, type CardTab,
 } from '~/utils/objectCard'
@@ -97,5 +98,27 @@ describe('objectCard', () => {
     expect(clampPanelWidth(2000, 1600)).toBe(900)
     expect(clampPanelWidth(800, 700)).toBe(580)
     expect(clampFloat({ x: -50, y: 2000, w: 5000, h: 300 }, 1280, 800)).toEqual({ x: 8, y: 492, w: 1264, h: 300 })
+  })
+
+  it('applyFieldValues: помощник заполняет поля своей колонки, только правимые', () => {
+    const card = pairCard()
+    const draft = initialDraft(card)
+    const { draft: next, applied } = applyFieldValues(card, draft, 'heatpipesections', 1, {
+      DiameterCondit: 80, pipeSectStateIDflow: 2, externalNodeName: 'x', nosuch: 1,
+    })
+    // в колонке обратки Ду правится, признак подачи — нет
+    expect(applied).toEqual([draftKey('heatPipeSections', 101, 'diameterCondit')])
+    expect(next[draftKey('heatPipeSections', 101, 'diameterCondit')]).toBe(80)
+    expect(next[draftKey('heatPipeSections', 100, 'diameterCondit')]).toBe(150)
+    expect(draft[draftKey('heatPipeSections', 101, 'diameterCondit')]).toBe(125)
+  })
+
+  it('местные сопротивления: разбор и сумма как MestSopr3', () => {
+    const m = parseMestn('13|2|0.2 40|4|2 bad')
+    expect([...m.entries()]).toEqual([[13, { k: 2, v: 0.2 }], [40, { k: 4, v: 2 }]])
+    expect(parseMestn(null).size).toBe(0)
+    expect(mestnResult([{ id: 13, k: 2, v: 0.2 }, { id: 1, k: 0, v: 0.5 }, { id: 40, k: 4, v: 2 }]))
+      .toEqual({ sum: 8.4, list: '13|2|0.2 40|4|2' })
+    expect(mestnResult([])).toEqual({ sum: 0, list: '' })
   })
 })
