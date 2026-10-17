@@ -7,7 +7,7 @@ import { watch } from 'vue';
 import type maplibregl from 'maplibre-gl';
 import { useJournalMapBridge } from '~/composables/useJournalMapBridge';
 import { useMapStore } from '~/stores/mapStore';
-import { pickNetworkFeature } from '~/utils/networkFeature';
+import { collectNetworkCandidates, pickNetworkFeature } from '~/utils/networkFeature';
 import { isMapMeasureActive } from '~/composables/useMapDraw';
 
 const OVERLAY_SOURCE = 'journal-contour';
@@ -136,11 +136,76 @@ export function useJournalContourLayer(getMap: () => maplibregl.Map | null | und
     bridge.togglePicked(pick.candidate.id, pick.candidate.feature);
   };
 
+  // Выбор рамкой: Shift + протянуть мышью — добавить все объекты в рамке (фрагменты контекста)
+  let box: { start: { x: number; y: number }; el: HTMLDivElement } | null = null;
+  let boxZoomWasOn = false;
+  const boxPoint = (map: maplibregl.Map, e: MouseEvent) => {
+    const rect = map.getCanvasContainer().getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+  const onBoxMove = (e: MouseEvent) => {
+    const map = getMap();
+    if (!map || !box) return;
+    const p = boxPoint(map, e);
+    const x = Math.min(p.x, box.start.x);
+    const y = Math.min(p.y, box.start.y);
+    Object.assign(box.el.style, {
+      left: `${x}px`, top: `${y}px`,
+      width: `${Math.abs(p.x - box.start.x)}px`, height: `${Math.abs(p.y - box.start.y)}px`,
+    });
+  };
+  const onBoxUp = (e: MouseEvent) => {
+    const map = getMap();
+    document.removeEventListener('mousemove', onBoxMove);
+    document.removeEventListener('mouseup', onBoxUp);
+    if (!map || !box) return;
+    const start = box.start;
+    box.el.remove();
+    box = null;
+    map.dragPan.enable();
+    const end = boxPoint(map, e);
+    if (Math.abs(end.x - start.x) < 4 && Math.abs(end.y - start.y) < 4) return;
+    const features = map.queryRenderedFeatures([
+      [Math.min(start.x, end.x), Math.min(start.y, end.y)],
+      [Math.max(start.x, end.x), Math.max(start.y, end.y)],
+    ]).filter((f: any) => !OWN_LAYERS.has(f?.layer?.id));
+    const kind = bridge.state.pick.kind === 'node' ? 'node' : 'line';
+    let candidates = collectNetworkCandidates(features, kind);
+    const context = (options.fragmentIds?.() ?? []).filter((id) => Number.isInteger(id) && id > 0);
+    if (context.length) candidates = candidates.filter((c) => c.fragmentId !== null && context.includes(c.fragmentId));
+    const seen = new Set<number>();
+    const items = candidates.filter((c) => !seen.has(c.id) && seen.add(c.id)).map((c) => ({ id: c.id, feature: c.feature }));
+    if (!items.length) {
+      options.onPickHint?.(kind === 'node' ? 'В рамке нет узлов сети.' : 'В рамке нет участков сети.');
+      return;
+    }
+    bridge.addPicked(items);
+  };
+  const onBoxDown = (e: MouseEvent) => {
+    const map = getMap();
+    if (!map || !bridge.state.pick.active || !e.shiftKey || e.button !== 0 || isMapMeasureActive()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    map.dragPan.disable();
+    const el = document.createElement('div');
+    el.className = 'tgid-pick-box';
+    Object.assign(el.style, {
+      position: 'absolute', zIndex: '5', pointerEvents: 'none',
+      border: '2px dashed #ff6f00', background: 'rgba(255, 111, 0, 0.08)',
+    });
+    map.getCanvasContainer().appendChild(el);
+    box = { start: boxPoint(map, e), el };
+    document.addEventListener('mousemove', onBoxMove);
+    document.addEventListener('mouseup', onBoxUp);
+  };
+
   const attach = (map: maplibregl.Map) => {
     map.on('click', onClick);
+    map.getCanvasContainer().addEventListener('mousedown', onBoxDown, true);
   };
   const detach = (map: maplibregl.Map | null | undefined) => {
     map?.off('click', onClick);
+    map?.getCanvasContainer().removeEventListener('mousedown', onBoxDown, true);
   };
 
   watch(() => bridge.state.overlayVersion, () => {
@@ -150,6 +215,16 @@ export function useJournalContourLayer(getMap: () => maplibregl.Map | null | und
   watch(() => [bridge.state.pick.active, bridge.state.pick.lineIds.length], () => drawPicked());
   watch(() => bridge.state.pick.active, (active) => {
     // во время выбора клик не открывает карточку объекта
+    // Shift + рамка — выбор, а не приближение (boxZoom MapLibre)
+    const map = getMap();
+    if (map) {
+      if (active) {
+        boxZoomWasOn = map.boxZoom.isEnabled();
+        map.boxZoom.disable();
+      } else if (boxZoomWasOn) {
+        map.boxZoom.enable();
+      }
+    }
     if (active) {
       identifyBeforePick = mapStore.identifyModeEnabled;
       mapStore.setIdentifyMode(false);

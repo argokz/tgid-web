@@ -23,6 +23,8 @@ export interface CardFieldEdit {
   not_null: boolean
   readonly: boolean[]
   raw: unknown[]
+  /** карточка нескольких объектов: в колонке значения различаются («разные») */
+  mixed?: boolean[]
 }
 
 export interface CardField {
@@ -63,6 +65,32 @@ export interface CardEditData {
   versions: Record<string, string>
   rules: Record<string, { vis: VisRules; disable: VisRules }>
   edit_tables: string[]
+  /** карточка нескольких участков (id полей — колонка: 1 подача/одиночные, 2 обратка) */
+  batch?: boolean
+  selection?: {
+    columns: { title: string; line_ids: number[] }[]
+    lines: number
+    rows: Record<string, number[]>
+  }
+}
+
+/** Предпросмотр правки нескольких объектов */
+export interface CardBatchPreview {
+  lines: number
+  changes: number
+  cells: number
+  fields: {
+    table: string
+    field: string
+    label: string
+    column: number
+    column_title: string
+    new: unknown
+    new_title: unknown
+    rows: number
+    changes: number
+    was: { value: unknown; title: unknown; count: number }[]
+  }[]
 }
 
 export interface CardChange {

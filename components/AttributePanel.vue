@@ -682,6 +682,22 @@
             </v-btn>
 
             <v-btn
+              v-if="canEditCard && !editing && editTarget?.kind === 'line'"
+              icon
+              variant="text"
+              size="small"
+              color="primary"
+              aria-label="Править несколько участков"
+              @click="startBatchEditing"
+            >
+              <v-icon size="18">mdi-select-multiple</v-icon>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Править несколько участков: выбрать на карте (Shift + рамка — все в рамке)</v-tooltip>
+            </v-btn>
+
+            <v-btn
               v-if="!isMobile"
               icon
               variant="text"
@@ -724,8 +740,9 @@
           :kind="editTarget.kind"
           :table="editTarget.table"
           :object-id="editTarget.id"
+          :batch-ids="batchIds"
           @saved="onCardSaved"
-          @cancel="editing = false"
+          @cancel="editing = false; batchIds = null"
           @dirty="editDirty = $event"
         />
 
@@ -1222,6 +1239,8 @@ import { canEditFragment } from '~/utils/permissions'
 import ObjectCardShell from '~/components/objectCard/ObjectCardShell.vue'
 import ObjectCardEdit from '~/components/objectCard/ObjectCardEdit.vue'
 import { useObjectCardLayout } from '~/composables/useObjectCardLayout'
+import { useJournalMapBridge } from '~/composables/useJournalMapBridge'
+import { groupSettersService } from '~/services/groupSettersService'
 import { confirmAction } from '~/composables/useConfirm'
 import { desktopCardKind, desktopCardProps } from '~/utils/desktopCard'
 import { useAuthStore } from '~/stores/authStore'
@@ -1424,19 +1443,60 @@ const editTarget = computed<{ kind: 'line' | 'node'; table: string; id: number }
 })
 const canEditCard = computed(() => Boolean(editTarget.value) && authStore.canEditNetwork && cardInTerritory.value)
 const startEditing = () => {
-  if (canEditCard.value) editing.value = true
+  if (canEditCard.value) {
+    batchIds.value = null
+    editing.value = true
+  }
+}
+
+// --- несколько участков одной карточкой: выбор на карте (клик, Shift + рамка) ---
+const batchIds = ref<number[] | null>(null)
+const mapBridge = useJournalMapBridge()
+const startBatchEditing = async () => {
+  const target = editTarget.value
+  if (!canEditCard.value || target?.kind !== 'line') return
+  const ids = await mapBridge.startPick([target.id], 'свойства участков', 'line', 'Выбор')
+  if (!ids?.length) return
+  batchIds.value = ids
+  editing.value = true
+}
+
+const undoBatch = async (changeGroupId: string) => {
+  try {
+    const dry = await groupSettersService.undo(changeGroupId, true)
+    const conflictText = dry.conflicts.length
+      ? `\nСтрок, изменённых после операции (останутся как есть): ${dry.conflicts.length}.`
+      : ''
+    if (!(await confirmAction({ text: `Вернуть прежние значения для ${dry.restorable} строк?${conflictText}`, action: 'Вернуть' }))) return
+    const res = await groupSettersService.undo(changeGroupId, false)
+    useNotificationStore().showSuccess(`Восстановлено строк: ${res.restorable}`)
+    emit('refresh-layers')
+  } catch (e) {
+    useNotificationStore().showError(formatApiError(e, 'Не удалось отменить'))
+  }
 }
 /** Несохранённые правки: спросить, можно ли их потерять (закрытие, другой объект) */
 const confirmLeaveEditing = async (): Promise<boolean> => {
   if (!editing.value || !editDirty.value) return true
   return confirmAction({ text: 'В карточке есть несохранённые изменения. Отменить их?', action: 'Отменить изменения' })
 }
-const onCardSaved = async ({ changed }: { changed: number }) => {
+const onCardSaved = async ({ changed, changeGroupId }: { changed: number; changeGroupId?: string | null }) => {
+  const wasBatch = Boolean(batchIds.value)
   editing.value = false
   editDirty.value = false
-  notificationError.value = false
-  notificationMessage.value = changed ? `Сохранено полей: ${changed}` : 'Изменений нет'
-  showNotification.value = true
+  batchIds.value = null
+  if (wasBatch) {
+    const notify = useNotificationStore()
+    if (changed && changeGroupId) {
+      notify.notify('success', `Изменено строк: ${changed}`, { label: 'Отменить', handler: () => undoBatch(changeGroupId) })
+    } else {
+      notify.showInfo('Изменений нет')
+    }
+  } else {
+    notificationError.value = false
+    notificationMessage.value = changed ? `Сохранено полей: ${changed}` : 'Изменений нет'
+    showNotification.value = true
+  }
   emit('refresh-layers')
   // просмотр — по свежей карточке API
   const target = editTarget.value
@@ -1667,6 +1727,7 @@ const getObjectTitle = (props: Record<string, any>): string => {
 const show = (props: Record<string, any>) => {
   editing.value = false
   editDirty.value = false
+  batchIds.value = null
 
   let objectTabs: any[] | null = null
 
@@ -1764,6 +1825,7 @@ const close = async () => {
   if (!(await confirmLeaveEditing())) return
   editing.value = false
   editDirty.value = false
+  batchIds.value = null
 
   visible.value = false
 

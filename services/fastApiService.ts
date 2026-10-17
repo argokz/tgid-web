@@ -3,7 +3,7 @@ import { reactive } from 'vue';
 import { BAD_CREDENTIALS_TEXT, SESSION_EXPIRED_TEXT, serverDetailText, statusMessage } from '~/utils/apiError';
 import type { FeatureData, Fragment } from '~/types';
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
-import type { CardChange, CardEditData, CardHelper, CardOption } from '~/utils/objectCard';
+import type { CardBatchPreview, CardChange, CardEditData, CardHelper, CardOption } from '~/utils/objectCard';
 import type {
   NetworkImportInspect,
   NetworkImportMode,
@@ -2475,6 +2475,22 @@ export const fastApiService = {
     const query: Record<string, string | number> = { table: params.table, field: params.field };
     if (params.value !== null && params.value !== undefined && params.value !== '') query.value = String(params.value);
     return request('api/v1/card-edit/after', { query });
+  },
+
+  /** Карточка нескольких участков: значения сведены по колонкам («разные») */
+  async getCardBatch(ids: number[]): Promise<CardEditData> {
+    return request('api/v1/card-edit/batch/card', { method: 'POST', body: { ids } });
+  },
+
+  /** Предпросмотр правки нескольких участков */
+  async previewCardBatch(body: { ids: number[]; changes: CardChange[] }): Promise<CardBatchPreview> {
+    return request('api/v1/card-edit/batch/preview', mutationOptions('POST', body));
+  },
+
+  /** Применить правку нескольких участков (отмена — group-setters/undo по change_group_id) */
+  async applyCardBatch(body: { ids: number[]; changes: CardChange[]; expected_changes?: number }):
+    Promise<{ changed: number; applied: Record<string, number>; change_group_id: string | null }> {
+    return request('api/v1/card-edit/batch/apply', mutationOptions('POST', body));
   },
 
   /** Сохранить изменения карточки (одна транзакция; версия строки изменилась — 409) */

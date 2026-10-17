@@ -28,6 +28,20 @@
       >Повторить</v-btn>
     </div>
     <template v-else-if="card">
+      <div
+        v-if="card.batch && card.selection"
+        class="oce-batch"
+      >
+        <v-icon
+          size="18"
+          color="primary"
+        >mdi-select-multiple</v-icon>
+        <span>
+          Участков: <b>{{ card.selection.lines }}</b><template v-if="card.selection.columns.length > 1">
+            (подача {{ card.selection.columns[0].line_ids.length }}, обратка {{ card.selection.columns[1].line_ids.length }})</template>.
+          Поля с пометкой «разные» не меняются, пока не задано значение.
+        </span>
+      </div>
       <v-tabs
         v-model="tab"
         density="compact"
@@ -109,13 +123,14 @@
                         :fileid="card.fileid"
                         :row-id="col.id"
                         :error="errors[draftKey(f.table, col.id, f.field)]"
+                        :mixed="Boolean(f.edit?.mixed?.[ci]) && draft[draftKey(f.table, col.id, f.field)] == null"
                         @update:model-value="setValue(f, ci, $event)"
                         @helper="openHelper(f, ci)"
                       />
                       <span
                         v-else
                         class="oce-readonly"
-                      >{{ shown(ci === 0 ? f.value : f.value2) }}</span>
+                      >{{ f.edit?.mixed?.[ci] ? 'разные' : shown(ci === 0 ? f.value : f.value2) }}</span>
                     </template>
                   </div>
                 </template>
@@ -143,9 +158,63 @@
           :loading="saving"
           :disabled="!changes.length"
           @click="save"
-        >Сохранить</v-btn>
+        >{{ card.batch ? 'Применить…' : 'Сохранить' }}</v-btn>
       </div>
     </template>
+    <!-- Несколько участков: предпросмотр «было → станет» перед применением -->
+    <v-dialog
+      v-model="previewOpen"
+      max-width="640"
+      scrollable
+    >
+      <v-card v-if="preview">
+        <v-card-title class="text-subtitle-1">Изменить свойства участков</v-card-title>
+        <v-divider />
+        <v-card-text class="oce-preview">
+          <div class="text-body-2 mb-2">
+            Участков в выборе: {{ preview.lines }}. Изменится строк: <b>{{ preview.changes }}</b>.
+          </div>
+          <div
+            v-for="(pf, i) in preview.fields"
+            :key="i"
+            class="oce-pv-field"
+          >
+            <div class="font-weight-medium">
+              {{ pf.label }}<span
+                v-if="pf.column_title"
+                class="text-medium-emphasis"
+              > · {{ pf.column_title }}</span>
+            </div>
+            <div class="text-body-2">
+              → <b>{{ shown(pf.new_title) }}</b>
+              <span class="text-medium-emphasis"> — изменится {{ pf.changes }} из {{ pf.rows }}</span>
+            </div>
+            <div
+              v-if="pf.was.length"
+              class="text-caption text-medium-emphasis"
+            >
+              было: {{ wasText(pf.was) }}
+            </div>
+          </div>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions>
+          <v-spacer />
+          <v-btn
+            variant="text"
+            :disabled="saving"
+            @click="previewOpen = false"
+          >Назад</v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :loading="saving"
+            :disabled="!preview.changes"
+            @click="applyBatch"
+          >Применить</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <CardHelperDialog
       v-model="helperOpen"
       :helper="helperData"
@@ -168,12 +237,18 @@ import { formatApiError } from '~/utils/apiError';
 import { formatDesktopNumber } from '~/utils/desktopNumber';
 import {
   applyFieldValues, draftChanges, draftKey, fieldColumns, hiddenByVis, initialDraft, ruleValues, validateDraft,
-  type CardEditData, type CardField, type CardHelper, type CardTab,
+  type CardBatchPreview, type CardEditData, type CardField, type CardHelper, type CardTab,
 } from '~/utils/objectCard';
 
-const props = defineProps<{ kind: 'line' | 'node'; table: string; objectId: number }>();
+const props = defineProps<{
+  kind: 'line' | 'node'
+  table: string
+  objectId: number
+  /** несколько участков (linesobj.id): одна карточка, значения по колонкам */
+  batchIds?: number[] | null
+}>();
 const emit = defineEmits<{
-  saved: [result: { changed: number }]
+  saved: [result: { changed: number; changeGroupId?: string | null }]
   cancel: []
   dirty: [dirty: boolean]
 }>();
@@ -190,7 +265,9 @@ const load = async () => {
   loading.value = true;
   loadError.value = '';
   try {
-    const data = await fastApiService.getCardEdit(props.kind, props.table, props.objectId);
+    const data = props.batchIds?.length
+      ? await fastApiService.getCardBatch(props.batchIds)
+      : await fastApiService.getCardEdit(props.kind, props.table, props.objectId);
     card.value = data;
     draft.value = initialDraft(data);
     titles.value = {};
@@ -201,7 +278,7 @@ const load = async () => {
     loading.value = false;
   }
 };
-watch(() => [props.kind, props.table, props.objectId], () => { void load(); }, { immediate: true });
+watch(() => [props.kind, props.table, props.objectId, props.batchIds?.join(',')], () => { void load(); }, { immediate: true });
 
 // Вкладки результатов расчёта — только просмотр, в форме правки их нет
 const editTabs = computed<CardTab[]>(() => (card.value?.tabs ?? []).filter((t) => !t.readonly));
@@ -311,10 +388,66 @@ const cancel = async () => {
   emit('cancel');
 };
 
+// --- несколько участков: предпросмотр и применение ---
+const previewOpen = ref(false);
+const preview = ref<CardBatchPreview | null>(null);
+const wasText = (was: CardBatchPreview['fields'][number]['was']) =>
+  was.map((w) => `${shown(w.title)} (${w.count})`).join(', ');
+
+// «разные» без нового значения — не изменение
+const isMixedChange = (c: { table: string; id: number; field: string; value: unknown }) => {
+  if (c.value !== null) return false;
+  for (const t of card.value?.tabs ?? []) {
+    for (const sub of t.subsections) {
+      for (const f of sub.fields) {
+        if (f.table.toLowerCase() === c.table.toLowerCase() && f.field.toLowerCase() === c.field.toLowerCase()) {
+          return Boolean(f.edit?.mixed?.[c.id - 1]);
+        }
+      }
+    }
+  }
+  return false;
+};
+const batchChanges = computed(() => changes.value.filter((c) => !isMixedChange(c)));
+
+const applyBatch = async () => {
+  if (!preview.value || !props.batchIds?.length) return;
+  saving.value = true;
+  try {
+    const res = await fastApiService.applyCardBatch({
+      ids: props.batchIds, changes: batchChanges.value, expected_changes: preview.value.changes,
+    });
+    previewOpen.value = false;
+    emit('saved', { changed: res.changed, changeGroupId: res.change_group_id });
+  } catch (e) {
+    previewOpen.value = false;
+    if (e instanceof ApiError && e.status === 409) {
+      useNotificationStore().showWarning(formatApiError(e, 'Данные изменились — повторите'));
+    } else {
+      useNotificationStore().showError(formatApiError(e, 'Не удалось применить'));
+    }
+  } finally {
+    saving.value = false;
+  }
+};
+
 const save = async () => {
   if (!card.value || !changes.value.length) return;
   showErrors.value = true;
   if (Object.keys(validateDraft(card.value, draft.value)).length) return;
+  if (card.value.batch) {
+    if (!props.batchIds?.length || !batchChanges.value.length) return;
+    saving.value = true;
+    try {
+      preview.value = await fastApiService.previewCardBatch({ ids: props.batchIds, changes: batchChanges.value });
+      previewOpen.value = true;
+    } catch (e) {
+      useNotificationStore().showError(formatApiError(e, 'Не удалось подготовить предпросмотр'));
+    } finally {
+      saving.value = false;
+    }
+    return;
+  }
   saving.value = true;
   try {
     const res = await fastApiService.saveCardEdit({ changes: changes.value, versions: card.value.versions });
@@ -351,6 +484,22 @@ defineExpose({ hasChanges: () => changes.value.length > 0, reload: load });
 }
 .oce-tabs {
   flex-shrink: 0;
+}
+.oce-batch {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  background: rgba(var(--v-theme-primary), 0.06);
+  flex-shrink: 0;
+}
+.oce-preview {
+  max-height: 60vh;
+}
+.oce-pv-field {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(var(--v-border-color), 0.08);
 }
 .oce-body {
   flex: 1 1 auto;
