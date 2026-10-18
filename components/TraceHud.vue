@@ -116,6 +116,7 @@ const roadText = computed(() => {
   const r = props.distances?.road;
   if (!r) return '';
   const warn = props.distances?.roadWarn ? normText(props.norms?.roadM) : '';
+  if (r.distM < ON_WALL_M) return `на оси ${r.roadName || 'улицы'}${warn}`;
   return `${formatApproxM(r.distM)} до оси ${r.roadName || 'улицы'}${warn}`;
 });
 
