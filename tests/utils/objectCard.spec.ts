@@ -3,6 +3,7 @@ import {
   applyFieldValues, columnValues, disabledByRules, mestnResult, mixFactor, parseMestn, templateSkipped,
   draftChanges, draftKey, fieldColumns, hiddenByVis, initialDraft, parseInput, ruleValues, validateDraft, visText,
   type CardField, type CardTab,
+  CARD_KIND_BY_TABLE, EQUIPMENT_KINDS, equipmentTitle, groupEquipment, isEquipmentKind, KIND_TEXT, type NodeEquipmentItem,
 } from '~/utils/objectCard'
 import { clampFloat, clampPanelWidth } from '~/composables/useObjectCardLayout'
 
@@ -171,5 +172,50 @@ describe('objectCard', () => {
     ] }] }] } as { tabs: CardTab[] }
     expect(columnValues(card, initialDraft(card), 0).map((v) => v.field))
       .toEqual(['externalCodeID', 'nodeTypeID', 'organizationID'])
+  })
+})
+
+describe('оборудование узла (этап 5)', () => {
+  const item = (kind: NodeEquipmentItem['kind'], id: number, name: string | null, extra: Partial<NodeEquipmentItem> = {}): NodeEquipmentItem => ({
+    kind, table: EQUIPMENT_KINDS[kind].table, label: EQUIPMENT_KINDS[kind].label, id, row_id: id, name,
+    sign: '', nodes: 'ТК-1 – ТК-2', inner: true, ...extra,
+  })
+
+  it('виды оборудования: тексты окна и шаблона, таблицы карточек', () => {
+    for (const kind of Object.keys(EQUIPMENT_KINDS) as NodeEquipmentItem['kind'][]) {
+      expect(isEquipmentKind(kind)).toBe(true)
+      expect(CARD_KIND_BY_TABLE[EQUIPMENT_KINDS[kind].table.toLowerCase()]).toBeUndefined()
+      expect(KIND_TEXT[kind].many).toBe(EQUIPMENT_KINDS[kind].many)
+      expect(KIND_TEXT[kind].Many[0]).toBe(KIND_TEXT[kind].Many[0].toUpperCase())
+      expect(KIND_TEXT[kind].neighborTip).toContain(EQUIPMENT_KINDS[kind].of)
+    }
+    expect(isEquipmentKind('line')).toBe(false)
+    expect(isEquipmentKind('diaphragm')).toBe(false)
+  })
+
+  it('свои у каждого объекта поля оборудования не идут в шаблон', () => {
+    for (const f of ['number', 'nodeID', 'pumpStationID', 'lastPumpReplaceDate', 'repairCountEM', 'replaceCountAgreg']) {
+      expect(templateSkipped(f)).toBe(true)
+    }
+    for (const f of ['damperArmatureStateID', 'diameterCondit', 'standardPumpID', 'r0', 'turnCount']) {
+      expect(templateSkipped(f)).toBe(false)
+    }
+  })
+
+  it('список: группы по виду в порядке десктопа, поиск по имени и узлам', () => {
+    const items = [
+      item('pump', 3, 'Н-1'), item('damper', 1, null, { sign: 'П' }), item('damper', 2, 'З-2', { nodes: 'ПАВ-5 – 12-45' }),
+    ]
+    const groups = groupEquipment(items)
+    expect(groups.map((g) => g.kind)).toEqual(['damper', 'pump'])
+    expect(groups[0].items.map((i) => i.id)).toEqual([1, 2])
+    expect(groupEquipment(items, 'пав-5').flatMap((g) => g.items.map((i) => i.id))).toEqual([2])
+    expect(groupEquipment(items, 'насос').map((g) => g.kind)).toEqual(['pump'])
+    expect(groupEquipment(items, 'нет такого')).toEqual([])
+  })
+
+  it('подпись: имя или вид с номером линии, признак П/О', () => {
+    expect(equipmentTitle(item('damper', 7, null, { sign: 'О' }))).toBe('Задвижка №7 (О)')
+    expect(equipmentTitle(item('pump', 3, 'Н-1'))).toBe('Н-1')
   })
 })

@@ -140,8 +140,11 @@ const FUN_HINTS: Record<string, string> = {
   nagruz_ot: 'В десктопе — окно расчёта нагрузки по характеристикам здания',
   nagruz_vt: 'В десктопе — окно расчёта нагрузки по характеристикам здания',
   alsecoNagr: 'В десктопе — нагрузки здания из базы Alseco (слой зданий)',
+  viewNsDb: 'В десктопе — подбор насоса с расчётом коэффициентов характеристик (реестр насосов)',
+  nodes: 'Узел с регулируемым напором: выберите из списка узлов фрагмента (поиск по имени)',
 };
-const SILENT_FUNS = new Set(['ReadOnly', 'NotNull', 'hydroRes', 'ms_rs', 'Date', 'Hidden', 'NagrSum']);
+// standardDampLink — в десктопе без действия
+const SILENT_FUNS = new Set(['ReadOnly', 'NotNull', 'hydroRes', 'ms_rs', 'Date', 'Hidden', 'NagrSum', 'standardDampLink']);
 const funHint = computed(() => {
   const name = props.edit.fun_name;
   if (!name || SILENT_FUNS.has(name)) return '';

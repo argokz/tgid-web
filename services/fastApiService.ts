@@ -5,6 +5,7 @@ import type { FeatureData, Fragment } from '~/types';
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
 import type {
   CardBatchPreview, CardChange, CardEditData, CardHelper, CardKind, CardNeighbor, CardOption, CardTemplate, CardValues,
+  NodeEquipment,
 } from '~/utils/objectCard';
 import type {
   NetworkImportInspect,
@@ -2452,6 +2453,11 @@ export const fastApiService = {
   /** Окно свойств: карточка объекта сети для правки (поля, списки, версии строк, правила видимости) */
   async getCardEdit(kind: CardKind, table: string, id: number): Promise<CardEditData> {
     return request(`api/v1/card-edit/${encodePath(kind)}/${encodePath(table)}/${encodePath(id)}`);
+  },
+
+  /** Оборудование узла: примыкающее к узлу и во внутренней схеме (задвижки, регуляторы, насосы…) */
+  async getNodeEquipment(nodeId: number): Promise<NodeEquipment> {
+    return request(`api/v1/card-edit/equipment-at/${encodePath(nodeId)}`);
   },
 
   /** Варианты выпадающего списка поля — как в карточке десктопа */

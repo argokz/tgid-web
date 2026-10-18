@@ -666,6 +666,22 @@
             </v-btn>
 
             <v-btn
+              v-if="cardNodeId && !editing && !equipmentOpen"
+              icon
+              variant="text"
+              size="small"
+              color="primary"
+              aria-label="Оборудование узла"
+              @click="equipmentOpen = true"
+            >
+              <v-icon size="18">mdi-valve</v-icon>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Оборудование узла: задвижки, регуляторы, насосы… (примыкающие и во внутренней схеме)</v-tooltip>
+            </v-btn>
+
+            <v-btn
               v-if="canEditCard && !editing"
               icon
               variant="text"
@@ -734,16 +750,40 @@
         <v-divider />
 
 
+        <div
+          v-if="editing && equipTarget"
+          class="ap-equip-head"
+        >
+          <v-btn
+            icon="mdi-arrow-left"
+            variant="text"
+            size="small"
+            aria-label="К списку оборудования"
+            @click="backToEquipment"
+          />
+          <span class="ap-equip-title">{{ equipTarget.title }}</span>
+        </div>
+
         <ObjectCardEdit
-          v-if="editing && editTarget"
+          v-if="editing && activeEdit"
           ref="cardEditRef"
-          :kind="editTarget.kind"
-          :table="editTarget.table"
-          :object-id="editTarget.id"
+          :kind="activeEdit.kind"
+          :table="activeEdit.table"
+          :object-id="activeEdit.id"
           :batch-ids="batchIds"
           @saved="onCardSaved"
-          @cancel="editing = false; batchIds = null"
+          @cancel="onCardCancel"
           @dirty="editDirty = $event"
+        />
+
+        <NodeEquipmentList
+          v-else-if="equipmentOpen && cardNodeId"
+          ref="equipmentListRef"
+          :node-id="cardNodeId"
+          :can-edit="canEditEquipment"
+          @close="equipmentOpen = false"
+          @open="openEquipment"
+          @batch="openEquipmentBatch"
         />
 
         <template v-else>
@@ -1238,8 +1278,11 @@ import { getFeatureFragmentId, getSectionRowId, resolveCardObject, type CardObje
 import { canEditFragment } from '~/utils/permissions'
 import ObjectCardShell from '~/components/objectCard/ObjectCardShell.vue'
 import ObjectCardEdit from '~/components/objectCard/ObjectCardEdit.vue'
+import NodeEquipmentList from '~/components/objectCard/NodeEquipmentList.vue'
 import { useObjectCardLayout } from '~/composables/useObjectCardLayout'
-import { CARD_KIND_BY_TABLE, KIND_TEXT, type CardKind } from '~/utils/objectCard'
+import {
+  CARD_KIND_BY_TABLE, EQUIPMENT_KINDS, equipmentTitle, KIND_TEXT, type CardKind, type EquipmentKind, type NodeEquipmentItem,
+} from '~/utils/objectCard'
 import { useJournalMapBridge } from '~/composables/useJournalMapBridge'
 import { groupSettersService } from '~/services/groupSettersService'
 import { confirmAction } from '~/composables/useConfirm'
@@ -1447,8 +1490,38 @@ const canEditCard = computed(() => Boolean(editTarget.value) && authStore.canEdi
 const startEditing = () => {
   if (canEditCard.value) {
     batchIds.value = null
+    equipTarget.value = null
     editing.value = true
   }
+}
+
+// --- оборудование узла (задвижки, регуляторы, насосы…): список и карточка линии оборудования ---
+const equipmentOpen = ref(false)
+const equipmentListRef = ref<{ reload: () => Promise<void> } | null>(null)
+const equipTarget = ref<{ kind: EquipmentKind; table: string; id: number; title: string } | null>(null)
+const canEditEquipment = computed(() => authStore.canEditNetwork && cardInTerritory.value)
+const activeEdit = computed(() => equipTarget.value ?? editTarget.value)
+const openEquipment = (item: NodeEquipmentItem) => {
+  if (!canEditEquipment.value) return
+  batchIds.value = null
+  equipTarget.value = { kind: item.kind, table: item.table, id: item.id, title: `${item.label}: ${equipmentTitle(item)}` }
+  editing.value = true
+}
+const openEquipmentBatch = ({ kind, table, ids }: { kind: EquipmentKind; table: string; ids: number[] }) => {
+  if (!canEditEquipment.value || !ids.length) return
+  batchIds.value = ids
+  equipTarget.value = { kind, table, id: ids[0], title: `${EQUIPMENT_KINDS[kind].label}: выбрано ${ids.length}` }
+  editing.value = true
+}
+const onCardCancel = () => {
+  editing.value = false
+  batchIds.value = null
+  equipTarget.value = null
+}
+const backToEquipment = async () => {
+  if (!(await confirmLeaveEditing())) return
+  editDirty.value = false
+  onCardCancel()
 }
 
 // --- несколько объектов одной карточкой: выбор на карте (клик, Shift + рамка) ---
@@ -1487,9 +1560,11 @@ const confirmLeaveEditing = async (): Promise<boolean> => {
 }
 const onCardSaved = async ({ changed, changeGroupId }: { changed: number; changeGroupId?: string | null }) => {
   const wasBatch = Boolean(batchIds.value)
+  const wasEquipment = Boolean(equipTarget.value)
   editing.value = false
   editDirty.value = false
   batchIds.value = null
+  equipTarget.value = null
   if (wasBatch) {
     const notify = useNotificationStore()
     if (changed && changeGroupId) {
@@ -1503,7 +1578,11 @@ const onCardSaved = async ({ changed, changeGroupId }: { changed: number; change
     showNotification.value = true
   }
   emit('refresh-layers')
-  // просмотр — по свежей карточке API
+  // оборудование — назад к списку узла; иначе просмотр — по свежей карточке API
+  if (wasEquipment) {
+    void equipmentListRef.value?.reload()
+    return
+  }
   const target = editTarget.value
   const kind = target ? desktopCardKind(target.table) : null
   if (!target || !kind) return
@@ -1733,6 +1812,8 @@ const show = (props: Record<string, any>) => {
   editing.value = false
   editDirty.value = false
   batchIds.value = null
+  equipTarget.value = null
+  equipmentOpen.value = false
 
   let objectTabs: any[] | null = null
 
@@ -1831,6 +1912,8 @@ const close = async () => {
   editing.value = false
   editDirty.value = false
   batchIds.value = null
+  equipTarget.value = null
+  equipmentOpen.value = false
 
   visible.value = false
 
@@ -2259,6 +2342,20 @@ defineExpose({ show, close, confirmLeaveEditing })
 
 
 <style scoped>
+.ap-equip-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+.ap-equip-title {
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ── Card ── */
 

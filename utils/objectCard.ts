@@ -380,7 +380,79 @@ export function mestnResult(rows: { id: number; k: number; v: number }[]): { sum
 }
 
 /** Вид карточки: участок или узел */
-export type CardKind = 'line' | 'node' | 'consumer' | 'genconsumer' | 'source' | 'pumpstation'
+/** Оборудование — линия схемы с карточкой своей таблицы (itwin-api card_edit.EQUIPMENT_KINDS) */
+export type EquipmentKind = 'damper' | 'regarmature' | 'reversevalve' | 'pump' | 'pressregulator' | 'consregulator'
+  | 'pressdropregulator' | 'bypass' | 'elevator' | 'heatexchanger'
+
+export type CardKind = 'line' | 'node' | 'consumer' | 'genconsumer' | 'source' | 'pumpstation' | EquipmentKind
+
+interface EquipmentKindInfo {
+  table: string
+  /** «Задвижка» */
+  label: string
+  /** «задвижек» / «задвижки» */
+  many: string
+  of: string
+}
+
+/** Вид оборудования → таблица карточки и подписи */
+export const EQUIPMENT_KINDS: Readonly<Record<EquipmentKind, EquipmentKindInfo>> = {
+  damper: { table: 'dampers', label: 'Задвижка', many: 'задвижек', of: 'задвижки' },
+  regarmature: { table: 'regulArmatures', label: 'Регулирующая арматура', many: 'регулирующей арматуры', of: 'регулирующей арматуры' },
+  reversevalve: { table: 'reverseValves', label: 'Обратный клапан', many: 'обратных клапанов', of: 'обратного клапана' },
+  pump: { table: 'pumps', label: 'Насос', many: 'насосов', of: 'насоса' },
+  pressregulator: { table: 'pressRegulators', label: 'Регулятор давления', many: 'регуляторов давления', of: 'регулятора давления' },
+  consregulator: { table: 'consumptRegulators', label: 'Регулятор расхода', many: 'регуляторов расхода', of: 'регулятора расхода' },
+  pressdropregulator: {
+    table: 'pressDropRegulators', label: 'Регулятор перепада давления', many: 'регуляторов перепада давления',
+    of: 'регулятора перепада давления',
+  },
+  bypass: { table: 'bypass', label: 'Байпас', many: 'байпасов', of: 'байпаса' },
+  elevator: { table: 'elevators', label: 'Элеватор', many: 'элеваторов', of: 'элеватора' },
+  heatexchanger: { table: 'heatExchangers', label: 'Теплообменник', many: 'теплообменников', of: 'теплообменника' },
+}
+
+export const isEquipmentKind = (kind: string): kind is EquipmentKind => kind in EQUIPMENT_KINDS
+
+/** Оборудование узла (GET card-edit/equipment-at): примыкающее к узлу и во внутренней схеме */
+export interface NodeEquipmentItem {
+  kind: EquipmentKind
+  table: string
+  label: string
+  /** linesobj.id — id карточки */
+  id: number
+  row_id: number
+  name: string | null
+  /** «П», «О» или '' */
+  sign: string
+  /** «узел1 – узел2» */
+  nodes: string | null
+  /** во внутренней схеме (иначе примыкает к узлу) */
+  inner: boolean
+}
+
+export interface NodeEquipment {
+  node_id: number
+  fileid: number | null
+  items: NodeEquipmentItem[]
+  truncated: boolean
+}
+
+/** Группы списка оборудования: по виду в порядке EQUIPMENT_KINDS, фильтр по имени и узлам */
+export function groupEquipment(items: NodeEquipmentItem[], search = ''): { kind: EquipmentKind; label: string; items: NodeEquipmentItem[] }[] {
+  const needle = search.trim().toLowerCase()
+  const match = (i: NodeEquipmentItem) => !needle
+    || [i.name, i.nodes, i.label, i.sign, String(i.id)].some((v) => String(v ?? '').toLowerCase().includes(needle))
+  return (Object.keys(EQUIPMENT_KINDS) as EquipmentKind[])
+    .map((kind) => ({ kind, label: EQUIPMENT_KINDS[kind].label, items: items.filter((i) => i.kind === kind && match(i)) }))
+    .filter((g) => g.items.length)
+}
+
+/** Подпись объекта оборудования в списке: имя, иначе вид и признак П/О */
+export function equipmentTitle(i: Pick<NodeEquipmentItem, 'name' | 'label' | 'sign' | 'id'>): string {
+  const base = i.name || `${i.label} №${i.id}`
+  return i.sign ? `${base} (${i.sign})` : base
+}
 
 /** Таблица карточки объекта в узле → вид (у объектов в узле id карточки — id узла) */
 export const CARD_KIND_BY_TABLE: Readonly<Record<string, CardKind>> = {
@@ -440,6 +512,15 @@ export const KIND_TEXT: Readonly<Record<CardKind, KindText>> = {
     many: 'насосных станций', Many: 'Насосных станций', of: 'насосной станции', neighborTip: null, neighborMissing: '',
     templateNote: 'наименование — своё у каждой станции и не предлагается',
   },
+  ...Object.fromEntries((Object.entries(EQUIPMENT_KINDS) as [EquipmentKind, EquipmentKindInfo][]).map(([kind, e]) => [kind, {
+    many: e.many,
+    Many: e.many[0].toUpperCase() + e.many.slice(1),
+    of: e.of,
+    neighborTip: `Заполнить характеристики значениями ${e.of} рядом: с общим узлом или в той же внутренней схеме, `
+      + `иначе ближайшего. ${FILL_NOTE}`,
+    neighborMissing: `Соседний объект «${e.label.toLowerCase()}» не найден`,
+    templateNote: 'наименование, номер, узел регулирования и даты замен — свои у каждого объекта и не предлагаются',
+  }])) as Record<EquipmentKind, KindText>,
 }
 
 /** Значения полей по таблицам: {таблица: {поле: значение}} */
@@ -483,9 +564,11 @@ export const TEMPLATE_SKIP_FIELDS: ReadonlySet<string> = new Set([
   'b14', 'b20', 'b23', 'b28', 'b32', 'b35', 'b36', 'b38',
   'sourcename', 'hsourceid', 'hsourcepower', 'hsourcepowerinst', 'managerphone', 'controllerphone', 'name_tg',
   'date_on', 'name_exe', 'hseasonbegindate', 'hseasonenddate', 'q_r', 'q_gv',
+  // оборудование: номер, узел регулирования, насосная, причина отключения, отметка установки
+  'number', 'nodeid', 'lineid', 'pumpstationid', 'offreason', 'entrymark', 'registnum',
 ])
 /** Нагрузки (расчётные, договорные, перспективные, тепловыделения) — свои у каждого потребителя */
-const TEMPLATE_SKIP_RE = /^(calchl|avghl|calcinternhd|internhd|cont|persp|adj|normhlos)/
+const TEMPLATE_SKIP_RE = /^(calchl|avghl|calcinternhd|internhd|cont|persp|adj|normhlos|last\w*replacedate|repaircount|replacecount)/
 
 /** Поле не предлагается в шаблон (и не берётся в него по умолчанию) */
 export const templateSkipped = (field: string): boolean => {
