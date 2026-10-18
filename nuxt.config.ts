@@ -100,6 +100,10 @@ export default defineNuxtConfig({
       storagePrefix: process.env.NUXT_PUBLIC_STORAGE_PREFIX || env.NUXT_PUBLIC_STORAGE_PREFIX || '',
       // Фрагменты, видимые при открытии карты: "2-46,48,3179" (utils/cityConfig.ts); пусто — все
       defaultFragments: process.env.NUXT_PUBLIC_DEFAULT_FRAGMENTS || env.NUXT_PUBLIC_DEFAULT_FRAGMENTS || '',
+      // Охранные расстояния трассы, м (utils/cityConfig.ts cadDefaults): до стены здания и до оси улицы.
+      // Нормы задаёт заказчик; пусто — размеры показываются без проверки
+      cadMinBuildingM: process.env.NUXT_PUBLIC_CAD_MIN_BUILDING_M || env.NUXT_PUBLIC_CAD_MIN_BUILDING_M || '',
+      cadMinRoadM: process.env.NUXT_PUBLIC_CAD_MIN_ROAD_M || env.NUXT_PUBLIC_CAD_MIN_ROAD_M || '',
       geoserver: {
         url:
           process.env.NUXT_PUBLIC_GEOSERVER_URL ||

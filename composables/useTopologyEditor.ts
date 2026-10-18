@@ -1,7 +1,7 @@
 import { formatApiError, formatApiErrorWith } from '~/utils/apiError';
 import { confirmAction } from '~/composables/useConfirm';
 import maplibregl from 'maplibre-gl';
-import { getCurrentInstance, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, ref, watch } from 'vue';
 import type { Ref } from 'vue';
 import { ApiError, fastApiService } from '~/services/fastApiService';
 import type {
@@ -22,6 +22,17 @@ import { appStorage } from '~/utils/appStorage';
 import type { CardKind, CardTemplate } from '~/utils/objectCard';
 import { useSnapIndex } from '~/composables/useSnapIndex';
 import { useTraceDraw } from '~/composables/useTraceDraw';
+import { useContextSnap } from '~/composables/useContextSnap';
+import {
+  buildingAt,
+  buildingOutline,
+  CONTEXT_MIN_MAP_ZOOM,
+  formatApproxM,
+  planBuildingEntry,
+  type BuildingEntryPlan,
+  type ContextBuilding,
+} from '~/utils/cadContext';
+import { getCityConfig } from '~/utils/cityConfig';
 import { chainRequestPoints, traceOutcome, type PipeMode, type TracePoint } from '~/utils/cadChain';
 import { DEFAULT_POLAR_STEP, POLAR_STEPS } from '~/utils/cadConstraint';
 import type { LngLat } from '~/utils/lineVertices';
@@ -189,6 +200,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   // === Трасса участков (CAD): полилиния с привязкой, врезкой и режимом трубы ===
   const PIPE_MODE_KEY = 'topologyPipeMode';
   const POLAR_STEP_KEY = 'topologyPolarStep';
+  const CONTEXT_SNAP_KEY = 'topologyContextSnap';
   const readPipeMode = (): PipeMode => {
     try {
       const v = appStorage.getItem(PIPE_MODE_KEY);
@@ -226,8 +238,23 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     }
     trace.refresh();
   });
+  /** Привязка к зданиям и улицам подложки и размеры до них (этап C) */
+  const contextSnapEnabled = ref<boolean>((() => {
+    try {
+      return appStorage.getItem(CONTEXT_SNAP_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  })());
   const snapIndex = useSnapIndex(getMap, activeFragments);
-  const trace = useTraceDraw(getMap, snapIndex.index, activeFragments, { polarStep });
+  const contextSnap = useContextSnap(getMap);
+  const cadNorms = getCityConfig().cadDefaults;
+  const trace = useTraceDraw(getMap, snapIndex.index, activeFragments, {
+    polarStep,
+    context: contextSnap.index,
+    contextEnabled: contextSnapEnabled,
+    norms: () => cadNorms,
+  });
   // сменили рабочий фрагмент — привязка к его объектам, без ожидания сдвига карты
   watch(() => activeFragments().join(','), () => snapIndex.invalidate());
   const chainPreviewOpen = ref(false);
@@ -473,13 +500,119 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     const on = isEditTopologyMode.value && isChainMode.value;
     if (on) {
       snapIndex.start();
+      if (contextSnapEnabled.value) contextSnap.start();
       map?.doubleClickZoom?.disable();
     } else {
       trace.clear();
       snapIndex.stop();
+      contextSnap.stop();
+      isEntryMode.value = false;
       map?.doubleClickZoom?.enable();
       chainPreviewOpen.value = false;
     }
+  };
+
+  watch(contextSnapEnabled, (on) => {
+    try {
+      appStorage.setItem(CONTEXT_SNAP_KEY, on ? '1' : '0');
+    } catch {
+      // удобство: без хранилища действует до перезагрузки
+    }
+    if (!on) {
+      contextSnap.stop();
+      isEntryMode.value = false;
+    } else if (isEditTopologyMode.value && isChainMode.value) {
+      contextSnap.start();
+    }
+    trace.refresh();
+  });
+
+  // === Ввод в здание: клик по зданию → врезка в ближайшую трубу + участок + узел у стены ===
+  /** трубы дальше этого от здания не предлагаются, м */
+  const ENTRY_MAX_M = 150;
+  const isEntryMode = ref(false);
+  /** что под курсором в режиме ввода — для бейджа */
+  const entryHover = ref<{ building: ContextBuilding; plan: BuildingEntryPlan | null } | null>(null);
+  /** пояснение в предпросмотре трассы (ввод в здание) */
+  const chainNote = ref<string | null>(null);
+
+  const entryHint = computed(() => {
+    if (!isEntryMode.value) return '';
+    const h = entryHover.value;
+    if (!h) return 'Ввод в здание: наведите на здание и кликните';
+    const house = h.building.number ? `дом ${h.building.number}: ` : '';
+    if (!h.plan) return `${house}трубы ближе ${ENTRY_MAX_M} м нет (рабочий фрагмент, окно карты)`;
+    const from = h.plan.nodeId != null ? `от узла ${h.plan.nodeId}` : `врезка в уч. ${h.plan.lineId}`;
+    return `${house}${from}, ${formatApproxM(h.plan.lengthM)} до стены — клик: предпросмотр`;
+  });
+
+  const toggleEntryMode = () => {
+    if (!isEntryMode.value) {
+      const map = getMap();
+      if (!contextSnapEnabled.value) contextSnapEnabled.value = true;
+      if (contextSnap.status.value === 'no-key') {
+        useNotificationStore().showWarning('Здания подложки недоступны: не задан ключ MapTiler.');
+        return;
+      }
+      if (map && map.getZoom() < CONTEXT_MIN_MAP_ZOOM) {
+        useNotificationStore().showInfo('Приблизьте карту (масштаб 15 и крупнее): здания берутся с подложки.');
+      }
+      trace.clear();
+    } else {
+      trace.showEntry(null, null);
+    }
+    isEntryMode.value = !isEntryMode.value;
+    entryHover.value = null;
+  };
+
+  const entryAt = (e: any): { building: ContextBuilding; plan: BuildingEntryPlan | null } | null => {
+    const ctx = contextSnap.index.value;
+    const map = getMap();
+    if (!ctx || !map || map.getZoom() < CONTEXT_MIN_MAP_ZOOM) return null;
+    const building = buildingAt(ctx, [e.lngLat.lng, e.lngLat.lat]);
+    if (!building) return null;
+    if (entryHover.value?.building.id === building.id) return entryHover.value;
+    const idx = snapIndex.index.value;
+    return { building, plan: idx ? planBuildingEntry(idx, building, ENTRY_MAX_M, activeFragments()) : null };
+  };
+
+  const onEntryMove = (e: any) => {
+    const h = entryAt(e);
+    entryHover.value = h;
+    trace.showEntry(e, h ? { outline: buildingOutline(h.building), link: h.plan ? [h.plan.tap, h.plan.wall] : null } : null);
+  };
+
+  const onEntryClick = async (e: any) => {
+    const h = entryAt(e);
+    const notify = useNotificationStore();
+    if (!h) {
+      notify.showInfo(
+        contextSnap.status.value === 'zoom-in' || (getMap()?.getZoom() ?? 0) < CONTEXT_MIN_MAP_ZOOM
+          ? 'Приблизьте карту: здания для ввода — с масштаба 15.'
+          : 'Кликните внутри контура здания.',
+      );
+      return;
+    }
+    if (!h.plan) {
+      notify.showWarning(`Рядом со зданием (до ${ENTRY_MAX_M} м) нет трубы рабочего фрагмента в окне карты.`);
+      return;
+    }
+    if (h.plan.lengthM < 0.3) {
+      notify.showWarning('Труба проходит вплотную к зданию или через него — нарисуйте ввод трассой вручную.');
+      return;
+    }
+    const start: TracePoint = h.plan.nodeId != null
+      ? { kind: 'node', coord: h.plan.tap, nodeId: h.plan.nodeId }
+      : { kind: 'tap', coord: h.plan.tap, lineId: h.plan.lineId };
+    const end: TracePoint = { kind: 'new', coord: h.plan.wall };
+    trace.showEntry(null, null);
+    trace.setPoints([start, end]);
+    chainPoints = [start, end];
+    const house = h.building.number
+      ? `Номер дома по карте: ${h.building.number} — только для сверки, в карточку узла не записывается.`
+      : 'Номера дома на подложке нет.';
+    chainNote.value = `Узел у стены здания (по подложке MapTiler, ориентировочно ${formatApproxM(h.plan.lengthM)} от трубы). ${house}`;
+    await previewChain();
   };
 
   const toggleChainMode = () => {
@@ -526,6 +659,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
 
   /** Enter / двойной клик / клик по узлу или трубе: один узел, разрезание или цепочка */
   const finishTrace = async () => {
+    chainNote.value = null;
     const outcome = traceOutcome(trace.points.value);
     if (outcome.action === 'none') {
       trace.clear();
@@ -610,6 +744,11 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       ev.preventDefault();
       if (chainActive() && trace.active.value) trace.removeLast();
       else void undoLastTopologyOperation();
+      return;
+    }
+    if (chainActive() && isEntryMode.value && !trace.active.value && ev.key === 'Escape') {
+      ev.preventDefault();
+      toggleEntryMode();
       return;
     }
     if (!chainActive() || !trace.active.value) return;
@@ -765,7 +904,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       return;
     }
     if (draggedNodeId === null) {
-      if (chainActive()) trace.onMove(e);
+      if (chainActive() && isEntryMode.value && !trace.active.value) onEntryMove(e);
+      else if (chainActive()) trace.onMove(e);
       return;
     }
     if (!dragMoved && dragStartPoint) {
@@ -920,6 +1060,10 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
         );
         return;
       }
+      if (isEntryMode.value && !trace.active.value) {
+        await onEntryClick(e);
+        return;
+      }
       if (trace.onClick(e)) await finishTrace();
       return;
     }
@@ -1023,6 +1167,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     }
     trace.clear();
     snapIndex.stop();
+    contextSnap.stop();
+    isEntryMode.value = false;
     if (draggedNodeMarker) draggedNodeMarker.remove();
   };
 
@@ -1052,6 +1198,13 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     pipeMode,
     polarStep,
     snapIndex,
+    contextSnap,
+    contextSnapEnabled,
+    cadNorms,
+    isEntryMode,
+    entryHint,
+    chainNote,
+    toggleEntryMode,
     trace,
     chainPreviewOpen,
     chainPreviewLoading,

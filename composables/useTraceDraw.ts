@@ -9,11 +9,22 @@
  * полярная привязка с шагом polarStep от предыдущего участка, направляющие ∥ и ⊥ к соседней
  * трубе, Shift — строго по шагу 90°, и замки длины и угла, введённые с клавиатуры (utils/cadInput).
  * На трассе подписаны длины отрезков и углы поворота.
+ *
+ * Подложка (этап C, utils/cadContext): если к сети привязаться не к чему, точка прилипает к углу
+ * или стене здания и к оси улицы MapTiler; от курсора показаны размеры «≈ до здания» и «≈ до оси
+ * улицы» (только z ≥ 15), с подсветкой меньше нормы охранного расстояния, если она задана.
  */
 import { computed, ref, shallowRef } from 'vue';
 import type { Ref } from 'vue';
 import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
-import { findSnap, nearestPipeBearing, pipeBearingsAt, type SnapIndex, type SnapResult } from '~/utils/cadSnap';
+import { findSnap, fromContextSnap, nearestPipeBearing, pipeBearingsAt, type SnapIndex, type SnapResult } from '~/utils/cadSnap';
+import {
+  CONTEXT_MIN_MAP_ZOOM,
+  contextDistances,
+  findContextSnap,
+  type ContextDistance,
+  type ContextIndex,
+} from '~/utils/cadContext';
 import { constrainPoint, type ConstraintResult, type GuideKind } from '~/utils/cadConstraint';
 import { bearingDeg, distanceM, signedTurnDeg } from '~/utils/cadGeometry';
 import { cadInputKey, cadInputLocks, EMPTY_CAD_INPUT, type CadInputKey, type CadInputState } from '~/utils/cadInput';
@@ -25,6 +36,7 @@ import {
   samePoint,
   traceCollection,
   traceLengths,
+  type TraceDim,
   type TraceGuide,
   type TracePoint,
 } from '~/utils/cadChain';
@@ -36,6 +48,8 @@ const SOURCE_ID = 'cad-trace';
  */
 const LABEL_SOURCE_ID = 'cad-trace-labels';
 const isLabel = (f: any) => f.properties?.role === 'label' || f.properties?.role === 'angle';
+const LAYER_OUTLINE = 'cad-trace-outline';
+const LAYER_DIM = 'cad-trace-dim';
 const LAYER_GUIDE = 'cad-trace-guide';
 const LAYER_LINE = 'cad-trace-line';
 const LAYER_RUBBER = 'cad-trace-rubber';
@@ -48,6 +62,8 @@ export const TRACE_SNAP_RADIUS_PX = 14;
 const ARC_RADIUS_PX = 22;
 /** направляющая «вдоль трубы» — от трубы в стольких радиусах привязки от курсора */
 const NEAR_PIPE_RADII = 6;
+/** размеры до здания и улицы — в этом радиусе от курсора, м */
+const DIM_MAX_M = 60;
 
 const KIND_COLOR = [
   'match', ['get', 'kind'],
@@ -70,6 +86,26 @@ const GUIDE_COLOR = [
 export interface TraceDrawOptions {
   /** шаг полярной привязки, градусы; 0 — выкл (Shift всё равно даёт 90°) */
   polarStep?: Ref<number>;
+  /** индекс зданий и улиц подложки (useContextSnap) */
+  context?: Ref<ContextIndex | null>;
+  /** привязка и размеры по подложке включены */
+  contextEnabled?: Ref<boolean>;
+  /** нормы охранных расстояний, м (cityConfig.cadDefaults); null — не заданы */
+  norms?: () => { buildingM: number | null; roadM: number | null };
+}
+
+/** Размеры от курсора до подложки (ориентировочно) */
+export interface TraceDistances {
+  building: ContextDistance | null;
+  road: ContextDistance | null;
+  buildingWarn: boolean;
+  roadWarn: boolean;
+}
+
+/** Предпросмотр ввода в здание: контур здания и связь от трубы */
+export interface EntryPreview {
+  outline: LngLat[][];
+  link: [LngLat, LngLat] | null;
 }
 
 /** Сведения для бейджа у курсора */
@@ -101,6 +137,9 @@ export function useTraceDraw(
   const input = ref<CadInputState>({ ...EMPTY_CAD_INPUT });
   /** положение курсора на экране — для бейджа рядом с ним */
   const cursorPx = ref<{ x: number; y: number } | null>(null);
+  /** размеры до здания и улицы от точки под курсором */
+  const distances = shallowRef<TraceDistances | null>(null);
+  let entry: EntryPreview | null = null;
   const active = computed(() => points.value.length > 0);
   const lengths = computed(() => traceLengths(points.value, cursor.value));
   let raw: RawCursor | null = null;
@@ -132,7 +171,16 @@ export function useTraceDraw(
     if (!map) return;
     const lat = cursor.value?.[1] ?? map.getCenter().lat;
     const arcRadiusM = ARC_RADIUS_PX * metersPerPixel(map.getZoom(), lat);
-    const all = traceCollection(points.value, cursor.value, snap.value, { arcRadiusM, guide });
+    const dims: TraceDim[] = [];
+    const d = distances.value;
+    if (d && cursor.value) {
+      if (d.building && !d.building.inside && d.building.distM > 0.05) {
+        dims.push({ from: cursor.value, to: d.building.coord, kind: 'building', warn: d.buildingWarn });
+      }
+      if (d.road && d.road.distM > 0.05) dims.push({ from: cursor.value, to: d.road.coord, kind: 'road', warn: d.roadWarn });
+    }
+    if (entry?.link) dims.push({ from: entry.link[0], to: entry.link[1], kind: 'entry' });
+    const all = traceCollection(points.value, cursor.value, snap.value, { arcRadiusM, guide, dims, outline: entry?.outline });
     const data = { type: 'FeatureCollection', features: all.features.filter((f) => !isLabel(f)) } as any;
     const labels = { type: 'FeatureCollection', features: all.features.filter(isLabel) } as any;
     const src = map.getSource(SOURCE_ID) as any;
@@ -143,6 +191,24 @@ export function useTraceDraw(
     }
     map.addSource(SOURCE_ID, { type: 'geojson', data });
     map.addSource(LABEL_SOURCE_ID, { type: 'geojson', data: labels });
+    map.addLayer({
+      id: LAYER_OUTLINE,
+      type: 'line',
+      source: SOURCE_ID,
+      filter: ['==', ['get', 'role'], 'outline'],
+      paint: { 'line-color': '#1565c0', 'line-width': 3, 'line-opacity': 0.9 },
+    });
+    map.addLayer({
+      id: LAYER_DIM,
+      type: 'line',
+      source: SOURCE_ID,
+      filter: ['==', ['get', 'role'], 'dim'],
+      paint: {
+        'line-color': ['case', ['get', 'warn'], '#d32f2f', ['match', ['get', 'kind'], 'road', '#546e7a', 'entry', '#2e7d32', '#8d6e63']] as any,
+        'line-width': ['match', ['get', 'kind'], 'entry', 3, 1.2] as any,
+        'line-dasharray': [3, 2],
+      },
+    });
     map.addLayer({
       id: LAYER_GUIDE,
       type: 'line',
@@ -218,7 +284,7 @@ export function useTraceDraw(
   const clearLayers = () => {
     const map = getMap();
     if (!map) return;
-    for (const id of [LAYER_LABEL, LAYER_SNAP, LAYER_POINT, LAYER_ARC, LAYER_LINE, LAYER_RUBBER, LAYER_GUIDE]) {
+    for (const id of [LAYER_LABEL, LAYER_SNAP, LAYER_POINT, LAYER_ARC, LAYER_LINE, LAYER_RUBBER, LAYER_GUIDE, LAYER_DIM, LAYER_OUTLINE]) {
       if (map.getLayer(id)) map.removeLayer(id);
     }
     for (const id of [SOURCE_ID, LABEL_SOURCE_ID]) {
@@ -226,10 +292,40 @@ export function useTraceDraw(
     }
   };
 
+  /** индекс подложки, если он есть, включён и масштаб крупный */
+  const contextIndex = (): ContextIndex | null => {
+    const map = getMap();
+    const ctx = options.context?.value ?? null;
+    if (!ctx || options.contextEnabled?.value === false || !map || map.getZoom() < CONTEXT_MIN_MAP_ZOOM) return null;
+    return ctx;
+  };
+
+  /** Сеть важнее подложки: к зданию и улице — только если рядом нет объектов сети */
   const snapAt = (coord: LngLat): SnapResult | null => {
     const idx = snapIndex.value;
-    if (!idx) return null;
-    return findSnap(idx, coord, radiusM(coord[1]), { fragmentIds: getFragmentIds() });
+    const r = radiusM(coord[1]);
+    const net = idx ? findSnap(idx, coord, r, { fragmentIds: getFragmentIds() }) : null;
+    if (net) return net;
+    const ctx = contextIndex();
+    const c = ctx ? findContextSnap(ctx, coord, r) : null;
+    return c ? fromContextSnap(c) : null;
+  };
+
+  const updateDistances = () => {
+    const ctx = contextIndex();
+    const at = cursor.value;
+    if (!ctx || !at) {
+      distances.value = null;
+      return;
+    }
+    const { building, road } = contextDistances(ctx, at, DIM_MAX_M);
+    const norms = options.norms?.() ?? { buildingM: null, roadM: null };
+    distances.value = {
+      building,
+      road,
+      buildingWarn: Boolean(building && norms.buildingM != null && (building.inside || building.distM < norms.buildingM)),
+      roadWarn: Boolean(road && norms.roadM != null && road.distM < norms.roadM),
+    };
   };
 
   // направления труб у последней точки — пересчёт только при смене трассы
@@ -246,8 +342,14 @@ export function useTraceDraw(
     return near == null ? guidesAtLast : [...guidesAtLast, near];
   };
 
-  /** Точка под курсором: привязка к объекту или ограничения (замки, полярная, направляющие) */
+  /** Точка под курсором и размеры от неё до подложки */
   const compute = () => {
+    computePoint();
+    updateDistances();
+  };
+
+  /** Точка под курсором: привязка к объекту или ограничения (замки, полярная, направляющие) */
+  const computePoint = () => {
     guide = null;
     constraint.value = null;
     if (!raw) {
@@ -363,6 +465,8 @@ export function useTraceDraw(
     raw = null;
     guide = null;
     guidesFor = null;
+    entry = null;
+    distances.value = null;
     resetInput();
     clearLayers();
   };
@@ -382,6 +486,28 @@ export function useTraceDraw(
     render();
   };
 
+  /** Готовая трасса (ввод в здание): точки без рисования мышью */
+  const setPoints = (pts: TracePoint[]) => {
+    points.value = pts;
+    raw = null;
+    cursor.value = null;
+    snap.value = null;
+    constraint.value = null;
+    distances.value = null;
+    resetInput();
+    render();
+  };
+
+  /** Ввод в здание: подсветка здания под курсором и связь от трубы (без трассы) */
+  const showEntry = (e: MapMouseEvent | null, preview: EntryPreview | null) => {
+    entry = preview;
+    if (e) cursorPx.value = { x: e.point.x, y: e.point.y };
+    snap.value = null;
+    cursor.value = null;
+    distances.value = null;
+    render();
+  };
+
   /** Привязка под курсором без рисования (до первой точки — показать, к чему прилипнет клик) */
   const hover = (e: MapMouseEvent) => {
     onMove(e);
@@ -394,6 +520,7 @@ export function useTraceDraw(
     snap,
     input,
     metrics,
+    distances,
     active,
     lengths,
     onMove,
@@ -404,6 +531,8 @@ export function useTraceDraw(
     clear,
     refresh,
     setShift,
+    setPoints,
+    showEntry,
     render,
   };
 }

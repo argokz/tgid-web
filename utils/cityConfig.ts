@@ -51,12 +51,27 @@ export function parseFragmentIds(raw: unknown): number[] {
   return [...ids].sort((a, b) => a - b)
 }
 
+/** Положительное число метров из настройки; пусто или мусор — null */
+export function parseMeters(raw: unknown): number | null {
+  const s = String(raw ?? '').trim().replace(',', '.')
+  if (!s) return null
+  const v = Number(s)
+  return Number.isFinite(v) && v > 0 ? v : null
+}
+
+/** Нормы для трассы на карте: охранные расстояния, м (null — не заданы) */
+export interface CadDefaults {
+  buildingM: number | null
+  roadM: number | null
+}
+
 export interface CityConfig {
   bbox: LonLatBBox
   center: [number, number]
   workspace: string
   /** Фрагменты, видимые при открытии карты; пусто — все */
   defaultFragments: number[]
+  cadDefaults: CadDefaults
 }
 
 export function readCityConfig(pub: Record<string, any>): CityConfig {
@@ -68,6 +83,7 @@ export function readCityConfig(pub: Record<string, any>): CityConfig {
     center,
     workspace: String(pub.geoserver?.workspace || DEFAULT_WORKSPACE),
     defaultFragments: parseFragmentIds(pub.defaultFragments),
+    cadDefaults: { buildingM: parseMeters(pub.cadMinBuildingM), roadM: parseMeters(pub.cadMinRoadM) },
   }
 }
 

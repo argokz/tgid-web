@@ -55,6 +55,18 @@
       Enter — поставить точку, Tab — другое поле, Esc — сбросить ввод
     </div>
     <div
+      v-if="buildingText"
+      :class="distances?.buildingWarn ? 'trace-hud__warn' : 'trace-hud__ctx'"
+    >
+      {{ buildingText }}
+    </div>
+    <div
+      v-if="roadText"
+      :class="distances?.roadWarn ? 'trace-hud__warn' : 'trace-hud__ctx'"
+    >
+      {{ roadText }}
+    </div>
+    <div
       v-if="hint"
       class="trace-hud__dim"
     >
@@ -66,9 +78,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { formatMeters, formatTurn } from '~/utils/cadGeometry';
+import { formatApproxM, ON_WALL_M } from '~/utils/cadContext';
 import { snapLabel, type SnapResult } from '~/utils/cadSnap';
 import type { CadInputState } from '~/utils/cadInput';
-import type { TraceMetrics } from '~/composables/useTraceDraw';
+import type { TraceDistances, TraceMetrics } from '~/composables/useTraceDraw';
+import type { CadDefaults } from '~/utils/cityConfig';
 
 const props = defineProps<{
   position: { x: number; y: number } | null
@@ -80,7 +94,30 @@ const props = defineProps<{
   /** угол в поле — азимут (первый участок трассы), иначе поворот от предыдущего */
   angleIsAzimuth?: boolean
   hint?: string
+  /** размеры до здания и оси улицы по подложке (ориентировочно) */
+  distances?: TraceDistances | null
+  /** охранные расстояния города, м */
+  norms?: CadDefaults | null
 }>();
+
+const normText = (m: number | null | undefined) => (m != null ? ` — меньше нормы ${formatMeters(m)}` : '');
+
+const buildingText = computed(() => {
+  const b = props.distances?.building;
+  if (!b) return '';
+  const house = b.buildingNumber ? ` (дом ${b.buildingNumber})` : '';
+  if (b.inside) return `внутри здания${house}`;
+  if (b.distM < ON_WALL_M) return `на стене здания${house}`;
+  const warn = props.distances?.buildingWarn ? normText(props.norms?.buildingM) : '';
+  return `${formatApproxM(b.distM)} до здания${house}${warn}`;
+});
+
+const roadText = computed(() => {
+  const r = props.distances?.road;
+  if (!r) return '';
+  const warn = props.distances?.roadWarn ? normText(props.norms?.roadM) : '';
+  return `${formatApproxM(r.distM)} до оси ${r.roadName || 'улицы'}${warn}`;
+});
 
 const snapText = computed(() => {
   if (!props.snap) return '';
@@ -130,6 +167,13 @@ const guideText = computed(() => {
 }
 .trace-hud__turn {
   color: #ffcc80;
+}
+.trace-hud__ctx {
+  color: #d7ccc8;
+}
+.trace-hud__warn {
+  color: #ff8a80;
+  font-weight: 600;
 }
 .trace-hud__guide {
   color: #80cbc4;

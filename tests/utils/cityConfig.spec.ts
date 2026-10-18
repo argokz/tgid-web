@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { ALMATY_BBOX, ALMATY_CENTER, getCityConfig, parseBbox, parseCenter, parseFragmentIds, readCityConfig } from '~/utils/cityConfig'
+import { ALMATY_BBOX, ALMATY_CENTER, getCityConfig, parseBbox, parseCenter, parseFragmentIds, parseMeters, readCityConfig } from '~/utils/cityConfig'
 
 describe('настройки города стенда', () => {
   it('по умолчанию — Алматы и AlmatyGIS', () => {
-    expect(readCityConfig({})).toEqual({ bbox: ALMATY_BBOX, center: ALMATY_CENTER, workspace: 'AlmatyGIS', defaultFragments: [] })
+    expect(readCityConfig({})).toEqual({
+      bbox: ALMATY_BBOX, center: ALMATY_CENTER, workspace: 'AlmatyGIS', defaultFragments: [],
+      cadDefaults: { buildingM: null, roadM: null },
+    })
     // вне Nuxt (useRuntimeConfig нет) — то же
     expect(getCityConfig().workspace).toBe('AlmatyGIS')
   })
@@ -31,5 +34,9 @@ describe('настройки города стенда', () => {
     expect(parseFragmentIds(['7', 3])).toEqual([3, 7])
     expect(parseFragmentIds('x,0,9-8,1-99999,12')).toEqual([12])
     expect(readCityConfig({ defaultFragments: '2-3,3179' }).defaultFragments).toEqual([2, 3, 3179])
+    expect(parseMeters('5,5')).toBe(5.5)
+    expect(parseMeters('')).toBeNull()
+    expect(parseMeters('-1')).toBeNull()
+    expect(readCityConfig({ cadMinBuildingM: '5', cadMinRoadM: 'x' }).cadDefaults).toEqual({ buildingM: 5, roadM: null })
   })
 })

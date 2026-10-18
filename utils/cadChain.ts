@@ -115,6 +115,19 @@ export interface TraceDecor {
   /** радиус дуги угла поворота, м (≈ 22 px на текущем масштабе); 0 — без дуг и подписей */
   arcRadiusM?: number;
   guide?: TraceGuide | null;
+  /** размеры от курсора до стены здания и оси улицы (подложка, ориентировочно) */
+  dims?: readonly TraceDim[];
+  /** подсвеченное здание (ввод в здание): кольца контура */
+  outline?: readonly (readonly LngLat[])[];
+}
+
+export interface TraceDim {
+  from: LngLat;
+  to: LngLat;
+  /** entry — связь трубы со зданием (ввод в здание) */
+  kind: 'building' | 'road' | 'entry';
+  /** меньше нормы охранного расстояния */
+  warn?: boolean;
 }
 
 /** Повороты меньше этого — прямая, без дуги и подписи */
@@ -165,6 +178,17 @@ export const traceCollection = (
   decor: TraceDecor = {},
 ) => {
   const features: any[] = [];
+  for (const ring of decor.outline ?? []) {
+    if (ring.length < 2) continue;
+    features.push({ type: 'Feature', properties: { role: 'outline' }, geometry: { type: 'LineString', coordinates: ring } });
+  }
+  for (const d of decor.dims ?? []) {
+    features.push({
+      type: 'Feature',
+      properties: { role: 'dim', kind: d.kind, warn: Boolean(d.warn) },
+      geometry: { type: 'LineString', coordinates: [d.from, d.to] },
+    });
+  }
   if (decor.guide) {
     const g = decor.guide;
     features.push({

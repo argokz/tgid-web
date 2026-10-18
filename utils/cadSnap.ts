@@ -11,6 +11,7 @@
  */
 import { distanceM, localFrame, projectOnSegment, type LocalFrame, type XY } from '~/utils/cadGeometry';
 import type { LngLat } from '~/utils/lineVertices';
+import { contextSnapLabel, type ContextSnap, type ContextSnapKind } from '~/utils/cadContext';
 
 /** Ответ GET api/v1/topology/snap-data */
 export interface SnapDataNode {
@@ -40,7 +41,8 @@ export interface SnapData {
   lines: SnapDataLine[];
 }
 
-export type SnapKind = 'node' | 'vertex' | 'midpoint' | 'segment';
+/** сеть: узел, излом, середина, точка на трубе; подложка (этап C): угол / стена здания, ось улицы */
+export type SnapKind = 'node' | 'vertex' | 'midpoint' | 'segment' | ContextSnapKind;
 
 export interface SnapResult {
   kind: SnapKind;
@@ -54,6 +56,8 @@ export interface SnapResult {
   /** труба (true) или оборудование (false) — врезаться можно только в трубу */
   pipe?: boolean;
   fragmentId?: number | null;
+  /** привязка к подложке MapTiler (здание, улица) — ориентировочная */
+  context?: ContextSnap;
 }
 
 interface IndexedSegment {
@@ -144,7 +148,7 @@ export interface SnapOptions {
   lines?: boolean;
 }
 
-const RANK: Record<SnapKind, number> = { node: 0, vertex: 1, midpoint: 2, segment: 3 };
+const RANK: Record<SnapKind, number> = { node: 0, vertex: 1, midpoint: 2, segment: 3, corner: 4, wall: 5, road: 6 };
 
 /** Лучшая привязка в радиусе radiusM от курсора; null — привязки нет */
 export const findSnap = (index: SnapIndex, cursor: LngLat, radiusM: number, opts: SnapOptions = {}): SnapResult | null => {
@@ -226,6 +230,9 @@ const alongOf = (index: SnapIndex, line: SnapDataLine, coord: LngLat): [number, 
   return [d, Math.max(0, total - d)];
 };
 
+/** Привязка к подложке как привязка трассы (точка — новый узел или излом) */
+export const fromContextSnap = (c: ContextSnap): SnapResult => ({ kind: c.kind, coord: c.coord, distM: c.distM, context: c });
+
 /** Подпись привязки для бейджа у курсора */
 export const snapLabel = (s: SnapResult): string => {
   const m = (v: number) => v.toFixed(1).replace('.', ',');
@@ -240,6 +247,8 @@ export const snapLabel = (s: SnapResult): string => {
       return s.alongM
         ? `Врезка в уч. ${s.lineId}: ${m(s.alongM[0])} / ${m(s.alongM[1])} м`
         : `Врезка в уч. ${s.lineId}`;
+    default:
+      return s.context ? contextSnapLabel(s.context) : '';
   }
 };
 

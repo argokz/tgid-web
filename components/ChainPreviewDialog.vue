@@ -9,7 +9,7 @@
         <v-icon class="me-2">
           mdi-vector-polyline-plus
         </v-icon>
-        <span class="text-subtitle-1">Новая трасса</span>
+        <span class="text-subtitle-1">{{ note ? 'Ввод в здание' : 'Новая трасса' }}</span>
         <v-spacer />
         <span
           v-if="result"
@@ -18,6 +18,15 @@
       </v-card-title>
 
       <v-card-text class="pa-4">
+        <v-alert
+          v-if="note"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+        >
+          {{ note }}
+        </v-alert>
         <div
           v-if="loading"
           class="d-flex align-center justify-center py-6"
@@ -167,6 +176,8 @@ const props = defineProps<{
   loading: boolean
   saving: boolean
   error: string | null
+  /** ввод в здание: что построено по подложке (номер дома — только для сверки) */
+  note?: string | null
 }>();
 const emit = defineEmits<{ confirm: []; back: []; discard: [] }>();
 

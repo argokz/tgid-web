@@ -390,6 +390,53 @@
                   При рисовании: цифры — длина, Tab — угол поворота, Enter — поставить точку
                 </v-tooltip>
               </v-select>
+              <v-btn
+                size="small"
+                :color="contextSnapEnabled ? 'brown' : 'default'"
+                :variant="contextSnapEnabled ? 'tonal' : 'outlined'"
+                @click="contextSnapEnabled = !contextSnapEnabled"
+              >
+                <v-icon
+                  start
+                  size="16"
+                >mdi-office-building-marker-outline</v-icon>
+                Здания и улицы
+                <v-tooltip
+                  activator="parent"
+                  location="bottom"
+                >
+                  Привязка к углам и стенам зданий и к осям улиц подложки MapTiler, размеры от курсора
+                  «≈ до здания» и «≈ до оси улицы». Ориентировочно (точность подложки), с масштаба 15.
+                  Объекты сети важнее: рядом с ними привязка к ним
+                </v-tooltip>
+              </v-btn>
+              <v-btn
+                size="small"
+                :color="isEntryMode ? 'success' : 'default'"
+                :variant="isEntryMode ? 'flat' : 'outlined'"
+                @click="toggleEntryMode"
+              >
+                <v-icon
+                  start
+                  size="16"
+                >mdi-home-import-outline</v-icon>
+                Ввод в здание
+                <v-tooltip
+                  activator="parent"
+                  location="bottom"
+                >
+                  Клик по зданию: врезка в ближайшую трубу рабочего фрагмента, участок до стены и новый
+                  узел у стены — одной операцией после предпросмотра. Esc — выйти из режима
+                </v-tooltip>
+              </v-btn>
+              <v-chip
+                v-if="contextStatusText"
+                size="small"
+                color="warning"
+                variant="tonal"
+              >
+                {{ contextStatusText }}
+              </v-chip>
               <v-chip
                 v-if="snapStatusText"
                 size="small"
@@ -560,6 +607,9 @@
           :metrics="trace.metrics.value"
           :input="trace.input.value"
           :angle-is-azimuth="trace.points.value.length < 2"
+          :distances="trace.distances.value"
+          :norms="cadNorms"
+          :hint="entryHint"
         />
         <LazyChainPreviewDialog
           v-if="chainPreviewOpen"
@@ -568,6 +618,7 @@
           :loading="chainPreviewLoading"
           :saving="chainSaving"
           :error="chainPreviewError"
+          :note="chainNote"
           @confirm="confirmChain"
           @back="backToTrace"
           @discard="discardTrace"
@@ -1424,6 +1475,13 @@ const {
   pipeMode,
   polarStep,
   snapIndex,
+  contextSnap,
+  contextSnapEnabled,
+  cadNorms,
+  isEntryMode,
+  entryHint,
+  chainNote,
+  toggleEntryMode,
   trace,
   chainPreviewOpen,
   chainPreviewLoading,
@@ -1454,6 +1512,19 @@ const {
   cancelSplit,
   onDeleteFeature,
 } = topologyEditor;
+/** Привязка к подложке: пусто — работает или выключена */
+const contextStatusText = computed(() => {
+  if (!contextSnapEnabled.value) return '';
+  switch (contextSnap.status.value) {
+    case 'zoom-in':
+      return 'Здания и улицы — с масштаба 15';
+    case 'no-key':
+      return 'Здания и улицы недоступны (нет ключа MapTiler)';
+    default:
+      return '';
+  }
+});
+
 /** Состояние привязки трассы: пусто — всё готово */
 const snapStatusText = computed(() => {
   switch (snapIndex.status.value) {
