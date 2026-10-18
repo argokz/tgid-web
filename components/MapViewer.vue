@@ -354,7 +354,8 @@
                 location="bottom"
               >
                 Узел → изломы → узел или труба (врезка). Enter / двойной клик — завершить в пустом месте,
-                Shift+клик по узлу — продолжить через него, Alt — без привязки. Выкл — прежний режим «узел → узел»
+                Shift+клик по узлу — продолжить через него, Alt — без привязки. Цифры — длина участка,
+                Tab — угол поворота, Enter — точка по введённому. Выкл — прежний режим «узел → узел»
               </v-tooltip>
             </v-btn>
             <template v-if="isChainMode">
@@ -369,6 +370,26 @@
                 hide-details
                 class="topology-pipe-select"
               />
+              <v-select
+                v-model="polarStep"
+                :items="POLAR_STEP_ITEMS"
+                item-title="title"
+                item-value="value"
+                label="Шаг угла"
+                density="compact"
+                variant="outlined"
+                hide-details
+                class="topology-polar-select"
+              >
+                <v-tooltip
+                  activator="parent"
+                  location="bottom"
+                >
+                  Направление следующего участка прилипает к шагу угла от предыдущего (первый — от севера)
+                  и к направлениям ∥ / ⊥ соседней трубы. Shift — строго 90°, Alt — без привязок.
+                  При рисовании: цифры — длина, Tab — угол поворота, Enter — поставить точку
+                </v-tooltip>
+              </v-select>
               <v-chip
                 v-if="snapStatusText"
                 size="small"
@@ -531,11 +552,14 @@
         </div>
 
         <TraceHud
-          v-if="isEditTopologyMode && isChainMode && !isVertexMode && !isMergeMode"
+          v-if="isEditTopologyMode && isChainMode && !isVertexMode && !isMergeMode && !chainPreviewOpen"
           :position="trace.cursorPx.value"
           :snap="trace.snap.value"
           :drawing="trace.active.value"
           :lengths="trace.lengths.value"
+          :metrics="trace.metrics.value"
+          :input="trace.input.value"
+          :angle-is-azimuth="trace.points.value.length < 2"
         />
         <LazyChainPreviewDialog
           v-if="chainPreviewOpen"
@@ -626,6 +650,7 @@ import type { PickCandidate } from '~/utils/networkFeature';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
 import { PIPE_MODE_ITEMS } from '~/utils/cadChain';
+import { POLAR_STEP_ITEMS } from '~/utils/cadConstraint';
 import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 
 const props = defineProps<{
@@ -1397,6 +1422,7 @@ const {
   redoBusy,
   isChainMode,
   pipeMode,
+  polarStep,
   snapIndex,
   trace,
   chainPreviewOpen,
@@ -1803,6 +1829,10 @@ watch(
 .topology-pipe-select {
   min-width: 190px;
   max-width: 220px;
+}
+.topology-polar-select {
+  min-width: 110px;
+  max-width: 120px;
 }
 .topology-template-select {
   min-width: 220px;

@@ -7,7 +7,8 @@
  * эту точку); Enter или двойной клик — завершить в последней точке (излом становится новым узлом).
  */
 import type { SnapResult } from '~/utils/cadSnap';
-import { distanceM, polylineLengthM } from '~/utils/cadGeometry';
+import { destination, distanceM, formatDeg, formatMeters, polylineLengthM, turnArc, vertexAngles } from '~/utils/cadGeometry';
+import type { GuideKind } from '~/utils/cadConstraint';
 import type { LngLat } from '~/utils/lineVertices';
 
 export type TracePointKind = 'node' | 'tap' | 'new' | 'vertex';
@@ -102,9 +103,81 @@ export const traceLengths = (points: readonly TracePoint[], cursor: LngLat | nul
   };
 };
 
-/** GeoJSON предпросмотра: проложенная трасса, «резинка» к курсору, точки, привязка */
-export const traceCollection = (points: readonly TracePoint[], cursor: LngLat | null, snap: SnapResult | null) => {
+/** Направляющая к курсору (полярная привязка, ∥/⊥ трубе): луч от последней точки */
+export interface TraceGuide {
+  from: LngLat;
+  bearing: number;
+  lengthM: number;
+  kind: GuideKind;
+}
+
+export interface TraceDecor {
+  /** радиус дуги угла поворота, м (≈ 22 px на текущем масштабе); 0 — без дуг и подписей */
+  arcRadiusM?: number;
+  guide?: TraceGuide | null;
+}
+
+/** Повороты меньше этого — прямая, без дуги и подписи */
+const MIN_TURN_LABEL_DEG = 0.5;
+
+/** Подписи длин отрезков и углов поворота, дуги углов — по трассе вместе с «резинкой» */
+const decorFeatures = (coords: LngLat[], arcRadiusM: number) => {
+  const out: any[] = [];
+  for (let i = 1; i < coords.length; i++) {
+    const len = distanceM(coords[i - 1], coords[i]);
+    if (len <= 0) continue;
+    out.push({
+      type: 'Feature',
+      properties: { role: 'label', text: formatMeters(len) },
+      geometry: {
+        type: 'Point',
+        coordinates: [(coords[i - 1][0] + coords[i][0]) / 2, (coords[i - 1][1] + coords[i][1]) / 2],
+      },
+    });
+  }
+  for (const v of vertexAngles(coords)) {
+    if (Math.abs(v.turnDeg) < MIN_TURN_LABEL_DEG) continue;
+    const r = Math.min(
+      arcRadiusM,
+      0.4 * distanceM(coords[v.index - 1], v.coord),
+      0.4 * distanceM(v.coord, coords[v.index + 1]),
+    );
+    out.push({
+      type: 'Feature',
+      properties: { role: 'arc' },
+      geometry: { type: 'LineString', coordinates: turnArc(v.coord, v.inBearing, v.turnDeg, r) },
+    });
+    out.push({
+      type: 'Feature',
+      properties: { role: 'angle', text: `∠ ${formatDeg(Math.abs(v.turnDeg))}` },
+      // подпись — снаружи угла, по биссектрисе дуги
+      geometry: { type: 'Point', coordinates: destination(v.coord, r * 1.9, v.inBearing + v.turnDeg / 2) },
+    });
+  }
+  return out;
+};
+
+/** GeoJSON предпросмотра: проложенная трасса, «резинка» к курсору, точки, привязка, размеры */
+export const traceCollection = (
+  points: readonly TracePoint[],
+  cursor: LngLat | null,
+  snap: SnapResult | null,
+  decor: TraceDecor = {},
+) => {
   const features: any[] = [];
+  if (decor.guide) {
+    const g = decor.guide;
+    features.push({
+      type: 'Feature',
+      properties: { role: 'guide', kind: g.kind },
+      geometry: { type: 'LineString', coordinates: [g.from, destination(g.from, g.lengthM, g.bearing)] },
+    });
+  }
+  if (decor.arcRadiusM && points.length) {
+    const coords = points.map((p) => p.coord);
+    if (cursor) coords.push(cursor);
+    features.push(...decorFeatures(coords, decor.arcRadiusM));
+  }
   if (points.length >= 2) {
     features.push({
       type: 'Feature',

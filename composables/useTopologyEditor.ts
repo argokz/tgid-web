@@ -23,6 +23,7 @@ import type { CardKind, CardTemplate } from '~/utils/objectCard';
 import { useSnapIndex } from '~/composables/useSnapIndex';
 import { useTraceDraw } from '~/composables/useTraceDraw';
 import { chainRequestPoints, traceOutcome, type PipeMode, type TracePoint } from '~/utils/cadChain';
+import { DEFAULT_POLAR_STEP, POLAR_STEPS } from '~/utils/cadConstraint';
 import type { LngLat } from '~/utils/lineVertices';
 
 export interface TopologyEditorOptions {
@@ -187,12 +188,22 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
 
   // === Трасса участков (CAD): полилиния с привязкой, врезкой и режимом трубы ===
   const PIPE_MODE_KEY = 'topologyPipeMode';
+  const POLAR_STEP_KEY = 'topologyPolarStep';
   const readPipeMode = (): PipeMode => {
     try {
       const v = appStorage.getItem(PIPE_MODE_KEY);
       return v === 'pair' || v === 'supply' || v === 'return' ? v : 'common';
     } catch {
       return 'common';
+    }
+  };
+  const readPolarStep = (): number => {
+    try {
+      const raw = appStorage.getItem(POLAR_STEP_KEY);
+      const v = raw == null || raw === '' ? NaN : Number(raw);
+      return POLAR_STEPS.includes(v) ? v : DEFAULT_POLAR_STEP;
+    } catch {
+      return DEFAULT_POLAR_STEP;
     }
   };
   /** Трасса: клики рисуют участки (иначе — прежний режим «узел → узел») */
@@ -205,8 +216,18 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       // режим трубы — удобство: без хранилища действует до перезагрузки
     }
   });
+  /** Шаг полярной привязки трассы, градусы; 0 — выкл (Shift — всё равно 90°) */
+  const polarStep = ref<number>(readPolarStep());
+  watch(polarStep, (v) => {
+    try {
+      appStorage.setItem(POLAR_STEP_KEY, String(v));
+    } catch {
+      // шаг — удобство: без хранилища действует до перезагрузки
+    }
+    trace.refresh();
+  });
   const snapIndex = useSnapIndex(getMap, activeFragments);
-  const trace = useTraceDraw(getMap, snapIndex.index, activeFragments);
+  const trace = useTraceDraw(getMap, snapIndex.index, activeFragments, { polarStep });
   // сменили рабочий фрагмент — привязка к его объектам, без ожидания сдвига карты
   watch(() => activeFragments().join(','), () => snapIndex.invalidate());
   const chainPreviewOpen = ref(false);
@@ -592,6 +613,15 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       return;
     }
     if (!chainActive() || !trace.active.value) return;
+    if (ev.key === 'Shift') {
+      trace.setShift(true);
+      return;
+    }
+    // длина и угол с клавиатуры: цифры, Tab, Enter со значением
+    if (trace.handleKey(ev)) {
+      ev.preventDefault();
+      return;
+    }
     if (ev.key === 'Enter') {
       ev.preventDefault();
       void finishTrace();
@@ -602,6 +632,10 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       ev.preventDefault();
       trace.removeLast();
     }
+  };
+
+  const onKeyUp = (ev: KeyboardEvent) => {
+    if (ev.key === 'Shift') trace.setShift(false);
   };
 
   const onMapDblClickForTopology = (e: any) => {
@@ -970,7 +1004,10 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     map.on('click', onMapClickForTopology);
     map.on('contextmenu', onMapContextMenuForTopology);
     map.on('dblclick', onMapDblClickForTopology);
-    if (typeof window !== 'undefined') window.addEventListener('keydown', onKeyDown);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', onKeyDown);
+      window.addEventListener('keyup', onKeyUp);
+    }
   };
 
   const detach = (map: maplibregl.Map | null | undefined) => {
@@ -980,7 +1017,10 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     map?.off('click', onMapClickForTopology);
     map?.off('contextmenu', onMapContextMenuForTopology);
     map?.off('dblclick', onMapDblClickForTopology);
-    if (typeof window !== 'undefined') window.removeEventListener('keydown', onKeyDown);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    }
     trace.clear();
     snapIndex.stop();
     if (draggedNodeMarker) draggedNodeMarker.remove();
@@ -1010,6 +1050,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     redoBusy,
     isChainMode,
     pipeMode,
+    polarStep,
     snapIndex,
     trace,
     chainPreviewOpen,

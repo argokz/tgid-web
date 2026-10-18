@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { bearingDeg, distanceM } from '~/utils/cadGeometry';
 import { nextTick, ref } from 'vue';
 
 const { api, notify, vertex, markers } = vi.hoisted(() => ({
@@ -465,6 +466,33 @@ describe('useTopologyEditor', () => {
       await editor.onMapClickForTopology(ev(76.9, 43.24));
       expect(editor.trace.points.value.length).toBe(0);
       expect(notify.showWarning).toHaveBeenCalledWith(expect.stringContaining('Приблизьте'));
+    });
+
+    it('этап B: длина и азимут с клавиатуры ставят точку точно; Enter без ввода — завершает', async () => {
+      const { editor, map } = await start();
+      editor.attach(map as any);
+      api.createChain.mockResolvedValue(ok());
+      const key = (k: string, mods: Record<string, boolean> = {}) =>
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: k, cancelable: true, ...mods }));
+      await editor.onMapClickForTopology(ev(76.900001, 43.24));
+      editor.onMapMouseMoveForTopology(ev(76.9001, 43.2401));
+      for (const k of ['2', '5', ',', '5', 'Tab', '9', '0']) key(k);
+      expect(editor.trace.input.value).toEqual({ length: '25,5', angle: '90', field: 'angle' });
+      expect(editor.trace.metrics.value.lockedLength).toBe(true);
+      key('Enter');
+      const pts = editor.trace.points.value;
+      expect(pts.map((p) => p.kind)).toEqual(['node', 'vertex']);
+      expect(distanceM(pts[0].coord, pts[1].coord)).toBeCloseTo(25.5, 2);
+      expect(bearingDeg(pts[0].coord, pts[1].coord)).toBeCloseTo(90, 2);
+      expect(editor.trace.input.value.field).toBeNull();
+      // Esc с вводом сбрасывает только ввод
+      key('7');
+      key('Escape');
+      expect(editor.trace.points.value.length).toBe(2);
+      key('Enter');
+      await flush();
+      expect(api.createChain.mock.calls[0][0].points.map((p: any) => p.kind)).toEqual(['node', 'new']);
+      editor.detach(map as any);
     });
 
     it('повтор отменённой операции', async () => {

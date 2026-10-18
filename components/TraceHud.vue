@@ -1,5 +1,5 @@
 <template>
-  <!-- Бейдж у курсора при рисовании трассы: привязка и длины -->
+  <!-- Бейдж у курсора при рисовании трассы: привязка, длины, поворот, ввод длины и угла -->
   <div
     v-if="position"
     class="trace-hud"
@@ -14,13 +14,45 @@
     <div v-if="drawing">
       {{ formatMeters(lengths.lastM) }}
       <span
-        v-if="lengths.segmentM !== lengths.lastM"
-        class="trace-hud__dim"
-      >· участок {{ formatMeters(lengths.segmentM) }}</span>
+        v-if="turnText"
+        class="trace-hud__turn"
+      >· {{ turnText }}</span>
       <span
-        v-if="lengths.totalM !== lengths.segmentM"
-        class="trace-hud__dim"
-      >· всего {{ formatMeters(lengths.totalM) }}</span>
+        v-if="guideText"
+        class="trace-hud__guide"
+      >· {{ guideText }}</span>
+    </div>
+    <div
+      v-if="drawing && (lengths.segmentM !== lengths.lastM || lengths.totalM !== lengths.segmentM)"
+      class="trace-hud__dim"
+    >
+      <span v-if="lengths.segmentM !== lengths.lastM">участок {{ formatMeters(lengths.segmentM) }}</span>
+      <span v-if="lengths.totalM !== lengths.segmentM"> · всего {{ formatMeters(lengths.totalM) }}</span>
+    </div>
+    <div
+      v-if="drawing && input"
+      class="trace-hud__input"
+    >
+      <span
+        class="trace-hud__field"
+        :class="{ 'trace-hud__field--active': input.field === 'length', 'trace-hud__field--locked': metrics?.lockedLength }"
+      >Длина <b>{{ input.length || '—' }}</b> м</span>
+      <span
+        class="trace-hud__field"
+        :class="{ 'trace-hud__field--active': input.field === 'angle', 'trace-hud__field--locked': metrics?.lockedAngle }"
+      >{{ angleIsAzimuth ? 'Азимут' : 'Поворот' }} <b>{{ input.angle || '—' }}</b>°</span>
+    </div>
+    <div
+      v-if="drawing && input && !input.field"
+      class="trace-hud__dim"
+    >
+      цифры — длина, Tab — {{ angleIsAzimuth ? 'азимут' : 'поворот (− влево)' }}, Shift — 90°
+    </div>
+    <div
+      v-else-if="drawing && input?.field"
+      class="trace-hud__dim"
+    >
+      Enter — поставить точку, Tab — другое поле, Esc — сбросить ввод
     </div>
     <div
       v-if="hint"
@@ -33,14 +65,20 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { formatMeters } from '~/utils/cadGeometry';
+import { formatMeters, formatTurn } from '~/utils/cadGeometry';
 import { snapLabel, type SnapResult } from '~/utils/cadSnap';
+import type { CadInputState } from '~/utils/cadInput';
+import type { TraceMetrics } from '~/composables/useTraceDraw';
 
 const props = defineProps<{
   position: { x: number; y: number } | null
   snap: SnapResult | null
   drawing: boolean
   lengths: { totalM: number; segmentM: number; lastM: number }
+  metrics?: TraceMetrics | null
+  input?: CadInputState | null
+  /** угол в поле — азимут (первый участок трассы), иначе поворот от предыдущего */
+  angleIsAzimuth?: boolean
   hint?: string
 }>();
 
@@ -50,6 +88,24 @@ const snapText = computed(() => {
   return props.snap.lineId != null && props.snap.kind !== 'node' && props.snap.pipe === false
     ? `${label} (оборудование — врезка невозможна)`
     : label;
+});
+
+const turnText = computed(() => {
+  const t = props.metrics?.turnDeg;
+  return t == null ? '' : formatTurn(t);
+});
+
+const guideText = computed(() => {
+  switch (props.metrics?.guide) {
+    case 'parallel':
+      return '∥ трубе';
+    case 'perpendicular':
+      return '⊥ трубе';
+    case 'polar':
+      return 'шаг угла';
+    default:
+      return '';
+  }
 });
 </script>
 
@@ -71,5 +127,28 @@ const snapText = computed(() => {
 }
 .trace-hud__dim {
   opacity: 0.75;
+}
+.trace-hud__turn {
+  color: #ffcc80;
+}
+.trace-hud__guide {
+  color: #80cbc4;
+}
+.trace-hud__input {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+.trace-hud__field {
+  padding: 0 5px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+}
+.trace-hud__field--active {
+  border-color: #ffb74d;
+  background: rgba(255, 183, 77, 0.2);
+}
+.trace-hud__field--locked b {
+  color: #ffcc80;
 }
 </style>

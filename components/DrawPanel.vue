@@ -73,6 +73,9 @@
             class="text-caption text-medium-emphasis"
           >
             Отрезок {{ formatLength(draw.currentSegment.value.length) }}, азимут {{ formatBearing(draw.currentSegment.value.bearing) }}
+            <template v-if="draw.currentSegment.value.turn != null">
+              , {{ formatTurn(draw.currentSegment.value.turn) }}
+            </template>
           </div>
         </template>
         <div class="text-caption text-medium-emphasis mt-1 draw-panel__keys">
@@ -249,6 +252,7 @@ import {
   type Measurement,
 } from '~/composables/useMapDraw';
 import { useNotificationStore } from '~/stores/notificationStore';
+import { formatTurn } from '~/utils/cadGeometry';
 
 const props = defineProps<{ map: MapLibreMap | null }>();
 const open = defineModel<boolean>({ default: false });

@@ -14,6 +14,7 @@ import { computed, ref, shallowRef } from 'vue';
 import type { Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent } from 'maplibre-gl';
 import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 import { sampleElevation } from '~/utils/terrainSample';
+import { formatDeg, formatTurn, signedTurnDeg, vertexAngles } from '~/utils/cadGeometry';
 
 export type DrawMode = 'none' | 'measure-distance' | 'measure-area';
 
@@ -59,8 +60,10 @@ const LAYER_DRAFT_LINE = 'measure-draft-line';
 const LAYER_DRAFT_VERTEX = 'measure-draft-vertex';
 const LAYER_SNAP = 'measure-snap';
 const LAYER_CURSOR_LABEL = 'measure-cursor-label';
+const LAYER_ANGLE_LABEL = 'measure-angle-label';
+const LAYER_DRAFT_ANGLE_LABEL = 'measure-draft-angle-label';
 const ALL_LAYERS = [
-  LAYER_CURSOR_LABEL, LAYER_SNAP, LAYER_DRAFT_VERTEX, LAYER_DRAFT_LINE, LAYER_DRAFT_FILL,
+  LAYER_CURSOR_LABEL, LAYER_DRAFT_ANGLE_LABEL, LAYER_ANGLE_LABEL, LAYER_SNAP, LAYER_DRAFT_VERTEX, LAYER_DRAFT_LINE, LAYER_DRAFT_FILL,
   LAYER_TOTAL_LABEL, LAYER_SEGMENT_LABEL, LAYER_VERTEX, LAYER_LINE, LAYER_FILL,
 ];
 
@@ -216,6 +219,17 @@ function segmentLabels(coords: number[][], closed: boolean, extra: Record<string
   return out;
 }
 
+/** Углы поворота в изломах линейки (транспортир): «∠ 35°» у вершины */
+export function angleLabels(coords: number[][], extra: Record<string, unknown> = {}) {
+  return vertexAngles(coords as [number, number][])
+    .filter((v) => Math.abs(v.turnDeg) >= 0.5)
+    .map((v) => ({
+      type: 'Feature',
+      properties: { angleLabel: `∠ ${formatDeg(Math.abs(v.turnDeg))}`, ...extra },
+      geometry: { type: 'Point', coordinates: v.coord },
+    }));
+}
+
 export function measurementLabel(m: Pick<Measurement, 'kind' | 'length' | 'area'>): string {
   return m.kind === 'area' ? `${formatArea(m.area || 0)} · периметр ${formatLength(m.length)}` : formatLength(m.length);
 }
@@ -283,7 +297,11 @@ export function useMapDraw() {
     const h = hoverPoint.value;
     if (!pts.length || !h) return null;
     const last = pts[pts.length - 1];
-    return { length: haversine(last, h), bearing: bearing(last, h) };
+    const prev = pts.length >= 2 ? pts[pts.length - 2] : null;
+    const b = bearing(last, h);
+    // поворот от предыдущего отрезка (транспортир); для первого отрезка — нет
+    const turn = prev && haversine(prev, last) > 0 && haversine(last, h) > 0 ? signedTurnDeg(bearing(prev, last), b) : null;
+    return { length: haversine(last, h), bearing: b, turn };
   });
 
   const featureCollection = () => {
@@ -303,6 +321,7 @@ export function useMapDraw() {
         geometry: { type: 'Point', coordinates: c },
       }));
       if (m.coordinates.length > 2 || closed) features.push(...segmentLabels(m.coordinates, closed, { measureId: m.id }));
+      if (!closed) features.push(...angleLabels(m.coordinates, { measureId: m.id }));
       const anchor = closed ? centroid(m.coordinates) : m.coordinates[m.coordinates.length - 1];
       features.push({
         type: 'Feature',
@@ -339,6 +358,7 @@ export function useMapDraw() {
         geometry: { type: 'LineString', coordinates: isArea.value ? closeRing(pts) : pts },
       });
       features.push(...segmentLabels(pts, isArea.value && pts.length >= 3));
+      if (!isArea.value) features.push(...angleLabels(pts));
     }
     const h = hoverPoint.value;
     if (h && isMeasuring.value) {
@@ -350,6 +370,7 @@ export function useMapDraw() {
         ? [
           isArea.value && draftArea.value > 0 ? formatArea(draftArea.value) : `Всего ${formatLength(draftLength.value)}`,
           `${formatLength(seg.length)} · азимут ${formatBearing(seg.bearing)}`,
+          ...(seg.turn != null ? [formatTurn(seg.turn)] : []),
         ]
         : [hoverSnapped.value ? 'Узел сети — кликните, чтобы начать' : 'Кликните, чтобы начать'];
       features.push({
@@ -496,6 +517,25 @@ export function useMapDraw() {
         'text-justify': 'left',
       },
       paint: { ...labelPaint('#202124'), 'text-halo-width': 2.5 },
+    });
+    // углы поворота в изломах (транспортир) — сбоку от вершины
+    const angleLayout = { ...labelLayout('angleLabel', 11), 'text-anchor': 'bottom-left', 'text-offset': [0.6, -0.4] };
+    map.addLayer({
+      id: LAYER_ANGLE_LABEL,
+      type: 'symbol',
+      source: SOURCE_ID,
+      filter: ['has', 'angleLabel'],
+      minzoom: 13,
+      layout: angleLayout,
+      paint: labelPaint('#5d4037'),
+    });
+    map.addLayer({
+      id: LAYER_DRAFT_ANGLE_LABEL,
+      type: 'symbol',
+      source: SOURCE_DRAFT_ID,
+      filter: ['has', 'angleLabel'],
+      layout: angleLayout,
+      paint: labelPaint('#5d4037'),
     });
   };
 

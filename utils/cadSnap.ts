@@ -242,3 +242,74 @@ export const snapLabel = (s: SnapResult): string => {
         : `Врезка в уч. ${s.lineId}`;
   }
 };
+
+const segBearing = (a: XY, b: XY) => ((Math.atan2(b[0] - a[0], b[1] - a[1]) * 180) / Math.PI + 360) % 360;
+
+/**
+ * Направления труб у точки трассы — для направляющих ∥ и ⊥: у узла — первые отрезки
+ * всех его участков, у врезки — отрезок трубы в точке врезки.
+ */
+export const pipeBearingsAt = (
+  index: SnapIndex,
+  point: { nodeId?: number; lineId?: number; coord: LngLat },
+): number[] => {
+  const out: number[] = [];
+  if (point.nodeId != null) {
+    for (const line of index.lineById.values()) {
+      if (line.c.length < 2) continue;
+      if (line.n1 === point.nodeId) out.push(segBearing(index.frame.toXY(line.c[0]), index.frame.toXY(line.c[1])));
+      if (line.n2 === point.nodeId) {
+        const n = line.c.length;
+        out.push(segBearing(index.frame.toXY(line.c[n - 1]), index.frame.toXY(line.c[n - 2])));
+      }
+    }
+  } else if (point.lineId != null) {
+    const line = index.lineById.get(point.lineId);
+    if (line && line.c.length >= 2) {
+      const p = index.frame.toXY(point.coord);
+      let best = Infinity;
+      let bearing: number | null = null;
+      for (let i = 0; i < line.c.length - 1; i++) {
+        const a = index.frame.toXY(line.c[i]);
+        const b = index.frame.toXY(line.c[i + 1]);
+        const d = projectOnSegment(p, a, b).dist;
+        if (d < best) {
+          best = d;
+          bearing = segBearing(a, b);
+        }
+      }
+      if (bearing != null) out.push(bearing);
+    }
+  }
+  return out;
+};
+
+/** Направление ближайшей к курсору трубы в радиусе radiusM (направляющая «вдоль трубы»), null — нет */
+export const nearestPipeBearing = (
+  index: SnapIndex,
+  cursor: LngLat,
+  radiusM: number,
+  fragmentIds?: readonly number[],
+): number | null => {
+  const p = index.frame.toXY(cursor);
+  const fragments = fragmentIds?.length ? new Set(fragmentIds) : null;
+  const c0x = Math.floor((p[0] - radiusM) / index.cell);
+  const c1x = Math.floor((p[0] + radiusM) / index.cell);
+  const c0y = Math.floor((p[1] - radiusM) / index.cell);
+  const c1y = Math.floor((p[1] + radiusM) / index.cell);
+  let best = radiusM;
+  let bearing: number | null = null;
+  for (let cx = c0x; cx <= c1x; cx++) {
+    for (let cy = c0y; cy <= c1y; cy++) {
+      for (const seg of index.segments.get(key(cx, cy)) ?? []) {
+        if ((fragments && (seg.line.f == null || !fragments.has(seg.line.f))) || seg.len === 0) continue;
+        const d = projectOnSegment(p, seg.a, seg.b).dist;
+        if (d <= best) {
+          best = d;
+          bearing = segBearing(seg.a, seg.b);
+        }
+      }
+    }
+  }
+  return bearing;
+};

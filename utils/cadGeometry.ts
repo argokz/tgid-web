@@ -80,6 +80,70 @@ export const turnAngleDeg = (prev: LngLat, cur: LngLat, next: LngLat): number | 
   return Math.acos(cos) / DEG;
 };
 
+/** Угол в (-180, 180] */
+export const normalizeDeg180 = (deg: number): number => {
+  const d = ((deg % 360) + 360) % 360;
+  return d > 180 ? d - 360 : d;
+};
+
+/** Угол в [0, 360) */
+export const normalizeDeg360 = (deg: number): number => ((deg % 360) + 360) % 360;
+
+/** Точка в distM метрах от origin по азимуту bearing (градусы от севера по часовой) */
+export const destination = (origin: LngLat, distM: number, bearing: number): LngLat => {
+  const f = localFrame(origin);
+  const b = bearing * DEG;
+  return f.toLngLat([distM * Math.sin(b), distM * Math.cos(b)]);
+};
+
+/**
+ * Поворот трассы со знаком: + вправо (по часовой), − влево; 0 — прямо.
+ * Модуль — угол отвода (как turnAngleDeg).
+ */
+export const signedTurnDeg = (inBearing: number, outBearing: number): number => normalizeDeg180(outBearing - inBearing);
+
+/** Углы в изломах ломаной: поворот со знаком и внутренний угол α = 180° − |поворот| */
+export interface VertexAngle {
+  index: number;
+  coord: LngLat;
+  turnDeg: number;
+  innerDeg: number;
+  inBearing: number;
+  outBearing: number;
+}
+
+export const vertexAngles = (coords: readonly LngLat[]): VertexAngle[] => {
+  const out: VertexAngle[] = [];
+  for (let i = 1; i < coords.length - 1; i++) {
+    if (distanceM(coords[i - 1], coords[i]) === 0 || distanceM(coords[i], coords[i + 1]) === 0) continue;
+    const inBearing = bearingDeg(coords[i - 1], coords[i]);
+    const outBearing = bearingDeg(coords[i], coords[i + 1]);
+    const turn = signedTurnDeg(inBearing, outBearing);
+    out.push({ index: i, coord: coords[i], turnDeg: turn, innerDeg: 180 - Math.abs(turn), inBearing, outBearing });
+  }
+  return out;
+};
+
+/** «90°», «22,5°» — без лишних нулей */
+export const formatDeg = (deg: number): string => {
+  const r = Math.round(deg * 10) / 10;
+  return `${Number.isInteger(r) ? r.toFixed(0) : r.toFixed(1).replace('.', ',')}°`;
+};
+
+/** «поворот 90° вправо» / «прямо» */
+export const formatTurn = (turnDeg: number): string => {
+  const a = Math.abs(turnDeg);
+  if (a < 0.05) return 'прямо';
+  return `поворот ${formatDeg(a)} ${turnDeg > 0 ? 'вправо' : 'влево'}`;
+};
+
+/** Дуга угла поворота в вершине: от продолжения входящего направления к исходящему */
+export const turnArc = (vertex: LngLat, inBearing: number, turnDeg: number, radiusM: number, steps = 12): LngLat[] => {
+  const pts: LngLat[] = [];
+  for (let k = 0; k <= steps; k++) pts.push(destination(vertex, radiusM, inBearing + (turnDeg * k) / steps));
+  return pts;
+};
+
 /** «12,34 м» / «1,23 км» — как в остальном интерфейсе (запятая) */
 export const formatMeters = (m: number): string =>
   m >= 1000 ? `${(m / 1000).toFixed(2).replace('.', ',')} км` : `${m.toFixed(2).replace('.', ',')} м`;
