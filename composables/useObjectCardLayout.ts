@@ -1,4 +1,4 @@
-import { reactive, watch } from 'vue';
+import { reactive, ref, watch } from 'vue';
 import { appStorage } from '~/utils/appStorage';
 
 /**
@@ -12,6 +12,12 @@ export interface ObjectCardLayout {
   panelWidth: number;
   float: { x: number; y: number; w: number; h: number };
 }
+
+/**
+ * Ширина открытой панели карточки справа (px; 0 — панели нет или окно плавающее): панели поверх
+ * карты (выбор объектов на карте) центрируются по видимой части карты, а не уходят под карточку.
+ */
+export const cardPanelInset = ref(0);
 
 const STORAGE_KEY = 'objectCardLayout';
 export const PANEL_MIN_WIDTH = 360;

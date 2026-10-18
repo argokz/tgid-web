@@ -27,8 +27,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { clampFloat, clampPanelWidth, useObjectCardLayout } from '~/composables/useObjectCardLayout';
+import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue';
+import { cardPanelInset, clampFloat, clampPanelWidth, useObjectCardLayout } from '~/composables/useObjectCardLayout';
 
 const props = defineProps<{ modelValue: boolean; mobile?: boolean }>();
 defineEmits<{ 'update:modelValue': [value: boolean] }>();
@@ -47,7 +47,13 @@ onMounted(() => {
   updateViewport();
   window.addEventListener('resize', updateViewport);
 });
+watchEffect(() => {
+  cardPanelInset.value = props.modelValue && !props.mobile && layout.mode === 'panel'
+    ? clampPanelWidth(layout.panelWidth, viewport.value.w)
+    : 0;
+});
 onBeforeUnmount(() => {
+  cardPanelInset.value = 0;
   window.removeEventListener('resize', updateViewport);
   stopPointer();
 });

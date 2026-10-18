@@ -682,19 +682,19 @@
             </v-btn>
 
             <v-btn
-              v-if="canEditCard && !editing && editTarget?.kind === 'line'"
+              v-if="canEditCard && !editing"
               icon
               variant="text"
               size="small"
               color="primary"
-              aria-label="Править несколько участков"
+              :aria-label="batchLabel"
               @click="startBatchEditing"
             >
               <v-icon size="18">mdi-select-multiple</v-icon>
               <v-tooltip
                 activator="parent"
                 location="bottom"
-              >Править несколько участков: выбрать на карте (Shift + рамка — все в рамке)</v-tooltip>
+              >{{ batchLabel }}: выбрать на карте (Shift + рамка — все в рамке)</v-tooltip>
             </v-btn>
 
             <v-btn
@@ -1430,7 +1430,8 @@ const cardLayout = useObjectCardLayout()
 const toggleCardMode = () => { cardLayout.mode = cardLayout.mode === 'panel' ? 'float' : 'panel' }
 // Что правится через карточку (этапы окна свойств: участки, затем узлы, потребители…).
 // Линия в десктопе — всегда карточка участка heatPipeSections (PropertyDial::init_gid)
-const CARD_EDIT_NODE_TABLES = new Set<string>([])
+// Узел и камера — таблица nodes (камера — тип узла); потребители, источники — следующие этапы
+const CARD_EDIT_NODE_TABLES = new Set<string>(['nodes'])
 const editing = ref(false)
 const editDirty = ref(false)
 const cardEditRef = ref<{ hasChanges: () => boolean } | null>(null)
@@ -1449,13 +1450,15 @@ const startEditing = () => {
   }
 }
 
-// --- несколько участков одной карточкой: выбор на карте (клик, Shift + рамка) ---
+// --- несколько участков (узлов) одной карточкой: выбор на карте (клик, Shift + рамка) ---
 const batchIds = ref<number[] | null>(null)
 const mapBridge = useJournalMapBridge()
+const batchLabel = computed(() => (editTarget.value?.kind === 'node' ? 'Править несколько узлов' : 'Править несколько участков'))
 const startBatchEditing = async () => {
   const target = editTarget.value
-  if (!canEditCard.value || target?.kind !== 'line') return
-  const ids = await mapBridge.startPick([target.id], 'свойства участков', 'line', 'Выбор')
+  if (!canEditCard.value || !target) return
+  const node = target.kind === 'node'
+  const ids = await mapBridge.startPick([target.id], node ? 'свойства узлов' : 'свойства участков', target.kind, 'Выбор')
   if (!ids?.length) return
   batchIds.value = ids
   editing.value = true

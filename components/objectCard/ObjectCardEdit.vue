@@ -37,16 +37,13 @@
           color="primary"
         >mdi-select-multiple</v-icon>
         <span>
-          Участков: <b>{{ card.selection.lines }}</b><template v-if="card.selection.columns.length > 1">
+          {{ kind === 'node' ? 'Узлов' : 'Участков' }}: <b>{{ card.selection.lines }}</b><template v-if="card.selection.columns.length > 1">
             (подача {{ card.selection.columns[0].line_ids.length }}, обратка {{ card.selection.columns[1].line_ids.length }})</template>.
           Поля с пометкой «разные» не меняются, пока не задано значение.
         </span>
       </div>
-      <!-- Заполнение: как у соседнего участка, из шаблона; сохранить значения как шаблон -->
-      <div
-        v-if="kind === 'line'"
-        class="oce-fill"
-      >
+      <!-- Заполнение: как у соседнего участка (узла), из шаблона; сохранить значения как шаблон -->
+      <div class="oce-fill">
         <v-btn
           v-if="!card.batch"
           size="small"
@@ -60,7 +57,9 @@
             activator="parent"
             location="bottom"
             max-width="300"
-          >Заполнить конструктив значениями смежного участка (общий узел; предпочтительно тот же Ду). Поля подсветятся — проверьте и сохраните.</v-tooltip>
+          >{{ kind === 'node'
+            ? 'Заполнить код схемы, конструкцию, балансовую принадлежность и отметки значениями смежного узла (предпочтительно того же типа). Поля подсветятся — проверьте и сохраните.'
+            : 'Заполнить конструктив значениями смежного участка (общий узел; предпочтительно тот же Ду). Поля подсветятся — проверьте и сохраните.' }}</v-tooltip>
         </v-btn>
         <v-menu location="bottom start">
           <template #activator="{ props: menuProps }">
@@ -278,7 +277,9 @@
             </v-btn-toggle>
           </div>
           <div class="text-caption text-medium-emphasis my-2">
-            Поля шаблона (длина, инвентарный номер и местные сопротивления — свои у каждого участка и не предлагаются):
+            {{ kind === 'node'
+              ? 'Поля шаблона (наименование, номера, признак трубопровода и отметки — свои у каждого узла и не предлагаются):'
+              : 'Поля шаблона (длина, инвентарный номер и местные сопротивления — свои у каждого участка и не предлагаются):' }}
           </div>
           <div
             v-for="it in tplCandidates"
@@ -315,18 +316,18 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-    <!-- Несколько участков: предпросмотр «было → станет» перед применением -->
+    <!-- Несколько участков (узлов): предпросмотр «было → станет» перед применением -->
     <v-dialog
       v-model="previewOpen"
       max-width="640"
       scrollable
     >
       <v-card v-if="preview">
-        <v-card-title class="text-subtitle-1">Изменить свойства участков</v-card-title>
+        <v-card-title class="text-subtitle-1">Изменить свойства {{ kind === 'node' ? 'узлов' : 'участков' }}</v-card-title>
         <v-divider />
         <v-card-text class="oce-preview">
           <div class="text-body-2 mb-2">
-            Участков в выборе: {{ preview.lines }}. Изменится строк: <b>{{ preview.changes }}</b>.
+            {{ kind === 'node' ? 'Узлов' : 'Участков' }} в выборе: {{ preview.lines }}. Изменится строк: <b>{{ preview.changes }}</b>.
           </div>
           <div
             v-for="(pf, i) in preview.fields"
@@ -400,7 +401,7 @@ const props = defineProps<{
   kind: 'line' | 'node'
   table: string
   objectId: number
-  /** несколько участков (linesobj.id): одна карточка, значения по колонкам */
+  /** несколько участков (linesobj.id) или узлов (nodes.id): одна карточка, значения по колонкам */
   batchIds?: number[] | null
 }>();
 const emit = defineEmits<{
@@ -422,7 +423,7 @@ const load = async () => {
   loadError.value = '';
   try {
     const data = props.batchIds?.length
-      ? await fastApiService.getCardBatch(props.batchIds)
+      ? await fastApiService.getCardBatch(props.batchIds, props.kind)
       : await fastApiService.getCardEdit(props.kind, props.table, props.objectId);
     card.value = data;
     draft.value = initialDraft(data);
@@ -520,21 +521,22 @@ const fillFromNeighbor = async () => {
   if (!card.value || card.value.batch) return;
   neighborLoading.value = true;
   try {
-    const res = await fastApiService.getCardNeighbor(props.objectId);
+    const res = await fastApiService.getCardNeighbor(props.kind, props.objectId);
     const before = changes.value.length;
     const from = new Set<number>();
     res.columns.forEach((c, ci) => {
-      if (!c.neighbor_line_id) return;
-      from.add(c.neighbor_line_id);
+      if (!c.neighbor_id) return;
+      from.add(c.neighbor_id);
       fillColumn(ci, c.values, c.titles);
     });
     const notify = useNotificationStore();
     const diff = changes.value.length - before;
-    if (!from.size) notify.showWarning('Смежный участок с паспортом не найден');
-    else if (!diff) notify.showInfo(`Значения уже как у участка ${[...from].join(', ')}`);
-    else notify.showInfo(`Как у участка ${[...from].join(', ')}: изменено полей ${diff} (подсвечены). Проверьте и сохраните.`);
+    const who = props.kind === 'node' ? 'узла' : 'участка';
+    if (!from.size) notify.showWarning(props.kind === 'node' ? 'Соседний узел не найден' : 'Смежный участок с паспортом не найден');
+    else if (!diff) notify.showInfo(`Значения уже как у ${who} ${[...from].join(', ')}`);
+    else notify.showInfo(`Как у ${who} ${[...from].join(', ')}: изменено полей ${diff} (подсвечены). Проверьте и сохраните.`);
   } catch (e) {
-    useNotificationStore().showError(formatApiError(e, 'Не удалось получить значения соседнего участка'));
+    useNotificationStore().showError(formatApiError(e, 'Не удалось получить значения соседнего объекта'));
   } finally {
     neighborLoading.value = false;
   }
@@ -548,7 +550,7 @@ const templatesLoading = ref(false);
 const loadTemplates = async () => {
   templatesLoading.value = true;
   try {
-    templates.value = (await fastApiService.listCardTemplates('line')).items;
+    templates.value = (await fastApiService.listCardTemplates(props.kind)).items;
   } catch (e) {
     useNotificationStore().showError(formatApiError(e, 'Не удалось загрузить шаблоны'));
   } finally {
@@ -604,7 +606,7 @@ const saveTemplate = async () => {
   }
   tplSaving.value = true;
   try {
-    const t = await fastApiService.createCardTemplate({ kind: 'line', name: tplName.value.trim(), values, shared: tplShared.value });
+    const t = await fastApiService.createCardTemplate({ kind: props.kind, name: tplName.value.trim(), values, shared: tplShared.value });
     templates.value = [...templates.value, t];
     saveTplOpen.value = false;
     useNotificationStore().showSuccess(`Шаблон «${t.name}» сохранён`);
@@ -661,7 +663,7 @@ const cancel = async () => {
   emit('cancel');
 };
 
-// --- несколько участков: предпросмотр и применение ---
+// --- несколько участков (узлов): предпросмотр и применение ---
 const previewOpen = ref(false);
 const preview = ref<CardBatchPreview | null>(null);
 const wasText = (was: CardBatchPreview['fields'][number]['was']) =>
@@ -688,7 +690,7 @@ const applyBatch = async () => {
   saving.value = true;
   try {
     const res = await fastApiService.applyCardBatch({
-      ids: props.batchIds, changes: batchChanges.value, expected_changes: preview.value.changes,
+      kind: props.kind, ids: props.batchIds, changes: batchChanges.value, expected_changes: preview.value.changes,
     });
     previewOpen.value = false;
     emit('saved', { changed: res.changed, changeGroupId: res.change_group_id });
@@ -712,7 +714,7 @@ const save = async () => {
     if (!props.batchIds?.length || !batchChanges.value.length) return;
     saving.value = true;
     try {
-      preview.value = await fastApiService.previewCardBatch({ ids: props.batchIds, changes: batchChanges.value });
+      preview.value = await fastApiService.previewCardBatch({ kind: props.kind, ids: props.batchIds, changes: batchChanges.value });
       previewOpen.value = true;
     } catch (e) {
       useNotificationStore().showError(formatApiError(e, 'Не удалось подготовить предпросмотр'));

@@ -130,4 +130,17 @@ describe('objectCard', () => {
     expect(vals.map((v) => [v.table, v.field, v.value])).toEqual([['heatpipesections', 'diameterCondit', 125]])
     expect(columnValues(card, draft, 0).map((v) => v.field)).toEqual(['diameterCondit', 'pipeSectStateIDflow'])
   })
+
+  it('columnValues: у узла в шаблон не идут имя, номера, признак и отметки', () => {
+    const f = (field: string, raw: unknown): CardField => ({
+      table: 'nodes', field, label: field, value: raw, id: 5,
+      edit: edit({ kind: 'int', readonly: [false], raw: [raw] }),
+    } as CardField)
+    const card = { tabs: [{ title: 'Данные', subsections: [{ title: 'Узел', fields: [
+      f('externalCodeID', 3), f('externalNodeName', 'К-1'), f('externalSignID', 2), f('geoMarkTopTube', 750),
+      f('nodeTypeID', 9), f('organizationID', 1), f('inventNumber', '12'), f('registNumber', '7'),
+    ] }] }] } as { tabs: CardTab[] }
+    expect(columnValues(card, initialDraft(card), 0).map((v) => v.field))
+      .toEqual(['externalCodeID', 'nodeTypeID', 'organizationID'])
+  })
 })

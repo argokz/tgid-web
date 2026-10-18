@@ -454,6 +454,20 @@
               no-data-text="Шаблонов нет — сохраните в окне свойств участка"
               @update:menu="(open: boolean) => { if (open) void loadLineTemplates(); }"
             />
+            <v-select
+              v-model="newNodeTemplateId"
+              :items="nodeTemplates"
+              item-title="name"
+              item-value="id"
+              label="Шаблон для новых узлов"
+              density="compact"
+              variant="outlined"
+              hide-details
+              clearable
+              class="topology-template-select"
+              no-data-text="Шаблонов нет — сохраните в окне свойств узла"
+              @update:menu="(open: boolean) => { if (open) void loadLineTemplates(); }"
+            />
           </div>
         </div>
 
@@ -1287,7 +1301,9 @@ const {
   isEditTopologyMode,
   isMergeMode,
   newLineTemplateId,
+  newNodeTemplateId,
   lineTemplates,
+  nodeTemplates,
   loadLineTemplates,
   mergeTargetNodeId,
   mergeSourceNodeId,

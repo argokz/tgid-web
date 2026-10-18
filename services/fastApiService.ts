@@ -4,7 +4,7 @@ import { BAD_CREDENTIALS_TEXT, SESSION_EXPIRED_TEXT, serverDetailText, statusMes
 import type { FeatureData, Fragment } from '~/types';
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
 import type {
-  CardBatchPreview, CardChange, CardEditData, CardHelper, CardNeighbor, CardOption, CardTemplate, CardValues,
+  CardBatchPreview, CardChange, CardEditData, CardHelper, CardKind, CardNeighbor, CardOption, CardTemplate, CardValues,
 } from '~/utils/objectCard';
 import type {
   NetworkImportInspect,
@@ -2480,32 +2480,32 @@ export const fastApiService = {
   },
 
   /** Карточка нескольких участков: значения сведены по колонкам («разные») */
-  async getCardBatch(ids: number[]): Promise<CardEditData> {
-    return request('api/v1/card-edit/batch/card', { method: 'POST', body: { ids } });
+  async getCardBatch(ids: number[], kind: CardKind = 'line'): Promise<CardEditData> {
+    return request('api/v1/card-edit/batch/card', { method: 'POST', body: { ids, kind } });
   },
 
   /** Предпросмотр правки нескольких участков */
-  async previewCardBatch(body: { ids: number[]; changes: CardChange[] }): Promise<CardBatchPreview> {
+  async previewCardBatch(body: { kind?: CardKind; ids: number[]; changes: CardChange[] }): Promise<CardBatchPreview> {
     return request('api/v1/card-edit/batch/preview', mutationOptions('POST', body));
   },
 
   /** Применить правку нескольких участков (отмена — group-setters/undo по change_group_id) */
-  async applyCardBatch(body: { ids: number[]; changes: CardChange[]; expected_changes?: number }):
+  async applyCardBatch(body: { kind?: CardKind; ids: number[]; changes: CardChange[]; expected_changes?: number }):
     Promise<{ changed: number; applied: Record<string, number>; change_group_id: string | null }> {
     return request('api/v1/card-edit/batch/apply', mutationOptions('POST', body));
   },
 
   /** «Как у соседнего»: значения конструктива смежного участка по колонкам карточки */
-  async getCardNeighbor(lineId: number): Promise<CardNeighbor> {
-    return request(`api/v1/card-edit/neighbor/line/${encodePath(lineId)}`);
+  async getCardNeighbor(kind: CardKind, id: number): Promise<CardNeighbor> {
+    return request(`api/v1/card-edit/neighbor/${kind}/${encodePath(id)}`);
   },
 
   /** Шаблоны свойств: свои и общие */
-  async listCardTemplates(kind: 'line' = 'line'): Promise<{ items: CardTemplate[] }> {
+  async listCardTemplates(kind: CardKind = 'line'): Promise<{ items: CardTemplate[] }> {
     return request('api/v1/card-templates', { query: { kind } });
   },
 
-  async createCardTemplate(body: { kind: 'line'; name: string; values: CardValues; shared: boolean }): Promise<CardTemplate> {
+  async createCardTemplate(body: { kind: CardKind; name: string; values: CardValues; shared: boolean }): Promise<CardTemplate> {
     return request('api/v1/card-templates', mutationOptions('POST', body));
   },
 

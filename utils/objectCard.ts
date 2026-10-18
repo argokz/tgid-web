@@ -345,13 +345,16 @@ export function mestnResult(rows: { id: number; k: number; v: number }[]): { sum
   return { sum: Math.round(sum * 1e6) / 1e6, list: parts.join(' ') }
 }
 
+/** Вид карточки: участок или узел */
+export type CardKind = 'line' | 'node'
+
 /** Значения полей по таблицам: {таблица: {поле: значение}} */
 export type CardValues = Record<string, Record<string, unknown>>
 
 /** Шаблон свойств (GET /api/v1/card-templates) */
 export interface CardTemplate {
   id: number
-  kind: 'line'
+  kind: CardKind
   name: string
   values: CardValues
   /** подписи значений списков */
@@ -362,12 +365,19 @@ export interface CardTemplate {
 
 /** «Как у соседнего»: по колонке карточки — участок-сосед и его значения */
 export interface CardNeighbor {
-  columns: { line_id: number; neighbor_line_id: number | null; values: CardValues; titles: CardValues }[]
+  columns: {
+    line_id?: number; node_id?: number
+    /** участок/узел-сосед; null — не найден */
+    neighbor_id: number | null
+    values: CardValues; titles: CardValues
+  }[]
 }
 
 /** Поля, которые не переносятся в шаблон по умолчанию: свои у каждого участка */
 export const TEMPLATE_SKIP_FIELDS: ReadonlySet<string> = new Set([
   'pipesectlength', 'inventnumber', 'mestn', 'localressum', 'externalsignlineid',
+  // узел: имя, номера, признак П/О и отметки — свои у каждого узла
+  'externalnodename', 'nodename', 'registnumber', 'externalsignid', 'geomarktoptube', 'geomarknodearea',
 ])
 
 /**
