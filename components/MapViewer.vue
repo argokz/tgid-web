@@ -330,7 +330,7 @@
           v-if="isEditTopologyMode"
           class="topology-edit-toolbar elevation-4"
         >
-          <div class="d-flex align-center ga-2 pa-2">
+          <div class="d-flex align-center flex-wrap ga-2 pa-2">
             <v-chip
               size="small"
               color="primary"
@@ -338,6 +338,46 @@
             >
               CAD Топология
             </v-chip>
+            <v-btn
+              size="small"
+              :color="isChainMode ? 'primary' : 'default'"
+              :variant="isChainMode ? 'flat' : 'outlined'"
+              @click="toggleChainMode"
+            >
+              <v-icon
+                start
+                size="16"
+              >mdi-vector-polyline-plus</v-icon>
+              Трасса
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >
+                Узел → изломы → узел или труба (врезка). Enter / двойной клик — завершить в пустом месте,
+                Shift+клик по узлу — продолжить через него, Alt — без привязки. Выкл — прежний режим «узел → узел»
+              </v-tooltip>
+            </v-btn>
+            <template v-if="isChainMode">
+              <v-select
+                v-model="pipeMode"
+                :items="PIPE_MODE_ITEMS"
+                item-title="title"
+                item-value="value"
+                label="Трубы"
+                density="compact"
+                variant="outlined"
+                hide-details
+                class="topology-pipe-select"
+              />
+              <v-chip
+                v-if="snapStatusText"
+                size="small"
+                :color="snapIndex.status.value === 'ready' ? 'success' : 'warning'"
+                variant="tonal"
+              >
+                {{ snapStatusText }}
+              </v-chip>
+            </template>
             <v-btn
               size="small"
               :color="isMergeMode ? 'warning' : 'default'"
@@ -433,7 +473,26 @@
                 activator="parent"
                 location="bottom"
               >
-                {{ lastTopologyOperation ? `Отменить: ${topologyOperationLabel(lastTopologyOperation)}` : 'Нет операций для отмены' }}
+                {{ lastTopologyOperation ? `Отменить: ${topologyOperationLabel(lastTopologyOperation)} (Ctrl+Z)` : 'Нет операций для отмены' }}
+              </v-tooltip>
+            </v-btn>
+            <v-btn
+              size="small"
+              variant="outlined"
+              :disabled="!lastRedoOperation"
+              :loading="redoBusy"
+              @click="redoLastTopologyOperation"
+            >
+              <v-icon
+                start
+                size="16"
+              >mdi-redo</v-icon>
+              Повторить
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >
+                {{ lastRedoOperation ? `Повторить: ${topologyOperationLabel(lastRedoOperation)} (Ctrl+Y)` : 'Нет отменённых операций' }}
               </v-tooltip>
             </v-btn>
             <v-divider
@@ -470,6 +529,25 @@
             />
           </div>
         </div>
+
+        <TraceHud
+          v-if="isEditTopologyMode && isChainMode && !isVertexMode && !isMergeMode"
+          :position="trace.cursorPx.value"
+          :snap="trace.snap.value"
+          :drawing="trace.active.value"
+          :lengths="trace.lengths.value"
+        />
+        <LazyChainPreviewDialog
+          v-if="chainPreviewOpen"
+          v-model="chainPreviewOpen"
+          :result="chainPreview"
+          :loading="chainPreviewLoading"
+          :saving="chainSaving"
+          :error="chainPreviewError"
+          @confirm="confirmChain"
+          @back="backToTrace"
+          @discard="discardTrace"
+        />
 
         <!-- Превью слияния узлов (dry-run: что и куда перенесётся, что блокирует) -->
         <LazyMergePreviewDialog
@@ -547,6 +625,7 @@ import { highlightKey } from '~/utils/selectionHighlight';
 import type { PickCandidate } from '~/utils/networkFeature';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
+import { PIPE_MODE_ITEMS } from '~/utils/cadChain';
 import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 
 const props = defineProps<{
@@ -1313,7 +1392,23 @@ const {
   mergePreviewLoading,
   mergePreviewError,
   lastTopologyOperation,
+  lastRedoOperation,
   undoBusy,
+  redoBusy,
+  isChainMode,
+  pipeMode,
+  snapIndex,
+  trace,
+  chainPreviewOpen,
+  chainPreviewLoading,
+  chainSaving,
+  chainPreview,
+  chainPreviewError,
+  toggleChainMode,
+  confirmChain,
+  backToTrace,
+  discardTrace,
+  redoLastTopologyOperation,
   isVertexMode,
   vertexEditor,
   splitPreviewOpen,
@@ -1333,6 +1428,21 @@ const {
   cancelSplit,
   onDeleteFeature,
 } = topologyEditor;
+/** Состояние привязки трассы: пусто — всё готово */
+const snapStatusText = computed(() => {
+  switch (snapIndex.status.value) {
+    case 'loading':
+      return 'Привязка: загрузка…';
+    case 'zoom-in':
+      return 'Приблизьте карту для привязки';
+    case 'error':
+      return 'Привязка недоступна';
+    case 'ready':
+      return snapIndex.truncated.value ? 'Привязка: окно урезано — приблизьте' : '';
+    default:
+      return '';
+  }
+});
 
 // === Контуры журналов (этап 9): слой контура и выбор участков кликом ===
 const journalContourLayer = useJournalContourLayer(() => mapStore.map, {
@@ -1690,11 +1800,16 @@ watch(
   pointer-events: none;
 }
 
+.topology-pipe-select {
+  min-width: 190px;
+  max-width: 220px;
+}
 .topology-template-select {
   min-width: 220px;
   max-width: 280px;
 }
 .topology-edit-toolbar {
+  max-width: calc(100% - 32px);
   position: absolute;
   top: 72px;
   left: 50%;

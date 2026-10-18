@@ -8,7 +8,7 @@
 export type NetworkKind = 'node' | 'line';
 
 /** Слои оверлеев (рисование, редактор вершин, трассировка) — не сеть */
-const OVERLAY_PREFIXES = ['draw-', 'topology-vertex-', 'trace-', 'route-', 'outage-', 'hydraulic-', 'measure-'];
+const OVERLAY_PREFIXES = ['draw-', 'cad-', 'topology-vertex-', 'trace-', 'route-', 'outage-', 'hydraulic-', 'measure-'];
 
 const featureSignature = (feature: any): string =>
   [

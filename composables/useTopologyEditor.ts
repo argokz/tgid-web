@@ -5,6 +5,8 @@ import { getCurrentInstance, onBeforeUnmount, ref, watch } from 'vue';
 import type { Ref } from 'vue';
 import { ApiError, fastApiService } from '~/services/fastApiService';
 import type {
+  ChainRequest,
+  ChainResult,
   MergeNodesReport,
   SplitReviewDecision,
   SplitTransferReport,
@@ -18,6 +20,10 @@ import { pickNetworkSnap } from '~/utils/networkSnap';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
 import { appStorage } from '~/utils/appStorage';
 import type { CardKind, CardTemplate } from '~/utils/objectCard';
+import { useSnapIndex } from '~/composables/useSnapIndex';
+import { useTraceDraw } from '~/composables/useTraceDraw';
+import { chainRequestPoints, traceOutcome, type PipeMode, type TracePoint } from '~/utils/cadChain';
+import type { LngLat } from '~/utils/lineVertices';
 
 export interface TopologyEditorOptions {
   getMap: () => maplibregl.Map | null | undefined;
@@ -117,10 +123,11 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   };
   watch(isEditTopologyMode, (on) => { if (on) void loadLineTemplates(); });
   /** Применить выбранный шаблон к новому объекту → хвост уведомления */
-  const applyNewTemplate = async (templateId: number | null, id: number | undefined): Promise<string> => {
-    if (!templateId || !id) return '';
+  const applyNewTemplate = async (templateId: number | null, id: number | undefined | number[]): Promise<string> => {
+    const ids = (Array.isArray(id) ? id : [id]).filter((x): x is number => Boolean(x)).map(Number);
+    if (!templateId || !ids.length) return '';
     try {
-      const applied = await fastApiService.applyCardTemplate(templateId, { ids: [Number(id)] });
+      const applied = await fastApiService.applyCardTemplate(templateId, { ids });
       return `; шаблон «${applied.template.name}»: изменено строк ${applied.changed}`;
     } catch (e) {
       return `; шаблон не применён: ${formatApiError(e, 'ошибка')}`;
@@ -150,34 +157,99 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     }
   };
 
-  // === Отмена последней операции топологии (журнал на сервере, B5) ===
+  // === Отмена и повтор операций топологии (журнал на сервере, B5) ===
   const lastTopologyOperation = ref<TopologyUndoEntry | null>(null);
+  const lastRedoOperation = ref<TopologyUndoEntry | null>(null);
   const undoBusy = ref(false);
+  const redoBusy = ref(false);
 
   const refreshUndoState = async () => {
     if (!enabled.value) {
       lastTopologyOperation.value = null;
+      lastRedoOperation.value = null;
       return;
     }
-    try {
-      lastTopologyOperation.value = await fastApiService.getLastTopologyOperation();
-    } catch {
-      lastTopologyOperation.value = null;
-    }
+    const safe = async (load: () => Promise<TopologyUndoEntry | null>) => {
+      try {
+        return (await load()) ?? null;
+      } catch {
+        return null;
+      }
+    };
+    const [undo, redo] = await Promise.all([
+      safe(() => fastApiService.getLastTopologyOperation()),
+      // сервер без повтора (старая версия) — кнопка просто недоступна
+      safe(() => fastApiService.getLastRedoOperation()),
+    ]);
+    lastTopologyOperation.value = undo;
+    lastRedoOperation.value = redo;
   };
 
-  /** После любой операции топологии: обновить слои и кнопку «Отменить» */
+  // === Трасса участков (CAD): полилиния с привязкой, врезкой и режимом трубы ===
+  const PIPE_MODE_KEY = 'topologyPipeMode';
+  const readPipeMode = (): PipeMode => {
+    try {
+      const v = appStorage.getItem(PIPE_MODE_KEY);
+      return v === 'pair' || v === 'supply' || v === 'return' ? v : 'common';
+    } catch {
+      return 'common';
+    }
+  };
+  /** Трасса: клики рисуют участки (иначе — прежний режим «узел → узел») */
+  const isChainMode = ref(true);
+  const pipeMode = ref<PipeMode>(readPipeMode());
+  watch(pipeMode, (v) => {
+    try {
+      appStorage.setItem(PIPE_MODE_KEY, v);
+    } catch {
+      // режим трубы — удобство: без хранилища действует до перезагрузки
+    }
+  });
+  const snapIndex = useSnapIndex(getMap, activeFragments);
+  const trace = useTraceDraw(getMap, snapIndex.index, activeFragments);
+  // сменили рабочий фрагмент — привязка к его объектам, без ожидания сдвига карты
+  watch(() => activeFragments().join(','), () => snapIndex.invalidate());
+  const chainPreviewOpen = ref(false);
+  const chainPreviewLoading = ref(false);
+  const chainSaving = ref(false);
+  const chainPreview = ref<ChainResult | null>(null);
+  const chainPreviewError = ref<string | null>(null);
+  let chainPoints: TracePoint[] = [];
+
+  /** После любой операции топологии: обновить слои, привязки и кнопки «Отменить»/«Повторить» */
   const afterTopologyChange = () => {
     refreshLayers();
+    snapIndex.invalidate();
     void refreshUndoState();
   };
 
   /** Карточка объекта сообщает об изменении (разворот, удаление) */
   const onCardRefreshLayers = () => afterTopologyChange();
 
+  const redoLastTopologyOperation = async () => {
+    const entry = lastRedoOperation.value;
+    if (!entry || redoBusy.value) return;
+    redoBusy.value = true;
+    try {
+      await fastApiService.redoTopologyOperation(entry.operation_id);
+      useNotificationStore().showSuccess(`Повторено: ${topologyOperationLabel(entry)}`);
+      vertexEditor.stop();
+      afterTopologyChange();
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isVersionConflict) {
+        useNotificationStore().showWarning('Повторить нельзя: объекты изменены после отмены.');
+      } else {
+        reportTopologyError(err, 'Ошибка повтора');
+      }
+      void refreshUndoState();
+    } finally {
+      redoBusy.value = false;
+    }
+  };
+
   const undoLastTopologyOperation = async () => {
     const entry = lastTopologyOperation.value;
-    if (!entry) return;
+    if (!entry || undoBusy.value) return;
     undoBusy.value = true;
     try {
       const res = await fastApiService.undoTopologyOperation(entry.operation_id);
@@ -224,6 +296,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       mergeTargetNodeId.value = null;
       mergeSourceNodeId.value = null;
       topologyStartNode.value = null;
+      trace.clear();
       useNotificationStore().showInfo('Правка вершин: кликните участок. Концы участка прибиты к узлам.');
     }
   };
@@ -251,6 +324,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     mergeSourceNodeId.value = null;
     if (isMergeMode.value) {
       topologyStartNode.value = null;
+      trace.clear();
       useNotificationStore().showInfo('Режим слияния узлов: выберите целевой узел, затем узел для объединения.');
     }
   };
@@ -369,6 +443,173 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     splitPreviewTarget.value = null;
   };
 
+  /** Трасса рисуется: правка сети включена, не режим вершин и не слияние */
+  const chainActive = () => isEditTopologyMode.value && isChainMode.value && !isVertexMode.value && !isMergeMode.value;
+
+  /** Индекс привязок и двойной клик карты — по режиму трассы */
+  const applyChainMode = () => {
+    const map = getMap();
+    const on = isEditTopologyMode.value && isChainMode.value;
+    if (on) {
+      snapIndex.start();
+      map?.doubleClickZoom?.disable();
+    } else {
+      trace.clear();
+      snapIndex.stop();
+      map?.doubleClickZoom?.enable();
+      chainPreviewOpen.value = false;
+    }
+  };
+
+  const toggleChainMode = () => {
+    isChainMode.value = !isChainMode.value;
+    topologyStartNode.value = null;
+    applyChainMode();
+  };
+
+  /** Новый узел в точке (клик в пустоту без трассы) + шаблон для новых узлов */
+  const createNodeAt = async ([lng, lat]: LngLat) => {
+    try {
+      const result = await fastApiService.createNode(lng, lat);
+      const templateNote = await applyNewTemplate(newNodeTemplateId.value, result.id);
+      useNotificationStore().showSuccess(`Узел ${result.id} создан (фрагмент ${result.fileid ?? '—'})${templateNote}`);
+      afterTopologyChange();
+    } catch (err: any) {
+      reportTopologyError(err, 'Ошибка создания узла');
+    }
+  };
+
+  const chainBody = (): ChainRequest => {
+    const fragments = activeFragments();
+    return {
+      points: chainRequestPoints(chainPoints),
+      pipe_mode: pipeMode.value,
+      // один фрагмент на карте — он рабочий: трасса в другом фрагменте — ошибка проверки
+      fileid: fragments.length === 1 ? fragments[0] : undefined,
+    };
+  };
+
+  const previewChain = async () => {
+    chainPreview.value = null;
+    chainPreviewError.value = null;
+    chainPreviewLoading.value = true;
+    chainPreviewOpen.value = true;
+    try {
+      chainPreview.value = await fastApiService.createChain(chainBody(), true);
+    } catch (err: any) {
+      chainPreviewError.value = formatApiError(err, 'Не удалось проверить трассу');
+    } finally {
+      chainPreviewLoading.value = false;
+    }
+  };
+
+  /** Enter / двойной клик / клик по узлу или трубе: один узел, разрезание или цепочка */
+  const finishTrace = async () => {
+    const outcome = traceOutcome(trace.points.value);
+    if (outcome.action === 'none') {
+      trace.clear();
+      return;
+    }
+    if (outcome.action === 'node') {
+      trace.clear();
+      await createNodeAt(outcome.coord);
+      return;
+    }
+    if (outcome.action === 'split') {
+      trace.clear();
+      await openSplitPreview(outcome.lineId, outcome.coord[0], outcome.coord[1]);
+      return;
+    }
+    chainPoints = outcome.points;
+    await previewChain();
+  };
+
+  const confirmChain = async () => {
+    const preview = chainPreview.value;
+    if (!preview?.ok) return;
+    // оборудование без позиции на трубах врезки остаётся на первой половине (как предупредил предпросмотр)
+    const review = Object.fromEntries(
+      preview.issues.filter((i) => i.code === 'review' && i.line_id != null).map((i) => [String(i.line_id), {}]),
+    );
+    chainSaving.value = true;
+    try {
+      const res = await fastApiService.createChain({
+        ...chainBody(),
+        review_to_new: Object.keys(review).length ? review : undefined,
+      });
+      const lines = res.created_lines ?? [];
+      const nodes = res.created_nodes ?? [];
+      const lineNote = await applyNewTemplate(newLineTemplateId.value, lines);
+      const nodeNote = await applyNewTemplate(newNodeTemplateId.value, nodes);
+      const taps = res.split_lines?.length ? `, врезка в ${res.split_lines.join(', ')}` : '';
+      useNotificationStore().showSuccess(
+        `Создано участков: ${lines.length} (${res.total_length_m.toFixed(2).replace('.', ',')} м), узлов: ${nodes.length}${taps}${lineNote}${nodeNote}`,
+      );
+      chainPreviewOpen.value = false;
+      trace.clear();
+      afterTopologyChange();
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 422 && Array.isArray(err.data?.issues)) {
+        chainPreview.value = { ...preview, ok: false, issues: err.data.issues };
+      } else if (err instanceof ApiError && err.isVersionConflict) {
+        reportTopologyError(err, 'Ошибка создания трассы', previewChain);
+        chainPreviewOpen.value = false;
+      } else {
+        chainPreviewError.value = formatApiError(err, 'Не удалось создать трассу');
+      }
+    } finally {
+      chainSaving.value = false;
+    }
+  };
+
+  /** Закрыть предпросмотр и продолжить рисование (точки остаются) */
+  const backToTrace = () => {
+    chainPreviewOpen.value = false;
+  };
+
+  const discardTrace = () => {
+    chainPreviewOpen.value = false;
+    trace.clear();
+  };
+
+  /** Клавиши редактора: Enter/Esc/Backspace — трасса; Ctrl+Z / Ctrl+Y — отмена и повтор */
+  const onKeyDown = (ev: KeyboardEvent) => {
+    if (!isEditTopologyMode.value) return;
+    const target = ev.target as HTMLElement | null;
+    if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+    if (chainPreviewOpen.value || splitPreviewOpen.value || mergeConfirmDialogOpen.value) return;
+    const ctrl = ev.ctrlKey || ev.metaKey;
+    const key = ev.key.toLowerCase();
+    if (ctrl && (key === 'y' || (key === 'z' && ev.shiftKey))) {
+      ev.preventDefault();
+      void redoLastTopologyOperation();
+      return;
+    }
+    if (ctrl && key === 'z') {
+      ev.preventDefault();
+      if (chainActive() && trace.active.value) trace.removeLast();
+      else void undoLastTopologyOperation();
+      return;
+    }
+    if (!chainActive() || !trace.active.value) return;
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      void finishTrace();
+    } else if (ev.key === 'Escape') {
+      ev.preventDefault();
+      trace.clear();
+    } else if (ev.key === 'Backspace') {
+      ev.preventDefault();
+      trace.removeLast();
+    }
+  };
+
+  const onMapDblClickForTopology = (e: any) => {
+    if (!chainActive() || !trace.active.value) return;
+    e.preventDefault?.();
+    void finishTrace();
+  };
+
   const toggleEditTopologyMode = async () => {
     if (!isEditTopologyMode.value && isDrawActive()) {
       useNotificationStore().showWarning('Сначала завершите рисование или измерение на панели рисования.');
@@ -383,13 +624,21 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       topologyStartNode.value = null;
       isTraceMode.value = false;
       setIdentifyMode(false);
-      useNotificationStore().showSuccess('Режим редактирования сети включен. Клик по пустому месту — создать узел. Перетаскивание узла — переместить. Клик по двум узлам — создать участок.');
+      applyChainMode();
+      useNotificationStore().showSuccess(
+        isChainMode.value
+          ? 'Редактирование сети: кликайте точки трассы — узел, изломы, узел или труба (врезка). '
+            + 'Enter или двойной клик — завершить в пустом месте, Backspace — убрать точку, Esc — сбросить. '
+            + 'Перетаскивание узла — переместить.'
+          : 'Режим редактирования сети включен. Клик по пустому месту — создать узел. Перетаскивание узла — переместить. Клик по двум узлам — создать участок.'
+      );
     } else {
       setIdentifyMode(true);
       resetNodeDrag();
       isMergeMode.value = false;
       mergeTargetNodeId.value = null;
       mergeSourceNodeId.value = null;
+      applyChainMode();
     }
   };
 
@@ -434,6 +683,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     }
     // В режиме слияния узлы только выбираются кликом
     if (isMergeMode.value) return;
+    // Трасса рисуется — карта не тянет узлы, клики ставят точки
+    if (chainActive() && trace.active.value) return;
     // Тянуть можно только однозначный узел активного фрагмента; копии в нескольких
     // фрагментах — без перетаскивания (клик откроет меню выбора)
     const res = pickNetworkFeature(getMap()?.queryRenderedFeatures(e.point), {
@@ -479,7 +730,10 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       vertexEditor.onMouseMove(e);
       return;
     }
-    if (draggedNodeId === null) return;
+    if (draggedNodeId === null) {
+      if (chainActive()) trace.onMove(e);
+      return;
+    }
     if (!dragMoved && dragStartPoint) {
       const dx = e.point.x - dragStartPoint.x;
       const dy = e.point.y - dragStartPoint.y;
@@ -623,6 +877,19 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       return;
     }
 
+    if (chainActive()) {
+      if (snapIndex.status.value !== 'ready') {
+        useNotificationStore().showWarning(
+          snapIndex.status.value === 'zoom-in'
+            ? 'Приблизьте карту: привязка к сети работает на окне до 6 км.'
+            : 'Данные привязки ещё загружаются — подождите секунду.',
+        );
+        return;
+      }
+      if (trace.onClick(e)) await finishTrace();
+      return;
+    }
+
     const node = await pickUnderCursor(e, { kind: 'node', fragmentIds: nodeContextFragments(), strictFragment: true });
     if (node.candidate) {
       await onNodeClick(node.candidate);
@@ -644,17 +911,9 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     }
     if (line.present) return;
 
-    try {
-      // Фрагмент, код и признак подачи/обратки сервер берёт у ближайшего узла сети —
-      // без них узел не попадёт в расчёт и не сольётся с соседями
-      const [lng, lat] = snapToNetwork(e, null);
-      const result = await fastApiService.createNode(lng, lat);
-      const templateNote = await applyNewTemplate(newNodeTemplateId.value, result.id);
-      useNotificationStore().showSuccess(`Узел ${result.id} создан (фрагмент ${result.fileid ?? '—'})${templateNote}`);
-      afterTopologyChange();
-    } catch (err: any) {
-      reportTopologyError(err, 'Ошибка создания узла');
-    }
+    // Фрагмент, код и признак подачи/обратки сервер берёт у ближайшего узла сети —
+    // без них узел не попадёт в расчёт и не сольётся с соседями
+    await createNodeAt(snapToNetwork(e, null));
   };
 
   /** Правый клик в режиме вершин — удалить промежуточную вершину */
@@ -710,6 +969,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     map.on('mouseup', onNodeDragEnd);
     map.on('click', onMapClickForTopology);
     map.on('contextmenu', onMapContextMenuForTopology);
+    map.on('dblclick', onMapDblClickForTopology);
+    if (typeof window !== 'undefined') window.addEventListener('keydown', onKeyDown);
   };
 
   const detach = (map: maplibregl.Map | null | undefined) => {
@@ -718,6 +979,10 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     map?.off('mouseup', onNodeDragEnd);
     map?.off('click', onMapClickForTopology);
     map?.off('contextmenu', onMapContextMenuForTopology);
+    map?.off('dblclick', onMapDblClickForTopology);
+    if (typeof window !== 'undefined') window.removeEventListener('keydown', onKeyDown);
+    trace.clear();
+    snapIndex.stop();
     if (draggedNodeMarker) draggedNodeMarker.remove();
   };
 
@@ -740,7 +1005,24 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     mergePreviewLoading,
     mergePreviewError,
     lastTopologyOperation,
+    lastRedoOperation,
     undoBusy,
+    redoBusy,
+    isChainMode,
+    pipeMode,
+    snapIndex,
+    trace,
+    chainPreviewOpen,
+    chainPreviewLoading,
+    chainSaving,
+    chainPreview,
+    chainPreviewError,
+    toggleChainMode,
+    finishTrace,
+    confirmChain,
+    backToTrace,
+    discardTrace,
+    redoLastTopologyOperation,
     isVertexMode,
     vertexEditor,
     splitPreviewOpen,

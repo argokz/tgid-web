@@ -113,6 +113,7 @@ const OPERATION_LABELS: Record<string, string> = {
   IMPORT_NODES: 'импорт узлов',
   IMPORT_LINES: 'импорт участков',
   IMPORT_COORDS: 'импорт координат узлов',
+  CHAIN: 'трасса',
 };
 
 /** Подпись кнопки «Отменить»: «разрезание участка 17» */
@@ -120,6 +121,10 @@ export const topologyOperationLabel = (entry: { operation: string; summary?: Rec
   if (!entry) return '';
   const s = entry.summary || {};
   const base = OPERATION_LABELS[entry.operation] || entry.operation.toLowerCase();
+  if (entry.operation === 'CHAIN' && Array.isArray(s.created_lines)) {
+    const length = typeof s.total_length_m === 'number' ? `, ${s.total_length_m.toFixed(2).replace('.', ',')} м` : '';
+    return `${base} (участков: ${s.created_lines.length}${length})`;
+  }
   const id = s.line_id ?? s.node_id ?? s.target_node_id ?? s.id;
   return id != null ? `${base} ${id}` : base;
 };

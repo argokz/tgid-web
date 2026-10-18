@@ -215,7 +215,7 @@ export const getFeatureFragmentId = (feature: any): number | null => {
 };
 
 /** Оверлеи редактора, рисования, трассировки — не объекты сети */
-const PICK_OVERLAY_PREFIXES = ['draw-', 'topology-vertex-', 'trace-', 'route-', 'piezo-', 'outage-', 'hydraulic-', 'measure-'];
+const PICK_OVERLAY_PREFIXES = ['draw-', 'cad-', 'topology-vertex-', 'trace-', 'route-', 'piezo-', 'outage-', 'hydraulic-', 'measure-'];
 const NODE_LAYER_RE = /uzel|node|узел|узл/;
 const LINE_LAYER_RE = /heatpipesection|linesobj|line|pipe|труб|участ/;
 

@@ -16,6 +16,11 @@ const { api, notify, vertex, markers } = vi.hoisted(() => ({
     splitLine: vi.fn(),
     deleteNode: vi.fn(),
     deleteLine: vi.fn(),
+    getSnapData: vi.fn(),
+    createChain: vi.fn(),
+    getLastRedoOperation: vi.fn(),
+    redoTopologyOperation: vi.fn(),
+    applyCardTemplate: vi.fn(),
   },
   notify: {
     showSuccess: vi.fn(),
@@ -85,12 +90,23 @@ const pipe = (id: number, fileid: number) => ({
   properties: { fileid, code: 'UT' }, geometry: { type: 'LineString', coordinates: [] },
 });
 
-const setup = (extra: Record<string, any> = {}) => {
+/** chain=false — прежний режим «узел → узел» (без трассы) */
+const setup = (extra: Record<string, any> = {}, chain = false) => {
   let features: any[] = [];
+  const sources: Record<string, any> = {};
   const map = {
     queryRenderedFeatures: vi.fn(() => features),
     project: (c: [number, number]) => ({ x: c[0], y: c[1] }),
     dragPan: { enable: vi.fn(), disable: vi.fn() },
+    doubleClickZoom: { enable: vi.fn(), disable: vi.fn() },
+    getZoom: () => 19,
+    getBounds: () => ({ getWest: () => 76.89, getSouth: () => 43.23, getEast: () => 76.91, getNorth: () => 43.25 }),
+    getSource: (id: string) => sources[id],
+    addSource: (id: string) => { sources[id] = { setData: vi.fn() }; },
+    removeSource: (id: string) => { delete sources[id]; },
+    addLayer: vi.fn(),
+    getLayer: vi.fn(() => true),
+    removeLayer: vi.fn(),
     on: vi.fn(),
     off: vi.fn(),
   };
@@ -106,6 +122,7 @@ const setup = (extra: Record<string, any> = {}) => {
     ...extra,
   };
   const editor = useTopologyEditor(opts);
+  if (!chain) editor.isChainMode.value = false;
   const click = (lng = 76.95, lat = 43.25) => editor.onMapClickForTopology({ point: { x: 10, y: 10 }, lngLat: { lng, lat } });
   return { map, opts, editor, click, setFeatures: (f: any[]) => { features = f; } };
 };
@@ -120,6 +137,7 @@ describe('useTopologyEditor', () => {
       return { [kind]: Object.fromEntries(req[kind].map((id: number) => [String(id), { version: `v${id}` }])) };
     });
     api.getLastTopologyOperation.mockResolvedValue(null);
+    api.getLastRedoOperation.mockResolvedValue(null);
   });
 
   it('включение/выключение режима: identify, трассировка, запрет во время рисования', async () => {
@@ -334,8 +352,130 @@ describe('useTopologyEditor', () => {
   it('attach/detach подписывают и снимают обработчики карты', () => {
     const { editor, map } = setup();
     editor.attach(map as any);
-    expect(map.on.mock.calls.map((c: any[]) => c[0])).toEqual(['mousedown', 'mousemove', 'mouseup', 'click', 'contextmenu']);
+    expect(map.on.mock.calls.map((c: any[]) => c[0]))
+      .toEqual(['mousedown', 'mousemove', 'mouseup', 'click', 'contextmenu', 'dblclick']);
     editor.detach(map as any);
-    expect(map.off).toHaveBeenCalledTimes(5);
+    expect(map.off.mock.calls.map((c: any[]) => c[0])).toEqual(expect.arrayContaining(['click', 'dblclick']));
+  });
+
+  describe('трасса (CAD)', () => {
+    // узлы 1 и 2 примерно в 100 м друг от друга, участок 10 между ними
+    const SNAP = {
+      too_large: false,
+      truncated: false,
+      nodes: [
+        { id: 1, c: [76.9, 43.24], f: 74, s: 1 },
+        { id: 2, c: [76.90123, 43.24], f: 74, s: 1 },
+      ],
+      lines: [{ id: 10, n1: 1, n2: 2, s: 1, f: 74, pipe: true, c: [[76.9, 43.24], [76.90123, 43.24]] }],
+    };
+    const ev = (lng: number, lat: number, mods: Record<string, boolean> = {}) =>
+      ({ point: { x: 10, y: 10 }, lngLat: { lng, lat }, originalEvent: mods, preventDefault: vi.fn() });
+    const ok = (extra: Record<string, any> = {}) =>
+      ({ ok: true, issues: [], segments: [], taps: [], total_length_m: 120, ...extra });
+
+    const start = async () => {
+      api.getSnapData.mockResolvedValue(SNAP);
+      api.getLastRedoOperation.mockResolvedValue(null);
+      const ctx = setup({}, true);
+      ctx.editor.toggleEditTopologyMode();
+      await flush();
+      expect(ctx.editor.snapIndex.status.value).toBe('ready');
+      return ctx;
+    };
+
+    it('узел → излом → узел: предпросмотр, затем создание с режимом трубы', async () => {
+      const { editor, map } = await start();
+      expect(map.doubleClickZoom.disable).toHaveBeenCalled();
+      api.createChain.mockImplementation(async (_body: any, dry: boolean) => (dry
+        ? ok()
+        : ok({ created_lines: [501], created_nodes: [], split_lines: [] })));
+      editor.pipeMode.value = 'pair';
+      await editor.onMapClickForTopology(ev(76.900001, 43.24));
+      await editor.onMapClickForTopology(ev(76.9006, 43.2405));
+      expect(api.createChain).not.toHaveBeenCalled();
+      await editor.onMapClickForTopology(ev(76.901229, 43.24));
+      await flush();
+      const [body, dry] = api.createChain.mock.calls[0];
+      expect(dry).toBe(true);
+      expect(body.pipe_mode).toBe('pair');
+      expect(body.points.map((p: any) => p.kind)).toEqual(['node', 'vertex', 'node']);
+      expect([body.points[0].node_id, body.points[2].node_id]).toEqual([1, 2]);
+      expect(editor.chainPreviewOpen.value).toBe(true);
+
+      await editor.confirmChain();
+      expect(api.createChain).toHaveBeenCalledTimes(2);
+      expect(api.createChain.mock.calls[1][1]).toBeFalsy();
+      expect(notify.showSuccess).toHaveBeenCalledWith(expect.stringContaining('Создано участков: 1'));
+      expect(editor.chainPreviewOpen.value).toBe(false);
+      expect(editor.trace.points.value).toEqual([]);
+    });
+
+    it('клик по трубе завершает трассу врезкой; Shift+клик по узлу — продолжает', async () => {
+      const { editor } = await start();
+      api.createChain.mockResolvedValue(ok());
+      await editor.onMapClickForTopology(ev(76.900001, 43.24));
+      await editor.onMapClickForTopology(ev(76.901229, 43.24, { shiftKey: true }));
+      expect(editor.trace.points.value.length).toBe(2);
+      await editor.onMapClickForTopology(ev(76.9006, 43.24001));
+      await flush();
+      const points = api.createChain.mock.calls[0][0].points;
+      expect(points.map((p: any) => p.kind)).toEqual(['node', 'node', 'tap']);
+      expect(points[2].line_id).toBe(10);
+    });
+
+    it('клик в пустоту + завершение — новый узел; Backspace и сброс правят трассу', async () => {
+      const { editor } = await start();
+      api.createNode.mockResolvedValue({ id: 900, fileid: 74 });
+      await editor.onMapClickForTopology(ev(76.905, 43.245));
+      expect(editor.trace.points.value.map((p) => p.kind)).toEqual(['new']);
+      await editor.finishTrace();
+      expect(api.createNode).toHaveBeenCalledWith(76.905, 43.245);
+
+      await editor.onMapClickForTopology(ev(76.905, 43.245));
+      await editor.onMapClickForTopology(ev(76.906, 43.245));
+      editor.trace.removeLast();
+      expect(editor.trace.points.value.length).toBe(1);
+      editor.discardTrace();
+      expect(editor.trace.points.value.length).toBe(0);
+    });
+
+    it('ошибки проверки при сохранении (422) возвращают предпросмотр с ошибками', async () => {
+      const { editor } = await start();
+      api.createChain.mockResolvedValueOnce(ok({ total_length_m: 5 }));
+      await editor.onMapClickForTopology(ev(76.900001, 43.24));
+      await editor.onMapClickForTopology(ev(76.901229, 43.24));
+      await flush();
+      const err: any = new (ApiError as any)('нельзя');
+      err.status = 422;
+      err.data = { code: 'validation', issues: [{ level: 'error', code: 'duplicate_line', message: 'дубль' }] };
+      api.createChain.mockRejectedValueOnce(err);
+      await editor.confirmChain();
+      expect(editor.chainPreview.value?.ok).toBe(false);
+      expect(editor.chainPreview.value?.issues[0].code).toBe('duplicate_line');
+      expect(editor.chainPreviewOpen.value).toBe(true);
+    });
+
+    it('мелкий масштаб: клик не ставит точку, а просит приблизить', async () => {
+      api.getSnapData.mockResolvedValue({ too_large: true, truncated: false, nodes: [], lines: [] });
+      const { editor } = setup({}, true);
+      editor.toggleEditTopologyMode();
+      await flush();
+      expect(editor.snapIndex.status.value).toBe('zoom-in');
+      await editor.onMapClickForTopology(ev(76.9, 43.24));
+      expect(editor.trace.points.value.length).toBe(0);
+      expect(notify.showWarning).toHaveBeenCalledWith(expect.stringContaining('Приблизьте'));
+    });
+
+    it('повтор отменённой операции', async () => {
+      const { editor } = await start();
+      editor.lastRedoOperation.value = {
+        operation_id: 7, operation: 'CHAIN', created_at: null, summary: {}, objects: 1, undo_supported: true,
+      };
+      api.redoTopologyOperation.mockResolvedValue({});
+      await editor.redoLastTopologyOperation();
+      expect(api.redoTopologyOperation).toHaveBeenCalledWith(7);
+      expect(notify.showSuccess).toHaveBeenCalledWith(expect.stringContaining('Повторено'));
+    });
   });
 });

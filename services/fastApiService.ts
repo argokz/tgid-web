@@ -3,6 +3,7 @@ import { reactive } from 'vue';
 import { BAD_CREDENTIALS_TEXT, SESSION_EXPIRED_TEXT, serverDetailText, statusMessage } from '~/utils/apiError';
 import type { FeatureData, Fragment } from '~/types';
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
+import type { SnapData } from '~/utils/cadSnap';
 import type {
   CardBatchPreview, CardChange, CardEditData, CardHelper, CardKind, CardNeighbor, CardOption, CardTemplate, CardValues,
   NodeEquipment,
@@ -495,6 +496,53 @@ export interface TopologyUndoResult extends TopologyUndoEntry {
   success: boolean;
   restored: Record<string, number>;
   deleted: Record<string, number[]>;
+}
+
+/** Проверка цепочки (POST topology/chains): error блокирует сохранение */
+export interface ChainIssue {
+  level: 'error' | 'warning' | 'info';
+  code: string;
+  message: string;
+  point?: number;
+  segment?: number;
+  node_id?: number;
+  line_id?: number;
+  lng?: number;
+  lat?: number;
+  items?: Record<string, { id: number; attrs: Record<string, any> }[]>;
+}
+
+export interface ChainRequestPoint {
+  kind: 'node' | 'tap' | 'new' | 'vertex';
+  node_id?: number;
+  line_id?: number;
+  lng?: number;
+  lat?: number;
+}
+
+export interface ChainRequest {
+  points: ChainRequestPoint[];
+  pipe_mode: 'common' | 'pair' | 'supply' | 'return';
+  fileid?: number;
+  versions?: TopologyVersionMap;
+  /** {line_id: {таблица: [id]}} — оборудование без позиции на трубах врезки ({} — всё на первой половине) */
+  review_to_new?: Record<string, SplitReviewDecision>;
+}
+
+export interface ChainResult {
+  ok: boolean;
+  dry_run?: boolean;
+  issues: ChainIssue[];
+  pipe_mode: string;
+  fileid: number | null;
+  segments: { segment: number; signs: number[]; sign_names: string[]; length_m: number }[];
+  taps: { line_id: number; pair_line_id?: number | null; node_id?: number; new_line_id?: number }[];
+  total_length_m: number;
+  created_nodes?: number[];
+  created_lines?: number[];
+  split_lines?: number[];
+  lines?: { id: number; segment: number; nodeid1: number; nodeid2: number; sign: number; sign_name: string; length_m: number }[];
+  operation_id?: number | null;
 }
 
 /** Полная геометрия участка для правки вершин (WGS84) */
@@ -1957,6 +2005,35 @@ export const fastApiService = {
   /** Отмена последней операции. 409 version_conflict — объекты изменены после неё; 404 — нечего отменять */
   async undoTopologyOperation(operationId?: number): Promise<TopologyUndoResult> {
     return request<TopologyUndoResult>('api/topology/undo', {
+      method: 'POST',
+      body: compact({ operation_id: operationId }),
+    });
+  },
+
+  /** Узлы и участки основной сети в окне карты с полной точностью — для привязки при рисовании */
+  async getSnapData(bbox: [number, number, number, number], fragmentIds: readonly number[] = []): Promise<SnapData> {
+    return request<SnapData>('api/v1/topology/snap-data', {
+      query: compact({ bbox: bbox.join(','), fragments: fragmentIds.length ? fragmentIds.join(',') : undefined }),
+    });
+  },
+
+  /** Цепочка участков: dry_run — проверки и отчёт; 422 validation — ошибки при сохранении */
+  async createChain(body: ChainRequest, dryRun = false): Promise<ChainResult> {
+    return request<ChainResult>('api/v1/topology/chains', {
+      method: 'POST',
+      body: { ...compact(body as any), dry_run: dryRun },
+    });
+  },
+
+  /** Последняя отменённая операция, которую можно повторить (null — нечего) */
+  async getLastRedoOperation(): Promise<TopologyUndoEntry | null> {
+    const res = await request<{ operation: TopologyUndoEntry | null }>('api/v1/topology/redo');
+    return res.operation;
+  },
+
+  /** Повтор последней отменённой операции. 409 — объекты изменены после отмены */
+  async redoTopologyOperation(operationId?: number): Promise<TopologyUndoResult> {
+    return request<TopologyUndoResult>('api/v1/topology/redo', {
       method: 'POST',
       body: compact({ operation_id: operationId }),
     });
