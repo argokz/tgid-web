@@ -231,13 +231,14 @@ export function validateDraft(card: Pick<CardEditData, 'tabs'>, draft: Record<st
       for (const f of sub.fields) {
         const e = f.edit
         if (!e) continue
-        for (const c of fieldColumns(f)) {
-          if (c.readonly) continue
+        fieldColumns(f).forEach((c, ci) => {
+          if (c.readonly) return
           const key = draftKey(f.table, c.id, f.field)
           const v = normalizeValue(draft[key])
           if (v === null) {
-            if (e.not_null) errors[key] = 'Обязательное поле'
-            continue
+            // несколько объектов: «разные» без значения — поле не меняется, обязательность не нарушена
+            if (e.not_null && !e.mixed?.[ci]) errors[key] = 'Обязательное поле'
+            return
           }
           if ((e.kind === 'int' || e.kind === 'float') && !e.list) {
             const n = Number(String(v).replace(',', '.'))
@@ -247,7 +248,7 @@ export function validateDraft(card: Pick<CardEditData, 'tabs'>, draft: Record<st
           if (e.kind === 'str' && e.max_length && String(v).length > e.max_length) {
             errors[key] = `Не длиннее ${e.max_length} символов`
           }
-        }
+        })
       }
     }
   }

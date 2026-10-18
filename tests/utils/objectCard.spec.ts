@@ -87,6 +87,15 @@ describe('objectCard', () => {
     expect(errors['heatpipesections:101:mestn']).toBe('Не длиннее 3 символов')
   })
 
+  it('validateDraft: «разные» у нескольких объектов не считаются пустым обязательным', () => {
+    const card = pairCard()
+    const f = card.tabs[0].subsections[0].fields[2]
+    f.edit = edit({ kind: 'str', not_null: true, raw: [null, null], mixed: [true, false] })
+    const errors = validateDraft(card, initialDraft(card))
+    expect(errors['heatpipesections:100:mestn']).toBeUndefined()
+    expect(errors['heatpipesections:101:mestn']).toBe('Обязательное поле')
+  })
+
   it('parseInput: запятая в числах, пусто → null', () => {
     expect(parseInput('float', '1,5')).toBe(1.5)
     expect(parseInput('int', ' ')).toBeNull()
