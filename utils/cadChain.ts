@@ -9,6 +9,7 @@
 import type { SnapResult } from '~/utils/cadSnap';
 import { destination, distanceM, formatDeg, formatMeters, polylineLengthM, turnArc, vertexAngles } from '~/utils/cadGeometry';
 import type { GuideKind } from '~/utils/cadConstraint';
+import type { NodeType } from '~/utils/nodeTypes';
 import type { LngLat } from '~/utils/lineVertices';
 
 export type TracePointKind = 'node' | 'tap' | 'new' | 'vertex';
@@ -18,6 +19,8 @@ export interface TracePoint {
   coord: LngLat;
   nodeId?: number;
   lineId?: number;
+  /** тип нового узла (kind=new): карточка типа создаётся вместе с трассой */
+  nodeType?: NodeType;
 }
 
 /** Режим трубы: общая (1), подача и обратка раздельно (2 + 3), только подача / обратка */
@@ -82,7 +85,8 @@ export const chainRequestPoints = (points: readonly TracePoint[]) =>
   points.map((p) => {
     if (p.kind === 'node') return { kind: 'node' as const, node_id: p.nodeId };
     if (p.kind === 'tap') return { kind: 'tap' as const, line_id: p.lineId, lng: p.coord[0], lat: p.coord[1] };
-    return { kind: p.kind, lng: p.coord[0], lat: p.coord[1] };
+    const type = p.kind === 'new' && p.nodeType && p.nodeType !== 'US' ? { node_type: p.nodeType } : {};
+    return { kind: p.kind, lng: p.coord[0], lat: p.coord[1], ...type };
   });
 
 /** Длина всей трассы и текущего участка (от последней границы) с учётом курсора, м */

@@ -114,6 +114,8 @@ const OPERATION_LABELS: Record<string, string> = {
   IMPORT_LINES: 'импорт участков',
   IMPORT_COORDS: 'импорт координат узлов',
   CHAIN: 'трасса',
+  CHANGE_NODE_TYPE: 'смена типа узла',
+  SET_NODE_FLAG: 'дополнение узла',
 };
 
 /** Подпись кнопки «Отменить»: «разрезание участка 17» */

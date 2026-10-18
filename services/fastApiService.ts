@@ -4,6 +4,7 @@ import { BAD_CREDENTIALS_TEXT, SESSION_EXPIRED_TEXT, serverDetailText, statusMes
 import type { FeatureData, Fragment } from '~/types';
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
 import type { SnapData } from '~/utils/cadSnap';
+import type { NodeFlag, NodeFlagResult, NodeType, NodeTypeChangeResult, NodeTypeInfo } from '~/utils/nodeTypes';
 import type {
   CardBatchPreview, CardChange, CardEditData, CardHelper, CardKind, CardNeighbor, CardOption, CardTemplate, CardValues,
   NodeEquipment,
@@ -518,6 +519,8 @@ export interface ChainRequestPoint {
   line_id?: number;
   lng?: number;
   lat?: number;
+  /** тип нового узла (только kind=new): карточка типа создаётся в той же операции */
+  node_type?: NodeType;
 }
 
 export interface ChainRequest {
@@ -1983,11 +1986,35 @@ export const fastApiService = {
   async createNode(
     lng: number,
     lat: number,
-    ref: { fileid?: number; nearNodeId?: number; nearLineId?: number } = {}
-  ): Promise<{ success: boolean; id: number; fileid: number | null; operation_id?: number | null }> {
+    ref: { fileid?: number; nearNodeId?: number; nearLineId?: number; nodeType?: NodeType } = {}
+  ): Promise<{ success: boolean; id: number; fileid: number | null; node_type?: NodeType; operation_id?: number | null }> {
     return request('api/topology/node', {
       method: 'POST',
-      body: compact({ lng, lat, fileid: ref.fileid, near_node_id: ref.nearNodeId, near_line_id: ref.nearLineId }),
+      body: compact({
+        lng, lat, fileid: ref.fileid, near_node_id: ref.nearNodeId, near_line_id: ref.nearLineId,
+        node_type: ref.nodeType && ref.nodeType !== 'US' ? ref.nodeType : undefined,
+      }),
+    });
+  },
+
+  /** Расчётный тип узла, его карточки и дополнения (заданный напор, подпитка) */
+  async getNodeType(nodeId: number): Promise<NodeTypeInfo> {
+    return request<NodeTypeInfo>(`api/v1/topology/node/${encodePath(nodeId)}/type`);
+  },
+
+  /** Смена типа узла; dryRun — что удалится (карточка старого типа, внутренняя схема) */
+  async changeNodeType(nodeId: number, nodeType: NodeType, opts: { dryRun?: boolean; version?: string | null } = {}): Promise<NodeTypeChangeResult> {
+    return request<NodeTypeChangeResult>(`api/v1/topology/node/${encodePath(nodeId)}/type`, {
+      method: 'POST',
+      body: compact({ node_type: nodeType, dry_run: Boolean(opts.dryRun), expected_version: opts.version ?? undefined }),
+    });
+  },
+
+  /** Заданный напор / подпитка: добавить (on) или удалить */
+  async setNodeFlag(nodeId: number, flag: NodeFlag, on: boolean, version?: string | null): Promise<NodeFlagResult> {
+    return request<NodeFlagResult>(`api/v1/topology/node/${encodePath(nodeId)}/flag`, {
+      method: 'POST',
+      body: compact({ flag, on, expected_version: version ?? undefined }),
     });
   },
 

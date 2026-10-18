@@ -33,6 +33,7 @@ import {
   type ContextBuilding,
 } from '~/utils/cadContext';
 import { getCityConfig } from '~/utils/cityConfig';
+import { NODE_TYPE_ITEMS, nodeTypeTitle, type NodeType } from '~/utils/nodeTypes';
 import { chainRequestPoints, traceOutcome, type PipeMode, type TracePoint } from '~/utils/cadChain';
 import { DEFAULT_POLAR_STEP, POLAR_STEPS } from '~/utils/cadConstraint';
 import type { LngLat } from '~/utils/lineVertices';
@@ -201,6 +202,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   const PIPE_MODE_KEY = 'topologyPipeMode';
   const POLAR_STEP_KEY = 'topologyPolarStep';
   const CONTEXT_SNAP_KEY = 'topologyContextSnap';
+  const NEW_NODE_TYPE_KEY = 'topologyNewNodeType';
   const readPipeMode = (): PipeMode => {
     try {
       const v = appStorage.getItem(PIPE_MODE_KEY);
@@ -246,6 +248,22 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       return true;
     }
   })());
+  /** Тип нового узла: клик в пустоту и конечный новый узел трассы (ввод в здание — всегда потребитель) */
+  const newNodeType = ref<NodeType>((() => {
+    try {
+      const v = appStorage.getItem(NEW_NODE_TYPE_KEY);
+      return NODE_TYPE_ITEMS.some((i) => i.value === v) ? (v as NodeType) : 'US';
+    } catch {
+      return 'US';
+    }
+  })());
+  watch(newNodeType, (v) => {
+    try {
+      appStorage.setItem(NEW_NODE_TYPE_KEY, v);
+    } catch {
+      // удобство: без хранилища действует до перезагрузки
+    }
+  });
   const snapIndex = useSnapIndex(getMap, activeFragments);
   const contextSnap = useContextSnap(getMap);
   const cadNorms = getCityConfig().cadDefaults;
@@ -604,14 +622,14 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     const start: TracePoint = h.plan.nodeId != null
       ? { kind: 'node', coord: h.plan.tap, nodeId: h.plan.nodeId }
       : { kind: 'tap', coord: h.plan.tap, lineId: h.plan.lineId };
-    const end: TracePoint = { kind: 'new', coord: h.plan.wall };
+    const end: TracePoint = { kind: 'new', coord: h.plan.wall, nodeType: 'PR' };
     trace.showEntry(null, null);
     trace.setPoints([start, end]);
     chainPoints = [start, end];
     const house = h.building.number
       ? `Номер дома по карте: ${h.building.number} — только для сверки, в карточку узла не записывается.`
       : 'Номера дома на подложке нет.';
-    chainNote.value = `Узел у стены здания (по подложке MapTiler, ориентировочно ${formatApproxM(h.plan.lengthM)} от трубы). ${house}`;
+    chainNote.value = `Новый узел у стены здания — потребитель (по подложке MapTiler, ориентировочно ${formatApproxM(h.plan.lengthM)} от трубы). ${house}`;
     await previewChain();
   };
 
@@ -624,9 +642,10 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   /** Новый узел в точке (клик в пустоту без трассы) + шаблон для новых узлов */
   const createNodeAt = async ([lng, lat]: LngLat) => {
     try {
-      const result = await fastApiService.createNode(lng, lat);
+      const result = await fastApiService.createNode(lng, lat, { nodeType: newNodeType.value });
       const templateNote = await applyNewTemplate(newNodeTemplateId.value, result.id);
-      useNotificationStore().showSuccess(`Узел ${result.id} создан (фрагмент ${result.fileid ?? '—'})${templateNote}`);
+      const typeNote = newNodeType.value !== 'US' ? `, тип: ${nodeTypeTitle(newNodeType.value)}` : '';
+      useNotificationStore().showSuccess(`Узел ${result.id} создан (фрагмент ${result.fileid ?? '—'}${typeNote})${templateNote}`);
       afterTopologyChange();
     } catch (err: any) {
       reportTopologyError(err, 'Ошибка создания узла');
@@ -676,6 +695,11 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       return;
     }
     chainPoints = outcome.points;
+    const last = chainPoints[chainPoints.length - 1];
+    if (last?.kind === 'new' && newNodeType.value !== 'US') {
+      chainPoints = [...chainPoints.slice(0, -1), { ...last, nodeType: newNodeType.value }];
+      chainNote.value = `Конечный новый узел — ${nodeTypeTitle(newNodeType.value).toLowerCase()}: карточка создастся вместе с трассой.`;
+    }
     await previewChain();
   };
 
@@ -1200,6 +1224,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     snapIndex,
     contextSnap,
     contextSnapEnabled,
+    newNodeType,
     cadNorms,
     isEntryMode,
     entryHint,

@@ -666,6 +666,22 @@
             </v-btn>
 
             <v-btn
+              v-if="isEditTopologyMode && cardInTerritory && cardNodeId && !editing"
+              icon
+              variant="text"
+              size="small"
+              color="primary"
+              aria-label="Тип узла, заданный напор, подпитка"
+              @click="nodeTypeOpen = true"
+            >
+              <v-icon size="18">mdi-swap-horizontal</v-icon>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Тип узла, заданный напор, подпитка</v-tooltip>
+            </v-btn>
+
+            <v-btn
               v-if="cardNodeId && !editing && !equipmentOpen"
               icon
               variant="text"
@@ -749,6 +765,14 @@
 
         <v-divider />
 
+
+        <NodeTypeDialog
+          v-if="nodeTypeOpen && cardNodeId"
+          v-model="nodeTypeOpen"
+          :node-id="cardNodeId"
+          @changed="onNodeTypeChanged"
+          @edit-card="openNodeExtraCard"
+        />
 
         <div
           v-if="editing && equipTarget"
@@ -1498,7 +1522,8 @@ const startEditing = () => {
 // --- оборудование узла (задвижки, регуляторы, насосы…): список и карточка линии оборудования ---
 const equipmentOpen = ref(false)
 const equipmentListRef = ref<{ reload: () => Promise<void> } | null>(null)
-const equipTarget = ref<{ kind: EquipmentKind; table: string; id: number; title: string } | null>(null)
+// оборудование или дополнение узла (заданный напор, подпитка) — карточка своей таблицы поверх карточки узла
+const equipTarget = ref<{ kind: CardKind; table: string; id: number; title: string } | null>(null)
 const canEditEquipment = computed(() => authStore.canEditNetwork && cardInTerritory.value)
 const activeEdit = computed(() => equipTarget.value ?? editTarget.value)
 const openEquipment = (item: NodeEquipmentItem) => {
@@ -1518,6 +1543,20 @@ const onCardCancel = () => {
   batchIds.value = null
   equipTarget.value = null
 }
+// --- тип узла, заданный напор, подпитка (окно NodeTypeDialog; в режиме правки топологии) ---
+const nodeTypeOpen = ref(false)
+const onNodeTypeChanged = (message: string) => {
+  useNotificationStore().showSuccess(message)
+  emit('refresh-layers')
+}
+const openNodeExtraCard = (target: { kind: CardKind; table: string; id: number; title: string }) => {
+  nodeTypeOpen.value = false
+  batchIds.value = null
+  equipmentOpen.value = false
+  equipTarget.value = target
+  editing.value = true
+}
+
 const backToEquipment = async () => {
   if (!(await confirmLeaveEditing())) return
   editDirty.value = false

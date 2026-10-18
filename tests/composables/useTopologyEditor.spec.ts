@@ -174,7 +174,7 @@ describe('useTopologyEditor', () => {
     editor.toggleEditTopologyMode();
     api.createNode.mockResolvedValue({ id: 101, fileid: 3 });
     await click(76.95, 43.25);
-    expect(api.createNode).toHaveBeenCalledWith(76.95, 43.25);
+    expect(api.createNode).toHaveBeenCalledWith(76.95, 43.25, { nodeType: 'US' });
     expect(opts.refreshLayers).toHaveBeenCalled();
   });
 
@@ -431,7 +431,7 @@ describe('useTopologyEditor', () => {
       await editor.onMapClickForTopology(ev(76.905, 43.245));
       expect(editor.trace.points.value.map((p) => p.kind)).toEqual(['new']);
       await editor.finishTrace();
-      expect(api.createNode).toHaveBeenCalledWith(76.905, 43.245);
+      expect(api.createNode).toHaveBeenCalledWith(76.905, 43.245, { nodeType: 'US' });
 
       await editor.onMapClickForTopology(ev(76.905, 43.245));
       await editor.onMapClickForTopology(ev(76.906, 43.245));

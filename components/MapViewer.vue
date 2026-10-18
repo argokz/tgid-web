@@ -371,6 +371,26 @@
                 class="topology-pipe-select"
               />
               <v-select
+                v-model="newNodeType"
+                :items="NODE_TYPE_ITEMS"
+                item-title="title"
+                item-value="value"
+                label="Новый узел"
+                density="compact"
+                variant="outlined"
+                hide-details
+                class="topology-nodetype-select"
+              >
+                <v-tooltip
+                  activator="parent"
+                  location="bottom"
+                >
+                  Тип узла, создаваемого кликом в пустом месте, и конечного нового узла трассы: карточка
+                  потребителя, источника или насосной станции создаётся вместе с ним. Тип существующего
+                  узла — кнопка «Тип узла» в его карточке
+                </v-tooltip>
+              </v-select>
+              <v-select
                 v-model="polarStep"
                 :items="POLAR_STEP_ITEMS"
                 item-title="title"
@@ -701,6 +721,7 @@ import type { PickCandidate } from '~/utils/networkFeature';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
 import { PIPE_MODE_ITEMS } from '~/utils/cadChain';
+import { NODE_TYPE_ITEMS } from '~/utils/nodeTypes';
 import { POLAR_STEP_ITEMS } from '~/utils/cadConstraint';
 import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 
@@ -1477,6 +1498,7 @@ const {
   snapIndex,
   contextSnap,
   contextSnapEnabled,
+  newNodeType,
   cadNorms,
   isEntryMode,
   entryHint,
@@ -1900,6 +1922,10 @@ watch(
 .topology-pipe-select {
   min-width: 190px;
   max-width: 220px;
+}
+.topology-nodetype-select {
+  width: 210px;
+  flex: 0 0 auto;
 }
 .topology-polar-select {
   min-width: 110px;

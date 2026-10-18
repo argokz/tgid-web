@@ -384,7 +384,9 @@ export function mestnResult(rows: { id: number; k: number; v: number }[]): { sum
 export type EquipmentKind = 'damper' | 'regarmature' | 'reversevalve' | 'pump' | 'pressregulator' | 'consregulator'
   | 'pressdropregulator' | 'bypass' | 'elevator' | 'heatexchanger'
 
-export type CardKind = 'line' | 'node' | 'consumer' | 'genconsumer' | 'source' | 'pumpstation' | EquipmentKind
+/** setpress / refill — дополнения узла: заданный напор (setPressNodes), подпитка (refillNodes) */
+export type CardKind = 'line' | 'node' | 'consumer' | 'genconsumer' | 'source' | 'pumpstation' | 'setpress' | 'refill'
+  | EquipmentKind
 
 interface EquipmentKindInfo {
   table: string
@@ -461,6 +463,8 @@ export const CARD_KIND_BY_TABLE: Readonly<Record<string, CardKind>> = {
   generalizedconsumers: 'genconsumer',
   heatsources: 'source',
   pumpstations: 'pumpstation',
+  setpressnodes: 'setpress',
+  refillnodes: 'refill',
 }
 
 /** Тексты окна по виду объектов */
@@ -511,6 +515,15 @@ export const KIND_TEXT: Readonly<Record<CardKind, KindText>> = {
   pumpstation: {
     many: 'насосных станций', Many: 'Насосных станций', of: 'насосной станции', neighborTip: null, neighborMissing: '',
     templateNote: 'наименование — своё у каждой станции и не предлагается',
+  },
+  setpress: {
+    many: 'узлов с заданным напором', Many: 'Узлов с заданным напором', of: 'узла с заданным напором',
+    neighborTip: null, neighborMissing: '',
+    templateNote: 'напоры и магистраль — свои у каждого узла и не предлагаются',
+  },
+  refill: {
+    many: 'узлов подпитки', Many: 'Узлов подпитки', of: 'узла подпитки', neighborTip: null, neighborMissing: '',
+    templateNote: 'расходы и объёмы — свои у каждого узла и не предлагаются',
   },
   ...Object.fromEntries((Object.entries(EQUIPMENT_KINDS) as [EquipmentKind, EquipmentKindInfo][]).map(([kind, e]) => [kind, {
     many: e.many,
