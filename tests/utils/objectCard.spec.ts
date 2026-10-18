@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  applyFieldValues, columnValues, mestnResult, parseMestn,
+  applyFieldValues, columnValues, disabledByRules, mestnResult, mixFactor, parseMestn, templateSkipped,
   draftChanges, draftKey, fieldColumns, hiddenByVis, initialDraft, parseInput, ruleValues, validateDraft, visText,
   type CardField, type CardTab,
 } from '~/utils/objectCard'
@@ -94,6 +94,26 @@ describe('objectCard', () => {
     const errors = validateDraft(card, initialDraft(card))
     expect(errors['heatpipesections:100:mestn']).toBeUndefined()
     expect(errors['heatpipesections:101:mestn']).toBe('Обязательное поле')
+  })
+
+  it('disabledByRules: как setDisableAll десктопа (код ключа, пусто — «0»)', () => {
+    const rules = { hydromodesignid: { '1': ['throtstagesignid', 'mixfactcoeff'], '2': ['pdvalveinstalllocid'] } }
+    expect([...disabledByRules(rules, { hydromodesignid: 1 })]).toEqual(['pdvalveinstalllocid'])
+    expect([...disabledByRules(rules, { hydromodesignid: 2.0 })].sort()).toEqual(['mixfactcoeff', 'throtstagesignid'])
+    expect(disabledByRules(rules, { hydromodesignid: null }).size).toBe(3)
+    expect(disabledByRules(rules, {}).size).toBe(0)
+  })
+
+  it('templateSkipped: имя, схема и нагрузки потребителя не идут в шаблон', () => {
+    for (const f of ['name', 'schemeNum', 'hydroResCloseSys', 'b14', 'mixFactCoeff', 'calcHLdep', 'contCalcHLdep', 'perspAvgHLGVSopenFlow', 'adjCalcHLmix', 'avgHLGVScloseMix'])
+      expect(templateSkipped(f), f).toBe(true)
+    for (const f of ['calcTemperatureID', 'specExpendID', 'buildingTypeID', 'diameterCondit', 'nodeTypeID'])
+      expect(templateSkipped(f), f).toBe(false)
+  })
+
+  it('mixFactor: u = (t1 − t3) / (t3 − t2), ошибка при t3 ≤ t2', () => {
+    expect(mixFactor(150, 70, 95)).toBeCloseTo(2.2)
+    expect(mixFactor(150, 70, 70)).toBeNull()
   })
 
   it('parseInput: запятая в числах, пусто → null', () => {

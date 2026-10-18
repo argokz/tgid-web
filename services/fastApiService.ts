@@ -2450,7 +2450,7 @@ export const fastApiService = {
   },
 
   /** Окно свойств: карточка объекта сети для правки (поля, списки, версии строк, правила видимости) */
-  async getCardEdit(kind: 'line' | 'node', table: string, id: number): Promise<CardEditData> {
+  async getCardEdit(kind: CardKind, table: string, id: number): Promise<CardEditData> {
     return request(`api/v1/card-edit/${encodePath(kind)}/${encodePath(table)}/${encodePath(id)}`);
   },
 

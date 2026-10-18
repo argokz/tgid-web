@@ -93,6 +93,57 @@
         </v-card-text>
       </template>
 
+      <!-- Коэффициент смешения (CUtfDialog): u = (t1 − t3) / (t3 − t2) -->
+      <template v-else-if="helper?.type === 'uf'">
+        <v-card-text class="chd-uf">
+          <v-text-field
+            v-model.number="uf.t1"
+            type="number"
+            label="Температура в подающем трубопроводе t1, °C"
+            density="compact"
+            variant="outlined"
+            hide-details
+          />
+          <v-text-field
+            v-model.number="uf.t2"
+            type="number"
+            label="Температура в обратном трубопроводе t2, °C"
+            density="compact"
+            variant="outlined"
+            hide-details
+          />
+          <v-text-field
+            v-model.number="uf.t3"
+            type="number"
+            label="Температура после узла смешения t3, °C"
+            density="compact"
+            variant="outlined"
+            hide-details
+          />
+          <div class="chd-uf-result">
+            Коэффициент смешения u = (t1 − t3) / (t3 − t2):
+            <b v-if="ufValue !== null">{{ formatDesktopNumber(ufValue) }}</b>
+            <b
+              v-else
+              class="text-error"
+            >ошибка — t3 должна быть больше t2</b>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn
+            variant="text"
+            @click="emit('update:modelValue', false)"
+          >Отмена</v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :disabled="ufValue === null"
+            @click="applyUf"
+          >Ок</v-btn>
+        </v-card-actions>
+      </template>
+
       <!-- Местные сопротивления (MestSopr3): количество и коэффициент по видам, сумма -->
       <template v-else-if="helper?.type === 'mestn'">
         <div class="px-4 pt-3">
@@ -169,7 +220,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { formatDesktopNumber } from '~/utils/desktopNumber';
-import { mestnResult, parseMestn, type CardHelper, type CardHelperMestn } from '~/utils/objectCard';
+import { mestnResult, mixFactor, parseMestn, type CardHelper, type CardHelperMestn } from '~/utils/objectCard';
 
 const props = defineProps<{
   modelValue: boolean
@@ -251,10 +302,24 @@ const applyMestn = () => {
   emit('update:modelValue', false);
 };
 
+// --- коэффициент смешения ---
+const uf = ref({ t1: 150, t2: 70, t3: 95 });
+const ufValue = computed(() => {
+  const u = mixFactor(Number(uf.value.t1), Number(uf.value.t2), Number(uf.value.t3));
+  return u === null ? null : Number(u.toPrecision(6));
+});
+const applyUf = () => {
+  const h = props.helper;
+  if (h?.type !== 'uf' || ufValue.value === null) return;
+  emit('apply', { [h.set.u]: ufValue.value });
+  emit('update:modelValue', false);
+};
+
 watch(() => [props.modelValue, props.helper], () => {
   if (!props.modelValue) return;
   search.value = '';
   if (props.helper?.type === 'mestn') initMestn();
+  if (props.helper?.type === 'uf') uf.value = { t1: props.helper.t1, t2: props.helper.t2, t3: props.helper.t3 };
 }, { immediate: true });
 </script>
 
@@ -330,5 +395,13 @@ watch(() => [props.modelValue, props.helper], () => {
   .chd-mrow {
     grid-template-columns: minmax(0, 1fr) 76px 86px;
   }
+}
+.chd-uf {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chd-uf-result {
+  font-size: 14px;
 }
 </style>

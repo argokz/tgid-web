@@ -1239,6 +1239,7 @@ import { canEditFragment } from '~/utils/permissions'
 import ObjectCardShell from '~/components/objectCard/ObjectCardShell.vue'
 import ObjectCardEdit from '~/components/objectCard/ObjectCardEdit.vue'
 import { useObjectCardLayout } from '~/composables/useObjectCardLayout'
+import { CARD_KIND_BY_TABLE, KIND_TEXT, type CardKind } from '~/utils/objectCard'
 import { useJournalMapBridge } from '~/composables/useJournalMapBridge'
 import { groupSettersService } from '~/services/groupSettersService'
 import { confirmAction } from '~/composables/useConfirm'
@@ -1428,19 +1429,19 @@ const cardTable = computed(() => cardObject.value.table)
 // ── Окно свойств: размещение (панель/окно) и правка карточки (routers/card_edit.py) ──
 const cardLayout = useObjectCardLayout()
 const toggleCardMode = () => { cardLayout.mode = cardLayout.mode === 'panel' ? 'float' : 'panel' }
-// Что правится через карточку (этапы окна свойств: участки, затем узлы, потребители…).
-// Линия в десктопе — всегда карточка участка heatPipeSections (PropertyDial::init_gid)
-// Узел и камера — таблица nodes (камера — тип узла); потребители, источники — следующие этапы
-const CARD_EDIT_NODE_TABLES = new Set<string>(['nodes'])
+// Что правится через карточку (этапы окна свойств: участки, узлы, потребители, источники…).
+// Линия в десктопе — всегда карточка участка heatPipeSections (PropertyDial::init_gid);
+// объекты в узле (узел и камера, потребители, источники, насосные) — карточка своей таблицы по id узла
 const editing = ref(false)
 const editDirty = ref(false)
 const cardEditRef = ref<{ hasChanges: () => boolean } | null>(null)
-const editTarget = computed<{ kind: 'line' | 'node'; table: string; id: number } | null>(() => {
+const editTarget = computed<{ kind: CardKind; table: string; id: number } | null>(() => {
   const { network, networkId, table } = cardObject.value
   if (!network || !networkId) return null
   if (network === 'line') return { kind: 'line', table: 'heatPipeSections', id: Number(networkId) }
-  if (!table || !CARD_EDIT_NODE_TABLES.has(String(table).toLowerCase())) return null
-  return { kind: 'node', table: String(table), id: Number(networkId) }
+  const kind = table ? CARD_KIND_BY_TABLE[String(table).toLowerCase()] : undefined
+  if (!kind) return null
+  return { kind, table: String(table), id: Number(networkId) }
 })
 const canEditCard = computed(() => Boolean(editTarget.value) && authStore.canEditNetwork && cardInTerritory.value)
 const startEditing = () => {
@@ -1450,15 +1451,16 @@ const startEditing = () => {
   }
 }
 
-// --- несколько участков (узлов) одной карточкой: выбор на карте (клик, Shift + рамка) ---
+// --- несколько объектов одной карточкой: выбор на карте (клик, Shift + рамка) ---
+// у потребителей, источников и насосных выбираются их узлы; сервер берёт узлы, где объект этого вида есть
 const batchIds = ref<number[] | null>(null)
 const mapBridge = useJournalMapBridge()
-const batchLabel = computed(() => (editTarget.value?.kind === 'node' ? 'Править несколько узлов' : 'Править несколько участков'))
+const batchLabel = computed(() => `Править несколько ${KIND_TEXT[editTarget.value?.kind ?? 'line'].many}`)
 const startBatchEditing = async () => {
   const target = editTarget.value
   if (!canEditCard.value || !target) return
-  const node = target.kind === 'node'
-  const ids = await mapBridge.startPick([target.id], node ? 'свойства узлов' : 'свойства участков', target.kind, 'Выбор')
+  const pickKind = target.kind === 'line' ? 'line' : 'node'
+  const ids = await mapBridge.startPick([target.id], `свойства ${KIND_TEXT[target.kind].many}`, pickKind, 'Выбор')
   if (!ids?.length) return
   batchIds.value = ids
   editing.value = true

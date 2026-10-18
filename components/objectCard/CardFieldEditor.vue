@@ -56,7 +56,7 @@
     @update:model-value="emit('update:modelValue', parseInput(edit.kind, $event))"
   >
     <template
-      v-if="edit.helper"
+      v-if="edit.helper || edit.fun_name === 'schemeNum'"
       #append-inner
     >
       <v-btn
@@ -124,15 +124,24 @@ const HELPER_TITLES: Record<string, string> = {
   diameter_std: 'Выбрать по сортаменту труб (Ду, диаметры, толщина стенки)',
   Table: 'Выбрать из справочной таблицы',
   'Местные сопротивления': 'Местные сопротивления: количество по видам и сумма',
+  schemeNum: 'Выбрать схему присоединения (нагрузки перейдут в поля новой схемы)',
+  uf: 'Рассчитать коэффициент смешения по температурам',
+  'uf150-70': 'Рассчитать коэффициент смешения по температурам',
+};
+const HELPER_ICONS: Record<string, string> = {
+  'Местные сопротивления': 'mdi-calculator', uf: 'mdi-calculator', 'uf150-70': 'mdi-calculator', schemeNum: 'mdi-tune-vertical',
 };
 const helperTitle = computed(() => HELPER_TITLES[props.edit.fun_name ?? ''] ?? 'Выбрать');
-const helperIcon = computed(() => (props.edit.fun_name === 'Местные сопротивления' ? 'mdi-calculator' : 'mdi-table-search'));
+const helperIcon = computed(() => HELPER_ICONS[props.edit.fun_name ?? ''] ?? 'mdi-table-search');
 
 // Функции без помощника в вебе — подсказка, что делает десктоп (ReadOnly/NotNull обработаны сервером)
 const FUN_HINTS: Record<string, string> = {
   heatTestsCoeff: 'В десктопе — калькулятор коэффициента по результатам тепловых испытаний',
+  nagruz_ot: 'В десктопе — окно расчёта нагрузки по характеристикам здания',
+  nagruz_vt: 'В десктопе — окно расчёта нагрузки по характеристикам здания',
+  alsecoNagr: 'В десктопе — нагрузки здания из базы Alseco (слой зданий)',
 };
-const SILENT_FUNS = new Set(['ReadOnly', 'NotNull', 'hydroRes', 'ms_rs', 'Date', 'Hidden']);
+const SILENT_FUNS = new Set(['ReadOnly', 'NotNull', 'hydroRes', 'ms_rs', 'Date', 'Hidden', 'NagrSum']);
 const funHint = computed(() => {
   const name = props.edit.fun_name;
   if (!name || SILENT_FUNS.has(name)) return '';

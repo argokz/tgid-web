@@ -37,7 +37,7 @@
           color="primary"
         >mdi-select-multiple</v-icon>
         <span>
-          {{ kind === 'node' ? 'Узлов' : 'Участков' }}: <b>{{ card.selection.lines }}</b><template v-if="card.selection.columns.length > 1">
+          {{ kindText.Many }}: <b>{{ card.selection.lines }}</b><template v-if="card.selection.columns.length > 1">
             (подача {{ card.selection.columns[0].line_ids.length }}, обратка {{ card.selection.columns[1].line_ids.length }})</template>.
           Поля с пометкой «разные» не меняются, пока не задано значение.
         </span>
@@ -45,7 +45,7 @@
       <!-- Заполнение: как у соседнего участка (узла), из шаблона; сохранить значения как шаблон -->
       <div class="oce-fill">
         <v-btn
-          v-if="!card.batch"
+          v-if="!card.batch && kindText.neighborTip"
           size="small"
           variant="text"
           prepend-icon="mdi-content-duplicate"
@@ -57,9 +57,7 @@
             activator="parent"
             location="bottom"
             max-width="300"
-          >{{ kind === 'node'
-            ? 'Заполнить код схемы, конструкцию, балансовую принадлежность и отметки значениями смежного узла (предпочтительно того же типа). Поля подсветятся — проверьте и сохраните.'
-            : 'Заполнить конструктив значениями смежного участка (общий узел; предпочтительно тот же Ду). Поля подсветятся — проверьте и сохраните.' }}</v-tooltip>
+          >{{ kindText.neighborTip }}</v-tooltip>
         </v-btn>
         <v-menu location="bottom start">
           <template #activator="{ props: menuProps }">
@@ -185,7 +183,7 @@
                       :key="ci"
                     >
                       <CardFieldEditor
-                        v-if="!col.readonly"
+                        v-if="!col.readonly && !isDisabled(f, ci)"
                         :model-value="draft[draftKey(f.table, col.id, f.field)]"
                         :edit="f.edit!"
                         :table="f.table"
@@ -277,9 +275,7 @@
             </v-btn-toggle>
           </div>
           <div class="text-caption text-medium-emphasis my-2">
-            {{ kind === 'node'
-              ? 'Поля шаблона (наименование, номера, признак трубопровода и отметки — свои у каждого узла и не предлагаются):'
-              : 'Поля шаблона (длина, инвентарный номер и местные сопротивления — свои у каждого участка и не предлагаются):' }}
+            Поля шаблона ({{ kindText.templateNote }}):
           </div>
           <div
             v-for="it in tplCandidates"
@@ -323,11 +319,11 @@
       scrollable
     >
       <v-card v-if="preview">
-        <v-card-title class="text-subtitle-1">Изменить свойства {{ kind === 'node' ? 'узлов' : 'участков' }}</v-card-title>
+        <v-card-title class="text-subtitle-1">Изменить свойства {{ kindText.many }}</v-card-title>
         <v-divider />
         <v-card-text class="oce-preview">
           <div class="text-body-2 mb-2">
-            {{ kind === 'node' ? 'Узлов' : 'Участков' }} в выборе: {{ preview.lines }}. Изменится строк: <b>{{ preview.changes }}</b>.
+            {{ kindText.Many }} в выборе: {{ preview.lines }}. Изменится строк: <b>{{ preview.changes }}</b>.
           </div>
           <div
             v-for="(pf, i) in preview.fields"
@@ -378,6 +374,11 @@
       :mestn-text="helperMestnText"
       @apply="applyHelper"
     />
+    <ConsumerSchemeDialog
+      v-model="schemeOpen"
+      :scheme="schemeCurrent"
+      @apply="applyScheme"
+    />
   </div>
 </template>
 
@@ -385,6 +386,8 @@
 import { computed, ref, watch } from 'vue';
 import CardFieldEditor from '~/components/objectCard/CardFieldEditor.vue';
 import CardHelperDialog from '~/components/objectCard/CardHelperDialog.vue';
+import ConsumerSchemeDialog from '~/components/objectCard/ConsumerSchemeDialog.vue';
+import { schemeChangeValues, schemeVisValues } from '~/utils/consumerScheme';
 import { ApiError, fastApiService } from '~/services/fastApiService';
 import { confirmAction } from '~/composables/useConfirm';
 import { useNotificationStore } from '~/stores/notificationStore';
@@ -392,18 +395,20 @@ import { useAuthStore } from '~/stores/authStore';
 import { formatApiError } from '~/utils/apiError';
 import { formatDesktopNumber } from '~/utils/desktopNumber';
 import {
-  applyFieldValues, columnValues, draftChanges, draftKey, fieldColumns, hiddenByVis, initialDraft, ruleValues, validateDraft,
-  type CardBatchPreview, type CardEditData, type CardField, type CardHelper, type CardTab, type CardTemplate,
+  applyFieldValues, columnValues, disabledByRules, draftChanges, draftKey, fieldColumns, hiddenByVis, initialDraft, KIND_TEXT,
+  ruleValues, validateDraft,
+  type CardBatchPreview, type CardEditData, type CardField, type CardHelper, type CardKind, type CardTab, type CardTemplate,
   type CardValues,
 } from '~/utils/objectCard';
 
 const props = defineProps<{
-  kind: 'line' | 'node'
+  kind: CardKind
   table: string
   objectId: number
-  /** несколько участков (linesobj.id) или узлов (nodes.id): одна карточка, значения по колонкам */
+  /** несколько участков (linesobj.id) или узлов (nodes.id; у потребителей и т.п. — их узлы): одна карточка */
   batchIds?: number[] | null
 }>();
+const kindText = computed(() => KIND_TEXT[props.kind]);
 const emit = defineEmits<{
   saved: [result: { changed: number; changeGroupId?: string | null }]
   cancel: []
@@ -450,15 +455,31 @@ const changedKeys = computed(() => new Set(changes.value.map((c) => draftKey(c.t
 const rowChanged = (f: CardField) => fieldColumns(f).some((c) => changedKeys.value.has(draftKey(f.table, c.id, f.field)));
 const changedInTab = (t: CardTab) => t.subsections.reduce((n, s) => n + s.fields.filter(rowChanged).length, 0);
 
-// Видимость как в десктопе: правила .vis по текущим значениям (меняются вместе с черновиком)
+// Видимость как в десктопе: правила .vis по текущим значениям (меняются вместе с черновиком);
+// у потребителя ключи — признаки номера схемы (setPR: elev, otop, gvs, …)
+const visValues = (table: string, ci: number) => {
+  const values = ruleValues(card.value!, draft.value, table, ci);
+  return table === 'realconsumers' ? { ...values, ...schemeVisValues(values.schemenum) } : values;
+};
 const hiddenSets = computed(() => {
   const out: Record<string, Set<string>[]> = {};
   if (!card.value) return out;
   for (const [table, r] of Object.entries(card.value.rules || {})) {
-    out[table] = columns.value.map((_, ci) => hiddenByVis(r.vis, ruleValues(card.value!, draft.value, table, ci)));
+    out[table] = columns.value.map((_, ci) => hiddenByVis(r.vis, visValues(table, ci)));
   }
   return out;
 });
+// Доступность как в десктопе: правила .disable по кодам списков (setDisableAll)
+const disabledSets = computed(() => {
+  const out: Record<string, Set<string>[]> = {};
+  if (!card.value) return out;
+  for (const [table, r] of Object.entries(card.value.rules || {})) {
+    if (!r.disable || !Object.keys(r.disable).length) continue;
+    out[table] = columns.value.map((_, ci) => disabledByRules(r.disable, ruleValues(card.value!, draft.value, table, ci)));
+  }
+  return out;
+});
+const isDisabled = (f: CardField, ci: number) => Boolean(disabledSets.value[f.table.toLowerCase()]?.[ci]?.has(f.field.toLowerCase()));
 const isHidden = (f: CardField) => {
   const sets = hiddenSets.value[f.table.toLowerCase()];
   if (!sets) return Boolean(f.hidden);
@@ -531,8 +552,8 @@ const fillFromNeighbor = async () => {
     });
     const notify = useNotificationStore();
     const diff = changes.value.length - before;
-    const who = props.kind === 'node' ? 'узла' : 'участка';
-    if (!from.size) notify.showWarning(props.kind === 'node' ? 'Соседний узел не найден' : 'Смежный участок с паспортом не найден');
+    const who = kindText.value.of;
+    if (!from.size) notify.showWarning(kindText.value.neighborMissing);
     else if (!diff) notify.showInfo(`Значения уже как у ${who} ${[...from].join(', ')}`);
     else notify.showInfo(`Как у ${who} ${[...from].join(', ')}: изменено полей ${diff} (подсвечены). Проверьте и сохраните.`);
   } catch (e) {
@@ -628,6 +649,12 @@ const helperMestnText = ref<unknown>(null);
 const openHelper = async (f: CardField, ci: number) => {
   if (!card.value) return;
   const values = ruleValues(card.value, draft.value, f.table, ci);
+  if (f.edit?.fun_name === 'schemeNum') {
+    schemeTarget.value = { table: f.table, column: ci };
+    schemeCurrent.value = values.schemenum == null ? '' : String(values.schemenum);
+    schemeOpen.value = true;
+    return;
+  }
   helperTarget.value = { table: f.table, column: ci };
   helperMestnText.value = values.mestn ?? null;
   helperData.value = null;
@@ -636,14 +663,37 @@ const openHelper = async (f: CardField, ci: number) => {
   helperOpen.value = true;
   try {
     const sid = Number(values.standardid);
-    helperData.value = await fastApiService.getCardHelper({
+    const h = await fastApiService.getCardHelper({
       table: f.table, field: f.field, standard_id: Number.isFinite(sid) && sid > 0 ? sid : null,
     });
+    // коэффициент смешения источника — по температурам из его карточки (fun_uf)
+    if (h.type === 'uf' && h.from) {
+      for (const k of ['t1', 't2', 't3'] as const) {
+        const v = Number(values[h.from[k]]);
+        if (Number.isFinite(v) && v !== 0) h[k] = v;
+      }
+    }
+    helperData.value = h;
   } catch (e) {
     helperError.value = formatApiError(e, 'Не удалось загрузить данные');
   } finally {
     helperLoading.value = false;
   }
+};
+
+// --- схема присоединения потребителя (fun_schemeNum): номер и перенос нагрузок ---
+const schemeOpen = ref(false);
+const schemeCurrent = ref('');
+const schemeTarget = ref<{ table: string; column: number } | null>(null);
+const applyScheme = (scheme: string) => {
+  if (!card.value || !schemeTarget.value || scheme === schemeCurrent.value) return;
+  const { table, column } = schemeTarget.value;
+  const values = ruleValues(card.value, draft.value, table, column);
+  const before = changes.value.length;
+  draft.value = applyFieldValues(card.value, draft.value, table, column,
+    schemeChangeValues(values, values.schemenum, scheme)).draft;
+  useNotificationStore().showInfo(`Схема ${scheme}: нагрузки перенесены в поля новой схемы, `
+    + `изменено полей ${changes.value.length - before}. Проверьте и сохраните.`);
 };
 
 const applyHelper = (values: Record<string, unknown>) => {

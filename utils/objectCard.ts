@@ -56,7 +56,7 @@ export interface CardTab {
 export type VisRules = Record<string, Record<string, string[]>>
 
 export interface CardEditData {
-  kind: 'line' | 'node'
+  kind: CardKind
   table: string
   id: number
   fileid: number | null
@@ -201,6 +201,21 @@ export function hiddenByVis(rules: VisRules | undefined, values: Record<string, 
   return new Set(Object.entries(shown).filter(([, on]) => !on).map(([c]) => c))
 }
 
+/**
+ * Поля только для чтения по правилам tab/<table>.disable (setDisableAll десктопа): поля ключа
+ * недоступны, кроме ветки текущего кода ключа. Пустой код — «0» (десктоп берёт индекс списка).
+ */
+export function disabledByRules(rules: VisRules | undefined, values: Record<string, unknown>): Set<string> {
+  const enabled: Record<string, boolean> = {}
+  for (const [key, branches] of Object.entries(rules || {})) {
+    if (!(key in values)) continue
+    for (const cols of Object.values(branches)) for (const c of cols) enabled[c] = false
+    const val = (visText(values[key]) || '0').toLowerCase()
+    for (const c of branches[val] || []) enabled[c] = true
+  }
+  return new Set(Object.entries(enabled).filter(([, on]) => !on).map(([c]) => c))
+}
+
 /** Значения ключей правил одной колонки (0 — подача/единственная, 1 — обратка) из черновика */
 export function ruleValues(
   card: Pick<CardEditData, 'tabs'>, draft: Record<string, unknown>, table: string, column: number,
@@ -288,7 +303,25 @@ export interface CardHelperMestn {
   set: { sum: string; list: string }
 }
 
-export type CardHelper = CardHelperPick | CardHelperMestn
+/** Коэффициент смешения (fun_uf / uf150-70, окно CUtfDialog десктопа): u = (t1 − t3) / (t3 − t2) */
+export interface CardHelperUf {
+  type: 'uf'
+  title: string
+  t1: number
+  t2: number
+  t3: number
+  /** температуры из полей карточки (lower-имя), если есть: {t1: 't1_r', …} */
+  from: { t1: string; t2: string; t3: string } | null
+  set: { u: string }
+}
+
+export type CardHelper = CardHelperPick | CardHelperMestn | CardHelperUf
+
+/** u = (t1 − t3) / (t3 − t2); null — при t3 ≤ t2 («Ошибка» в десктопе) */
+export function mixFactor(t1: number, t2: number, t3: number): number | null {
+  if (![t1, t2, t3].every(Number.isFinite) || t3 <= t2) return null
+  return (t1 - t3) / (t3 - t2)
+}
 
 /**
  * Значения полей одной колонки (0 — подача/единственная, 1 — обратка) из помощника → новый черновик.
@@ -347,7 +380,67 @@ export function mestnResult(rows: { id: number; k: number; v: number }[]): { sum
 }
 
 /** Вид карточки: участок или узел */
-export type CardKind = 'line' | 'node'
+export type CardKind = 'line' | 'node' | 'consumer' | 'genconsumer' | 'source' | 'pumpstation'
+
+/** Таблица карточки объекта в узле → вид (у объектов в узле id карточки — id узла) */
+export const CARD_KIND_BY_TABLE: Readonly<Record<string, CardKind>> = {
+  nodes: 'node',
+  realconsumers: 'consumer',
+  generalizedconsumers: 'genconsumer',
+  heatsources: 'source',
+  pumpstations: 'pumpstation',
+}
+
+/** Тексты окна по виду объектов */
+export interface KindText {
+  /** «участков» — Править несколько …, Изменить свойства … */
+  many: string
+  /** «Участков: N» */
+  Many: string
+  /** «как у участка N» */
+  of: string
+  /** подсказка «Как у соседнего»; null — кнопки нет */
+  neighborTip: string | null
+  neighborMissing: string
+  /** что не предлагается в шаблон */
+  templateNote: string
+}
+
+const FILL_NOTE = 'Поля подсветятся — проверьте и сохраните.'
+export const KIND_TEXT: Readonly<Record<CardKind, KindText>> = {
+  line: {
+    many: 'участков', Many: 'Участков', of: 'участка',
+    neighborTip: `Заполнить конструктив значениями смежного участка (общий узел; предпочтительно тот же Ду). ${FILL_NOTE}`,
+    neighborMissing: 'Смежный участок с паспортом не найден',
+    templateNote: 'длина, инвентарный номер и местные сопротивления — свои у каждого участка и не предлагаются',
+  },
+  node: {
+    many: 'узлов', Many: 'Узлов', of: 'узла',
+    neighborTip: `Заполнить код схемы, конструкцию, балансовую принадлежность и отметки значениями смежного узла (предпочтительно того же типа). ${FILL_NOTE}`,
+    neighborMissing: 'Соседний узел не найден',
+    templateNote: 'наименование, номера, признак трубопровода и отметки — свои у каждого узла и не предлагаются',
+  },
+  consumer: {
+    many: 'потребителей', Many: 'Потребителей', of: 'потребителя',
+    neighborTip: `Заполнить расчётные коды, признаки и температуры значениями ближайшего потребителя (предпочтительно с той же схемой). ${FILL_NOTE}`,
+    neighborMissing: 'Соседний потребитель не найден',
+    templateNote: 'наименование, схема, нагрузки, адрес, договор и учёт — свои у каждого потребителя и не предлагаются',
+  },
+  genconsumer: {
+    many: 'обобщённых потребителей', Many: 'Обобщённых потребителей', of: 'обобщённого потребителя',
+    neighborTip: `Заполнить расчётные коды, признаки и температуры значениями ближайшего обобщённого потребителя. ${FILL_NOTE}`,
+    neighborMissing: 'Соседний обобщённый потребитель не найден',
+    templateNote: 'наименование, квартал и нагрузки — свои у каждого потребителя и не предлагаются',
+  },
+  source: {
+    many: 'источников', Many: 'Источников', of: 'источника', neighborTip: null, neighborMissing: '',
+    templateNote: 'наименование, мощность, контакты и даты — свои у каждого источника и не предлагаются',
+  },
+  pumpstation: {
+    many: 'насосных станций', Many: 'Насосных станций', of: 'насосной станции', neighborTip: null, neighborMissing: '',
+    templateNote: 'наименование — своё у каждой станции и не предлагается',
+  },
+}
 
 /** Значения полей по таблицам: {таблица: {поле: значение}} */
 export type CardValues = Record<string, Record<string, unknown>>
@@ -379,7 +472,26 @@ export const TEMPLATE_SKIP_FIELDS: ReadonlySet<string> = new Set([
   'pipesectlength', 'inventnumber', 'mestn', 'localressum', 'externalsignlineid',
   // узел: имя, номера, признак П/О и отметки — свои у каждого узла
   'externalnodename', 'nodename', 'registnumber', 'externalsignid', 'geomarktoptube', 'geomarknodearea',
+  // потребитель, источник, насосная: имя, схема (переносит нагрузки), адрес, договор, учёт, объёмы здания
+  'name', 'schemenum', 'note_1', 'note_2', 'note_regime', 'quarter', 'buildheight', 'maxbuildingheight',
+  'contractnumber', 'streetid', 'housenumber', 'countfloors', 'countbusinessconsumers', 'countusergv', 'area',
+  'buildingvolume', 'basementvolume', 'builtinvolume', 'responsibleid', 'meterdevstampnum', 'meterdevsafety',
+  'heatsourceptsid', 'heatpointid', 'hydrothrustin', 'hydrothrustout', 'elevatornuminst', 'diameternozzle',
+  'diameterthrotdiaph', 'diameterelevnozzle', 'mixfactcoeff', 'meterdevworksign',
+  // рассчитанные по зданию: гидросопротивления и диаметры шайб (b14 … b38)
+  'hydroresclosesys', 'hydroresclosesyssummer', 'hydroreswdoflow', 'hydroreswdoret',
+  'b14', 'b20', 'b23', 'b28', 'b32', 'b35', 'b36', 'b38',
+  'sourcename', 'hsourceid', 'hsourcepower', 'hsourcepowerinst', 'managerphone', 'controllerphone', 'name_tg',
+  'date_on', 'name_exe', 'hseasonbegindate', 'hseasonenddate', 'q_r', 'q_gv',
 ])
+/** Нагрузки (расчётные, договорные, перспективные, тепловыделения) — свои у каждого потребителя */
+const TEMPLATE_SKIP_RE = /^(calchl|avghl|calcinternhd|internhd|cont|persp|adj|normhlos)/
+
+/** Поле не предлагается в шаблон (и не берётся в него по умолчанию) */
+export const templateSkipped = (field: string): boolean => {
+  const f = field.toLowerCase()
+  return TEMPLATE_SKIP_FIELDS.has(f) || TEMPLATE_SKIP_RE.test(f)
+}
 
 /**
  * Значения одной колонки черновика для шаблона: правимые поля с значением → {таблица: {поле: значение}}.
@@ -387,7 +499,7 @@ export const TEMPLATE_SKIP_FIELDS: ReadonlySet<string> = new Set([
  */
 export function columnValues(
   card: Pick<CardEditData, 'tabs'>, draft: Record<string, unknown>, column: number,
-  skip: ReadonlySet<string> = TEMPLATE_SKIP_FIELDS,
+  skip: (field: string) => boolean = templateSkipped,
 ): { table: string; field: string; label: string; value: unknown; text: unknown }[] {
   const out: { table: string; field: string; label: string; value: unknown; text: unknown }[] = []
   const seen = new Set<string>()
@@ -396,7 +508,7 @@ export function columnValues(
     for (const sub of tab.subsections) {
       for (const f of sub.fields) {
         const c = fieldColumns(f)[column]
-        if (!c || c.readonly || skip.has(f.field.toLowerCase())) continue
+        if (!c || c.readonly || skip(f.field)) continue
         const key = draftKey(f.table, c.id, f.field)
         if (seen.has(key)) continue
         seen.add(key)
