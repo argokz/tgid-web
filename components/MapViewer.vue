@@ -1319,6 +1319,8 @@ const toolDialogs: ToolDialogEntry[] = [
   // Администрирование: пользователи и роли (только admin), история правок audit_log
   { key: 'usersAdmin', component: lazyDialog(() => import('./UsersAdminDialog.vue')) },
   { key: 'auditHistory', component: lazyDialog(() => import('./AuditHistoryDialog.vue')) },
+  // журнал действий пользователей (activity_log, право «Просмотр журнала действий»)
+  { key: 'activityLog', component: lazyDialog(() => import('./ActivityLogDialog.vue')) },
   // Исходные данные (этап 9): участки ПТС, групповые установщики aSet* и справочники
   { key: 'ptsSites', component: lazyDialog(() => import('./PtsSitesDialog.vue')) },
   { key: 'groupSetters', component: lazyDialog(() => import('./GroupSetterDialog.vue')) },

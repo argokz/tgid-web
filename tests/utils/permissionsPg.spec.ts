@@ -67,7 +67,9 @@ describe('каталог инструментов: предметные прав
     expect(toolEvents(pg('calculator', ['network']))).toContain('open-group-setters')
     expect(toolEvents(pg('calculator', ['network']))).not.toContain('open-network-import')
     expect(toolEvents(pg('editor'))).not.toContain('open-group-setters')
-    expect(toolEvents(pg('viewer', ['network', 'network_struct']))).toContain('open-network-import')
+    // действующие права приходят с сервера (/auth/me): network_struct даёт «Импорт сети»
+    expect(toolEvents({ ...pg('viewer', ['network', 'network_struct']), permissions: { matrix: {}, general: ['import'] } }))
+      .toContain('open-network-import')
     expect(toolEvents(usersdb('editor'))).toContain('open-group-setters')
   })
 })

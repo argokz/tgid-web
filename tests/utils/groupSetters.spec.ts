@@ -94,11 +94,11 @@ describe('helpers', () => {
     expect(dictionaryPayload({ kodkv: 'X', otoplz: '0.9' }, { kodkv: 'X', otoplz: 0.69 })).toEqual({ otoplz: '0.9' });
   });
 
-  it('tools are registered for editors with icons', () => {
+  it('tools are registered by permission with icons', () => {
     const items = TOOL_GROUPS.flatMap((g) => g.items);
-    for (const event of ['open-group-setters', 'open-dictionaries']) {
+    for (const [event, perm] of [['open-group-setters', 'edit'], ['open-dictionaries', 'refs']]) {
       const tool = items.find((t) => t.event === event);
-      expect(tool?.requires).toBe('editor');
+      expect(tool?.requiresPerm).toBe(perm);
       expect(resolveMdiSvgPath(tool!.icon)).not.toBe('');
     }
     for (const g of TOOL_GROUPS) expect(resolveMdiSvgPath(g.icon)).not.toBe('');

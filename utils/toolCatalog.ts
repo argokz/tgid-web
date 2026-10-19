@@ -1,4 +1,4 @@
-import type { Cap, Role } from '~/utils/permissions'
+import type { Cap, GeneralPerm, Role } from '~/utils/permissions'
 
 /**
  * Каталог инструментов, не относящихся к карте: журналы, реестры,
@@ -38,6 +38,7 @@ export type ToolEvent =
   | 'open-hydraulic-thematic'
   | 'open-users-admin'
   | 'open-audit-history'
+  | 'open-activity-log'
   | 'open-group-setters'
   | 'open-pts-sites'
   | 'open-dictionaries'
@@ -77,6 +78,7 @@ export type ToolDialogKey =
   | 'excelReports'
   | 'usersAdmin'
   | 'auditHistory'
+  | 'activityLog'
   | 'groupSetters'
   | 'ptsSites'
   | 'dictionaries'
@@ -89,6 +91,8 @@ export interface ToolDescriptor {
   requires?: Role
   /** Предметное право пользователя PostgreSQL вместо роли (как require_roles(cap=…) на сервере) */
   requiresCap?: Cap
+  /** Право из матрицы прав вместо роли: общее право или 'edit' — свойства хоть каких-то объектов */
+  requiresPerm?: GeneralPerm | 'edit'
   icon: string
   color: string
   event: ToolEvent
@@ -170,9 +174,9 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     icon: 'mdi-book-open-page-variant-outline',
     color: 'teal-darken-3',
     items: [
-      { label: 'Групповые установщики', hint: 'Поле = значение для фрагмента, выделения или фильтра (aSet*)', icon: 'mdi-select-group', color: 'deep-orange-darken-2', event: 'open-group-setters', dialog: 'groupSetters', requires: 'editor', requiresCap: 'network' },
-      { label: 'Импорт SHP / Excel / координат', hint: 'Узлы, участки из SHP, координаты узлов: сопоставление полей, превью, отмена', icon: 'mdi-database-import', color: 'indigo-darken-2', event: 'open-network-import', dialog: 'networkImport', requires: 'editor', requiresCap: 'network_struct' },
-      { label: 'Справочники', hint: 'Удельные расходы, Kv, температуры, ГВС, организации, районы', icon: 'mdi-book-open-page-variant-outline', color: 'teal-darken-3', event: 'open-dictionaries', dialog: 'dictionaries', requires: 'editor' },
+      { label: 'Групповые установщики', hint: 'Поле = значение для фрагмента, выделения или фильтра (aSet*)', icon: 'mdi-select-group', color: 'deep-orange-darken-2', event: 'open-group-setters', dialog: 'groupSetters', requiresPerm: 'edit' },
+      { label: 'Импорт SHP / Excel / координат', hint: 'Узлы, участки из SHP, координаты узлов: сопоставление полей, превью, отмена', icon: 'mdi-database-import', color: 'indigo-darken-2', event: 'open-network-import', dialog: 'networkImport', requiresPerm: 'import' },
+      { label: 'Справочники', hint: 'Удельные расходы, Kv, температуры, ГВС, организации, районы', icon: 'mdi-book-open-page-variant-outline', color: 'teal-darken-3', event: 'open-dictionaries', dialog: 'dictionaries', requiresPerm: 'refs' },
     ],
   },
   {
@@ -181,7 +185,8 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     color: 'blue-grey-darken-2',
     items: [
       { label: 'История правок', hint: 'Кто, когда и что изменил в данных', icon: 'mdi-history', color: 'blue-grey-darken-2', event: 'open-audit-history', dialog: 'auditHistory', requires: 'viewer' },
-      { label: 'Пользователи', hint: 'Роли, блокировка, пароли', icon: 'mdi-account-cog', color: 'blue-grey-darken-3', event: 'open-users-admin', dialog: 'usersAdmin', requires: 'admin' },
+      { label: 'Журнал действий', hint: 'Входы, правки, расчёты и выгрузки всех пользователей', icon: 'mdi-account-clock-outline', color: 'blue-grey-darken-3', event: 'open-activity-log', dialog: 'activityLog', requiresPerm: 'audit_view' },
+      { label: 'Пользователи', hint: 'Роли и права, блокировка, пароли', icon: 'mdi-account-cog', color: 'blue-grey-darken-3', event: 'open-users-admin', dialog: 'usersAdmin', requiresPerm: 'users_admin' },
     ],
   },
 ]

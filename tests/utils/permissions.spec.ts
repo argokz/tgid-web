@@ -109,17 +109,25 @@ describe('каталог инструментов по ролям', () => {
     const groups = filterByRole(TOOL_GROUPS, computePermissions(base))
     expect(groups.find((g) => g.title === 'Администрирование')).toBeUndefined()
     expect(groups.find((g) => g.title === 'Исходные данные')).toBeUndefined()
-    const open = TOOL_GROUPS.flatMap((g) => g.items).filter((i) => !i.requires)
+    const open = TOOL_GROUPS.flatMap((g) => g.items).filter((i) => !i.requires && !i.requiresPerm)
     expect(groups.flatMap((g) => g.items).length).toBe(open.length)
   })
 
-  it('групповые установщики и справочники — editor+', () => {
-    for (const role of ['', 'viewer', 'calculator']) {
-      expect(toolEvents(role)).not.toContain('open-group-setters')
-      expect(toolEvents(role)).not.toContain('open-dictionaries')
-    }
+  it('групповые установщики — с правом правки свойств, справочники — с правом справочников', () => {
+    for (const role of ['', 'viewer']) expect(toolEvents(role)).not.toContain('open-group-setters')
+    // режимщик правит потребителей и оборудование — групповые установки ему нужны
+    expect(toolEvents('calculator')).toContain('open-group-setters')
+    for (const role of ['', 'viewer', 'calculator', 'operator']) expect(toolEvents(role)).not.toContain('open-dictionaries')
     expect(toolEvents('editor')).toContain('open-group-setters')
     expect(toolEvents('admin')).toContain('open-dictionaries')
+  })
+
+  it('журнал действий — только с правом просмотра журнала', () => {
+    for (const role of ['viewer', 'calculator', 'operator', 'editor']) {
+      expect(toolEvents(role)).not.toContain('open-activity-log')
+    }
+    expect(toolEvents('admin')).toContain('open-activity-log')
+    expect(toolEvents('editor', { permissions: { matrix: {}, general: ['audit_view'] } })).toContain('open-activity-log')
   })
 })
 

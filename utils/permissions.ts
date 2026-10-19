@@ -291,9 +291,17 @@ export function canEditFragment(permissions: Permissions, fileid: number | null 
 export interface RequiresRole {
   requires?: Role
   requiresCap?: Cap
+  /** Право матрицы прав: общее или 'edit' — свойства хоть каких-то объектов */
+  requiresPerm?: GeneralPerm | 'edit'
 }
 
 export function isToolVisible(tool: RequiresRole, permissions: Permissions): boolean {
+  if (tool.requiresPerm) {
+    if (!permissions.isAuthenticated) return false
+    return tool.requiresPerm === 'edit'
+      ? matrixHas(permissions.matrix, ['edit'])
+      : permissions.general.includes(tool.requiresPerm)
+  }
   if (!tool.requires) return true
   return allows(permissions.role, tool.requires, tool.requiresCap, permissions.pgUser, permissions.caps)
 }

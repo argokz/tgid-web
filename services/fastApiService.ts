@@ -1153,6 +1153,49 @@ export interface AdminRole {
   label?: string;
 }
 
+export interface ActivityLogItem {
+  id: number;
+  at: string | null;
+  username: string | null;
+  city: string | null;
+  action: string;
+  action_label: string;
+  method: string | null;
+  path: string | null;
+  status: number | null;
+  duration_ms: number | null;
+  ip: string | null;
+  user_agent: string | null;
+  details: string | null;
+}
+
+export interface ActivityLogQuery {
+  username?: string;
+  action?: string;
+  city?: string;
+  date_from?: string;
+  date_to?: string;
+  q?: string;
+  failed?: boolean;
+}
+
+export interface ActivityLogResponse {
+  items: ActivityLogItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  lookups: { users: string[]; cities: string[]; actions: { value: string; title: string }[] };
+}
+
+/** Параметры запроса без пустых значений */
+function cleanQuery(query: object): Record<string, string | number | boolean> {
+  const out: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== null && value !== undefined && value !== '') out[key] = value as string | number | boolean;
+  }
+  return out;
+}
+
 export interface AuditChange {
   field: string;
   old: any;
@@ -2898,6 +2941,16 @@ export const fastApiService = {
   /** Удалить пользователя UsersDB (пользователей PostgreSQL только блокируют) */
   async deleteAdminUser(userId: number | string): Promise<{ success: boolean; id: number | string }> {
     return request(`api/v1/admin/users/${encodePath(userId)}`, mutationOptions('DELETE'));
+  },
+
+  /** Журнал действий пользователей (activity_log): входы, правки, расчёты, выгрузки */
+  async getActivityLog(query: ActivityLogQuery & { page?: number; page_size?: number } = {}): Promise<ActivityLogResponse> {
+    return request<ActivityLogResponse>('api/v1/activity-log', { ...mutationOptions('GET'), query: cleanQuery(query) });
+  },
+
+  /** Журнал действий по фильтру — CSV для Excel */
+  async downloadActivityLogCsv(query: ActivityLogQuery = {}): Promise<Blob> {
+    return request<Blob>('api/v1/activity-log.csv', { ...mutationOptions('GET'), query: cleanQuery(query), responseType: 'blob' });
   },
 
   /** История правок audit_log с фильтрами */
