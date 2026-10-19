@@ -14,7 +14,7 @@
         @update:model-value="(t: EditorTool) => void setTool(t)"
       >
         <v-btn
-          v-for="t in EDITOR_TOOLS"
+          v-for="t in tools"
           :key="t.value"
           :value="t.value"
           size="small"
@@ -312,7 +312,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { useTopologyEditor } from '~/composables/useTopologyEditor';
-import { EDITOR_TOOLS, type EditorTool } from '~/utils/editorTools';
+import { EDITOR_TOOLS, toolAllowed, type EditorTool } from '~/utils/editorTools';
+import { useAuthStore } from '~/stores/authStore';
 import { PIPE_MODE_ITEMS } from '~/utils/cadChain';
 import { NODE_TYPE_ITEMS } from '~/utils/nodeTypes';
 import { POLAR_STEP_ITEMS } from '~/utils/cadConstraint';
@@ -345,6 +346,10 @@ const {
   loadLineTemplates,
   hotkeysHelpOpen,
 } = props.editor;
+
+const authStore = useAuthStore();
+/** Инструменты по правам пользователя: без права создания — нет «Трассы», «Узла», «Ввода в здание» */
+const tools = computed(() => EDITOR_TOOLS.filter((t) => toolAllowed(t.value, authStore.permissions)));
 
 /** Состояние привязок трассы — только когда что-то не так */
 const statusChips = computed(() => {

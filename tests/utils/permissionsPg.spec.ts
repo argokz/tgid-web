@@ -48,10 +48,11 @@ describe('права пользователей PostgreSQL', () => {
     expect(p.fragments).toBeNull()
   })
 
-  it('пользователи UsersDB — как раньше, по роли', () => {
+  it('пользователи UsersDB — по шаблону роли', () => {
     const editor = computePermissions(usersdb('editor'))
     expect(editor.canEditNetwork && editor.canEditRepairs && editor.canEditPts).toBe(true)
-    expect(editor.canEditTopology).toBe(false) // топология — admin
+    expect(editor.canEditTopology).toBe(true) // редактор создаёт и перемещает, удаляет свои
+    expect(computePermissions(usersdb('viewer')).canEditTopology).toBe(false)
     expect(computePermissions(usersdb('admin')).canEditTopology).toBe(true)
   })
 

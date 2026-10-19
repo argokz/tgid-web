@@ -41,7 +41,8 @@ import type { PointCrs } from '~/utils/pointCrs';
 import { chainRequestPoints, traceOutcome, type PipeMode, type TracePoint } from '~/utils/cadChain';
 import { DEFAULT_POLAR_STEP, POLAR_STEPS } from '~/utils/cadConstraint';
 import type { LngLat } from '~/utils/lineVertices';
-import { editorKeyAction, editorStatusHint, type EditorTool } from '~/utils/editorTools';
+import { canMoveNodes, editorKeyAction, editorStatusHint, toolAllowed, type EditorTool } from '~/utils/editorTools';
+import { canDo, type Permissions } from '~/utils/permissions';
 import { useEditSelection } from '~/composables/useEditSelection';
 
 export interface TopologyEditorOptions {
@@ -68,6 +69,8 @@ export interface TopologyEditorOptions {
   chooseCandidate?: (candidates: PickCandidate[], point: { x: number; y: number }) => Promise<PickCandidate | null>;
   /** Открыть карточку объекта под курсором (инструмент «Выбор»: опознавание в режиме правки выключено) */
   openCard?: (e: any) => void;
+  /** Права пользователя (матрица permissions): недоступные инструменты и действия не включаются */
+  getPermissions?: () => Pick<Permissions, 'matrix'>;
 }
 
 /** Выделенный объект редактора: на нём работают перетаскивание, Del, F, «Изломы» */
@@ -437,6 +440,11 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   const setTool = async (tool: EditorTool): Promise<boolean> => {
     const prev = activeTool.value;
     if (prev === tool) return true;
+    const perms = options.getPermissions?.();
+    if (perms && !toolAllowed(tool, perms)) {
+      useNotificationStore().showWarning('Нет права на этот инструмент — спросите администратора.');
+      return false;
+    }
     if (prev === 'vertex' && vertexEditor.dirty.value && !(await confirmDiscardVertices())) return false;
     if (tool === 'entry' && !canStartEntry()) return false;
     activeTool.value = tool;
@@ -925,6 +933,12 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       useNotificationStore().showInfo('Выделите узел или участок (инструмент «Выбор», V).');
       return;
     }
+    const perms = options.getPermissions?.();
+    if (perms && !(sel.kind === 'line' ? canDo(perms, 'line', 'delete')
+      : (['node', 'consumer', 'source'] as const).some((k) => canDo(perms, k, 'delete')))) {
+      useNotificationStore().showWarning('Нет права на удаление — спросите администратора.');
+      return;
+    }
     await onDeleteFeature(sel.id, undefined, { kind: sel.kind });
   };
 
@@ -1091,6 +1105,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     // (трасса, слияние, новый узел — клики; случайный сдвиг узла при работе исключён)
     const sel = selection.value;
     if (activeTool.value !== 'select' || sel?.kind !== 'node') return;
+    const perms = options.getPermissions?.();
+    if (perms && !canMoveNodes(perms)) return;
     // Тянуть можно только однозначный узел активного фрагмента; копии в нескольких
     // фрагментах — без перетаскивания (клик откроет меню выбора)
     const res = pickNetworkFeature(getMap()?.queryRenderedFeatures(e.point), {

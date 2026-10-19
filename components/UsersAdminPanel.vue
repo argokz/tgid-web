@@ -7,7 +7,7 @@
       density="compact"
       class="mb-2"
     >
-      Управление пользователями доступно только роли admin.
+      Управление пользователями — только с правом «Управление пользователями».
     </v-alert>
     <template v-else>
       <v-alert
@@ -175,6 +175,18 @@
             {{ capShort(c) }}
           </v-chip>
         </template>
+        <template #[`item.perms`]="{ item }">
+          <v-chip
+            size="small"
+            :color="diffCount(item.permissions) ? 'primary' : undefined"
+            variant="tonal"
+            :disabled="!canWrite"
+            prepend-icon="mdi-shield-account-outline"
+            @click="openPermissions(item)"
+          >
+            {{ diffCount(item.permissions) ? `роль + ${diffCount(item.permissions)}` : 'по роли' }}
+          </v-chip>
+        </template>
         <template #[`item.fragments`]="{ item }">
           <span v-if="item.role === 'admin' || !item.fragments?.length">вся сеть</span>
           <span v-else>{{ item.fragments.join(', ') }}</span>
@@ -248,7 +260,7 @@
           v-for="r in roles"
           :key="r.role"
         >
-          <b>{{ ROLE_LABELS[r.role] }}</b> ({{ r.role }}) — {{ r.description }}
+          <b>{{ r.label || ROLE_LABELS[r.role] }}</b> — {{ r.description }}
         </div>
         <div
           v-if="pgBackend"
@@ -265,8 +277,15 @@
           Города: без выбора — доступ ко всем городам (и к добавленным позже). Пользователь входит
           только в отмеченные города; мастер-учётке доступны все.
         </div>
+        <div
+          v-if="!pgBackend"
+          class="mt-1"
+        >
+          Роль — шаблон прав; в «Правах» можно выдать или снять отдельные права: свойства, создание,
+          перемещение и удаление по видам объектов («свои» — созданные пользователем) и общие права.
+        </div>
         <div class="mt-1">
-          Блокировка, смена роли и городов действуют на уже выданные токены в течение ~30 с.
+          Блокировка, смена роли, прав и городов действуют на уже выданные токены в течение ~30 с.
         </div>
       </div>
     </template>
@@ -363,6 +382,15 @@
       </v-card>
     </v-dialog>
 
+    <LazyUserPermissionsDialog
+      v-if="permUser"
+      v-model="permOpen"
+      v-model:saving="permSaving"
+      :user="permUser"
+      :model="permModel"
+      @save="savePermissions"
+    />
+
     <v-dialog
       v-model="passwordOpen"
       max-width="420"
@@ -422,12 +450,13 @@ import {
   type AdminUser,
   type AdminUserUpdate,
   type CityItem,
+  type PermissionsModel,
   type UserRole,
 } from '~/services/fastApiService'
 import { useAuthStore } from '~/stores/authStore'
 import { useFragmentStore } from '~/stores/fragmentStore'
 import { useNotificationStore } from '~/stores/notificationStore'
-import { CAP_LABELS, ROLE_LABELS, ROLE_ORDER, type Cap } from '~/utils/permissions'
+import { CAP_LABELS, diffCount, ROLE_LABELS, ROLE_ORDER, type Cap } from '~/utils/permissions'
 
 const authStore = useAuthStore()
 const fragmentStore = useFragmentStore()
@@ -480,6 +509,7 @@ const headers = computed(() => pgBackend.value
       { title: 'ID', key: 'id', width: 70 },
       { title: 'Логин', key: 'username' },
       { title: 'Роль', key: 'role', sortable: false },
+      { title: 'Права', key: 'perms', sortable: false },
       ...(showCities.value ? [{ title: 'Города', key: 'cities', sortable: false }] : []),
       { title: 'Статус', key: 'is_active' },
       { title: '', key: 'actions', sortable: false, width: 150 },
@@ -531,7 +561,8 @@ const load = async () => {
     const [res, roleRes] = await Promise.all([
       fastApiService.getAdminUsers(),
       roles.value.length
-        ? Promise.resolve({ items: roles.value, caps: caps.value, backend: pgBackend.value ? 'pg' : undefined })
+        ? Promise.resolve({ items: roles.value, caps: caps.value, backend: pgBackend.value ? 'pg' : undefined,
+          model: permModel.value ?? undefined })
         : fastApiService.getAdminRoles(),
     ])
     users.value = res.items
@@ -542,6 +573,7 @@ const load = async () => {
     currentCity.value = res.current_city || ''
     roles.value = roleRes.items
     caps.value = roleRes.caps || []
+    permModel.value = roleRes.model ?? null
     pgBackend.value = roleRes.backend === 'pg'
     if (pgBackend.value && !fragmentStore.fragments?.length) void fragmentStore.loadFragments()
   } catch (e: any) {
@@ -644,6 +676,27 @@ const saveEdit = async () => {
     web_access: editForm.web_access,
   }, `${editUser.value.username}: права сохранены`)
   if (ok) editOpen.value = false
+}
+
+// --- права пользователя UsersDB: роль-шаблон + отличия (UserPermissionsDialog) ---
+const permModel = ref<PermissionsModel | null>(null)
+const permOpen = ref(false)
+const permSaving = ref(false)
+const permUser = ref<AdminUser | null>(null)
+const openPermissions = (item: AdminUser) => {
+  if (!permModel.value) {
+    notificationStore.showWarning('Сервер не прислал модель прав — обновите API.')
+    return
+  }
+  permUser.value = item
+  permOpen.value = true
+}
+const savePermissions = async (body: AdminUserUpdate) => {
+  if (!permUser.value) return
+  permSaving.value = true
+  const ok = await update(permUser.value, body, `${permUser.value.username}: права сохранены`)
+  permSaving.value = false
+  if (ok) permOpen.value = false
 }
 
 const askPassword = (item: AdminUser) => {

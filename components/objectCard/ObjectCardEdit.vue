@@ -28,6 +28,13 @@
       >Повторить</v-btn>
     </div>
     <template v-else-if="card">
+      <!-- кто создал объект в вебе (право «только свои») -->
+      <div
+        v-if="card.created"
+        class="text-caption text-medium-emphasis px-3 pt-1"
+      >
+        Создан: <b>{{ card.created.created_by }}</b><template v-if="card.created.created_at">, {{ formatCreated(card.created.created_at) }}</template>
+      </div>
       <div
         v-if="card.batch && card.selection"
         class="oce-batch"
@@ -383,6 +390,8 @@
 </template>
 
 <script setup lang="ts">
+/** «19.10.2026 12:21» — дата создания объекта в карточке */
+const formatCreated = (iso: string) => new Date(iso).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })
 import { computed, ref, watch } from 'vue';
 import CardFieldEditor from '~/components/objectCard/CardFieldEditor.vue';
 import CardHelperDialog from '~/components/objectCard/CardHelperDialog.vue';

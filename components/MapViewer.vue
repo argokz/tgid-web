@@ -1201,6 +1201,7 @@ const topologyEditor = useTopologyEditor({
   getActiveFragmentIds: () => fragmentStore.activeFragmentIds,
   chooseCandidate: chooseNetworkCandidate,
   openCard: (e: any) => void mapStore.identifyFeature(e),
+  getPermissions: () => authStore.permissions,
 });
 const {
   isEditTopologyMode,

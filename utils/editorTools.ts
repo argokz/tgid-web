@@ -3,7 +3,32 @@
  * Esc — назад к «Выбору», клавиша-буква — инструмент). Чистые функции — для тестов и справки «?».
  */
 
+import { canDo, type PermKind, type Permissions } from '~/utils/permissions';
+
 export type EditorTool = 'select' | 'trace' | 'node' | 'vertex' | 'merge' | 'entry';
+
+const NODE_KINDS: PermKind[] = ['node', 'consumer', 'source'];
+
+/** Инструмент доступен по правам (матрица permissions): «Выбор» — всем, остальные — по действию */
+export const toolAllowed = (tool: EditorTool, p: Pick<Permissions, 'matrix'>): boolean => {
+  switch (tool) {
+    case 'trace':
+      return canDo(p, 'line', 'create');
+    case 'entry':
+      return canDo(p, 'line', 'create') && canDo(p, 'consumer', 'create');
+    case 'node':
+      return NODE_KINDS.some((k) => canDo(p, k, 'create'));
+    case 'vertex':
+      return canDo(p, 'line', 'move');
+    case 'merge':
+      return NODE_KINDS.some((k) => canDo(p, k, 'delete'));
+    default:
+      return true;
+  }
+};
+
+/** Перемещать узлы (своих или все) — хоть какого-то вида */
+export const canMoveNodes = (p: Pick<Permissions, 'matrix'>) => NODE_KINDS.some((k) => canDo(p, k, 'move'));
 
 export interface EditorToolInfo {
   value: EditorTool;

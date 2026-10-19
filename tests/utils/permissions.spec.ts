@@ -1,13 +1,20 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import {
+  canDo,
+  cardPermKind,
   computePermissions,
+  diffCount,
+  diffFromPreset,
   filterByRole,
+  permScope,
+  ROLE_PRESETS,
   requestSavesPo,
   requestWritesSourceData,
   type PermissionInput,
 } from '~/utils/permissions'
 import { TOOL_GROUPS } from '~/utils/toolCatalog'
+import { EDITOR_TOOLS, toolAllowed } from '~/utils/editorTools'
 import { useAuthStore } from '~/stores/authStore'
 
 const base: PermissionInput = {
@@ -45,9 +52,30 @@ describe('computePermissions: роль × флаги сервера', () => {
     })
   })
 
-  it('editor правит журналы только при MUTATIONS_ENABLED, топологию — никогда', () => {
-    expect(computePermissions({ ...base, role: 'editor' })).toMatchObject({ canEditData: true, canEditTopology: false })
+  it('editor правит журналы и сеть (удаляет только свои) — при MUTATIONS_ENABLED', () => {
+    const p = computePermissions({ ...base, role: 'editor' })
+    expect(p).toMatchObject({ canEditData: true, canEditTopology: true, isAdmin: false })
+    expect(permScope(p, 'line', 'delete')).toBe('own')
     expect(computePermissions({ ...base, role: 'editor', mutationsEnabled: false }).canEditData).toBe(false)
+  })
+
+  it('режимщик правит режимные параметры, но не сеть; оператор создаёт, удаляет свои', () => {
+    const calc = computePermissions({ ...base, role: 'calculator' })
+    expect(canDo(calc, 'consumer', 'edit') && canDo(calc, 'equipment', 'edit')).toBe(true)
+    expect(canDo(calc, 'line', 'edit') || canDo(calc, 'line', 'create')).toBe(false)
+    expect(calc).toMatchObject({ canEditNetwork: true, canEditTopology: false, canSaveCalc: true })
+    const op = computePermissions({ ...base, role: 'operator' })
+    expect(op).toMatchObject({ canEditTopology: true, canCalculate: false, canEditData: false })
+    expect([permScope(op, 'node', 'create'), permScope(op, 'node', 'delete')]).toEqual(['all', 'own'])
+  })
+
+  it('действующие права с сервера важнее шаблона роли', () => {
+    const p = computePermissions({
+      ...base, role: 'viewer',
+      permissions: { matrix: { line: { create: 'all' } }, general: ['audit_view'] },
+    })
+    expect(p).toMatchObject({ canEditTopology: true, canViewAudit: true, canCalculate: false })
+    expect(permScope(p, 'node', 'create')).toBe('none')
   })
 
   it('admin: топология требует оба серверных флага', () => {
@@ -144,5 +172,30 @@ describe('authStore: права по роли и флагам сервера', (
     store.authDisabled = true
     expect(store.isAdmin).toBe(true)
     expect(store.canEditData).toBe(false)
+  })
+})
+
+describe('матрица прав: отличия от роли, вид карточки', () => {
+  it('diffFromPreset хранит только отличия; diffCount считает их', () => {
+    const preset = ROLE_PRESETS.operator
+    const same = diffFromPreset(preset, preset.matrix, preset.general, ['export', 'import'])
+    expect(same).toEqual({})
+    expect(diffCount(same)).toBe(0)
+    const matrix = { ...preset.matrix, line: { ...preset.matrix.line, delete: 'all' as const } }
+    const d = diffFromPreset(preset, matrix, ['export', 'import'], ['export', 'import'])
+    expect(d).toEqual({ matrix: { line: { delete: 'all' } }, general: { import: true } })
+    expect(diffCount(d)).toBe(2)
+  })
+
+  it('cardPermKind: карточка → вид объекта в правах', () => {
+    expect(['line', 'genconsumer', 'pumpstation', 'refill', 'damper'].map(cardPermKind))
+      .toEqual(['line', 'consumer', 'source', 'regime', 'equipment'])
+  })
+
+  it('инструменты редактора по правам', () => {
+    const calc = computePermissions({ ...base, role: 'calculator' })
+    expect(EDITOR_TOOLS.filter((t) => toolAllowed(t.value, calc)).map((t) => t.value)).toEqual(['select'])
+    const op = computePermissions({ ...base, role: 'operator' })
+    expect(EDITOR_TOOLS.every((t) => toolAllowed(t.value, op))).toBe(true)
   })
 })

@@ -1,6 +1,6 @@
 import { appStorage } from '~/utils/appStorage'
 import { defineStore } from 'pinia'
-import { computePermissions, type Permissions } from '~/utils/permissions'
+import { computePermissions, type Permissions, type ServerPermissions } from '~/utils/permissions'
 import { isJwtExpired } from '~/utils/jwt'
 import { SESSION_EXPIRED_TEXT } from '~/utils/apiError'
 import { useNotificationStore } from '~/stores/notificationStore'
@@ -36,6 +36,9 @@ export const useAuthStore = defineStore('auth', {
     pgUser: false as boolean,
     caps: [] as string[],
     fragments: null as number[] | null,
+    /** Действующие права из /auth/me (шаблон роли + отличия); null — права шаблона роли */
+    serverPermissions: null as ServerPermissions | null,
+    roleLabel: '' as string,
     displayName: '' as string,
     mustChangePassword: false as boolean,
     /** Мастер-учётка владельца: пароль меняется только на сервере */
@@ -64,6 +67,7 @@ export const useAuthStore = defineStore('auth', {
         pgUser: state.pgUser,
         caps: state.caps,
         fragments: state.fragments,
+        permissions: state.accessToken ? state.serverPermissions : null,
       }),
     /** Роль editor+ (при AUTH_DISABLED сервер считает всех admin) */
     canEdit(): boolean {
@@ -189,6 +193,8 @@ export const useAuthStore = defineStore('auth', {
       this.pgUser = false
       this.caps = []
       this.fragments = null
+      this.serverPermissions = null
+      this.roleLabel = ''
       this.displayName = ''
       this.mustChangePassword = false
       this.isMaster = false
@@ -209,6 +215,8 @@ export const useAuthStore = defineStore('auth', {
         this.pgUser = me.auth_backend === 'pg' && String(me.sub || '').startsWith('tgid_u_')
         this.caps = me.caps || []
         this.fragments = me.fragments ?? null
+        this.serverPermissions = me.permissions?.matrix ? me.permissions : null
+        this.roleLabel = me.role_label || ''
         this.displayName = me.display_name || me.username
         this.mustChangePassword = Boolean(me.must_change_password)
         this.isMaster = Boolean(me.is_master)

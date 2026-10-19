@@ -3,6 +3,7 @@ import { reactive } from 'vue';
 import { BAD_CREDENTIALS_TEXT, SESSION_EXPIRED_TEXT, serverDetailText, statusMessage } from '~/utils/apiError';
 import type { FeatureData, Fragment } from '~/types';
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
+import type { PermAction, PermKind, PermMatrix, PermScope, ServerPermissions } from '~/utils/permissions';
 import type { SnapData } from '~/utils/cadSnap';
 import type { NodeFlag, NodeFlagResult, NodeType, NodeTypeChangeResult, NodeTypeInfo } from '~/utils/nodeTypes';
 import type { LineType, LineTypeChangeResult, LineTypeInfo } from '~/utils/lineTypes';
@@ -1066,7 +1067,7 @@ export interface ReportsCatalog {
   not_ported: { sql: string; reason: string }[];
 }
 
-export type UserRole = 'viewer' | 'calculator' | 'editor' | 'admin';
+export type UserRole = 'viewer' | 'calculator' | 'operator' | 'editor' | 'admin';
 
 export interface AdminUser {
   /** UsersDB — число; AUTH_BACKEND=pg — имя роли tgid_u_<логин> */
@@ -1083,6 +1084,9 @@ export interface AdminUser {
   /** Фрагменты правки; [] — вся сеть */
   fragments?: number[];
   web_access?: boolean;
+  /** UsersDB: отличия прав от шаблона роли и действующие права (itwin-api permissions.py) */
+  permissions?: ServerPermissionsDiff;
+  effective?: ServerPermissions;
   password_set?: boolean;
   must_change_password?: boolean;
   legacy_right?: number | null;
@@ -1107,6 +1111,23 @@ export interface AdminUserUpdate {
   web_access?: boolean;
   /** null — все города */
   cities?: string[] | null;
+  /** UsersDB: отличия прав от шаблона роли; null — права роли как есть */
+  permissions?: ServerPermissionsDiff | null;
+}
+
+/** Отличия прав пользователя от шаблона роли (users.permissions) */
+export interface ServerPermissionsDiff {
+  matrix?: PermMatrix;
+  general?: Record<string, boolean>;
+}
+
+/** Модель прав для админки (permissions.catalog) */
+export interface PermissionsModel {
+  kinds: { kind: PermKind; label: string; actions: PermAction[] }[];
+  actions: { action: PermAction; label: string }[];
+  scopes: { scope: PermScope; label: string }[];
+  general: { key: string; label: string }[];
+  roles: { role: UserRole; label: string; description: string; permissions: Required<ServerPermissions> }[];
 }
 
 export interface AdminCap {
@@ -1129,6 +1150,7 @@ export interface AdminRole {
   role: UserRole;
   level: number;
   description: string;
+  label?: string;
 }
 
 export interface AuditChange {
@@ -1851,6 +1873,9 @@ export const fastApiService = {
     city_label?: string;
     cities?: CityItem[];
     all_cities?: boolean;
+    /** действующие права: шаблон роли + отличия пользователя (itwin-api permissions.py) */
+    permissions?: ServerPermissions;
+    role_label?: string;
   }> {
     return request('api/v1/auth/me', mutationOptions('GET'));
   },
@@ -2844,7 +2869,7 @@ export const fastApiService = {
   },
 
   /** Администрирование пользователей UsersDB (только admin) */
-  async getAdminRoles(): Promise<{ items: AdminRole[]; caps?: AdminCap[]; backend?: string }> {
+  async getAdminRoles(): Promise<{ items: AdminRole[]; caps?: AdminCap[]; backend?: string; model?: PermissionsModel }> {
     return request('api/v1/admin/roles', mutationOptions('GET'));
   },
 

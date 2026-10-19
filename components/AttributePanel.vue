@@ -1364,7 +1364,7 @@ import { formatDesktopNumber } from '~/utils/desktopNumber'
 
 import { ApiError, fastApiService, type ReverseLineReport } from '~/services/fastApiService'
 import { getFeatureFragmentId, getSectionRowId, resolveCardObject, type CardObject } from '~/utils/networkFeature'
-import { canEditFragment } from '~/utils/permissions'
+import { canDo, canEditFragment, cardPermKind } from '~/utils/permissions'
 import ObjectCardShell from '~/components/objectCard/ObjectCardShell.vue'
 import ObjectCardEdit from '~/components/objectCard/ObjectCardEdit.vue'
 import NodeEquipmentList from '~/components/objectCard/NodeEquipmentList.vue'
@@ -1575,7 +1575,10 @@ const editTarget = computed<{ kind: CardKind; table: string; id: number } | null
   if (!kind) return null
   return { kind, table: String(table), id: Number(networkId) }
 })
-const canEditCard = computed(() => Boolean(editTarget.value) && authStore.canEditNetwork && cardInTerritory.value)
+// право «Свойства» вида объекта (режимщик — потребители и оборудование, но не паспорт трубы);
+// охват «только свои» проверяет сервер при сохранении
+const canEditCard = computed(() => Boolean(editTarget.value) && authStore.canEditNetwork && cardInTerritory.value
+  && canDo(authStore.permissions, cardPermKind(editTarget.value!.kind), 'edit'))
 const startEditing = () => {
   if (canEditCard.value) {
     batchIds.value = null
@@ -1589,10 +1592,12 @@ const equipmentOpen = ref(false)
 const equipmentListRef = ref<{ reload: () => Promise<void> } | null>(null)
 // оборудование или дополнение узла (заданный напор, подпитка) — карточка своей таблицы поверх карточки узла
 const equipTarget = ref<{ kind: CardKind; table: string; id: number; title: string } | null>(null)
-const canEditEquipment = computed(() => authStore.canEditNetwork && cardInTerritory.value)
+const canEditEquipment = computed(() => authStore.canEditNetwork && cardInTerritory.value
+  && canDo(authStore.permissions, 'equipment', 'edit'))
 const activeEdit = computed(() => equipTarget.value ?? editTarget.value)
 const openEquipment = (item: NodeEquipmentItem) => {
-  if (!canEditEquipment.value) return
+  // оборудование — право «Свойства: оборудование», заданный напор и подпитка — «Режим узла»
+  if (!(authStore.canEditNetwork && cardInTerritory.value && canDo(authStore.permissions, cardPermKind(item.kind), 'edit'))) return
   batchIds.value = null
   equipTarget.value = { kind: item.kind, table: item.table, id: item.id, title: `${item.label}: ${equipmentTitle(item)}` }
   editing.value = true

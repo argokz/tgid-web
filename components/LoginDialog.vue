@@ -145,6 +145,7 @@ const allowRolePick = ref(false)
 const roles = [
   { title: 'viewer', value: 'viewer' },
   { title: 'calculator', value: 'calculator' },
+  { title: 'operator', value: 'operator' },
   { title: 'editor', value: 'editor' },
   { title: 'admin', value: 'admin' },
 ]

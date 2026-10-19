@@ -65,6 +65,8 @@ export interface CardEditData {
   versions: Record<string, string>
   rules: Record<string, { vis: VisRules; disable: VisRules }>
   edit_tables: string[]
+  /** кто и когда создал объект в вебе (object_authorship); null — десктоп или до учёта авторов */
+  created?: { created_by: string; created_at: string | null } | null
   /** карточка нескольких участков (id полей — колонка: 1 подача/одиночные, 2 обратка) */
   batch?: boolean
   selection?: {
