@@ -341,6 +341,21 @@
           v-if="hotkeysHelpOpen"
           v-model="hotkeysHelpOpen"
         />
+        <!-- Удаление с предпросмотром: «убрать узел, соединив трубы», с участками, пара П/О -->
+        <LazyDeletePreviewDialog
+          v-if="deleteTarget"
+          v-model="deleteOpen"
+          :target="deleteTarget"
+          @done="onDeleteDone"
+          @failed="onDeleteFailed"
+        />
+        <!-- Правый щелчок в правке сети -->
+        <EditorContextMenu
+          v-if="isEditTopologyMode"
+          v-model="contextMenuOpen"
+          :menu="contextMenu"
+          @action="runContextAction"
+        />
 
         <TraceHud
           v-if="isEditTopologyMode && isChainMode && !isVertexMode && !isMergeMode && !chainPreviewOpen"
@@ -1208,6 +1223,13 @@ const {
   activeTool,
   statusHint,
   hotkeysHelpOpen,
+  deleteTarget,
+  deleteOpen,
+  onDeleteDone,
+  onDeleteFailed,
+  contextMenu,
+  contextMenuOpen,
+  runContextAction,
   isMergeMode,
   mergeTargetNodeId,
   mergeSourceNodeId,

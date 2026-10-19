@@ -116,6 +116,8 @@ const OPERATION_LABELS: Record<string, string> = {
   CHAIN: 'трасса',
   CHANGE_NODE_TYPE: 'смена типа узла',
   SET_NODE_FLAG: 'дополнение узла',
+  CHANGE_LINE_TYPE: 'смена типа линии',
+  DISSOLVE_NODE: 'соединение труб через узел',
 };
 
 /** Подпись кнопки «Отменить»: «разрезание участка 17» */

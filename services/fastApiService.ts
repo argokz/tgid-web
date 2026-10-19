@@ -1153,6 +1153,44 @@ export interface AdminRole {
   label?: string;
 }
 
+export interface DissolveJoin {
+  keep: number;
+  remove: number;
+  length_m: number;
+  sign: number;
+}
+
+export interface NodeDeletePreview {
+  node_id: number;
+  node_type: string;
+  lines: { id: number; other: number; sign: number; length_m: number | null; du: number | null }[];
+  references: Record<string, number>;
+  dissolve: { ok: boolean; reasons: string[]; joins: DissolveJoin[] };
+}
+
+export interface LineDeletePreview {
+  id: number;
+  nodeid1: number;
+  nodeid2: number;
+  sign: number;
+  length_m: number | null;
+  passport_id: number | null;
+  du: number | null;
+  equipment: Record<string, number>;
+  pair_line_id: number | null;
+  pair_equipment: Record<string, number>;
+}
+
+export interface DissolveResult {
+  node_id: number;
+  ok: boolean;
+  joined?: { line_id: number; removed_line_id: number; length_m: number }[];
+  reasons?: string[];
+  line_id?: number;
+  removed_lines?: number[];
+  operation_id?: number | null;
+}
+
 export interface ActivityLogItem {
   id: number;
   at: string | null;
@@ -2005,8 +2043,14 @@ export const fastApiService = {
    * Удаление участка. expectedSectionId — heatpipesections.id из карточки: сервер сверит,
    * что это паспорт именно этого участка (иначе 409 object_mismatch, QA F54).
    */
-  async deleteLine(lineId: number, expectedVersion?: string, expectedSectionId?: number | null): Promise<any> {
-    const query = compact({ expected_version: expectedVersion, expected_section_id: expectedSectionId ?? undefined });
+  async deleteLine(
+    lineId: number, expectedVersion?: string, expectedSectionId?: number | null, includePair = false,
+  ): Promise<any> {
+    const query = compact({
+      expected_version: expectedVersion,
+      expected_section_id: expectedSectionId ?? undefined,
+      include_pair: includePair ? 'true' : undefined,
+    });
     return request(`api/topology/line/${encodePath(lineId)}`, {
       method: 'DELETE',
       ...(Object.keys(query).length ? { query } : {}),
@@ -2162,10 +2206,30 @@ export const fastApiService = {
     });
   },
 
-  async deleteNode(id: number, expectedVersion?: string): Promise<any> {
+  /** cascade — вместе с участками узла (иначе сервер откажет, если они есть) */
+  async deleteNode(id: number, expectedVersion?: string, cascade = false): Promise<any> {
+    const query = compact({ expected_version: expectedVersion, cascade: cascade ? 'true' : undefined });
     return request(`api/topology/node/${encodePath(id)}`, {
       method: 'DELETE',
-      ...(expectedVersion ? { query: { expected_version: expectedVersion } } : {}),
+      ...(Object.keys(query).length ? { query } : {}),
+    });
+  },
+
+  /** Окно удаления узла: участки, ссылки, можно ли убрать узел, соединив трубы */
+  async getNodeDeletePreview(id: number): Promise<NodeDeletePreview> {
+    return request(`api/v1/topology/node/${encodePath(id)}/delete-preview`, mutationOptions('GET'));
+  },
+
+  /** Окно удаления участка: паспорт, оборудование, парная труба П/О */
+  async getLineDeletePreview(id: number): Promise<LineDeletePreview> {
+    return request(`api/v1/topology/line/${encodePath(id)}/delete-preview`, mutationOptions('GET'));
+  },
+
+  /** Убрать узел, соединив его трубы в одну (dry_run — план) */
+  async dissolveNode(id: number, dryRun = false, expectedVersion?: string): Promise<DissolveResult> {
+    return request(`api/v1/topology/node/${encodePath(id)}/dissolve`, {
+      method: 'POST',
+      body: { dry_run: dryRun, expected_version: expectedVersion },
     });
   },
 

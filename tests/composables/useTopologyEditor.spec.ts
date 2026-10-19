@@ -29,6 +29,7 @@ const { api, notify, vertex, markers } = vi.hoisted(() => ({
     showWarning: vi.fn(),
     showError: vi.fn(),
     showConflict: vi.fn(),
+    showUndo: vi.fn(),
   },
   vertex: {} as any,
 }));
@@ -72,7 +73,6 @@ vi.mock('maplibre-gl', () => {
 
 import { ApiError } from '~/services/fastApiService';
 import { useTopologyEditor } from '~/composables/useTopologyEditor';
-import { confirmState, settleConfirm } from '~/composables/useConfirm';
 
 const nodeFeature = (id: number, coords = [76.9, 43.2]) => ({
   layer: { id: 'tgid-nodes' }, properties: { id }, geometry: { type: 'Point', coordinates: coords },
@@ -269,10 +269,11 @@ describe('useTopologyEditor', () => {
     expect(editor.selection.value?.id).toBe(11);
     key({ key: 'Delete' });
     await flush();
-    expect(confirmState.visible).toBe(true);
-    settleConfirm(false);
-    await flush();
+    // Del открывает окно удаления с предпросмотром, само ничего не удаляет
+    expect(editor.deleteOpen.value).toBe(true);
+    expect(editor.deleteTarget.value).toMatchObject({ kind: 'node', id: 11 });
     expect(api.deleteNode).not.toHaveBeenCalled();
+    editor.deleteOpen.value = false;
     key({ key: 'Escape' });
     expect(editor.selection.value).toBeNull();
     key({ key: '?', code: 'Slash', shiftKey: true });
@@ -343,15 +344,36 @@ describe('useTopologyEditor', () => {
     await editor.undoLastTopologyOperation();
     expect(api.undoTopologyOperation).toHaveBeenCalledWith(42);
 
-    // QA F45: подтверждение своим диалогом, не window.confirm
-    const pending = editor.onDeleteFeature(11, 'ver');
-    await flush();
-    expect(confirmState.visible).toBe(true);
-    expect(confirmState.text).toContain('узел 11');
-    settleConfirm(true);
-    await pending;
-    expect(api.deleteNode).toHaveBeenCalledWith(11, 'ver');
+    // удаление из карточки — окно предпросмотра; итог — уведомление с «Отменить» этой операции
+    await editor.onDeleteFeature(11, 'ver');
+    expect(editor.deleteTarget.value).toMatchObject({ kind: 'node', id: 11, version: 'ver' });
+    expect(editor.deleteOpen.value).toBe(true);
+    editor.onDeleteDone({ message: 'Узел 11 удалён', operationId: 77, kind: 'node', id: 11 });
     expect(opts.closeCard).toHaveBeenCalled();
+    expect(notify.showUndo).toHaveBeenCalledWith('Узел 11 удалён', expect.any(Function));
+    api.undoTopologyOperation.mockClear();
+    await notify.showUndo.mock.calls[0][1]();
+    expect(api.undoTopologyOperation).toHaveBeenCalledWith(77);
+  });
+
+  it('правый щелчок: выделяет объект и показывает меню; «Удалить…» открывает окно удаления', async () => {
+    const { editor, setFeatures } = setup();
+    editor.toggleEditTopologyMode();
+    setFeatures([lineFeature(7)]);
+    await editor.onMapContextMenuForTopology({
+      point: { x: 5, y: 5 }, lngLat: { lng: 76.9, lat: 43.2 },
+      originalEvent: { clientX: 100, clientY: 120, preventDefault: vi.fn() }, preventDefault: vi.fn(),
+    });
+    expect(editor.selection.value).toMatchObject({ kind: 'line', id: 7 });
+    expect(editor.contextMenuOpen.value).toBe(true);
+    expect(editor.contextMenu.value).toMatchObject({ kind: 'line', id: 7, clientX: 100, clientY: 120 });
+    await editor.runContextAction('delete');
+    expect(editor.deleteTarget.value).toMatchObject({ kind: 'line', id: 7 });
+    expect(editor.contextMenuOpen.value).toBe(false);
+    // пустое место — меню точки карты
+    setFeatures([]);
+    await editor.onMapContextMenuForTopology({ point: { x: 5, y: 5 }, lngLat: { lng: 76.9, lat: 43.2 }, preventDefault: vi.fn() });
+    expect(editor.contextMenu.value).toMatchObject({ kind: 'map', id: null });
   });
 
   it('QA F52: клик по узлу (mousedown → mouseup → click) выделяет его, маркер не создаётся', async () => {

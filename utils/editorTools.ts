@@ -181,3 +181,36 @@ export const editorStatusHint = (s: EditorStatus): string => {
       return '';
   }
 };
+
+/** Что удаляется в окне предпросмотра удаления (DeletePreviewDialog) */
+export interface DeleteTarget {
+  kind: 'node' | 'line';
+  id: number;
+  version?: string;
+  expectedSectionId?: number | null;
+}
+
+/** Итог удаления: текст уведомления и операция журнала для «Отменить» */
+export interface DeleteDone {
+  message: string;
+  operationId: number | null;
+  kind: 'node' | 'line';
+  id: number;
+}
+
+export type EditorContextAction =
+  | 'props' | 'trace-from' | 'merge-into' | 'focus' | 'copy' | 'dissolve' | 'delete'
+  | 'vertices' | 'split-here' | 'node-here' | 'divider';
+
+/** Правый щелчок в правке сети: объект под курсором (или точка карты) и где показать меню */
+export interface EditorContextTarget {
+  kind: 'node' | 'line' | 'map';
+  id: number | null;
+  fragmentId: number | null;
+  /** точка щелчка, WGS84 */
+  lngLat: [number, number];
+  /** координаты объекта (узел — его точка) */
+  coords: [number, number][];
+  clientX: number;
+  clientY: number;
+}

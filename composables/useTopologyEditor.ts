@@ -44,6 +44,7 @@ import type { LngLat } from '~/utils/lineVertices';
 import { canMoveNodes, editorKeyAction, editorStatusHint, toolAllowed, type EditorTool } from '~/utils/editorTools';
 import { canDo, type Permissions } from '~/utils/permissions';
 import { useEditSelection } from '~/composables/useEditSelection';
+import type { DeleteDone, DeleteTarget, EditorContextAction, EditorContextTarget } from '~/utils/editorTools';
 
 export interface TopologyEditorOptions {
   getMap: () => maplibregl.Map | null | undefined;
@@ -381,6 +382,34 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     }
   };
 
+  /** Уведомление об операции с кнопкой «Отменить» (отмена именно её, по номеру в журнале) */
+  const notifyDone = (message: string, operationId?: number | null) => {
+    const notify = useNotificationStore();
+    if (!operationId) {
+      notify.showSuccess(message);
+      return;
+    }
+    notify.showUndo(message, () => undoOperation(operationId));
+  };
+
+  /** Отмена операции по номеру (кнопка в уведомлении): 409 — её объекты уже изменены или она не последняя */
+  const undoOperation = async (operationId: number) => {
+    try {
+      await fastApiService.undoTopologyOperation(operationId);
+      useNotificationStore().showSuccess('Отменено');
+      vertexEditor.stop();
+      clearSelection();
+      afterTopologyChange();
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isVersionConflict) {
+        useNotificationStore().showWarning('Отменить нельзя: после неё были другие правки этих объектов (или более поздние операции).');
+      } else {
+        reportTopologyError(err, 'Ошибка отмены');
+      }
+      void refreshUndoState();
+    }
+  };
+
   const undoLastTopologyOperation = async () => {
     const entry = lastTopologyOperation.value;
     if (!entry || undoBusy.value) return;
@@ -411,7 +440,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   // === Правка вершин участка (8.5) ===
   const vertexEditor = useLineVertexEditor(getMap, {
     onSaved: (res) => {
-      useNotificationStore().showSuccess(`Геометрия участка ${res.line_id} сохранена, длина ${res.new_length} м`);
+      notifyDone(`Геометрия участка ${res.line_id} сохранена, длина ${res.new_length} м`, (res as any).operation_id);
       if (selection.value?.kind === 'line' && selection.value.id === res.line_id) {
         select('line', res.line_id, selection.value.fragmentId, selection.value.coords);
       }
@@ -527,8 +556,9 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       });
       const moved = Object.values(res.transferred || {}).reduce((a, n) => a + Number(n || 0), 0);
       const removed = res.removed_lines?.length ? `, снят участок: ${res.removed_lines.join(', ')}` : '';
-      useNotificationStore().showSuccess(
-        `Узел ${source} слит в ${target}. Перепривязано участков: ${res.merged_lines ?? 0}, перенесено ссылок: ${moved}${removed}`
+      notifyDone(
+        `Узел ${source} слит в ${target}. Перепривязано участков: ${res.merged_lines ?? 0}, перенесено ссылок: ${moved}${removed}`,
+        (res as any).operation_id,
       );
       afterTopologyChange();
       mergeConfirmDialogOpen.value = false;
@@ -578,9 +608,10 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       const result = await fastApiService.splitLine(target.lineId, target.lng, target.lat, target.version, reviewToNew);
       const movedByOperator = Object.values(result.transferred?.review_moved || {})
         .reduce((a: number, ids: any) => a + (ids?.length || 0), 0);
-      useNotificationStore().showSuccess(
+      notifyDone(
         `Участок ${target.lineId} разрезан: узел ${result.new_node_id}, участок ${result.new_line_id}`
-        + (movedByOperator ? `; на вторую половину перенесено оборудования: ${movedByOperator}` : '')
+        + (movedByOperator ? `; на вторую половину перенесено оборудования: ${movedByOperator}` : ''),
+        (result as any).operation_id,
       );
       afterTopologyChange();
       splitPreviewOpen.value = false;
@@ -768,7 +799,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       const result = await fastApiService.createNode(lng, lat, { nodeType: newNodeType.value });
       const templateNote = await applyNewTemplate(newNodeTemplateId.value, result.id);
       const typeNote = newNodeType.value !== 'US' ? `, тип: ${nodeTypeTitle(newNodeType.value)}` : '';
-      useNotificationStore().showSuccess(`Узел ${result.id} создан (фрагмент ${result.fileid ?? '—'}${typeNote})${templateNote}`);
+      notifyDone(`Узел ${result.id} создан (фрагмент ${result.fileid ?? '—'}${typeNote})${templateNote}`, result.operation_id);
       if (result.id) select('node', Number(result.id), result.fileid ?? null, [[lng, lat]]);
       afterTopologyChange();
     } catch (err: any) {
@@ -850,8 +881,9 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       const lineNote = await applyNewTemplate(newLineTemplateId.value, lines);
       const nodeNote = await applyNewTemplate(newNodeTemplateId.value, nodes);
       const taps = res.split_lines?.length ? `, врезка в ${res.split_lines.join(', ')}` : '';
-      useNotificationStore().showSuccess(
+      notifyDone(
         `Создано участков: ${lines.length} (${res.total_length_m.toFixed(2).replace('.', ',')} м), узлов: ${nodes.length}${taps}${lineNote}${nodeNote}`,
+        res.operation_id,
       );
       chainPreviewOpen.value = false;
       trace.clear();
@@ -1222,8 +1254,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
 
     try {
       const expectedVersion = versionPromise ? await versionPromise : undefined;
-      await fastApiService.moveNode(id, lngLat.lng, lngLat.lat, expectedVersion);
-      useNotificationStore().showSuccess(`Узел ${id} перемещён — Ctrl+Z отменит`);
+      const moved = await fastApiService.moveNode(id, lngLat.lng, lngLat.lat, expectedVersion);
+      notifyDone(`Узел ${id} перемещён`, (moved as any)?.operation_id);
       if (selection.value?.kind === 'node' && selection.value.id === id) {
         select('node', id, selection.value.fragmentId, [[lngLat.lng, lngLat.lat]]);
       }
@@ -1340,16 +1372,105 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     }
   };
 
-  /** Правый клик в режиме вершин — удалить промежуточную вершину */
-  const onMapContextMenuForTopology = (e: any) => {
-    if (!isEditTopologyMode.value || !isVertexMode.value) return;
-    vertexEditor.onContextMenu(e);
+  // === Контекстное меню (правый щелчок): действия с узлом, участком или точкой карты ===
+  const contextMenu = ref<EditorContextTarget | null>(null);
+  const contextMenuOpen = ref(false);
+  let contextCandidate: PickCandidate | null = null;
+  let contextEvent: any = null;
+
+  /** Правый щелчок: в «Изломах» — убрать излом; иначе — выделить объект под курсором и показать меню */
+  const onMapContextMenuForTopology = async (e: any) => {
+    if (!isEditTopologyMode.value) return;
+    if (isVertexMode.value) {
+      vertexEditor.onContextMenu(e);
+      return;
+    }
+    if (chainActive() && trace.active.value) return;
+    e.preventDefault?.();
+    e.originalEvent?.preventDefault?.();
+    const lngLat: LngLat = [e.lngLat.lng, e.lngLat.lat];
+    const pos = { clientX: e.originalEvent?.clientX ?? e.point.x, clientY: e.originalEvent?.clientY ?? e.point.y };
+    contextCandidate = null;
+    contextEvent = e;
+    const node = await pickUnderCursor(e, { kind: 'node', fragmentIds: activeFragments(), strictFragment: true });
+    const line = node.candidate || node.present
+      ? { candidate: null, present: false }
+      : await pickUnderCursor(e, { kind: 'line', fragmentIds: activeFragments(), strictFragment: true });
+    const picked = node.candidate ?? line.candidate;
+    if (!picked && (node.present || line.present)) return; // отказались в меню выбора / чужой фрагмент
+    if (activeTool.value !== 'select') await setTool('select');
+    if (picked) {
+      const kind = node.candidate ? 'node' : 'line';
+      contextCandidate = picked;
+      select(kind, picked.id, picked.fragmentId, featureCoords(picked.feature));
+      contextMenu.value = { kind, id: picked.id, fragmentId: picked.fragmentId, lngLat,
+        coords: featureCoords(picked.feature), ...pos };
+    } else {
+      contextMenu.value = { kind: 'map', id: null, fragmentId: null, lngLat, coords: [], ...pos };
+    }
+    contextMenuOpen.value = true;
+  };
+
+  /** Начать трассу из точки (узел — от него, труба — врезкой, карта — новый узел) */
+  const traceFrom = async (coord: LngLat) => {
+    if (!(await setTool('trace'))) return;
+    await snapIndex.reload();
+    trace.addCoord(coord);
+  };
+
+  const runContextAction = async (action: EditorContextAction) => {
+    const m = contextMenu.value;
+    contextMenuOpen.value = false;
+    if (!m) return;
+    const point: LngLat = m.kind === 'node' && m.coords[0] ? m.coords[0] : m.lngLat;
+    switch (action) {
+      case 'props':
+        if (contextEvent) options.openCard?.(contextEvent);
+        break;
+      case 'trace-from':
+        await traceFrom(point);
+        break;
+      case 'merge-into':
+        if (contextCandidate && (await setTool('merge'))) await onMergeNodeClick(contextCandidate);
+        break;
+      case 'focus':
+        focusSelection();
+        break;
+      case 'copy':
+        try {
+          await navigator.clipboard.writeText(`${point[1].toFixed(6)}, ${point[0].toFixed(6)}`);
+          useNotificationStore().showSuccess(`Скопировано: ${point[1].toFixed(6)}, ${point[0].toFixed(6)}`);
+        } catch {
+          useNotificationStore().showWarning('Буфер обмена недоступен');
+        }
+        break;
+      case 'dissolve':
+      case 'delete':
+        if (m.id != null && m.kind !== 'map') await onDeleteFeature(m.id, undefined, { kind: m.kind });
+        break;
+      case 'vertices':
+        await setTool('vertex');
+        break;
+      case 'split-here':
+        if (m.id != null) await openSplitPreview(m.id, m.lngLat[0], m.lngLat[1]);
+        break;
+      case 'node-here':
+        await createNodeAt(contextEvent ? snapToNetwork(contextEvent, null) : m.lngLat);
+        break;
+    }
   };
 
   /**
    * Удаление из карточки: version — версия объекта, запомненная при открытии карточки;
    * meta.kind — вид объекта по карточке (участок/узел), meta.expectedSectionId —
    * heatpipesections.id карточки участка: сервер сверит его с участком (QA F54).
+   */
+  // === Удаление: окно предпросмотра (DeletePreviewDialog) — «убрать узел, соединив трубы» или с участками ===
+  const deleteTarget = ref<DeleteTarget | null>(null);
+  const deleteOpen = ref(false);
+  /**
+   * Удаление из карточки, клавишей Del или из меню: version — версия объекта из карточки;
+   * meta.kind — вид объекта, meta.expectedSectionId — heatpipesections.id карточки (QA F54).
    */
   const onDeleteFeature = async (
     featureId: string | number,
@@ -1368,24 +1489,18 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       // старый вызов без вида объекта: по имени слоя
       kind = selected.layerId?.includes('node') || selected.layerName?.includes('node') ? 'node' : 'line';
     }
-    const what = kind === 'node' ? `узел ${id}` : `участок ${id}`;
-    const tail = kind === 'node' ? ' Прилегающие участки будут удалены вместе с ним.' : '';
-    if (!(await confirmAction({ text: `Удалить ${what}?${tail}`, action: 'Удалить' }))) return;
-    try {
-      if (kind === 'node') {
-        await fastApiService.deleteNode(id, version);
-        useNotificationStore().showSuccess('Узел и прилегающие участки удалены');
-      } else {
-        await fastApiService.deleteLine(id, version, meta?.expectedSectionId);
-        useNotificationStore().showSuccess('Участок удален');
-      }
-      if (selection.value?.id === id && selection.value.kind === kind) clearSelection();
-      closeCard();
-      afterTopologyChange();
-    } catch (err: any) {
-      reportTopologyError(err, 'Ошибка удаления', () => closeCard());
-    }
+    deleteTarget.value = { kind, id, version, expectedSectionId: meta?.expectedSectionId ?? null };
+    deleteOpen.value = true;
   };
+
+  const onDeleteDone = (done: DeleteDone) => {
+    notifyDone(done.message, done.operationId);
+    if (selection.value?.id === done.id && selection.value.kind === done.kind) clearSelection();
+    closeCard();
+    afterTopologyChange();
+  };
+
+  const onDeleteFailed = (err: unknown) => reportTopologyError(err, 'Ошибка удаления', () => closeCard());
 
   /** Подписка на события карты (порядок: mousedown, mousemove, mouseup, click, contextmenu) */
   const attach = (map: maplibregl.Map) => {
@@ -1441,6 +1556,14 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     clearSelection,
     statusHint,
     hotkeysHelpOpen,
+    deleteTarget,
+    deleteOpen,
+    contextMenu,
+    contextMenuOpen,
+    runContextAction,
+    onDeleteDone,
+    onDeleteFailed,
+    undoOperation,
     focusSelection,
     deleteSelection,
     escape,

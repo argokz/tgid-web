@@ -40,6 +40,11 @@ export const useNotificationStore = defineStore('notification', {
       this.notify('info', msg);
     },
 
+    /** Операция выполнена — с кнопкой «Отменить» (журнал отмены, как Ctrl+Z) */
+    showUndo(msg: string, onUndo: () => void | Promise<void>) {
+      this.notify('success', msg, { label: 'Отменить', handler: onUndo });
+    },
+
     /** Объект изменён другим пользователем (409): предложить перезагрузить его */
     showConflict(msg: string, onReload: () => void | Promise<void>) {
       this.notify('warning', msg, { label: 'Перезагрузить объект', handler: onReload });
