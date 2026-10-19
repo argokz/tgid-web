@@ -419,7 +419,7 @@ const props = defineProps<{
 }>();
 const kindText = computed(() => KIND_TEXT[props.kind]);
 const emit = defineEmits<{
-  saved: [result: { changed: number; changeGroupId?: string | null }]
+  saved: [result: { changed: number; changeGroupId?: string | null; operationId?: number | null }]
   cancel: []
   dirty: [dirty: boolean]
 }>();
@@ -786,7 +786,7 @@ const save = async () => {
   try {
     const res = await fastApiService.saveCardEdit({ changes: changes.value, versions: card.value.versions });
     const changed = res.rows.reduce((n, r) => n + Object.keys(r.changed || {}).length, 0);
-    emit('saved', { changed });
+    emit('saved', { changed, operationId: res.operation_id ?? null });
   } catch (e) {
     if (e instanceof ApiError && e.status === 409) {
       const reload = await confirmAction({

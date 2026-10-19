@@ -225,6 +225,23 @@
         </v-tooltip>
       </v-btn>
 
+      <v-btn
+        size="small"
+        variant="text"
+        icon
+        @click="historyOpen = true"
+      >
+        <v-icon size="20">
+          mdi-history
+        </v-icon>
+        <v-tooltip
+          activator="parent"
+          location="bottom"
+        >
+          История правок (H): показать, откатить до места
+        </v-tooltip>
+      </v-btn>
+
       <!-- Шаблоны для новых объектов — в меню, чтобы не загромождать панель -->
       <v-menu
         :close-on-content-click="false"
@@ -345,6 +362,7 @@ const {
   nodeTemplates,
   loadLineTemplates,
   hotkeysHelpOpen,
+  historyOpen,
 } = props.editor;
 
 const authStore = useAuthStore();

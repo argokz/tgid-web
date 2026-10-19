@@ -118,6 +118,7 @@ const OPERATION_LABELS: Record<string, string> = {
   SET_NODE_FLAG: 'дополнение узла',
   CHANGE_LINE_TYPE: 'смена типа линии',
   DISSOLVE_NODE: 'соединение труб через узел',
+  CARD_EDIT: 'свойства',
 };
 
 /** Подпись кнопки «Отменить»: «разрезание участка 17» */
@@ -125,6 +126,8 @@ export const topologyOperationLabel = (entry: { operation: string; summary?: Rec
   if (!entry) return '';
   const s = entry.summary || {};
   const base = OPERATION_LABELS[entry.operation] || entry.operation.toLowerCase();
+  // правка карточки: «свойства: паспорт участка 205099 — Шероховатость: 0.5 → 0.7»
+  if (typeof s.text === 'string' && s.text) return `${base}: ${s.text}`;
   if (entry.operation === 'CHAIN' && Array.isArray(s.created_lines)) {
     const length = typeof s.total_length_m === 'number' ? `, ${s.total_length_m.toFixed(2).replace('.', ',')} м` : '';
     return `${base} (участков: ${s.created_lines.length}${length})`;

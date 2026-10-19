@@ -1153,6 +1153,19 @@ export interface AdminRole {
   label?: string;
 }
 
+export interface TopologyHistoryItem {
+  operation_id: number;
+  operation: string;
+  created_at: string | null;
+  undone_at: string | null;
+  redone_at: string | null;
+  summary: Record<string, any>;
+  objects: number;
+  undo_supported: boolean;
+  /** [minLng, minLat, maxLng, maxLat] — «Показать на карте» */
+  bbox: number[] | null;
+}
+
 export interface DissolveJoin {
   keep: number;
   remove: number;
@@ -2215,6 +2228,18 @@ export const fastApiService = {
     });
   },
 
+  /** «История»: последние операции пользователя (сеть и карточки), новые сверху */
+  async getTopologyHistory(limit = 30): Promise<{ items: TopologyHistoryItem[] }> {
+    return request('api/v1/topology/history', { ...mutationOptions('GET'), query: { limit } });
+  },
+
+  /** Откатить свои операции от последней до выбранной включительно */
+  async undoTo(operationId: number): Promise<{
+    undone: number[]; complete: boolean; stopped: { reason: string } | null; target: number;
+  }> {
+    return request('api/v1/topology/undo-to', { method: 'POST', body: { operation_id: operationId } });
+  },
+
   /** Окно удаления узла: участки, ссылки, можно ли убрать узел, соединив трубы */
   async getNodeDeletePreview(id: number): Promise<NodeDeletePreview> {
     return request(`api/v1/topology/node/${encodePath(id)}/delete-preview`, mutationOptions('GET'));
@@ -2791,7 +2816,11 @@ export const fastApiService = {
 
   /** Сохранить изменения карточки (одна транзакция; версия строки изменилась — 409) */
   async saveCardEdit(body: { changes: CardChange[]; versions: Record<string, string>; dry_run?: boolean }):
-    Promise<{ rows: { table: string; key: number; changed: Record<string, { old: unknown; new: unknown }>; version: string }[] }> {
+    Promise<{
+      rows: { table: string; key: number; changed: Record<string, { old: unknown; new: unknown }>; version: string }[];
+      /** операция журнала отмены (Ctrl+Z, «Отменить», «История»); нет — журнал не установлен */
+      operation_id?: number | null;
+    }> {
     return request('api/v1/card-edit', mutationOptions('PUT', body));
   },
 

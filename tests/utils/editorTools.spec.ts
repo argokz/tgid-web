@@ -27,6 +27,7 @@ describe('editorKeyAction', () => {
     expect(editorKeyAction(ev('Delete'))).toEqual({ type: 'delete' });
     expect(editorKeyAction(ev('а', { code: 'KeyF' }))).toEqual({ type: 'focus' });
     expect(editorKeyAction(ev('g'))).toEqual({ type: 'coords' });
+    expect(editorKeyAction(ev('р', { code: 'KeyH' }))).toEqual({ type: 'history' });
     expect(editorKeyAction(ev('?', { shiftKey: true }))).toEqual({ type: 'help' });
     expect(editorKeyAction(ev(',', { code: 'Slash', shiftKey: true }))).toEqual({ type: 'help' });
   });
@@ -53,5 +54,15 @@ describe('editorStatusHint', () => {
     expect(editorStatusHint({ ...base, tool: 'vertex', vertexLineId: 5, vertexDirty: true })).toContain('Ctrl+S');
     expect(editorStatusHint({ ...base, tool: 'merge', mergeTarget: 3 })).toContain('Целевой узел 3');
     expect(editorStatusHint({ ...base, tool: 'entry', entryHint: 'дом 5' })).toBe('дом 5');
+  });
+});
+
+describe('подписи операций в «Истории»', () => {
+  it('правка карточки — по тексту журнала, сеть — по виду операции', async () => {
+    const { topologyOperationLabel } = await import('~/utils/topologyLabels');
+    expect(topologyOperationLabel({ operation: 'CARD_EDIT', summary: { text: 'паспорт участка 5 — Ду: 100 → 125' } }))
+      .toBe('свойства: паспорт участка 5 — Ду: 100 → 125');
+    expect(topologyOperationLabel({ operation: 'DISSOLVE_NODE', summary: { node_id: 7, line_id: 3 } }))
+      .toBe('соединение труб через узел 3');
   });
 });

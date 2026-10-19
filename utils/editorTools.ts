@@ -69,6 +69,7 @@ export type EditorKeyAction =
   | { type: 'focus' }
   | { type: 'help' }
   | { type: 'coords' }
+  | { type: 'history' }
   | { type: 'save' };
 
 /**
@@ -90,6 +91,7 @@ export const editorKeyAction = (
   if (ev.shiftKey) return null;
   if (letter === 'F') return { type: 'focus' };
   if (letter === 'G') return { type: 'coords' };
+  if (letter === 'H') return { type: 'history' };
   const tool = EDITOR_TOOLS.find((t) => t.key === letter);
   return tool ? { type: 'tool', tool: tool.value } : null;
 };
@@ -138,6 +140,7 @@ export const EDITOR_HOTKEYS: readonly HotkeyGroup[] = [
     items: [
       { keys: ['Ctrl+Z'], text: 'Отменить (в трассе — убрать точку)' },
       { keys: ['Ctrl+Y', 'Ctrl+Shift+Z'], text: 'Повторить' },
+      { keys: ['H'], text: 'История правок: показать, откатить до места' },
       { keys: ['Ctrl+S'], text: 'Сохранить изломы' },
       { keys: ['?'], text: 'Эта справка' },
     ],

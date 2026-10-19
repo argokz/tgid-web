@@ -341,6 +341,13 @@
           v-if="hotkeysHelpOpen"
           v-model="hotkeysHelpOpen"
         />
+        <!-- История правок пользователя: показать на карте, откатить до места -->
+        <LazyEditHistoryPanel
+          v-if="historyOpen"
+          v-model="historyOpen"
+          @show="showBbox"
+          @changed="afterTopologyChange"
+        />
         <!-- Удаление с предпросмотром: «убрать узел, соединив трубы», с участками, пара П/О -->
         <LazyDeletePreviewDialog
           v-if="deleteTarget"
@@ -1247,6 +1254,9 @@ const {
   activeTool,
   statusHint,
   hotkeysHelpOpen,
+  historyOpen,
+  showBbox,
+  afterTopologyChange,
   deleteTarget,
   deleteOpen,
   onDeleteDone,

@@ -115,6 +115,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   const isVertexMode = toolFlag(['vertex'], 'select');
   const isEntryMode = toolFlag(['entry'], 'trace');
   const hotkeysHelpOpen = ref(false);
+  /** «История правок» (EditHistoryPanel) */
+  const historyOpen = ref(false);
 
   // === Выделение (инструмент «Выбор») ===
   const selection = ref<EditSelection | null>(null);
@@ -960,6 +962,13 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     }
   };
 
+  /** «Показать на карте» из истории: [minLng, minLat, maxLng, maxLat] */
+  const showBbox = (bbox: number[]) => {
+    const map = getMap();
+    if (!map || bbox.length !== 4) return;
+    map.fitBounds([[bbox[0]!, bbox[1]!], [bbox[2]!, bbox[3]!]], { padding: 120, maxZoom: 19, duration: 500 });
+  };
+
   /** F — показать выделенное */
   const focusSelection = () => {
     const sel = selection.value;
@@ -999,7 +1008,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   /** Клавиши редактора (utils/editorTools): инструменты, Esc, Del, F, ?, Ctrl+Z / Ctrl+Y; в трассе — её клавиши */
   const onKeyDown = (ev: KeyboardEvent) => {
     if (!isEditTopologyMode.value || isTypingTarget(ev.target)) return;
-    if (chainPreviewOpen.value || splitPreviewOpen.value || mergeConfirmDialogOpen.value || hotkeysHelpOpen.value) return;
+    if (chainPreviewOpen.value || splitPreviewOpen.value || mergeConfirmDialogOpen.value || hotkeysHelpOpen.value
+      || historyOpen.value || deleteOpen.value) return;
     const action = editorKeyAction(ev);
     if (action?.type === 'redo') {
       ev.preventDefault();
@@ -1058,6 +1068,9 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
         break;
       case 'help':
         hotkeysHelpOpen.value = true;
+        break;
+      case 'history':
+        historyOpen.value = true;
         break;
       case 'coords':
         void setTool('trace').then((ok) => { if (ok) coordPointOpen.value = true; });
@@ -1606,6 +1619,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     clearSelection,
     statusHint,
     hotkeysHelpOpen,
+    historyOpen,
+    showBbox,
     deleteTarget,
     deleteOpen,
     contextMenu,

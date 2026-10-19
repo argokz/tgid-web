@@ -1677,7 +1677,9 @@ const confirmLeaveEditing = async (): Promise<boolean> => {
   if (!editing.value || !editDirty.value) return true
   return confirmAction({ text: 'В карточке есть несохранённые изменения. Отменить их?', action: 'Отменить изменения' })
 }
-const onCardSaved = async ({ changed, changeGroupId }: { changed: number; changeGroupId?: string | null }) => {
+const onCardSaved = async ({ changed, changeGroupId, operationId }: {
+  changed: number; changeGroupId?: string | null; operationId?: number | null
+}) => {
   const wasBatch = Boolean(batchIds.value)
   const wasEquipment = Boolean(equipTarget.value)
   editing.value = false
@@ -1691,12 +1693,36 @@ const onCardSaved = async ({ changed, changeGroupId }: { changed: number; change
     } else {
       notify.showInfo('Изменений нет')
     }
+  } else if (changed && operationId) {
+    // правка карточки — в общей истории отмены: «Отменить» здесь, Ctrl+Z и «История» в правке сети
+    useNotificationStore().showUndo(`Сохранено полей: ${changed}`, () => undoCardEdit(operationId))
   } else {
     notificationError.value = false
     notificationMessage.value = changed ? `Сохранено полей: ${changed}` : 'Изменений нет'
     showNotification.value = true
   }
   emit('refresh-layers')
+  await reloadCardView(wasEquipment)
+}
+
+/** Отмена правки карточки по номеру операции журнала; 409 — после неё объект уже меняли */
+const undoCardEdit = async (operationId: number) => {
+  const notify = useNotificationStore()
+  try {
+    await fastApiService.undoTopologyOperation(operationId)
+    notify.showSuccess('Правка свойств отменена')
+  } catch (e) {
+    notify.showWarning(e instanceof ApiError && e.isVersionConflict
+      ? 'Отменить нельзя: объект изменён после этой правки.'
+      : formatApiError(e, 'Не удалось отменить правку'))
+    return
+  }
+  emit('refresh-layers')
+  await reloadCardView(false)
+}
+
+/** Просмотр карточки — по свежим данным API (после сохранения или отмены) */
+const reloadCardView = async (wasEquipment: boolean) => {
   // оборудование — назад к списку узла; иначе просмотр — по свежей карточке API
   if (wasEquipment) {
     void equipmentListRef.value?.reload()
