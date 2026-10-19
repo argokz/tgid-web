@@ -36,6 +36,51 @@
         </v-btn>
       </v-btn-toggle>
 
+      <!-- Фрагмент новых узлов и участков: копии сети разных фрагментов лежат друг на друге -->
+      <v-menu
+        v-if="creating"
+        v-model="fragmentMenuOpen"
+        location="bottom start"
+        :disabled="fragmentLocked"
+      >
+        <template #activator="{ props: menuProps }">
+          <v-chip
+            v-bind="menuProps"
+            size="small"
+            :color="creationFragmentId == null ? 'warning' : 'primary'"
+            :variant="creationFragmentId == null ? 'flat' : 'tonal'"
+            :append-icon="fragmentLocked ? undefined : 'mdi-menu-down'"
+            prepend-icon="mdi-layers-outline"
+            class="editor-toolbar__fragment"
+          >
+            {{ creationFragmentId == null ? 'Фрагмент: выберите' : `Фрагмент ${fragmentText(creationFragmentId)}` }}
+            <v-tooltip
+              activator="parent"
+              location="bottom"
+            >
+              {{ fragmentLocked
+                ? 'Новые узлы и участки создаются в этом фрагменте — он один на карте (сменить — на панели фрагментов)'
+                : 'В каком фрагменте создавать новые узлы и участки. Трасса от узла или трубы — в их фрагменте' }}
+            </v-tooltip>
+          </v-chip>
+        </template>
+        <v-list
+          density="compact"
+          max-height="360"
+        >
+          <v-list-subheader>Создавать новые объекты во фрагменте</v-list-subheader>
+          <v-list-item
+            v-for="id in fragmentChoiceIds"
+            :key="id"
+            :active="id === creationFragmentId"
+            color="primary"
+            @click="setWorkFragment(id)"
+          >
+            <v-list-item-title>{{ fragmentText(id) }}</v-list-item-title>
+          </v-list-item>
+        </v-list>
+      </v-menu>
+
       <!-- Параметры активного инструмента -->
       <template v-if="activeTool === 'trace' || activeTool === 'entry'">
         <v-select
@@ -335,6 +380,8 @@ import { PIPE_MODE_ITEMS } from '~/utils/cadChain';
 import { NODE_TYPE_ITEMS } from '~/utils/nodeTypes';
 import { POLAR_STEP_ITEMS } from '~/utils/cadConstraint';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
+import { fragmentChoices, fragmentLabel } from '~/utils/editFragment';
+import { useFragmentStore } from '~/stores/fragmentStore';
 
 const props = defineProps<{ editor: ReturnType<typeof useTopologyEditor> }>();
 
@@ -363,7 +410,23 @@ const {
   loadLineTemplates,
   hotkeysHelpOpen,
   historyOpen,
+  activeFragmentList,
+  creationFragmentId,
+  fragmentMenuOpen,
+  setWorkFragment,
 } = props.editor;
+
+const fragmentStore = useFragmentStore();
+/** Инструменты, создающие объекты: им нужен фрагмент */
+const creating = computed(() => ['trace', 'node', 'entry'].includes(activeTool.value));
+/** Фрагмент один на карте (выбран или единственный видимый) — менять его здесь нечего */
+const fragmentLocked = computed(() => activeFragmentList.value.length === 1);
+const fragmentChoiceIds = computed(() => fragmentChoices(
+  activeFragmentList.value,
+  fragmentStore.fragments.map((f) => Number(f.id)).filter((id) => Number.isInteger(id) && id > 0),
+));
+const fragmentText = (id: number) =>
+  fragmentLabel(id, fragmentStore.fragments.find((f) => Number(f.id) === id)?.name);
 
 const authStore = useAuthStore();
 /** Инструменты по правам пользователя: без права создания — нет «Трассы», «Узла», «Ввода в здание» */
@@ -420,6 +483,9 @@ const statusChips = computed(() => {
 }
 .editor-toolbar__select--polar {
   width: 110px;
+}
+.editor-toolbar__fragment {
+  max-width: 260px;
 }
 kbd {
   padding: 0 4px;

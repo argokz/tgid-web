@@ -139,6 +139,7 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 describe('useTopologyEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear(); // выбранный фрагмент создания запоминается
     api.getTopologyVersions.mockImplementation(async (req: any) => {
       const kind = Object.keys(req)[0];
       return { [kind]: Object.fromEntries(req[kind].map((id: number) => [String(id), { version: `v${id}` }])) };
@@ -174,7 +175,7 @@ describe('useTopologyEditor', () => {
   });
 
   it('инструмент «Узел»: клик по пустому месту создаёт узел и выделяет его; в «Выборе» — нет', async () => {
-    const { editor, opts, click } = setup();
+    const { editor, opts, click } = setup({ getActiveFragmentIds: () => [3] });
     await click();
     expect(api.createNode).not.toHaveBeenCalled();
     editor.toggleEditTopologyMode();
@@ -183,9 +184,30 @@ describe('useTopologyEditor', () => {
     await editor.setTool('node');
     api.createNode.mockResolvedValue({ id: 101, fileid: 3 });
     await click(76.95, 43.25);
-    expect(api.createNode).toHaveBeenCalledWith(76.95, 43.25, { nodeType: 'US' });
+    // единственный фрагмент на карте — узел создаётся в нём
+    expect(api.createNode).toHaveBeenCalledWith(76.95, 43.25, { nodeType: 'US', fileid: 3 });
     expect(opts.refreshLayers).toHaveBeenCalled();
     expect(editor.selection.value).toMatchObject({ kind: 'node', id: 101, coords: [[76.95, 43.25]] });
+  });
+
+  it('«Узел» при нескольких фрагментах: без выбора не создаётся, после выбора — в выбранном', async () => {
+    const { editor, click } = setup({ getActiveFragmentIds: () => [41, 42] });
+    editor.toggleEditTopologyMode();
+    await editor.setTool('node');
+    expect(editor.creationFragmentId.value).toBeNull();
+    expect(editor.statusHint.value).toContain('фрагмент');
+    await click(76.95, 43.25);
+    expect(api.createNode).not.toHaveBeenCalled();
+    expect(notify.showWarning).toHaveBeenCalled();
+    expect(editor.fragmentMenuOpen.value).toBe(true);
+    editor.setWorkFragment(42);
+    expect(editor.fragmentMenuOpen.value).toBe(false);
+    api.createNode.mockResolvedValue({ id: 102, fileid: 42 });
+    await click(76.95, 43.25);
+    expect(api.createNode).toHaveBeenCalledWith(76.95, 43.25, { nodeType: 'US', fileid: 42 });
+    // выбранный фрагмент, которого нет среди видимых, не используется
+    editor.setWorkFragment(95);
+    expect(editor.creationFragmentId.value).toBeNull();
   });
 
   it('«Выбор»: узел важнее участка, карточка открывается; пустое место снимает выделение', async () => {
@@ -511,10 +533,10 @@ describe('useTopologyEditor', () => {
     const ok = (extra: Record<string, any> = {}) =>
       ({ ok: true, issues: [], segments: [], taps: [], total_length_m: 120, ...extra });
 
-    const start = async () => {
+    const start = async (extra: Record<string, any> = {}) => {
       api.getSnapData.mockResolvedValue(SNAP);
       api.getLastRedoOperation.mockResolvedValue(null);
-      const ctx = setup({}, true);
+      const ctx = setup(extra, true);
       ctx.editor.toggleEditTopologyMode();
       await flush();
       expect(ctx.editor.snapIndex.status.value).toBe('ready');
@@ -561,13 +583,29 @@ describe('useTopologyEditor', () => {
       expect(points[2].line_id).toBe(10);
     });
 
-    it('клик в пустоту + завершение — новый узел; Backspace и сброс правят трассу', async () => {
+    it('без фрагмента: трасса от узла берёт его фрагмент, из пустого места — не начинается', async () => {
       const { editor } = await start();
+      expect(editor.creationFragmentId.value).toBeNull();
+      await editor.onMapClickForTopology(ev(76.905, 43.245));
+      expect(editor.trace.points.value).toEqual([]);
+      expect(editor.fragmentMenuOpen.value).toBe(true);
+      await editor.onMapClickForTopology(ev(76.900001, 43.24));
+      expect(editor.trace.points.value.map((p) => p.kind)).toEqual(['node']);
+      expect(editor.creationFragmentId.value).toBe(74);
+      api.createChain.mockResolvedValue(ok());
+      await editor.onMapClickForTopology(ev(76.9006, 43.2405));
+      await editor.finishTrace();
+      await flush();
+      expect(api.createChain.mock.calls[0][0].fileid).toBe(74);
+    });
+
+    it('клик в пустоту + завершение — новый узел; Backspace и сброс правят трассу', async () => {
+      const { editor } = await start({ getActiveFragmentIds: () => [74] });
       api.createNode.mockResolvedValue({ id: 900, fileid: 74 });
       await editor.onMapClickForTopology(ev(76.905, 43.245));
       expect(editor.trace.points.value.map((p) => p.kind)).toEqual(['new']);
       await editor.finishTrace();
-      expect(api.createNode).toHaveBeenCalledWith(76.905, 43.245, { nodeType: 'US' });
+      expect(api.createNode).toHaveBeenCalledWith(76.905, 43.245, { nodeType: 'US', fileid: 74 });
 
       await editor.onMapClickForTopology(ev(76.905, 43.245));
       await editor.onMapClickForTopology(ev(76.906, 43.245));

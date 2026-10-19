@@ -44,6 +44,7 @@ import type { LngLat } from '~/utils/lineVertices';
 import { canMoveNodes, editorKeyAction, editorStatusHint, toolAllowed, type EditorTool } from '~/utils/editorTools';
 import { canDo, type Permissions } from '~/utils/permissions';
 import { useEditSelection } from '~/composables/useEditSelection';
+import { creationFragment, tracePointFragment } from '~/utils/editFragment';
 import type { DeleteDone, DeleteTarget, EditorContextAction, EditorContextTarget, ObjectDialog } from '~/utils/editorTools';
 
 export interface TopologyEditorOptions {
@@ -92,6 +93,34 @@ export interface EditSelection {
 export function useTopologyEditor(options: TopologyEditorOptions) {
   const { getMap, enabled, isTraceMode, isDrawActive, setIdentifyMode, refreshLayers, getSelectedFeature, closeCard } = options;
   const activeFragments = (): readonly number[] => options.getActiveFragmentIds?.() ?? [];
+  const activeFragmentList = computed(() => [...activeFragments()]);
+
+  // === Фрагмент новых объектов (utils/editFragment.ts) ===
+  // Копии сети разных фрагментов лежат друг на друге: фрагмент нового узла/участка задаётся явно —
+  // единственный видимый, выбранный на панели или взятый от узла/трубы начала трассы
+  const WORK_FRAGMENT_KEY = 'editorWorkFragment';
+  const workFragmentId = ref<number | null>((() => {
+    try {
+      const v = Number(appStorage.getItem(WORK_FRAGMENT_KEY));
+      return Number.isInteger(v) && v > 0 ? v : null;
+    } catch {
+      return null;
+    }
+  })());
+  watch(workFragmentId, (v) => {
+    try {
+      if (v == null) appStorage.removeItem(WORK_FRAGMENT_KEY);
+      else appStorage.setItem(WORK_FRAGMENT_KEY, String(v));
+    } catch {
+      // удобство: без хранилища выбор живёт до перезагрузки
+    }
+  });
+  const creationFragmentId = computed(() => creationFragment(activeFragments(), workFragmentId.value));
+  /** Привязка трассы и поиск трубы для ввода — только в фрагменте создания (если он известен) */
+  const creationFragments = (): readonly number[] =>
+    (creationFragmentId.value != null ? [creationFragmentId.value] : activeFragments());
+  /** Меню выбора фрагмента на панели редактора */
+  const fragmentMenuOpen = ref(false);
 
   // === Состояние режима ===
   const isEditTopologyMode = ref(false);
@@ -349,17 +378,59 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       // удобство: без хранилища действует до перезагрузки
     }
   });
-  const snapIndex = useSnapIndex(getMap, activeFragments);
+  const snapIndex = useSnapIndex(getMap, creationFragments);
   const contextSnap = useContextSnap(getMap);
   const cadNorms = getCityConfig().cadDefaults;
-  const trace = useTraceDraw(getMap, snapIndex.index, activeFragments, {
+  const trace = useTraceDraw(getMap, snapIndex.index, creationFragments, {
     polarStep,
     context: contextSnap.index,
     contextEnabled: contextSnapEnabled,
     norms: () => cadNorms,
   });
   // сменили рабочий фрагмент — привязка к его объектам, без ожидания сдвига карты
-  watch(() => activeFragments().join(','), () => snapIndex.invalidate());
+  // (сузили набор — например, фрагмент взят от начала трассы — загруженные данные его уже содержат)
+  watch(() => creationFragments().join(','), (now, before) => {
+    if (before === '') return; // были загружены все фрагменты
+    const had = new Set(before.split(','));
+    if (now === '' || !now.split(',').every((id) => had.has(id))) snapIndex.invalidate();
+  });
+
+  /** Фрагмент новых объектов не определён — попросить выбрать его на панели */
+  const askFragment = (what: string) => {
+    useNotificationStore().showWarning(
+      `На карте несколько фрагментов — выберите на панели, в каком создать ${what}, или начните от узла сети.`,
+    );
+    fragmentMenuOpen.value = true;
+  };
+
+  /** Выбор фрагмента на панели; начатая трасса в другом фрагменте сбрасывается */
+  const setWorkFragment = (id: number | null) => {
+    workFragmentId.value = id;
+    fragmentMenuOpen.value = false;
+    const first = trace.points.value[0];
+    const f = tracePointFragment(first, snapIndex.index.value);
+    if (first && (first.kind === 'new' || (f != null && f !== creationFragmentId.value))) {
+      trace.clear();
+      chainPoints = [];
+    }
+  };
+
+  /**
+   * Первая точка трассы: фрагмент не выбран — берётся от узла/трубы, с которых начали;
+   * трассу из пустого места без фрагмента не начинать. → false — точка снята
+   */
+  const ensureTraceFragment = (): boolean => {
+    if (creationFragmentId.value != null || trace.points.value.length !== 1) return true;
+    const f = tracePointFragment(trace.points.value[0], snapIndex.index.value);
+    if (f != null) {
+      workFragmentId.value = f;
+      if (creationFragmentId.value === f) useNotificationStore().showInfo(`Новые объекты — во фрагменте ${f} (по началу трассы)`);
+      return true;
+    }
+    trace.clear();
+    askFragment('трассу');
+    return false;
+  };
   const chainPreviewOpen = ref(false);
   const chainPreviewLoading = ref(false);
   const chainSaving = ref(false);
@@ -527,6 +598,11 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       });
       return;
     }
+    if (err instanceof ApiError && err.status === 409 && err.data?.code === 'fragment_required') {
+      notify.showWarning(err.data.message || 'Выберите фрагмент, в котором создать объект');
+      fragmentMenuOpen.value = true;
+      return;
+    }
     notify.showError(formatApiErrorWith(prefix, err));
   };
 
@@ -662,6 +738,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       await snapIndex.reload();
     }
     const point = trace.addCoord([converted.lng, converted.lat]);
+    if (point && !ensureTraceFragment()) return { converted, point: null };
     return { converted, point };
   };
 
@@ -763,7 +840,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     if (!building) return null;
     if (entryHover.value?.building.id === building.id) return entryHover.value;
     const idx = snapIndex.index.value;
-    return { building, plan: idx ? planBuildingEntry(idx, building, ENTRY_MAX_M, activeFragments()) : null };
+    return { building, plan: idx ? planBuildingEntry(idx, building, ENTRY_MAX_M, creationFragments()) : null };
   };
 
   const onEntryMove = (e: any) => {
@@ -795,6 +872,15 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       ? { kind: 'node', coord: h.plan.tap, nodeId: h.plan.nodeId }
       : { kind: 'tap', coord: h.plan.tap, lineId: h.plan.lineId };
     const end: TracePoint = { kind: 'new', coord: h.plan.wall, nodeType: 'PR' };
+    // ввод — во фрагменте трубы, от которой он идёт
+    if (creationFragmentId.value == null) {
+      const f = tracePointFragment(start, snapIndex.index.value);
+      if (f == null) {
+        askFragment('ввод');
+        return;
+      }
+      workFragmentId.value = f;
+    }
     trace.showEntry(null, null);
     trace.setPoints([start, end]);
     chainPoints = [start, end];
@@ -814,8 +900,13 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
 
   /** Новый узел в точке (клик в пустоту без трассы) + шаблон для новых узлов; новый узел — выделен */
   const createNodeAt = async ([lng, lat]: LngLat) => {
+    const fileid = creationFragmentId.value;
+    if (fileid == null) {
+      askFragment('узел');
+      return;
+    }
     try {
-      const result = await fastApiService.createNode(lng, lat, { nodeType: newNodeType.value });
+      const result = await fastApiService.createNode(lng, lat, { nodeType: newNodeType.value, fileid });
       const templateNote = await applyNewTemplate(newNodeTemplateId.value, result.id);
       const typeNote = newNodeType.value !== 'US' ? `, тип: ${nodeTypeTitle(newNodeType.value)}` : '';
       notifyDone(`Узел ${result.id} создан (фрагмент ${result.fileid ?? '—'}${typeNote})${templateNote}`, result.operation_id);
@@ -827,7 +918,6 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   };
 
   const chainBody = (): ChainRequest => {
-    const fragments = activeFragments();
     const points: ChainRequestPoint[] = chainRequestPoints(chainPoints);
     const card = entryCard();
     const last = points[points.length - 1];
@@ -835,8 +925,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     return {
       points,
       pipe_mode: pipeMode.value,
-      // один фрагмент на карте — он рабочий: трасса в другом фрагменте — ошибка проверки
-      fileid: fragments.length === 1 ? fragments[0] : undefined,
+      // фрагмент создания: трасса от объектов другого фрагмента — ошибка проверки
+      fileid: creationFragmentId.value ?? undefined,
     };
   };
 
@@ -1386,6 +1476,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
           return;
         }
         if (trace.onClick(e)) await finishTrace();
+        else ensureTraceFragment();
         return;
       }
       case 'merge': {
@@ -1472,8 +1563,11 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   /** Начать трассу из точки (узел — от него, труба — врезкой, карта — новый узел) */
   const traceFrom = async (coord: LngLat) => {
     if (!(await setTool('trace'))) return;
+    // от узла/трубы другого видимого фрагмента — трасса в их фрагменте
+    const from = contextMenu.value?.fragmentId ?? null;
+    if (from != null && creationFragmentId.value !== from) setWorkFragment(from);
     await snapIndex.reload();
-    trace.addCoord(coord);
+    if (trace.addCoord(coord)) ensureTraceFragment();
   };
 
   const runContextAction = async (action: EditorContextAction) => {
@@ -1609,6 +1703,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     mergeTarget: mergeTargetNodeId.value,
     nodeTypeTitle: nodeTypeTitle(newNodeType.value),
     entryHint: entryHint.value,
+    needFragment: creationFragmentId.value == null,
   }));
 
   return {
@@ -1618,6 +1713,10 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     selection,
     clearSelection,
     statusHint,
+    activeFragmentList,
+    creationFragmentId,
+    fragmentMenuOpen,
+    setWorkFragment,
     hotkeysHelpOpen,
     historyOpen,
     showBbox,

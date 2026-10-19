@@ -156,6 +156,8 @@ export interface EditorStatus {
   mergeTarget: number | null;
   nodeTypeTitle: string;
   entryHint: string;
+  /** на карте несколько фрагментов, а фрагмент новых объектов не выбран */
+  needFragment?: boolean;
 }
 
 /** Подсказка следующего шага для строки состояния */
@@ -167,11 +169,16 @@ export const editorStatusHint = (s: EditorStatus): string => {
         ? `Узел ${s.selection.id}: тяните, чтобы переместить · правый щелчок — меню · Del — удалить · Esc — снять выделение`
         : `Участок ${s.selection.id}: тяните излом или «○» — изгиб сохраняется сразу · правый щелчок — меню · Del — удалить`;
     case 'trace':
-      return s.tracing
-        ? 'Следующая точка · узел или труба — завершить · Enter — завершить здесь · Backspace — шаг назад · Esc — сбросить'
+      if (s.tracing) {
+        return 'Следующая точка · узел или труба — завершить · Enter — завершить здесь · Backspace — шаг назад · Esc — сбросить';
+      }
+      return s.needFragment
+        ? 'Щёлкните узел или трубу — трасса будет в их фрагменте; с пустого места — сначала выберите фрагмент на панели'
         : 'Щёлкните узел, трубу или карту — начало трассы · Esc — к «Выбору»';
     case 'node':
-      return `Щёлкните карту — новый узел «${s.nodeTypeTitle}» · Esc — к «Выбору»`;
+      return s.needFragment
+        ? 'Выберите на панели фрагмент, в котором создать узел'
+        : `Щёлкните карту — новый узел «${s.nodeTypeTitle}» · Esc — к «Выбору»`;
     case 'vertex':
       if (s.vertexLineId == null) return 'Щёлкните участок · Esc — к «Выбору»';
       return `Участок ${s.vertexLineId}: тяните излом, «○» — добавить, правый щелчок — убрать`
