@@ -145,6 +145,22 @@
             </v-btn>
 
             <v-btn
+              v-if="cardLineId && isLineObject && canEditEquipment && !editing"
+              icon
+              variant="text"
+              size="small"
+              color="primary"
+              aria-label="Отводы по трассе → местные сопротивления"
+              @click="bendsLineId = cardLineId"
+            >
+              <v-icon size="18">mdi-vector-polyline</v-icon>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Отводы по трассе → местные сопротивления</v-tooltip>
+            </v-btn>
+
+            <v-btn
 
               v-if="canOpenDefectJournal"
 
@@ -788,6 +804,14 @@
           :node-id="cardNodeId"
           @changed="onNodeTypeChanged"
           @edit-card="openNodeExtraCard"
+        />
+
+        <BendResistanceDialog
+          v-if="bendsLineId"
+          :model-value="true"
+          :line-id="bendsLineId"
+          @update:model-value="(v: boolean) => { if (!v) bendsLineId = null }"
+          @saved="(n: number) => onCardSaved({ changed: n })"
         />
 
         <LineTypeDialog
@@ -1592,6 +1616,8 @@ const onNodeTypeChanged = (message: string) => {
 }
 // --- тип линии: участок ↔ оборудование (окно LineTypeDialog; из карточки участка или оборудования) ---
 const lineTypeId = ref<number | null>(null)
+// --- отводы по геометрии участка → местные сопротивления паспорта (окно BendResistanceDialog) ---
+const bendsLineId = ref<number | null>(null)
 const canChangeEquipType = computed(() => {
   const t = equipTarget.value
   return Boolean(isEditTopologyMode.value && cardInTerritory.value && t && !batchIds.value

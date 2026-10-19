@@ -6,6 +6,7 @@ import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~
 import type { SnapData } from '~/utils/cadSnap';
 import type { NodeFlag, NodeFlagResult, NodeType, NodeTypeChangeResult, NodeTypeInfo } from '~/utils/nodeTypes';
 import type { LineType, LineTypeChangeResult, LineTypeInfo } from '~/utils/lineTypes';
+import type { LineBendsData } from '~/utils/bends';
 import type {
   CardBatchPreview, CardChange, CardEditData, CardHelper, CardKind, CardNeighbor, CardOption, CardTemplate, CardValues,
   NodeEquipment,
@@ -2024,6 +2025,11 @@ export const fastApiService = {
   /** Тип линии (участок или оборудование), её карточки и парная труба */
   async getLineType(lineId: number): Promise<LineTypeInfo> {
     return request<LineTypeInfo>(`api/v1/topology/line/${encodePath(lineId)}/type`);
+  },
+
+  /** Отводы участка по геометрии и местные сопротивления его паспортов (и парной трубы) */
+  async getLineBends(lineId: number): Promise<LineBendsData> {
+    return request<LineBendsData>(`api/v1/topology/line/${encodePath(lineId)}/bends`);
   },
 
   /** Смена типа линии (вместе с парной трубой); dryRun — какие карточки удалятся */
