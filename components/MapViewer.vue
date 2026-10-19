@@ -325,316 +325,22 @@
           @cancel="cancelSplit"
         />
 
-        <!-- Панель инструментов CAD топологии -->
-        <div
+        <!-- Панель инструментов редактора сети: инструменты, параметры активного, отмена/повтор -->
+        <EditorToolbar
           v-if="isEditTopologyMode"
-          class="topology-edit-toolbar elevation-4"
-        >
-          <div class="d-flex align-center flex-wrap ga-2 pa-2">
-            <v-chip
-              size="small"
-              color="primary"
-              variant="flat"
-            >
-              CAD Топология
-            </v-chip>
-            <v-btn
-              size="small"
-              :color="isChainMode ? 'primary' : 'default'"
-              :variant="isChainMode ? 'flat' : 'outlined'"
-              @click="toggleChainMode"
-            >
-              <v-icon
-                start
-                size="16"
-              >mdi-vector-polyline-plus</v-icon>
-              Трасса
-              <v-tooltip
-                activator="parent"
-                location="bottom"
-              >
-                Узел → изломы → узел или труба (врезка). Enter / двойной клик — завершить в пустом месте,
-                Shift+клик по узлу — продолжить через него, Alt — без привязки. Цифры — длина участка,
-                Tab — угол поворота, Enter — точка по введённому. Выкл — прежний режим «узел → узел»
-              </v-tooltip>
-            </v-btn>
-            <template v-if="isChainMode">
-              <v-select
-                v-model="pipeMode"
-                :items="PIPE_MODE_ITEMS"
-                item-title="title"
-                item-value="value"
-                label="Трубы"
-                density="compact"
-                variant="outlined"
-                hide-details
-                class="topology-pipe-select"
-              />
-              <v-select
-                v-model="newNodeType"
-                :items="NODE_TYPE_ITEMS"
-                item-title="title"
-                item-value="value"
-                label="Новый узел"
-                density="compact"
-                variant="outlined"
-                hide-details
-                class="topology-nodetype-select"
-              >
-                <v-tooltip
-                  activator="parent"
-                  location="bottom"
-                >
-                  Тип узла, создаваемого кликом в пустом месте, и конечного нового узла трассы: карточка
-                  потребителя, источника или насосной станции создаётся вместе с ним. Тип существующего
-                  узла — кнопка «Тип узла» в его карточке
-                </v-tooltip>
-              </v-select>
-              <v-select
-                v-model="polarStep"
-                :items="POLAR_STEP_ITEMS"
-                item-title="title"
-                item-value="value"
-                label="Шаг угла"
-                density="compact"
-                variant="outlined"
-                hide-details
-                class="topology-polar-select"
-              >
-                <v-tooltip
-                  activator="parent"
-                  location="bottom"
-                >
-                  Направление следующего участка прилипает к шагу угла от предыдущего (первый — от севера)
-                  и к направлениям ∥ / ⊥ соседней трубы. Shift — строго 90°, Alt — без привязок.
-                  При рисовании: цифры — длина, Tab — угол поворота, Enter — поставить точку
-                </v-tooltip>
-              </v-select>
-              <v-btn
-                size="small"
-                :color="contextSnapEnabled ? 'brown' : 'default'"
-                :variant="contextSnapEnabled ? 'tonal' : 'outlined'"
-                @click="contextSnapEnabled = !contextSnapEnabled"
-              >
-                <v-icon
-                  start
-                  size="16"
-                >mdi-office-building-marker-outline</v-icon>
-                Здания и улицы
-                <v-tooltip
-                  activator="parent"
-                  location="bottom"
-                >
-                  Привязка к углам и стенам зданий и к осям улиц подложки MapTiler, размеры от курсора
-                  «≈ до здания» и «≈ до оси улицы». Ориентировочно (точность подложки), с масштаба 15.
-                  Объекты сети важнее: рядом с ними привязка к ним
-                </v-tooltip>
-              </v-btn>
-              <v-btn
-                size="small"
-                :color="isEntryMode ? 'success' : 'default'"
-                :variant="isEntryMode ? 'flat' : 'outlined'"
-                @click="toggleEntryMode"
-              >
-                <v-icon
-                  start
-                  size="16"
-                >mdi-home-import-outline</v-icon>
-                Ввод в здание
-                <v-tooltip
-                  activator="parent"
-                  location="bottom"
-                >
-                  Клик по зданию: врезка в ближайшую трубу рабочего фрагмента, участок до стены и новый
-                  узел у стены — одной операцией после предпросмотра. Esc — выйти из режима
-                </v-tooltip>
-              </v-btn>
-              <v-btn
-                size="small"
-                variant="outlined"
-                @click="coordPointOpen = true"
-              >
-                <v-icon
-                  start
-                  size="16"
-                >mdi-crosshairs-gps</v-icon>
-                По координатам
-                <v-tooltip
-                  activator="parent"
-                  location="bottom"
-                >
-                  Точка трассы по координатам из ведомости съёмки: местная система (м), x/y десктопа (см)
-                  или WGS84. Трассу целиком из файла (GPX, DXF, таблица точек) — «Импорт сети», режим «Участки»
-                </v-tooltip>
-              </v-btn>
-              <v-chip
-                v-if="contextStatusText"
-                size="small"
-                color="warning"
-                variant="tonal"
-              >
-                {{ contextStatusText }}
-              </v-chip>
-              <v-chip
-                v-if="snapStatusText"
-                size="small"
-                :color="snapIndex.status.value === 'ready' ? 'success' : 'warning'"
-                variant="tonal"
-              >
-                {{ snapStatusText }}
-              </v-chip>
-            </template>
-            <v-btn
-              size="small"
-              :color="isMergeMode ? 'warning' : 'default'"
-              :variant="isMergeMode ? 'flat' : 'outlined'"
-              @click="toggleMergeMode"
-            >
-              <v-icon
-                start
-                size="16"
-              >mdi-call-merge</v-icon>
-              {{ isMergeMode ? 'Отменить слияние' : 'Слияние узлов' }}
-            </v-btn>
-            <span
-              v-if="isMergeMode && !mergeTargetNodeId"
-              class="text-caption text-medium-emphasis"
-            >
-              Кликните целевой узел
-            </span>
-            <span
-              v-else-if="isMergeMode && mergeTargetNodeId"
-              class="text-caption text-warning font-weight-medium"
-            >
-              Узел {{ mergeTargetNodeId }} выбран. Кликните узел для слияния.
-            </span>
-            <v-btn
-              size="small"
-              :color="isVertexMode ? 'warning' : 'default'"
-              :variant="isVertexMode ? 'flat' : 'outlined'"
-              @click="toggleVertexMode"
-            >
-              <v-icon
-                start
-                size="16"
-              >mdi-vector-polyline-edit</v-icon>
-              {{ isVertexMode ? 'Закрыть вершины' : 'Вершины' }}
-            </v-btn>
-            <template v-if="isVertexMode">
-              <span
-                v-if="!vertexEditor.active.value"
-                class="text-caption text-medium-emphasis"
-              >
-                Кликните участок
-              </span>
-              <template v-else>
-                <span class="text-caption">
-                  Участок {{ vertexEditor.lineId.value }}: тяните вершину, «○» — добавить, правый клик — удалить
-                </span>
-                <v-btn
-                  size="small"
-                  color="primary"
-                  variant="flat"
-                  :disabled="!vertexEditor.dirty.value"
-                  :loading="vertexEditor.saving.value"
-                  @click="vertexEditor.save()"
-                >
-                  <v-icon
-                    start
-                    size="16"
-                  >mdi-content-save</v-icon>
-                  Сохранить
-                </v-btn>
-                <v-btn
-                  size="small"
-                  variant="text"
-                  :disabled="!vertexEditor.dirty.value"
-                  @click="vertexEditor.reset()"
-                >
-                  <v-icon
-                    start
-                    size="16"
-                  >mdi-restore</v-icon>
-                  Сбросить
-                </v-btn>
-              </template>
-            </template>
-            <v-divider
-              vertical
-              class="mx-1"
-            />
-            <v-btn
-              size="small"
-              variant="outlined"
-              :disabled="!lastTopologyOperation || !lastTopologyOperation.undo_supported"
-              :loading="undoBusy"
-              @click="undoLastTopologyOperation"
-            >
-              <v-icon
-                start
-                size="16"
-              >mdi-undo</v-icon>
-              Отменить
-              <v-tooltip
-                activator="parent"
-                location="bottom"
-              >
-                {{ lastTopologyOperation ? `Отменить: ${topologyOperationLabel(lastTopologyOperation)} (Ctrl+Z)` : 'Нет операций для отмены' }}
-              </v-tooltip>
-            </v-btn>
-            <v-btn
-              size="small"
-              variant="outlined"
-              :disabled="!lastRedoOperation"
-              :loading="redoBusy"
-              @click="redoLastTopologyOperation"
-            >
-              <v-icon
-                start
-                size="16"
-              >mdi-redo</v-icon>
-              Повторить
-              <v-tooltip
-                activator="parent"
-                location="bottom"
-              >
-                {{ lastRedoOperation ? `Повторить: ${topologyOperationLabel(lastRedoOperation)} (Ctrl+Y)` : 'Нет отменённых операций' }}
-              </v-tooltip>
-            </v-btn>
-            <v-divider
-              vertical
-              class="mx-1"
-            />
-            <v-select
-              v-model="newLineTemplateId"
-              :items="lineTemplates"
-              item-title="name"
-              item-value="id"
-              label="Шаблон для новых участков"
-              density="compact"
-              variant="outlined"
-              hide-details
-              clearable
-              class="topology-template-select"
-              no-data-text="Шаблонов нет — сохраните в окне свойств участка"
-              @update:menu="(open: boolean) => { if (open) void loadLineTemplates(); }"
-            />
-            <v-select
-              v-model="newNodeTemplateId"
-              :items="nodeTemplates"
-              item-title="name"
-              item-value="id"
-              label="Шаблон для новых узлов"
-              density="compact"
-              variant="outlined"
-              hide-details
-              clearable
-              class="topology-template-select"
-              no-data-text="Шаблонов нет — сохраните в окне свойств узла"
-              @update:menu="(open: boolean) => { if (open) void loadLineTemplates(); }"
-            />
-          </div>
-        </div>
+          :editor="topologyEditor"
+        />
+        <EditorStatusBar
+          v-if="isEditTopologyMode && !chainPreviewOpen"
+          :tool="activeTool"
+          :hint="statusHint"
+        />
+        <!-- Координаты курсора внизу карты: WGS84 / местная / десктоп, копирование -->
+        <CursorCoords />
+        <LazyHotkeysHelp
+          v-if="hotkeysHelpOpen"
+          v-model="hotkeysHelpOpen"
+        />
 
         <TraceHud
           v-if="isEditTopologyMode && isChainMode && !isVertexMode && !isMergeMode && !chainPreviewOpen"
@@ -745,10 +451,6 @@ import { nearestGroup, queryRenderedNear } from '~/utils/mapPick';
 import { highlightKey } from '~/utils/selectionHighlight';
 import type { PickCandidate } from '~/utils/networkFeature';
 import { useFragmentStore } from '~/stores/fragmentStore';
-import { topologyOperationLabel } from '~/utils/topologyLabels';
-import { PIPE_MODE_ITEMS } from '~/utils/cadChain';
-import { NODE_TYPE_ITEMS } from '~/utils/nodeTypes';
-import { POLAR_STEP_ITEMS } from '~/utils/cadConstraint';
 import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 
 const props = defineProps<{
@@ -1498,15 +1200,14 @@ const topologyEditor = useTopologyEditor({
   closeCard: () => attributePanelRef.value?.close(),
   getActiveFragmentIds: () => fragmentStore.activeFragmentIds,
   chooseCandidate: chooseNetworkCandidate,
+  openCard: (e: any) => void mapStore.identifyFeature(e),
 });
 const {
   isEditTopologyMode,
+  activeTool,
+  statusHint,
+  hotkeysHelpOpen,
   isMergeMode,
-  newLineTemplateId,
-  newNodeTemplateId,
-  lineTemplates,
-  nodeTemplates,
-  loadLineTemplates,
   mergeTargetNodeId,
   mergeSourceNodeId,
   mergeConfirmDialogOpen,
@@ -1514,39 +1215,24 @@ const {
   mergePreviewReport,
   mergePreviewLoading,
   mergePreviewError,
-  lastTopologyOperation,
-  lastRedoOperation,
-  undoBusy,
-  redoBusy,
   isChainMode,
-  pipeMode,
-  polarStep,
-  snapIndex,
-  contextSnap,
-  contextSnapEnabled,
-  newNodeType,
   cadNorms,
-  isEntryMode,
   entryHint,
   chainNote,
   coordPointOpen,
   addTracePointByCoords,
   entryAddressText,
   entryAddressWrite,
-  toggleEntryMode,
   trace,
   chainPreviewOpen,
   chainPreviewLoading,
   chainSaving,
   chainPreview,
   chainPreviewError,
-  toggleChainMode,
   confirmChain,
   backToTrace,
   discardTrace,
-  redoLastTopologyOperation,
   isVertexMode,
-  vertexEditor,
   splitPreviewOpen,
   splitPreviewLoading,
   splitPreviewConfirming,
@@ -1554,44 +1240,13 @@ const {
   splitPreviewReport,
   splitPreviewTarget,
   onCardRefreshLayers,
-  undoLastTopologyOperation,
   toggleEditTopologyMode,
-  toggleVertexMode,
-  toggleMergeMode,
   cancelMerge,
   confirmMerge,
   confirmSplit,
   cancelSplit,
   onDeleteFeature,
 } = topologyEditor;
-/** Привязка к подложке: пусто — работает или выключена */
-const contextStatusText = computed(() => {
-  if (!contextSnapEnabled.value) return '';
-  switch (contextSnap.status.value) {
-    case 'zoom-in':
-      return 'Здания и улицы — с масштаба 15';
-    case 'no-key':
-      return 'Здания и улицы недоступны (нет ключа MapTiler)';
-    default:
-      return '';
-  }
-});
-
-/** Состояние привязки трассы: пусто — всё готово */
-const snapStatusText = computed(() => {
-  switch (snapIndex.status.value) {
-    case 'loading':
-      return 'Привязка: загрузка…';
-    case 'zoom-in':
-      return 'Приблизьте карту для привязки';
-    case 'error':
-      return 'Привязка недоступна';
-    case 'ready':
-      return snapIndex.truncated.value ? 'Привязка: окно урезано — приблизьте' : '';
-    default:
-      return '';
-  }
-});
 
 // === Контуры журналов (этап 9): слой контура и выбор участков кликом ===
 const journalContourLayer = useJournalContourLayer(() => mapStore.map, {
@@ -1949,32 +1604,4 @@ watch(
   pointer-events: none;
 }
 
-.topology-pipe-select {
-  min-width: 190px;
-  max-width: 220px;
-}
-.topology-nodetype-select {
-  width: 210px;
-  flex: 0 0 auto;
-}
-.topology-polar-select {
-  min-width: 110px;
-  max-width: 120px;
-}
-.topology-template-select {
-  min-width: 220px;
-  max-width: 280px;
-}
-.topology-edit-toolbar {
-  max-width: calc(100% - 32px);
-  position: absolute;
-  top: 72px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(8px);
-  border-radius: 24px;
-  z-index: 10;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-}
 </style>

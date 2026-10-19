@@ -1,0 +1,247 @@
+<template>
+  <div class="cursor-coords">
+    <v-menu location="top start">
+      <template #activator="{ props: menuProps }">
+        <button
+          v-bind="menuProps"
+          type="button"
+          class="cursor-coords__crs"
+          :aria-label="`Система координат: ${crsItem.title}`"
+        >
+          {{ crsItem.short }}
+          <v-icon size="14">
+            mdi-menu-up
+          </v-icon>
+        </button>
+      </template>
+      <v-list density="compact">
+        <v-list-item
+          v-for="c in CRS_ITEMS"
+          :key="c.value"
+          :active="c.value === crs"
+          :title="c.title"
+          @click="crs = c.value"
+        />
+      </v-list>
+    </v-menu>
+
+    <button
+      type="button"
+      class="cursor-coords__value"
+      :disabled="!point"
+      @click="copy(copyFormatFor(crs))"
+    >
+      {{ label }}
+      <v-tooltip
+        activator="parent"
+        location="top"
+      >
+        Щелчок или клавиша C над картой — скопировать
+      </v-tooltip>
+    </button>
+
+    <v-menu location="top end">
+      <template #activator="{ props: menuProps }">
+        <v-btn
+          v-bind="menuProps"
+          icon
+          variant="text"
+          size="x-small"
+          :disabled="!point"
+          aria-label="Скопировать координаты"
+        >
+          <v-icon size="16">
+            mdi-content-copy
+          </v-icon>
+        </v-btn>
+      </template>
+      <v-list density="compact">
+        <v-list-subheader>Скопировать</v-list-subheader>
+        <v-list-item
+          v-for="f in COORD_COPY_ITEMS"
+          :key="f.value"
+          :title="f.title"
+          :subtitle="point ? (coordCopyText(f.value, point) ?? 'пересчёт…') : ''"
+          @click="copy(f.value)"
+        />
+      </v-list>
+    </v-menu>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import type maplibregl from 'maplibre-gl';
+import { useMapStore } from '~/stores/mapStore';
+import { useNotificationStore } from '~/stores/notificationStore';
+import { fastApiService } from '~/services/fastApiService';
+import { appStorage } from '~/utils/appStorage';
+import {
+  COORD_COPY_ITEMS,
+  coordCopyText,
+  copyFormatFor,
+  formatCursorCoords,
+  type CoordCopyFormat,
+  type CursorPoint,
+  type PointCrs,
+} from '~/utils/pointCrs';
+
+const CRS_ITEMS: readonly { value: PointCrs; title: string; short: string }[] = [
+  { value: 'wgs84', title: 'WGS84 (широта, долгота)', short: 'WGS84' },
+  { value: 'local', title: 'Местная система (9998), м', short: 'Местн.' },
+  { value: 'desktop', title: 'Координаты десктопа (x/y узлов), см', short: 'Десктоп' },
+];
+const CRS_KEY = 'cursorCoordsCrs';
+
+const crs = ref<PointCrs>((() => {
+  try {
+    const v = appStorage.getItem(CRS_KEY);
+    return CRS_ITEMS.some((c) => c.value === v) ? (v as PointCrs) : 'wgs84';
+  } catch {
+    return 'wgs84';
+  }
+})());
+watch(crs, (v) => {
+  try {
+    appStorage.setItem(CRS_KEY, v);
+  } catch {
+    // удобство: без хранилища — до перезагрузки
+  }
+  if (point.value && !point.value.converted && v !== 'wgs84') scheduleConvert();
+});
+const crsItem = computed(() => CRS_ITEMS.find((c) => c.value === crs.value) ?? CRS_ITEMS[0]!);
+
+const point = ref<CursorPoint | null>(null);
+const convertFailed = ref(false);
+const label = computed(() => {
+  if (!point.value) return 'Наведите курсор на карту';
+  const text = formatCursorCoords(crs.value, point.value);
+  if (text) return text;
+  return convertFailed.value ? 'Пересчёт недоступен' : 'Пересчёт…';
+});
+
+// Местная система и десктоп — пересчёт на сервере (PostGIS), когда курсор остановился
+const CONVERT_DELAY_MS = 250;
+let convertTimer: ReturnType<typeof setTimeout> | null = null;
+let convertRequest = 0;
+const scheduleConvert = () => {
+  if (convertTimer) clearTimeout(convertTimer);
+  convertTimer = setTimeout(convertNow, CONVERT_DELAY_MS);
+};
+const convertNow = async (): Promise<void> => {
+  const p = point.value;
+  if (!p || p.converted) return;
+  const request = ++convertRequest;
+  try {
+    const converted = await fastApiService.convertPoint('wgs84', p.lng, p.lat);
+    if (request !== convertRequest || point.value !== p) return;
+    point.value = { ...p, converted };
+    convertFailed.value = false;
+  } catch {
+    if (request === convertRequest) convertFailed.value = true;
+  }
+};
+
+let overMap = false;
+const onMove = (e: maplibregl.MapMouseEvent) => {
+  overMap = true;
+  point.value = { lng: e.lngLat.lng, lat: e.lngLat.lat, converted: null };
+  if (crs.value !== 'wgs84') scheduleConvert();
+};
+const onOut = () => {
+  overMap = false;
+};
+
+const copy = async (format: CoordCopyFormat) => {
+  const notify = useNotificationStore();
+  if (!point.value) return;
+  if (format !== 'latlng' && format !== 'lnglat' && !point.value.converted) {
+    if (convertTimer) clearTimeout(convertTimer);
+    await convertNow();
+  }
+  const text = point.value ? coordCopyText(format, point.value) : null;
+  if (!text) {
+    notify.showWarning('Не удалось пересчитать координаты — скопируйте в WGS84.');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    notify.showSuccess(`Скопировано: ${text}`);
+  } catch {
+    notify.showWarning(`Буфер обмена недоступен: ${text}`);
+  }
+};
+
+/** C над картой — скопировать в текущей системе (не в полях ввода) */
+const onKeyDown = (ev: KeyboardEvent) => {
+  if (!overMap || ev.ctrlKey || ev.metaKey || ev.altKey || ev.shiftKey) return;
+  if (ev.code !== 'KeyC') return;
+  const el = ev.target as HTMLElement | null;
+  if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+  ev.preventDefault();
+  void copy(copyFormatFor(crs.value));
+};
+
+const mapStore = useMapStore();
+let attached: maplibregl.Map | null = null;
+const detach = () => {
+  attached?.off('mousemove', onMove);
+  attached?.getCanvasContainer().removeEventListener('mouseleave', onOut);
+  attached = null;
+};
+watch(() => mapStore.map as maplibregl.Map | null, (map) => {
+  if (map === attached) return;
+  detach();
+  if (!map) return;
+  map.on('mousemove', onMove);
+  map.getCanvasContainer().addEventListener('mouseleave', onOut);
+  attached = map;
+}, { immediate: true });
+if (typeof window !== 'undefined') window.addEventListener('keydown', onKeyDown);
+onBeforeUnmount(() => {
+  detach();
+  if (convertTimer) clearTimeout(convertTimer);
+  if (typeof window !== 'undefined') window.removeEventListener('keydown', onKeyDown);
+});
+</script>
+
+<style scoped>
+.cursor-coords {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px 0 2px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 22px;
+  background: rgba(var(--v-theme-surface), 0.9);
+  color: rgb(var(--v-theme-on-surface));
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18);
+  max-width: calc(100% - 24px);
+}
+.cursor-coords__crs {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px 0 8px;
+  border-right: 1px solid rgba(var(--v-theme-on-surface), 0.15);
+  font-weight: 600;
+  color: rgb(var(--v-theme-primary));
+}
+.cursor-coords__value {
+  padding: 0 6px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: copy;
+}
+.cursor-coords__value:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+</style>

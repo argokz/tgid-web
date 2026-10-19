@@ -123,9 +123,15 @@ const setup = (extra: Record<string, any> = {}, chain = false) => {
     ...extra,
   };
   const editor = useTopologyEditor(opts);
-  if (!chain) editor.isChainMode.value = false;
+  editor.activeTool.value = chain ? 'trace' : 'select';
   const click = (lng = 76.95, lat = 43.25) => editor.onMapClickForTopology({ point: { x: 10, y: 10 }, lngLat: { lng, lat } });
-  return { map, opts, editor, click, setFeatures: (f: any[]) => { features = f; } };
+  const setFeatures = (f: any[]) => { features = f; };
+  /** «Выбор»: щелчок по узлу выделяет его — после этого его можно тянуть */
+  const selectNode = async (id: number, coords = [76.9, 43.2]) => {
+    setFeatures([nodeFeature(id, coords)]);
+    await click();
+  };
+  return { map, opts, editor, click, setFeatures, selectNode };
 };
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -167,33 +173,50 @@ describe('useTopologyEditor', () => {
     expect(editor.isEditTopologyMode.value).toBe(false);
   });
 
-  it('клик по пустому месту создаёт узел; вне режима клики игнорируются', async () => {
+  it('инструмент «Узел»: клик по пустому месту создаёт узел и выделяет его; в «Выборе» — нет', async () => {
     const { editor, opts, click } = setup();
     await click();
     expect(api.createNode).not.toHaveBeenCalled();
     editor.toggleEditTopologyMode();
+    await click(76.95, 43.25);
+    expect(api.createNode).not.toHaveBeenCalled();
+    await editor.setTool('node');
     api.createNode.mockResolvedValue({ id: 101, fileid: 3 });
     await click(76.95, 43.25);
     expect(api.createNode).toHaveBeenCalledWith(76.95, 43.25, { nodeType: 'US' });
     expect(opts.refreshLayers).toHaveBeenCalled();
+    expect(editor.selection.value).toMatchObject({ kind: 'node', id: 101, coords: [[76.95, 43.25]] });
   });
 
-  it('два узла подряд создают участок с версиями обоих узлов', async () => {
-    const { editor, click, setFeatures } = setup();
+  it('«Выбор»: узел важнее участка, карточка открывается; пустое место снимает выделение', async () => {
+    const openCard = vi.fn();
+    const { editor, click, setFeatures, opts } = setup({ openCard });
     editor.toggleEditTopologyMode();
-    api.createLine.mockResolvedValue({ passport: { template_line_id: 9 } });
-    setFeatures([nodeFeature(1)]);
+    setFeatures([lineFeature(7), nodeFeature(3)]);
     await click();
-    setFeatures([nodeFeature(2)]);
+    expect(editor.selection.value).toMatchObject({ kind: 'node', id: 3 });
+    expect(openCard).toHaveBeenCalledTimes(1);
+    setFeatures([lineFeature(7)]);
     await click();
-    expect(api.createLine).toHaveBeenCalledWith(1, 2, { nodeid1: 'v1', nodeid2: 'v2' });
+    expect(editor.selection.value).toMatchObject({ kind: 'line', id: 7 });
+    expect(api.previewSplitLine).not.toHaveBeenCalled(); // щелчок по трубе больше не режет её
+    setFeatures([]);
+    await click();
+    expect(editor.selection.value).toBeNull();
+    expect(opts.closeCard).toHaveBeenCalled();
+    expect(api.createNode).not.toHaveBeenCalled();
   });
 
-  it('перетаскивание узла пишет moveNode с версией на момент захвата; клик без сдвига — нет', async () => {
-    const { editor, setFeatures, map } = setup();
+  it('перетаскивается только выделенный узел; moveNode с версией на момент захвата; клик без сдвига — нет', async () => {
+    const { editor, setFeatures, map, selectNode } = setup();
     editor.toggleEditTopologyMode();
     setFeatures([nodeFeature(5, [76.9, 43.2])]);
     const down = { point: { x: 0, y: 0 }, lngLat: { lng: 76.9, lat: 43.2 }, preventDefault: vi.fn() };
+    // не выделен — карта не тянет узел
+    editor.onMapMouseDownForTopology(down);
+    expect(map.dragPan.disable).not.toHaveBeenCalled();
+    await selectNode(5, [76.9, 43.2]);
+    setFeatures([nodeFeature(5, [76.9, 43.2])]);
     editor.onMapMouseDownForTopology(down);
     await editor.onNodeDragEnd();
     expect(api.moveNode).not.toHaveBeenCalled();
@@ -204,6 +227,67 @@ describe('useTopologyEditor', () => {
     await editor.onNodeDragEnd();
     expect(api.moveNode).toHaveBeenCalledWith(5, 77, 43.3, 'v5');
     expect(map.dragPan.enable).toHaveBeenCalled();
+    // выделение переехало вместе с узлом
+    expect(editor.selection.value?.coords).toEqual([[77, 43.3]]);
+  });
+
+  it('Esc во время перетаскивания — узел остаётся на месте; Alt — без привязки', async () => {
+    const { editor, setFeatures, map, selectNode } = setup();
+    editor.attach(map as any);
+    editor.toggleEditTopologyMode();
+    await selectNode(5);
+    setFeatures([nodeFeature(5)]);
+    editor.onMapMouseDownForTopology({ point: { x: 0, y: 0 }, lngLat: { lng: 76.9, lat: 43.2 }, preventDefault: vi.fn() });
+    editor.onMapMouseMoveForTopology({ point: { x: 50, y: 0 }, lngLat: { lng: 77, lat: 43.3 } });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await editor.onNodeDragEnd();
+    expect(api.moveNode).not.toHaveBeenCalled();
+
+    // Alt: узел-сосед под курсором не притягивает
+    await flush();
+    setFeatures([nodeFeature(5)]);
+    editor.onMapMouseDownForTopology({ point: { x: 0, y: 0 }, lngLat: { lng: 76.9, lat: 43.2 }, preventDefault: vi.fn() });
+    setFeatures([nodeFeature(6, [80, 40])]);
+    editor.onMapMouseMoveForTopology({ point: { x: 50, y: 0 }, lngLat: { lng: 77, lat: 43.3 }, originalEvent: { altKey: true } });
+    await editor.onNodeDragEnd();
+    expect(api.moveNode).toHaveBeenCalledWith(5, 77, 43.3, 'v5');
+    editor.detach(map as any);
+  });
+
+  it('клавиши: буквы — инструменты (и в русской раскладке), Esc — назад, Del — удалить выделенное, ? — справка', async () => {
+    const { editor, map, selectNode } = setup();
+    editor.attach(map as any);
+    editor.toggleEditTopologyMode();
+    const key = (init: KeyboardEventInit) => window.dispatchEvent(new KeyboardEvent('keydown', { cancelable: true, ...init }));
+    key({ key: 'д', code: 'KeyL' });
+    expect(editor.activeTool.value).toBe('trace');
+    key({ key: 'm', code: 'KeyM' });
+    expect(editor.activeTool.value).toBe('merge');
+    key({ key: 'Escape' });
+    expect(editor.activeTool.value).toBe('select');
+    await selectNode(11);
+    expect(editor.selection.value?.id).toBe(11);
+    key({ key: 'Delete' });
+    await flush();
+    expect(confirmState.visible).toBe(true);
+    settleConfirm(false);
+    await flush();
+    expect(api.deleteNode).not.toHaveBeenCalled();
+    key({ key: 'Escape' });
+    expect(editor.selection.value).toBeNull();
+    key({ key: '?', code: 'Slash', shiftKey: true });
+    expect(editor.hotkeysHelpOpen.value).toBe(true);
+    editor.detach(map as any);
+  });
+
+  it('строка состояния подсказывает следующий шаг инструмента', async () => {
+    const { editor, selectNode } = setup();
+    editor.toggleEditTopologyMode();
+    expect(editor.statusHint.value).toContain('Щёлкните узел или участок');
+    await selectNode(4);
+    expect(editor.statusHint.value).toContain('Узел 4: тяните');
+    await editor.setTool('merge');
+    expect(editor.statusHint.value).toContain('целевой узел');
   });
 
   it('слияние: целевой узел, источник → превью; подтверждение уходит с версиями превью', async () => {
@@ -222,13 +306,12 @@ describe('useTopologyEditor', () => {
     expect(editor.isMergeMode.value).toBe(false);
   });
 
-  it('разрезание: клик по участку → превью, подтверждение с версией участка', async () => {
-    const { editor, click, setFeatures } = setup();
+  it('разрезание: превью, подтверждение с версией участка', async () => {
+    const { editor } = setup();
     editor.toggleEditTopologyMode();
     api.previewSplitLine.mockResolvedValue({ transferred: {}, versions: { 'line:7': 'L7' } });
     api.splitLine.mockResolvedValue({ new_node_id: 1, new_line_id: 2, transferred: {} });
-    setFeatures([lineFeature(7)]);
-    await click(76.1, 43.1);
+    await editor.openSplitPreview(7, 76.1, 43.1);
     expect(editor.splitPreviewOpen.value).toBe(true);
     await editor.confirmSplit();
     expect(api.splitLine).toHaveBeenCalledWith(7, 76.1, 43.1, 'L7', {});
@@ -236,8 +319,9 @@ describe('useTopologyEditor', () => {
   });
 
   it('409 при перемещении показывает конфликт с кнопкой перезагрузки', async () => {
-    const { editor, setFeatures, opts } = setup();
+    const { editor, setFeatures, opts, selectNode } = setup();
     editor.toggleEditTopologyMode();
+    await selectNode(5);
     setFeatures([nodeFeature(5)]);
     api.moveNode.mockRejectedValue(new (ApiError as any)('Изменён другим пользователем', true));
     editor.onMapMouseDownForTopology({ point: { x: 0, y: 0 }, lngLat: { lng: 1, lat: 1 }, preventDefault: vi.fn() });
@@ -270,10 +354,10 @@ describe('useTopologyEditor', () => {
     expect(opts.closeCard).toHaveBeenCalled();
   });
 
-  it('QA F52: клик по узлу (mousedown → mouseup → click) выбирает его, маркер не создаётся', async () => {
-    const { editor, setFeatures, map } = setup();
+  it('QA F52: клик по узлу (mousedown → mouseup → click) выделяет его, маркер не создаётся', async () => {
+    const { editor, setFeatures, map, selectNode } = setup();
     editor.toggleEditTopologyMode();
-    api.createLine.mockResolvedValue({});
+    await selectNode(1); // выделенный узел — mousedown на нём начинает захват
     markers.length = 0;
     const press = async (id: number) => {
       setFeatures([nodeFeature(id)]);
@@ -286,57 +370,56 @@ describe('useTopologyEditor', () => {
     expect(markers).toHaveLength(0);
     expect(api.moveNode).not.toHaveBeenCalled();
     expect(map.dragPan.enable).toHaveBeenCalled();
-    expect(editor.topologyStartNode.value).toBe(1);
+    expect(editor.selection.value?.id).toBe(1);
     await press(2);
-    expect(api.createLine).toHaveBeenCalledWith(1, 2, { nodeid1: 'v1', nodeid2: 'v2' });
+    expect(editor.selection.value?.id).toBe(2);
+    expect(api.createLine).not.toHaveBeenCalled();
   });
 
-  it('QA F53: разрезание и выбор узла — объекты активного фрагмента, а не первые под курсором', async () => {
+  it('QA F53: выделение — объекты активного фрагмента, а не первые под курсором', async () => {
     const { editor, click, setFeatures } = setup({ getActiveFragmentIds: () => [74] });
     editor.toggleEditTopologyMode();
-    api.previewSplitLine.mockResolvedValue({ transferred: {}, versions: {} });
     setFeatures([pipe(381, 1), pipe(324388, 74), pipe(370367, 89)]);
     await click(76.1, 43.1);
-    expect(api.previewSplitLine).toHaveBeenCalledWith(324388, 76.1, 43.1);
+    expect(editor.selection.value).toMatchObject({ kind: 'line', id: 324388, fragmentId: 74 });
 
     setFeatures([uzel(13402, 4), uzel(535475, 74), uzel(888, 1)]);
     await click();
-    expect(editor.topologyStartNode.value).toBe(535475);
+    expect(editor.selection.value).toMatchObject({ kind: 'node', id: 535475 });
   });
 
   it('QA F53: несколько кандидатов — меню выбора; отказ в меню ничего не делает', async () => {
     const chooseCandidate = vi.fn(async (c: any[]) => c.find((x) => x.fragmentId === 74));
     const { editor, click, setFeatures } = setup({ chooseCandidate });
     editor.toggleEditTopologyMode();
-    api.previewSplitLine.mockResolvedValue({ transferred: {}, versions: {} });
     setFeatures([pipe(381, 1), pipe(324388, 74)]);
     await click(76.1, 43.1);
     expect(chooseCandidate.mock.calls[0][0].map((c: any) => c.id)).toEqual([381, 324388]);
-    expect(api.previewSplitLine).toHaveBeenCalledWith(324388, 76.1, 43.1);
+    expect(editor.selection.value?.id).toBe(324388);
 
     chooseCandidate.mockResolvedValueOnce(undefined as any);
     setFeatures([uzel(888, 1), uzel(535475, 74)]);
     await click();
-    expect(editor.topologyStartNode.value).toBeNull();
+    expect(editor.selection.value?.id).toBe(324388); // отказ — выделение прежнее
     expect(api.createNode).not.toHaveBeenCalled();
   });
 
-  it('QA F53: второй узел участка — только из фрагмента первого; чужой — отказ, без нового узла', async () => {
+  it('QA F53: слияние — сливаемый узел только из фрагмента целевого; чужой — отказ', async () => {
     const { editor, click, setFeatures } = setup();
     editor.toggleEditTopologyMode();
+    await editor.setTool('merge');
+    api.previewMergeNodes.mockResolvedValue({ versions: {} });
     setFeatures([uzel(535475, 74)]);
     await click();
+    expect(editor.selection.value?.id).toBe(535475); // целевой подсвечен
     setFeatures([uzel(888, 1)]);
     await click();
-    expect(api.createLine).not.toHaveBeenCalled();
-    expect(api.createNode).not.toHaveBeenCalled();
+    expect(api.previewMergeNodes).not.toHaveBeenCalled();
     expect(notify.showWarning).toHaveBeenCalledWith(expect.stringContaining('фрагмента 74'));
-    expect(editor.topologyStartNode.value).toBe(535475);
 
-    api.createLine.mockResolvedValue({});
     setFeatures([uzel(889, 1), uzel(535476, 74)]); // копии: берётся узел фрагмента 74 без меню
     await click();
-    expect(api.createLine).toHaveBeenCalledWith(535475, 535476, expect.any(Object));
+    expect(api.previewMergeNodes).toHaveBeenCalledWith({ target_node_id: 535475, source_node_id: 535476 });
   });
 
   it('QA F53: копии узла в нескольких фрагментах не перетаскиваются', async () => {

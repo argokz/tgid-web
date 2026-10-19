@@ -52,3 +52,43 @@ const fmt = (v: number, digits: number) => v.toFixed(digits).replace('.', ',')
 export const describeConverted = (p: ConvertedPoint): string =>
   `${fmt(p.lat, 6)}°, ${fmt(p.lng, 6)}° · местн. X ${fmt(p.local.x, 3)} Y ${fmt(p.local.y, 3)}`
   + ` · десктоп x ${fmt(p.desktop.x, 1)} y ${fmt(p.desktop.y, 1)}`
+
+/** Координаты курсора в строке состояния карты */
+export interface CursorPoint {
+  lng: number
+  lat: number
+  /** местная система и десктоп — после пересчёта на сервере (null — ещё нет) */
+  converted: ConvertedPoint | null
+}
+
+/** Подпись в строке координат (null — точка ещё не пересчитана в эту систему) */
+export const formatCursorCoords = (crs: PointCrs, p: CursorPoint): string | null => {
+  if (crs === 'wgs84') return `${fmt(p.lat, 6)}° с. ш.  ${fmt(p.lng, 6)}° в. д.`
+  if (!p.converted) return null
+  return crs === 'local'
+    ? `X ${fmt(p.converted.local.x, 3)}  Y ${fmt(p.converted.local.y, 3)} м`
+    : `x ${fmt(p.converted.desktop.x, 1)}  y ${fmt(p.converted.desktop.y, 1)} см`
+}
+
+export type CoordCopyFormat = 'latlng' | 'lnglat' | 'local' | 'desktop'
+
+export const COORD_COPY_ITEMS: readonly { value: CoordCopyFormat; title: string }[] = [
+  { value: 'latlng', title: 'Широта, долгота (Яндекс, Google, 2ГИС)' },
+  { value: 'lnglat', title: 'Долгота широта (ГИС, GeoJSON)' },
+  { value: 'local', title: 'Местная система X Y, м' },
+  { value: 'desktop', title: 'x y десктопа, см' },
+]
+
+/** Текст для буфера: точка-разделитель дробной части (вставляется в карты и обратно в «По координатам») */
+export const coordCopyText = (format: CoordCopyFormat, p: CursorPoint): string | null => {
+  if (format === 'latlng') return `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`
+  if (format === 'lnglat') return `${p.lng.toFixed(6)} ${p.lat.toFixed(6)}`
+  if (!p.converted) return null
+  return format === 'local'
+    ? `${p.converted.local.x.toFixed(3)} ${p.converted.local.y.toFixed(3)}`
+    : `${p.converted.desktop.x.toFixed(1)} ${p.converted.desktop.y.toFixed(1)}`
+}
+
+/** Система подписи → формат копирования по умолчанию */
+export const copyFormatFor = (crs: PointCrs): CoordCopyFormat =>
+  crs === 'wgs84' ? 'latlng' : crs
