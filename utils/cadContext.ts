@@ -515,6 +515,40 @@ export const planBuildingEntry = (
 };
 
 /** «≈ 5,2 м» — размеры по подложке ориентировочные */
+/** улица у здания ищется в стольких метрах от его стен (подпись лежит на оси улицы) */
+export const STREET_NEAR_BUILDING_M = 60;
+
+/** Название ближайшей к зданию улицы по подписям подложки (null — подписанной улицы рядом нет) */
+export const buildingStreet = (idx: ContextIndex, building: ContextBuilding, maxM = STREET_NEAR_BUILDING_M): string | null => {
+  const entry = idx.buildings.find((e) => e.building.id === building.id);
+  if (!entry) return null;
+  let best = maxM;
+  let name: string | null = null;
+  const seen = new Set<LabelSeg>();
+  for (const poly of entry.rings) {
+    for (const v of poly[0] ?? []) {
+      for (const k of cellsAround(idx, v, maxM)) {
+        for (const l of idx.labels.get(k) ?? []) {
+          if (seen.has(l)) continue;
+          seen.add(l);
+          for (const w of poly[0]) {
+            const d = projectOnSegment(w, l.a, l.b).dist;
+            if (d <= best) {
+              best = d;
+              name = l.name;
+            }
+          }
+        }
+      }
+    }
+  }
+  return name;
+};
+
+/** Подпись потребителя из адреса по карте: «ул. Абая, 10», «ул. Абая», «10» */
+export const entryAddress = (street: string | null | undefined, number: string | null | undefined): string =>
+  [street?.trim(), number?.trim()].filter(Boolean).join(', ');
+
 export const formatApproxM = (m: number): string => `≈ ${m.toFixed(1).replace('.', ',')} м`;
 
 /** Подпись привязки к подложке для бейджа */

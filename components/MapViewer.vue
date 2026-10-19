@@ -638,6 +638,8 @@
           :loading="chainPreviewLoading"
           :saving="chainSaving"
           :error="chainPreviewError"
+          v-model:address-text="entryAddressText"
+          v-model:address-write="entryAddressWrite"
           :note="chainNote"
           @confirm="confirmChain"
           @back="backToTrace"
@@ -1503,6 +1505,8 @@ const {
   isEntryMode,
   entryHint,
   chainNote,
+  entryAddressText,
+  entryAddressWrite,
   toggleEntryMode,
   trace,
   chainPreviewOpen,

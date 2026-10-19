@@ -4,8 +4,10 @@ import {
   buildingAt,
   buildingNumbers,
   buildingOutline,
+  buildingStreet,
   contextDistances,
   contextSnapLabel,
+  entryAddress,
   findContextSnap,
   formatApproxM,
   isClipEdge,
@@ -129,6 +131,14 @@ describe('cadContext: привязка и размеры', () => {
     const r = fromContextSnap(road!);
     expect(r.kind).toBe('road');
     expect(snapLabel(r)).toBe('Ось: Проспект Абая');
+  });
+
+  it('адрес для ввода: ближайшая подписанная улица у стен и номер дома', () => {
+    expect(buildingStreet(idx, house)).toBe('Проспект Абая');
+    expect(buildingStreet(idx, house, 20)).toBeNull();
+    expect(entryAddress('Проспект Абая', '12а')).toBe('Проспект Абая, 12а');
+    expect(entryAddress(null, ' 12а ')).toBe('12а');
+    expect(entryAddress('', undefined)).toBe('');
   });
 
   it('вне радиуса — нет привязки', () => {

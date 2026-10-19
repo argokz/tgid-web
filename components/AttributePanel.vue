@@ -129,6 +129,22 @@
             </v-btn>
 
             <v-btn
+              v-if="cardLineId && isLineObject && isEditTopologyMode && cardInTerritory && !editing"
+              icon
+              variant="text"
+              size="small"
+              color="primary"
+              aria-label="Тип линии: участок или оборудование"
+              @click="lineTypeId = cardLineId"
+            >
+              <v-icon size="18">mdi-pipe-valve</v-icon>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Тип линии: участок или оборудование</v-tooltip>
+            </v-btn>
+
+            <v-btn
 
               v-if="canOpenDefectJournal"
 
@@ -774,6 +790,15 @@
           @edit-card="openNodeExtraCard"
         />
 
+        <LineTypeDialog
+          v-if="lineTypeId"
+          :model-value="true"
+          :line-id="lineTypeId"
+          @update:model-value="(v: boolean) => { if (!v) lineTypeId = null }"
+          @changed="onNodeTypeChanged"
+          @edit-card="openNodeExtraCard"
+        />
+
         <div
           v-if="editing && equipTarget"
           class="ap-equip-head"
@@ -786,6 +811,22 @@
             @click="backToEquipment"
           />
           <span class="ap-equip-title">{{ equipTarget.title }}</span>
+          <v-btn
+            v-if="canChangeEquipType"
+            icon
+            variant="text"
+            size="small"
+            color="primary"
+            :disabled="editDirty"
+            aria-label="Тип линии: участок или оборудование"
+            @click="lineTypeId = equipTarget.id"
+          >
+            <v-icon size="18">mdi-pipe-valve</v-icon>
+            <v-tooltip
+              activator="parent"
+              location="bottom"
+            >{{ editDirty ? 'Сначала сохраните или отмените правку' : 'Тип линии: участок или оборудование' }}</v-tooltip>
+          </v-btn>
         </div>
 
         <ObjectCardEdit
@@ -1305,7 +1346,7 @@ import ObjectCardEdit from '~/components/objectCard/ObjectCardEdit.vue'
 import NodeEquipmentList from '~/components/objectCard/NodeEquipmentList.vue'
 import { useObjectCardLayout } from '~/composables/useObjectCardLayout'
 import {
-  CARD_KIND_BY_TABLE, EQUIPMENT_KINDS, equipmentTitle, KIND_TEXT, type CardKind, type EquipmentKind, type NodeEquipmentItem,
+  CARD_KIND_BY_TABLE, EQUIPMENT_KINDS, equipmentTitle, isEquipmentKind, KIND_TEXT, type CardKind, type EquipmentKind, type NodeEquipmentItem,
 } from '~/utils/objectCard'
 import { useJournalMapBridge } from '~/composables/useJournalMapBridge'
 import { groupSettersService } from '~/services/groupSettersService'
@@ -1549,8 +1590,16 @@ const onNodeTypeChanged = (message: string) => {
   useNotificationStore().showSuccess(message)
   emit('refresh-layers')
 }
+// --- тип линии: участок ↔ оборудование (окно LineTypeDialog; из карточки участка или оборудования) ---
+const lineTypeId = ref<number | null>(null)
+const canChangeEquipType = computed(() => {
+  const t = equipTarget.value
+  return Boolean(isEditTopologyMode.value && cardInTerritory.value && t && !batchIds.value
+    && (t.kind === 'line' || isEquipmentKind(t.kind)))
+})
 const openNodeExtraCard = (target: { kind: CardKind; table: string; id: number; title: string }) => {
   nodeTypeOpen.value = false
+  lineTypeId.value = null
   batchIds.value = null
   equipmentOpen.value = false
   equipTarget.value = target

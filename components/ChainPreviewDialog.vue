@@ -28,6 +28,28 @@
           {{ note }}
         </v-alert>
         <div
+          v-if="addressText != null"
+          class="mb-3"
+        >
+          <v-text-field
+            v-model="addressText"
+            label="Подпись потребителя (адрес)"
+            density="compact"
+            variant="outlined"
+            hide-details="auto"
+            maxlength="50"
+            counter="50"
+            :disabled="saving"
+          />
+          <v-checkbox
+            v-model="addressWrite"
+            :disabled="saving || !addressText?.trim()"
+            density="compact"
+            hide-details
+            label="Записать в карточку потребителя (имя и номер дома)"
+          />
+        </div>
+        <div
           v-if="loading"
           class="d-flex align-center justify-center py-6"
         >
@@ -180,6 +202,9 @@ const props = defineProps<{
   note?: string | null
 }>();
 const emit = defineEmits<{ confirm: []; back: []; discard: [] }>();
+/** ввод в здание: подпись потребителя по адресу с карты (null — поле не показывается) и согласие записать её */
+const addressText = defineModel<string | null>('addressText', { default: null });
+const addressWrite = defineModel<boolean>('addressWrite', { default: false });
 
 const pipeModeTitle = computed(
   () => PIPE_MODE_ITEMS.find((m) => m.value === props.result?.pipe_mode)?.title ?? '',

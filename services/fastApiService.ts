@@ -5,6 +5,7 @@ import type { FeatureData, Fragment } from '~/types';
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
 import type { SnapData } from '~/utils/cadSnap';
 import type { NodeFlag, NodeFlagResult, NodeType, NodeTypeChangeResult, NodeTypeInfo } from '~/utils/nodeTypes';
+import type { LineType, LineTypeChangeResult, LineTypeInfo } from '~/utils/lineTypes';
 import type {
   CardBatchPreview, CardChange, CardEditData, CardHelper, CardKind, CardNeighbor, CardOption, CardTemplate, CardValues,
   NodeEquipment,
@@ -521,6 +522,8 @@ export interface ChainRequestPoint {
   lat?: number;
   /** тип нового узла (только kind=new): карточка типа создаётся в той же операции */
   node_type?: NodeType;
+  /** поля новой карточки (ввод в здание: name, housenumber) */
+  card?: Record<string, string>;
 }
 
 export interface ChainRequest {
@@ -2015,6 +2018,19 @@ export const fastApiService = {
     return request<NodeFlagResult>(`api/v1/topology/node/${encodePath(nodeId)}/flag`, {
       method: 'POST',
       body: compact({ flag, on, expected_version: version ?? undefined }),
+    });
+  },
+
+  /** Тип линии (участок или оборудование), её карточки и парная труба */
+  async getLineType(lineId: number): Promise<LineTypeInfo> {
+    return request<LineTypeInfo>(`api/v1/topology/line/${encodePath(lineId)}/type`);
+  },
+
+  /** Смена типа линии (вместе с парной трубой); dryRun — какие карточки удалятся */
+  async changeLineType(lineId: number, lineType: LineType, opts: { dryRun?: boolean; version?: string | null } = {}): Promise<LineTypeChangeResult> {
+    return request<LineTypeChangeResult>(`api/v1/topology/line/${encodePath(lineId)}/type`, {
+      method: 'POST',
+      body: compact({ line_type: lineType, dry_run: Boolean(opts.dryRun), expected_version: opts.version ?? undefined }),
     });
   },
 

@@ -6,6 +6,7 @@ import type { Ref } from 'vue';
 import { ApiError, fastApiService } from '~/services/fastApiService';
 import type {
   ChainRequest,
+  ChainRequestPoint,
   ChainResult,
   MergeNodesReport,
   SplitReviewDecision,
@@ -26,6 +27,8 @@ import { useContextSnap } from '~/composables/useContextSnap';
 import {
   buildingAt,
   buildingOutline,
+  buildingStreet,
+  entryAddress,
   CONTEXT_MIN_MAP_ZOOM,
   formatApproxM,
   planBuildingEntry,
@@ -548,11 +551,31 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   // === Ввод в здание: клик по зданию → врезка в ближайшую трубу + участок + узел у стены ===
   /** трубы дальше этого от здания не предлагаются, м */
   const ENTRY_MAX_M = 150;
+  /** realConsumers.name — varchar(50) */
+  const ENTRY_NAME_MAX = 50;
   const isEntryMode = ref(false);
   /** что под курсором в режиме ввода — для бейджа */
   const entryHover = ref<{ building: ContextBuilding; plan: BuildingEntryPlan | null } | null>(null);
   /** пояснение в предпросмотре трассы (ввод в здание) */
   const chainNote = ref<string | null>(null);
+  /** ввод в здание: подпись потребителя по адресу с карты (null — не ввод); пишется, только если отмечено */
+  const entryAddressText = ref<string | null>(null);
+  const entryAddressWrite = ref(false);
+  let entryHouseNumber: string | null = null;
+  const resetEntryAddress = () => {
+    entryAddressText.value = null;
+    entryAddressWrite.value = false;
+    entryHouseNumber = null;
+  };
+  /** поля карточки потребителя для конечного узла ввода — только с подтверждением оператора */
+  const entryCard = (): Record<string, string> | null => {
+    const name = entryAddressText.value?.trim();
+    if (entryAddressText.value == null || !entryAddressWrite.value) return null;
+    const card: Record<string, string> = {};
+    if (name) card.name = name;
+    if (entryHouseNumber) card.housenumber = entryHouseNumber;
+    return Object.keys(card).length ? card : null;
+  };
 
   const entryHint = computed(() => {
     if (!isEntryMode.value) return '';
@@ -626,9 +649,14 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     trace.showEntry(null, null);
     trace.setPoints([start, end]);
     chainPoints = [start, end];
-    const house = h.building.number
-      ? `Номер дома по карте: ${h.building.number} — только для сверки, в карточку узла не записывается.`
-      : 'Номера дома на подложке нет.';
+    const ctx = contextSnap.index.value;
+    const street = ctx ? buildingStreet(ctx, h.building) : null;
+    entryHouseNumber = h.building.number?.trim() || null;
+    entryAddressText.value = entryAddress(street, entryHouseNumber).slice(0, ENTRY_NAME_MAX);
+    entryAddressWrite.value = false;
+    const house = entryAddressText.value
+      ? 'Адрес взят с подложки карты — сверьте его, прежде чем записывать в карточку.'
+      : 'Адреса на подложке нет — подпись можно ввести вручную.';
     chainNote.value = `Новый узел у стены здания — потребитель (по подложке MapTiler, ориентировочно ${formatApproxM(h.plan.lengthM)} от трубы). ${house}`;
     await previewChain();
   };
@@ -654,8 +682,12 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
 
   const chainBody = (): ChainRequest => {
     const fragments = activeFragments();
+    const points: ChainRequestPoint[] = chainRequestPoints(chainPoints);
+    const card = entryCard();
+    const last = points[points.length - 1];
+    if (card && last?.kind === 'new') points[points.length - 1] = { ...last, card };
     return {
-      points: chainRequestPoints(chainPoints),
+      points,
       pipe_mode: pipeMode.value,
       // один фрагмент на карте — он рабочий: трасса в другом фрагменте — ошибка проверки
       fileid: fragments.length === 1 ? fragments[0] : undefined,
@@ -679,6 +711,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   /** Enter / двойной клик / клик по узлу или трубе: один узел, разрезание или цепочка */
   const finishTrace = async () => {
     chainNote.value = null;
+    resetEntryAddress();
     const outcome = traceOutcome(trace.points.value);
     if (outcome.action === 'none') {
       trace.clear();
@@ -1229,6 +1262,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     isEntryMode,
     entryHint,
     chainNote,
+    entryAddressText,
+    entryAddressWrite,
     toggleEntryMode,
     trace,
     chainPreviewOpen,
