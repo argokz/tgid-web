@@ -7,6 +7,7 @@ import type { SnapData } from '~/utils/cadSnap';
 import type { NodeFlag, NodeFlagResult, NodeType, NodeTypeChangeResult, NodeTypeInfo } from '~/utils/nodeTypes';
 import type { LineType, LineTypeChangeResult, LineTypeInfo } from '~/utils/lineTypes';
 import type { LineBendsData } from '~/utils/bends';
+import type { ConvertedPoint, PointCrs } from '~/utils/pointCrs';
 import type {
   CardBatchPreview, CardChange, CardEditData, CardHelper, CardKind, CardNeighbor, CardOption, CardTemplate, CardValues,
   NodeEquipment,
@@ -2025,6 +2026,11 @@ export const fastApiService = {
   /** Тип линии (участок или оборудование), её карточки и парная труба */
   async getLineType(lineId: number): Promise<LineTypeInfo> {
     return request<LineTypeInfo>(`api/v1/topology/line/${encodePath(lineId)}/type`);
+  },
+
+  /** Точка по координатам (WGS84, местная система 9998, x/y десктопа) → во всех трёх системах */
+  async convertPoint(crs: PointCrs, x: number, y: number): Promise<ConvertedPoint> {
+    return request<ConvertedPoint>('api/v1/topology/convert-point', { method: 'POST', body: { crs, x, y } });
   },
 
   /** Отводы участка по геометрии и местные сопротивления его паспортов (и парной трубы) */

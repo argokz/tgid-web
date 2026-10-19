@@ -37,6 +37,7 @@ import {
 } from '~/utils/cadContext';
 import { getCityConfig } from '~/utils/cityConfig';
 import { NODE_TYPE_ITEMS, nodeTypeTitle, type NodeType } from '~/utils/nodeTypes';
+import type { PointCrs } from '~/utils/pointCrs';
 import { chainRequestPoints, traceOutcome, type PipeMode, type TracePoint } from '~/utils/cadChain';
 import { DEFAULT_POLAR_STEP, POLAR_STEPS } from '~/utils/cadConstraint';
 import type { LngLat } from '~/utils/lineVertices';
@@ -510,6 +511,24 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
 
   const cancelSplit = () => {
     splitPreviewTarget.value = null;
+  };
+
+  // === Точка трассы по координатам (исполнительная съёмка, привязка по ведомости) ===
+  const coordPointOpen = ref(false);
+  /**
+   * Пересчитать координаты на сервере, показать место (масштаб не мельче 18), обновить индекс привязок
+   * и добавить точку в трассу. → пересчитанная точка и как она легла (узел сети или свободная)
+   */
+  const addTracePointByCoords = async (crs: PointCrs, x: number, y: number) => {
+    if (!chainActive()) throw new Error('Включите режим «Трасса» в правке сети');
+    const converted = await fastApiService.convertPoint(crs, x, y);
+    const map = getMap();
+    if (map) {
+      map.jumpTo({ center: [converted.lng, converted.lat], zoom: Math.max(map.getZoom(), 18) });
+      await snapIndex.reload();
+    }
+    const point = trace.addCoord([converted.lng, converted.lat]);
+    return { converted, point };
   };
 
   /** Трасса рисуется: правка сети включена, не режим вершин и не слияние */
@@ -1258,6 +1277,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     contextSnap,
     contextSnapEnabled,
     newNodeType,
+    coordPointOpen,
+    addTracePointByCoords,
     cadNorms,
     isEntryMode,
     entryHint,

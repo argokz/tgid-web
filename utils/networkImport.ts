@@ -1,6 +1,7 @@
 /**
  * Мастер импорта сети (этап 10): типы API /api/v1/import/* и чистые помощники UI.
- * Режимы: узлы (SHP-точки или таблица X/Y), участки (SHP-линии), координаты узлов (id/код → X/Y).
+ * Режимы: узлы (SHP-точки или таблица X/Y), участки (линии SHP, GPX, DXF или таблица точек
+ * исполнительной съёмки), координаты узлов (id/код → X/Y).
  */
 
 import { formatApiError } from '~/utils/apiError'
@@ -14,8 +15,10 @@ export interface NetworkImportTarget {
   required: boolean
 }
 
+export type NetworkImportKind = 'shp' | 'gpx' | 'dxf' | 'table'
+
 export interface NetworkImportInspect {
-  kind: 'shp' | 'table'
+  kind: NetworkImportKind
   columns: string[]
   row_count: number
   sample: Record<string, unknown>[]
@@ -27,6 +30,8 @@ export interface NetworkImportInspect {
   warnings: string[]
   targets: NetworkImportTarget[]
   suggested_mapping: Record<string, string>
+  /** слои DXF с числом линий (можно взять только нужные) */
+  layers?: { layer: string; count: number }[]
 }
 
 export interface NetworkImportParams {
@@ -41,6 +46,8 @@ export interface NetworkImportParams {
   skip_errors?: boolean
   encoding?: string
   sheet?: string
+  /** слои DXF; не задано — все */
+  layers?: string[]
 }
 
 export interface NetworkImportAction {
@@ -78,8 +85,9 @@ export const IMPORT_MODES: { value: NetworkImportMode; title: string; hint: stri
   {
     value: 'lines',
     title: 'Участки',
-    hint: 'Линии SHP → участки: концы привязываются к узлам фрагмента в допуске, иначе создаются узлы',
-    accept: '.zip,.shp,.shx,.dbf,.prj,.cpg',
+    hint: 'Трассы: линии SHP, треки GPX, линии DXF или таблица точек съёмки (X/Y по порядку, колонка «трасса» '
+      + 'делит линии) → участки; концы привязываются к узлам фрагмента в допуске, иначе создаются узлы',
+    accept: '.zip,.shp,.shx,.dbf,.prj,.cpg,.gpx,.dxf,.xlsx,.xlsm,.csv,.txt',
   },
   {
     value: 'coords',
@@ -96,13 +104,20 @@ export const IMPORT_CRS_OPTIONS: { value: NetworkImportCrs; title: string }[] = 
   { value: 'desktop', title: 'Координаты десктопа (x/y узлов, см)' },
 ]
 
-/** Допустимые системы координат: SHP с .prj — «из файла»; таблица — только явная система */
+/** Допустимые системы: SHP с .prj и GPX — «из файла»; DXF, SHP без .prj и таблица — явная система */
 export const crsOptionsFor = (inspect: NetworkImportInspect | null) =>
   IMPORT_CRS_OPTIONS.filter((o) => {
     if (!inspect) return true
-    if (inspect.kind === 'shp') return inspect.crs_known ? o.value === 'auto' : o.value === 'wgs84' || o.value === 'local'
+    if (inspect.kind !== 'table' && inspect.crs_known) return o.value === 'auto'
     return o.value !== 'auto'
   })
+
+export const importSourceTitle = (inspect: NetworkImportInspect): string => {
+  if (inspect.kind === 'shp') return `Shapefile: ${inspect.geometry_type || 'без геометрии'}`
+  if (inspect.kind === 'gpx') return 'GPX: треки и маршруты'
+  if (inspect.kind === 'dxf') return `DXF: линии${inspect.layers?.length ? `, слоёв ${inspect.layers.length}` : ''}`
+  return `Таблица${inspect.sheet ? ` «${inspect.sheet}»` : ''}`
+}
 
 const toNumber = (v: unknown): number | null => {
   if (typeof v === 'number') return Number.isFinite(v) ? v : null
@@ -135,7 +150,7 @@ export const defaultCrsFor = (
   inspect: NetworkImportInspect,
   mapping: Record<string, string | null | undefined> = inspect.suggested_mapping,
 ): NetworkImportCrs => {
-  if (inspect.kind === 'shp') return inspect.crs_known ? 'auto' : 'local'
+  if (inspect.kind !== 'table') return inspect.crs_known ? 'auto' : 'local'
   return sampleLooksLikeDegrees(inspect, mapping) ? 'wgs84' : 'local'
 }
 

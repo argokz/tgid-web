@@ -449,6 +449,24 @@
                   узел у стены — одной операцией после предпросмотра. Esc — выйти из режима
                 </v-tooltip>
               </v-btn>
+              <v-btn
+                size="small"
+                variant="outlined"
+                @click="coordPointOpen = true"
+              >
+                <v-icon
+                  start
+                  size="16"
+                >mdi-crosshairs-gps</v-icon>
+                По координатам
+                <v-tooltip
+                  activator="parent"
+                  location="bottom"
+                >
+                  Точка трассы по координатам из ведомости съёмки: местная система (м), x/y десктопа (см)
+                  или WGS84. Трассу целиком из файла (GPX, DXF, таблица точек) — «Импорт сети», режим «Участки»
+                </v-tooltip>
+              </v-btn>
               <v-chip
                 v-if="contextStatusText"
                 size="small"
@@ -631,6 +649,12 @@
           :norms="cadNorms"
           :hint="entryHint"
         />
+        <LazyCoordPointDialog
+          v-if="coordPointOpen"
+          v-model="coordPointOpen"
+          :add-point="addTracePointByCoords"
+        />
+
         <LazyChainPreviewDialog
           v-if="chainPreviewOpen"
           v-model="chainPreviewOpen"
@@ -1505,6 +1529,8 @@ const {
   isEntryMode,
   entryHint,
   chainNote,
+  coordPointOpen,
+  addTracePointByCoords,
   entryAddressText,
   entryAddressWrite,
   toggleEntryMode,

@@ -30,6 +30,9 @@ import { bearingDeg, distanceM, signedTurnDeg } from '~/utils/cadGeometry';
 import { cadInputKey, cadInputLocks, EMPTY_CAD_INPUT, type CadInputKey, type CadInputState } from '~/utils/cadInput';
 import { metersPerPixel } from '~/utils/cameraSync';
 import type { LngLat } from '~/utils/lineVertices';
+
+/** точка по координатам ближе этого к узлу сети — это узел, м */
+export const COORD_NODE_SNAP_M = 0.3;
 import {
   finishesTrace,
   pointFromClick,
@@ -417,6 +420,19 @@ export function useTraceDraw(
     return true;
   };
 
+  /**
+   * Точка по введённым координатам: к узлу сети — если он ближе COORD_NODE_SNAP_M (как проверка
+   * «точка у узла» на сервере), иначе ровно в координатах. null — точка совпала с предыдущей.
+   */
+  const addCoord = (coord: LngLat): TracePoint | null => {
+    const idx = snapIndex.value;
+    const s = idx ? findSnap(idx, coord, COORD_NODE_SNAP_M, { fragmentIds: getFragmentIds() }) : null;
+    const point: TracePoint = s?.kind === 'node' && s.nodeId != null
+      ? { kind: 'node', coord: s.coord, nodeId: s.nodeId }
+      : { kind: points.value.length ? 'vertex' : 'new', coord };
+    return addPoint(point) ? point : null;
+  };
+
   /** Клик: добавить точку; true — трасса завершена этим кликом (узел/труба без Shift) */
   const onClick = (e: MapMouseEvent): boolean => {
     raw = rawFrom(e);
@@ -525,6 +541,7 @@ export function useTraceDraw(
     lengths,
     onMove,
     onClick,
+    addCoord,
     handleKey,
     hover,
     removeLast,

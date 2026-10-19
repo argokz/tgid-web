@@ -65,7 +65,7 @@
             v-model="files"
             :accept="currentMode.accept"
             multiple
-            label="Файл: zip с shapefile (или .shp+.shx+.dbf+.prj), .xlsx, .csv"
+            :label="mode === 'lines' ? 'Файл: zip с shapefile, .gpx, .dxf, .xlsx или .csv (точки съёмки)' : 'Файл: zip с shapefile (или .shp+.shx+.dbf+.prj), .xlsx, .csv'"
             density="compact"
             hide-details
             prepend-icon="mdi-file-upload-outline"
@@ -105,7 +105,7 @@
             {{ w }}
           </v-alert>
           <div class="text-caption text-medium-emphasis mt-2">
-            {{ inspect.kind === 'shp' ? `Shapefile: ${inspect.geometry_type || 'без геометрии'}` : `Таблица${inspect.sheet ? ` «${inspect.sheet}»` : ''}` }},
+            {{ importSourceTitle(inspect) }},
             строк: {{ inspect.row_count }}{{ inspect.crs ? `, система: ${inspect.crs}` : '' }}
           </div>
 
@@ -162,6 +162,21 @@
                 max="50"
                 step="0.5"
                 label="Допуск привязки концов, м"
+                density="compact"
+                hide-details
+              />
+            </v-col>
+            <v-col
+              v-if="inspect.layers?.length"
+              cols="12"
+            >
+              <v-select
+                v-model="layers"
+                :items="inspect.layers.map((l) => ({ title: `${l.layer} (${l.count})`, value: l.layer }))"
+                label="Слои DXF (пусто — все)"
+                multiple
+                chips
+                closable-chips
                 density="compact"
                 hide-details
               />
@@ -347,6 +362,7 @@ import {
   defaultCrsFor,
   describeImportAction,
   importApiError,
+  importSourceTitle,
   importSummary,
   missingRequiredTargets,
   type NetworkImportCrs,
@@ -375,6 +391,7 @@ const snapTolerance = ref(1);
 const recalcLengths = ref(true);
 const buildMissingLines = ref(false);
 const skipErrors = ref(false);
+const layers = ref<string[]>([]);
 const report = ref<NetworkImportReport | null>(null);
 const applied = ref<NetworkImportReport | null>(null);
 const undone = ref(false);
@@ -413,10 +430,11 @@ const params = (): NetworkImportParams => ({
   build_missing_lines: buildMissingLines.value,
   skip_errors: skipErrors.value,
   sheet: sheet.value,
+  layers: layers.value.length ? layers.value : undefined,
 });
 
 watch(
-  [fileid, sourceCrs, matchBy, snapTolerance, recalcLengths, buildMissingLines, skipErrors, () => ({ ...mapping })],
+  [fileid, sourceCrs, matchBy, snapTolerance, recalcLengths, buildMissingLines, skipErrors, layers, () => ({ ...mapping })],
   () => {
     if (report.value?.dry_run) previewStale.value = true;
   },
@@ -439,6 +457,7 @@ function resetInspect() {
   undone.value = false;
   error.value = '';
   sheet.value = undefined;
+  layers.value = [];
   Object.keys(mapping).forEach((k) => delete mapping[k]);
 }
 

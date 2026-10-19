@@ -48,7 +48,9 @@ const report = (over: Partial<NetworkImportReport>): NetworkImportReport => ({
 describe('network import helpers', () => {
   it('offers only file CRS for SHP with .prj and explicit CRS for tables', () => {
     expect(crsOptionsFor(inspect({ kind: 'shp', crs_known: true })).map((o) => o.value)).toEqual(['auto']);
-    expect(crsOptionsFor(inspect({ kind: 'shp', crs_known: false })).map((o) => o.value)).toEqual(['wgs84', 'local']);
+    expect(crsOptionsFor(inspect({ kind: 'shp', crs_known: false })).map((o) => o.value)).toEqual(['wgs84', 'local', 'desktop']);
+    expect(crsOptionsFor(inspect({ kind: 'gpx', crs_known: true })).map((o) => o.value)).toEqual(['auto']);
+    expect(crsOptionsFor(inspect({ kind: 'dxf', crs_known: false })).map((o) => o.value)).toEqual(['wgs84', 'local', 'desktop']);
     expect(crsOptionsFor(inspect({ kind: 'table' })).map((o) => o.value)).toEqual(['wgs84', 'local', 'desktop']);
     expect(defaultCrsFor(inspect({ kind: 'shp', crs_known: true }))).toBe('auto');
     expect(defaultCrsFor(inspect({ kind: 'table' }))).toBe('local');
