@@ -349,6 +349,30 @@
           @done="onDeleteDone"
           @failed="onDeleteFailed"
         />
+        <!-- Окна объекта из меню правого щелчка: тип узла, тип линии, отводы -->
+        <LazyNodeTypeDialog
+          v-if="objectDialog?.kind === 'node-type'"
+          :model-value="true"
+          :node-id="objectDialog.id"
+          @update:model-value="(v: boolean) => { if (!v) closeObjectDialog() }"
+          @changed="onObjectDialogChanged"
+          @edit-card="onObjectDialogEditCard"
+        />
+        <LazyLineTypeDialog
+          v-if="objectDialog?.kind === 'line-type'"
+          :model-value="true"
+          :line-id="objectDialog.id"
+          @update:model-value="(v: boolean) => { if (!v) closeObjectDialog() }"
+          @changed="onObjectDialogChanged"
+          @edit-card="onObjectDialogEditCard"
+        />
+        <LazyBendResistanceDialog
+          v-if="objectDialog?.kind === 'bends'"
+          :model-value="true"
+          :line-id="objectDialog.id"
+          @update:model-value="(v: boolean) => { if (!v) closeObjectDialog() }"
+          @saved="(n: number) => onObjectDialogChanged(`Местные сопротивления сохранены (строк: ${n})`)"
+        />
         <!-- Правый щелчок в правке сети -->
         <EditorContextMenu
           v-if="isEditTopologyMode"
@@ -1230,6 +1254,10 @@ const {
   contextMenu,
   contextMenuOpen,
   runContextAction,
+  objectDialog,
+  closeObjectDialog,
+  onObjectDialogChanged,
+  onObjectDialogEditCard,
   isMergeMode,
   mergeTargetNodeId,
   mergeSourceNodeId,

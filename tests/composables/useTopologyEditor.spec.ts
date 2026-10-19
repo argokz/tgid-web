@@ -356,6 +356,37 @@ describe('useTopologyEditor', () => {
     expect(api.undoTopologyOperation).toHaveBeenCalledWith(77);
   });
 
+  it('«Выбор»: у выделенного участка — ручки изломов; излом сохраняется по отпусканию мыши', async () => {
+    const { editor, click, setFeatures } = setup();
+    editor.toggleEditTopologyMode();
+    setFeatures([lineFeature(7)]);
+    await click();
+    expect(vertex.load).toHaveBeenCalledWith(7);
+    vertex.save = vi.fn();
+    vertex.onMouseUp.mockReturnValueOnce(true);
+    vertex.dirty.value = true;
+    await editor.onNodeDragEnd();
+    expect(vertex.save).toHaveBeenCalled();
+    vertex.dirty.value = false;
+    // снять выделение — ручки убираются
+    vertex.active.value = true;
+    setFeatures([]);
+    await click();
+    expect(vertex.stop).toHaveBeenCalled();
+    vertex.active.value = false;
+  });
+
+  it('меню: «Тип линии…» открывает окно объекта', async () => {
+    const { editor, setFeatures } = setup();
+    editor.toggleEditTopologyMode();
+    setFeatures([lineFeature(9)]);
+    await editor.onMapContextMenuForTopology({ point: { x: 1, y: 1 }, lngLat: { lng: 76.9, lat: 43.2 }, preventDefault: vi.fn() });
+    await editor.runContextAction('line-type');
+    expect(editor.objectDialog.value).toEqual({ kind: 'line-type', id: 9 });
+    editor.closeObjectDialog();
+    expect(editor.objectDialog.value).toBeNull();
+  });
+
   it('правый щелчок: выделяет объект и показывает меню; «Удалить…» открывает окно удаления', async () => {
     const { editor, setFeatures } = setup();
     editor.toggleEditTopologyMode();

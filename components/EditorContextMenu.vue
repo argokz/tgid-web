@@ -45,7 +45,7 @@ const open = defineModel<boolean>({ default: false })
 const authStore = useAuthStore()
 const p = computed(() => authStore.permissions)
 const nodeKinds: PermKind[] = ['node', 'consumer', 'source']
-const anyNode = (a: 'create' | 'move' | 'delete') => nodeKinds.some((k) => canDo(p.value, k, a))
+const anyNode = (a: 'edit' | 'create' | 'move' | 'delete') => nodeKinds.some((k) => canDo(p.value, k, a))
 
 const title = computed(() => {
   const m = props.menu
@@ -76,6 +76,7 @@ const items = computed<Item[]>(() => {
       { action: 'props', title: 'Свойства', icon: 'mdi-card-text-outline' },
       { action: 'trace-from', title: 'Начать трассу отсюда', icon: 'mdi-vector-polyline-plus', disabled: !canDo(p.value, 'line', 'create') },
       { action: 'merge-into', title: 'Слить другой узел в этот…', icon: 'mdi-call-merge', disabled: !anyNode('delete') },
+      { action: 'node-type', title: 'Тип узла, ЗН, подпитка…', icon: 'mdi-shape-outline', disabled: !anyNode('edit') && !canDo(p.value, 'regime', 'edit') },
       { action: 'focus', title: 'Показать', icon: 'mdi-image-filter-center-focus', hint: 'F' },
       ...common,
       { action: 'divider', title: '', divider: true },
@@ -88,6 +89,8 @@ const items = computed<Item[]>(() => {
       { action: 'props', title: 'Свойства', icon: 'mdi-card-text-outline' },
       { action: 'vertices', title: 'Изломы', icon: 'mdi-vector-polyline-edit', hint: 'E', disabled: !canDo(p.value, 'line', 'move') },
       { action: 'split-here', title: 'Врезать узел здесь…', icon: 'mdi-source-branch-plus', disabled: !canDo(p.value, 'line', 'move') },
+      { action: 'line-type', title: 'Тип линии (участок ↔ оборудование)…', icon: 'mdi-pipe-valve', disabled: !canDo(p.value, 'line', 'edit') },
+      { action: 'bends', title: 'Отводы → местные сопротивления…', icon: 'mdi-vector-polyline', disabled: !canDo(p.value, 'line', 'edit') },
       { action: 'trace-from', title: 'Начать трассу отсюда (врезка)', icon: 'mdi-vector-polyline-plus', disabled: !canDo(p.value, 'line', 'create') },
       { action: 'focus', title: 'Показать', icon: 'mdi-image-filter-center-focus', hint: 'F' },
       ...common,

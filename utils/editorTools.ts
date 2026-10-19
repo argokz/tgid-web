@@ -113,7 +113,9 @@ export const EDITOR_HOTKEYS: readonly HotkeyGroup[] = [
     title: 'Выделенный объект',
     items: [
       { keys: ['Щелчок'], text: 'Выделить и открыть свойства' },
+      { keys: ['Правый щелчок'], text: 'Меню действий с объектом' },
       { keys: ['Перетащить'], text: 'Переместить выделенный узел (трубы тянутся следом)' },
+      { keys: ['○', 'излом'], text: 'У выделенного участка: тянуть — излом, «○» — новый, правый щелчок — убрать' },
       { keys: ['Alt'], text: 'Перетаскивать без привязки' },
       { keys: ['Del'], text: 'Удалить выделенное' },
       { keys: ['F'], text: 'Показать выделенное на карте' },
@@ -157,10 +159,10 @@ export interface EditorStatus {
 export const editorStatusHint = (s: EditorStatus): string => {
   switch (s.tool) {
     case 'select':
-      if (!s.selection) return 'Щёлкните узел или участок — свойства. ? — горячие клавиши';
+      if (!s.selection) return 'Щёлкните узел или участок — свойства · правый щелчок — меню · ? — горячие клавиши';
       return s.selection.kind === 'node'
-        ? `Узел ${s.selection.id}: тяните, чтобы переместить · Del — удалить · Esc — снять выделение`
-        : `Участок ${s.selection.id}: E — изломы · Del — удалить · Esc — снять выделение`;
+        ? `Узел ${s.selection.id}: тяните, чтобы переместить · правый щелчок — меню · Del — удалить · Esc — снять выделение`
+        : `Участок ${s.selection.id}: тяните излом или «○» — изгиб сохраняется сразу · правый щелчок — меню · Del — удалить`;
     case 'trace':
       return s.tracing
         ? 'Следующая точка · узел или труба — завершить · Enter — завершить здесь · Backspace — шаг назад · Esc — сбросить'
@@ -200,7 +202,13 @@ export interface DeleteDone {
 
 export type EditorContextAction =
   | 'props' | 'trace-from' | 'merge-into' | 'focus' | 'copy' | 'dissolve' | 'delete'
-  | 'vertices' | 'split-here' | 'node-here' | 'divider';
+  | 'vertices' | 'split-here' | 'node-here' | 'node-type' | 'line-type' | 'bends' | 'divider';
+
+/** Окна объекта из контекстного меню (их же кнопки есть в карточке) */
+export interface ObjectDialog {
+  kind: 'node-type' | 'line-type' | 'bends';
+  id: number;
+}
 
 /** Правый щелчок в правке сети: объект под курсором (или точка карты) и где показать меню */
 export interface EditorContextTarget {

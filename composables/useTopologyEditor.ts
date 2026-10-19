@@ -44,7 +44,7 @@ import type { LngLat } from '~/utils/lineVertices';
 import { canMoveNodes, editorKeyAction, editorStatusHint, toolAllowed, type EditorTool } from '~/utils/editorTools';
 import { canDo, type Permissions } from '~/utils/permissions';
 import { useEditSelection } from '~/composables/useEditSelection';
-import type { DeleteDone, DeleteTarget, EditorContextAction, EditorContextTarget } from '~/utils/editorTools';
+import type { DeleteDone, DeleteTarget, EditorContextAction, EditorContextTarget, ObjectDialog } from '~/utils/editorTools';
 
 export interface TopologyEditorOptions {
   getMap: () => maplibregl.Map | null | undefined;
@@ -130,6 +130,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     selectionRequest++;
     selection.value = null;
     selectionLayer.clear();
+    syncInlineVertices(null, null);
   };
   const featureCoords = (feature: any): LngLat[] => {
     const g = feature?.geometry;
@@ -137,11 +138,24 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     if (g?.type === 'LineString' && Array.isArray(g.coordinates)) return g.coordinates.map((c: any) => [Number(c[0]), Number(c[1])]);
     return [];
   };
+  /** «Выбор»: у выделенного участка — ручки изломов (с правом «Перемещение и изломы» участков) */
+  const syncInlineVertices = (kind: 'node' | 'line' | null, id: number | null) => {
+    if (activeTool.value !== 'select') return;
+    const perms = options.getPermissions?.();
+    const allowed = !perms || canDo(perms, 'line', 'move');
+    if (kind === 'line' && id != null && allowed && isEditTopologyMode.value) {
+      if (vertexEditor.lineId?.value !== id) void loadVertexLine(id);
+    } else if (vertexEditor.active.value) {
+      vertexEditor.stop();
+    }
+  };
+
   /** Выделить объект: узел — сразу, участок — по тайлу, затем точная геометрия с сервера */
   const select = (kind: 'node' | 'line', id: number, fragmentId: number | null, coords: LngLat[]) => {
     const request = ++selectionRequest;
     selection.value = { kind, id, fragmentId, coords };
     showSelection(selection.value);
+    syncInlineVertices(kind, id);
     if (kind !== 'line') return;
     void (async () => {
       try {
@@ -443,6 +457,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       notifyDone(`Геометрия участка ${res.line_id} сохранена, длина ${res.new_length} м`, (res as any).operation_id);
       if (selection.value?.kind === 'line' && selection.value.id === res.line_id) {
         select('line', res.line_id, selection.value.fragmentId, selection.value.coords);
+        // редактор закрывается после сохранения — в «Выборе» ручки возвращаются на тот же участок
+        void Promise.resolve().then(() => syncInlineVertices('line', res.line_id));
       }
       afterTopologyChange();
     },
@@ -477,7 +493,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     if (prev === 'vertex' && vertexEditor.dirty.value && !(await confirmDiscardVertices())) return false;
     if (tool === 'entry' && !canStartEntry()) return false;
     activeTool.value = tool;
-    if (prev === 'vertex') vertexEditor.stop();
+    if (prev === 'vertex' || prev === 'select') vertexEditor.stop();
     if (prev === 'merge') {
       mergeTargetNodeId.value = null;
       mergeSourceNodeId.value = null;
@@ -489,10 +505,11 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     }
     if (tool === 'merge' || tool === 'vertex' || tool === 'entry') trace.clear();
     if (isEditTopologyMode.value) applyChainMode();
-    // «Изломы» на выделенном участке — сразу его правка
+    // «Изломы» на выделенном участке — сразу его правка; «Выбор» — ручки у выделенного участка
     if (tool === 'vertex' && isEditTopologyMode.value && selection.value?.kind === 'line') {
       await loadVertexLine(selection.value.id);
     }
+    if (tool === 'select') syncInlineVertices(selection.value?.kind ?? null, selection.value?.id ?? null);
     return true;
   };
 
@@ -1133,6 +1150,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       vertexEditor.onMouseDown(e);
       return;
     }
+    // «Выбор»: ручки изломов выделенного участка
+    if (activeTool.value === 'select' && vertexEditor.active.value && vertexEditor.onMouseDown(e)) return;
     // «Выделил и тяни»: перетаскивается только выделенный узел в инструменте «Выбор»
     // (трасса, слияние, новый узел — клики; случайный сдвиг узла при работе исключён)
     const sel = selection.value;
@@ -1185,6 +1204,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       vertexEditor.onMouseMove(e);
       return;
     }
+    if (activeTool.value === 'select' && vertexEditor.onMouseMove(e)) return;
     if (draggedNodeId === null) {
       if (chainActive() && isEntryMode.value && !trace.active.value) onEntryMove(e);
       else if (chainActive()) trace.onMove(e);
@@ -1240,7 +1260,12 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   };
 
   const onNodeDragEnd = async () => {
-    if (vertexEditor.onMouseUp()) return;
+    if (vertexEditor.onMouseUp()) {
+      // «Выбор»: излом сохраняется сразу (Ctrl+Z — отмена)
+      if (activeTool.value === 'select' && vertexEditor.dirty.value) void vertexEditor.save();
+      suppressTopologyClickUntil = Date.now() + 250;
+      return;
+    }
     if (draggedNodeId === null) return;
     if (!dragMoved || !draggedNodeMarker) {
       // Сдвига не было: это клик — его обработает onMapClickForTopology (выбор узла)
@@ -1388,6 +1413,11 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     if (chainActive() && trace.active.value) return;
     e.preventDefault?.();
     e.originalEvent?.preventDefault?.();
+    // правый щелчок по излому выделенного участка — убрать излом (сохраняется сразу)
+    if (activeTool.value === 'select' && vertexEditor.active.value && vertexEditor.onContextMenu(e)) {
+      void vertexEditor.save();
+      return;
+    }
     const lngLat: LngLat = [e.lngLat.lng, e.lngLat.lat];
     const pos = { clientX: e.originalEvent?.clientX ?? e.point.x, clientY: e.originalEvent?.clientY ?? e.point.y };
     contextCandidate = null;
@@ -1409,6 +1439,21 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       contextMenu.value = { kind: 'map', id: null, fragmentId: null, lngLat, coords: [], ...pos };
     }
     contextMenuOpen.value = true;
+  };
+
+  /** Окна «Тип узла», «Тип линии», «Отводы» из меню (их же кнопки — в карточке) */
+  const objectDialog = ref<ObjectDialog | null>(null);
+  const closeObjectDialog = () => {
+    objectDialog.value = null;
+  };
+  const onObjectDialogChanged = (message: string) => {
+    useNotificationStore().showSuccess(message);
+    afterTopologyChange();
+  };
+  /** «Открыть карточку» из окна типа — свойства объекта под меню */
+  const onObjectDialogEditCard = () => {
+    objectDialog.value = null;
+    if (contextEvent) options.openCard?.(contextEvent);
   };
 
   /** Начать трассу из точки (узел — от него, труба — врезкой, карта — новый узел) */
@@ -1456,6 +1501,11 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
         break;
       case 'node-here':
         await createNodeAt(contextEvent ? snapToNetwork(contextEvent, null) : m.lngLat);
+        break;
+      case 'node-type':
+      case 'line-type':
+      case 'bends':
+        if (m.id != null) objectDialog.value = { kind: action, id: m.id };
         break;
     }
   };
@@ -1561,6 +1611,10 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     contextMenu,
     contextMenuOpen,
     runContextAction,
+    objectDialog,
+    closeObjectDialog,
+    onObjectDialogChanged,
+    onObjectDialogEditCard,
     onDeleteDone,
     onDeleteFailed,
     undoOperation,
