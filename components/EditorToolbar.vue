@@ -416,7 +416,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { useTopologyEditor } from '~/composables/useTopologyEditor';
 import { EDITOR_TOOLS, toolAllowed, type EditorTool } from '~/utils/editorTools';
 import { useAuthStore } from '~/stores/authStore';
@@ -505,24 +505,26 @@ const togglePinned = () => {
   writeStorage(PINNED_KEY, pinned.value ? '1' : null);
 };
 
-// панель сменила размер (другой инструмент) или окно уменьшилось — не уходить за край карты
+// сменили инструмент (другой набор параметров — другой размер панели) или окно уменьшилось —
+// не уходить за край карты. Без ResizeObserver: панель перестраивается внутри наблюдателей
+// Vuetify, и наблюдатель на ней даёт «ResizeObserver loop» (событие error без объекта ошибки)
+let reclampFrame = 0;
 const reclamp = () => {
-  if (!pos.value || dragging.value) return;
-  const next = clampToArea(pos.value);
-  if (next.x !== pos.value.x || next.y !== pos.value.y) pos.value = next;
+  if (reclampFrame) return;
+  reclampFrame = requestAnimationFrame(() => {
+    reclampFrame = 0;
+    if (!pos.value || dragging.value) return;
+    const next = clampToArea(pos.value);
+    if (next.x !== pos.value.x || next.y !== pos.value.y) pos.value = next;
+  });
 };
-let observer: ResizeObserver | null = null;
 onMounted(() => {
-  if (typeof ResizeObserver !== 'undefined' && rootEl.value) {
-    observer = new ResizeObserver(reclamp);
-    observer.observe(rootEl.value);
-  }
   window.addEventListener('resize', reclamp);
   reclamp();
 });
 onBeforeUnmount(() => {
   stopDrag?.();
-  observer?.disconnect();
+  if (reclampFrame) cancelAnimationFrame(reclampFrame);
   window.removeEventListener('resize', reclamp);
 });
 
@@ -556,6 +558,7 @@ const {
   fragmentMenuOpen,
   setWorkFragment,
 } = props.editor;
+watch(activeTool, reclamp);
 
 const fragmentStore = useFragmentStore();
 /** Инструменты, создающие объекты: им нужен фрагмент */
@@ -601,6 +604,8 @@ const statusChips = computed(() => {
 
 <style scoped>
 .editor-toolbar {
+  /* ширина — по содержимому, не по месту на карте: иначе сдвиг панели меняет её размер */
+  width: max-content;
   max-width: calc(100% - 32px);
   position: absolute;
   top: 72px;

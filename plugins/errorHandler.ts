@@ -28,7 +28,10 @@ export default defineNuxtPlugin((nuxtApp: any) => {
     })
 
     window.addEventListener('error', (event: any) => {
-      console.error('[Window Error]:', event.error)
+      // «ResizeObserver loop …» — уведомление браузера, а не сбой (события без объекта ошибки):
+      // окно «непредвиденная ошибка» на каждое такое — только пугает
+      if (/ResizeObserver loop/i.test(String(event?.message ?? ''))) return
+      console.error('[Window Error]:', event.error ?? event.message)
       showErrorToUser()
     })
   }
