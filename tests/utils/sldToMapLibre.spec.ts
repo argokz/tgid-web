@@ -3,7 +3,7 @@ import {
   convertSldToMapLibre, mergeIconLadders, scaleDenominatorToZoom,
   META_LABEL_POINT, META_TEXT_UOM, METRE_TEXT_MAX_PX, METRE_TEXT_MIN_PX, metreTextSize,
 } from '../../utils/sldToMapLibre'
-import { readableTextLayout, scaleTextLayout, scaleZoomValue } from '../../utils/mapStyleScale'
+import { largerPointLayer, readableTextLayout, scaleTextLayout, scaleZoomValue } from '../../utils/mapStyleScale'
 
 const wrapRules = (rules: string) => `
 <sld:StyledLayerDescriptor xmlns:sld="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc">
@@ -138,7 +138,7 @@ describe('SLD to MapLibre conversion', () => {
     expect(size.slice(0, 3)).toEqual(['interpolate', ['linear'], ['zoom']])
     expect(size[4]).toBe(METRE_TEXT_MIN_PX)
     expect(size[6]).toBe(METRE_TEXT_MAX_PX)
-    // 6 м достигают 11 px у широты Алматы чуть раньше 17-го зума; дальше рост до 15 px за три зума
+    // 6 м достигают 10,5 px у широты Алматы чуть раньше 17-го зума; дальше рост до 14 px за три зума
     expect(size[3]).toBeGreaterThan(16.5)
     expect(size[3]).toBeLessThan(17)
     expect(size[5] - size[3]).toBe(3)
@@ -176,13 +176,24 @@ describe('масштаб шрифта стилей', () => {
     expect(scaleTextLayout({ 'text-field': 'x' }, 0.8)).toEqual({ 'text-field': 'x' })
   })
 
-  it('подписи узлов и диаметров: шрифт растёт с зумом, не мельче 11 px', () => {
+  it('подписи узлов и диаметров: шрифт растёт с зумом, не мельче 10,5 px; подпись отодвинута от значка', () => {
     expect(readableTextLayout({ 'text-size': 14, 'text-offset': [0, -0.5] })).toEqual({
-      'text-size': ['interpolate', ['linear'], ['zoom'], 13, 12.6, 15, 14, 18, 17.5],
-      'text-offset': [0, -0.5],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 13, 11.9, 15, 12.9, 18, 15.4],
+      // −7 px + 2 px зазора под увеличенный значок
+      'text-offset': [0, -0.643],
     })
-    expect(readableTextLayout({ 'text-size': 10 })['text-size']).toEqual(['interpolate', ['linear'], ['zoom'], 13, 11, 15, 11, 18, 12.5])
+    expect(readableTextLayout({ 'text-size': 10 })['text-size']).toEqual(['interpolate', ['linear'], ['zoom'], 13, 10.5, 15, 10.5, 18, 11])
     const zoomed = ['interpolate', ['linear'], ['zoom'], 10, 12, 18, 16]
     expect(readableTextLayout({ 'text-size': zoomed })['text-size']).toBe(zoomed)
+  })
+
+  it('значки точек крупнее стиля на 20%', () => {
+    const icon = largerPointLayer({ type: 'symbol', layout: { 'icon-image': 'us', 'icon-size': 0.1 } })
+    expect(icon.layout!['icon-size']).toBe(0.12)
+    const ladder = largerPointLayer({ type: 'symbol', layout: { 'icon-image': 'us', 'icon-size': ['interpolate', ['linear'], ['zoom'], 14, 0.1, 17, 0.2] } })
+    expect(ladder.layout!['icon-size']).toEqual(['interpolate', ['linear'], ['zoom'], 14, 0.12, 17, 0.24])
+    expect(largerPointLayer({ type: 'circle', paint: { 'circle-radius': 5 } }).paint!['circle-radius']).toBe(6)
+    const text = { type: 'symbol', layout: { 'text-field': 'x' } }
+    expect(largerPointLayer(text)).toBe(text)
   })
 })

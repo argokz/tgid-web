@@ -47,20 +47,45 @@ export function scaleTextLayout(layout: Record<string, any>, k: number): Record<
   return out;
 }
 
-/** Подпись в стиле GeoServer (px) на экране веба: ×0,9 издали (z13), как в стиле на z15, ×1,25 вблизи (z18) */
-export const READABLE_TEXT_STOPS: ReadonlyArray<[number, number]> = [[13, 0.9], [15, 1], [18, 1.25]]
+/**
+ * Подпись в стиле GeoServer (px) на экране веба: ×0,85 издали (z13), ×0,92 на z15, ×1,1 вблизи (z18).
+ * 20.10: ×0,9 / 1 / 1,25 — подписи крупные, на средних масштабах заслоняли сеть и друг друга.
+ */
+export const READABLE_TEXT_STOPS: ReadonlyArray<[number, number]> = [[13, 0.85], [15, 0.92], [18, 1.1]]
 /** Мельче не бывает — иначе не прочесть */
-export const READABLE_TEXT_MIN_PX = 11
+export const READABLE_TEXT_MIN_PX = 10.5
+/** Значки точек (узлы, камеры) из стиля GeoServer — крупнее, чем в стиле: их видно издали */
+export const POINT_SYMBOL_SCALE = 1.2
+/** Подпись у значка отодвигается на столько пикселей — значок крупнее, и она не наезжает на него */
+const LABEL_ICON_GAP_PX = 2
 
 /**
  * Шрифт подписей узлов, камер, диаметров — читаемый на всех масштабах: постоянный размер из стиля
- * растёт с зумом (издали чуть меньше, вблизи крупнее). Раньше веб уменьшал его на 20% (10–13 px).
- * Размер, уже заданный по зуму, не трогаем. Смещение text-offset задано в em — растёт вместе со шрифтом.
+ * меняется с зумом (издали меньше, вблизи крупнее). Размер, уже заданный по зуму, не трогаем.
+ * Смещение text-offset задано в em — растёт вместе со шрифтом; к нему добавляется зазор под
+ * увеличенный значок.
  */
 export function readableTextLayout(layout: Record<string, any>): Record<string, any> {
   const size = layout['text-size']
   if (!isNumber(size)) return layout
   const expr: any[] = ['interpolate', ['linear'], ['zoom']]
   for (const [z, k] of READABLE_TEXT_STOPS) expr.push(z, Math.max(READABLE_TEXT_MIN_PX, Math.round(size * k * 10) / 10))
-  return { ...layout, 'text-size': expr }
+  const out: Record<string, any> = { ...layout, 'text-size': expr }
+  const offset = layout['text-offset']
+  if (Array.isArray(offset) && offset.length === 2 && offset.every(isNumber) && size > 0) {
+    const gap = LABEL_ICON_GAP_PX / size
+    out['text-offset'] = offset.map((v: number) => (v ? Math.round((v + Math.sign(v) * gap) * 1000) / 1000 : v))
+  }
+  return out
+}
+
+/** Значок точки крупнее: icon-size (число или по зуму) у символов, circle-radius у кружков */
+export function largerPointLayer<T extends { type?: string; layout?: Record<string, any>; paint?: Record<string, any> }>(layer: T): T {
+  if (layer.type === 'symbol' && layer.layout?.['icon-image'] != null && layer.layout?.['icon-size'] != null) {
+    return { ...layer, layout: { ...layer.layout, 'icon-size': scaleZoomValue(layer.layout['icon-size'], POINT_SYMBOL_SCALE) } }
+  }
+  if (layer.type === 'circle' && layer.paint?.['circle-radius'] != null) {
+    return { ...layer, paint: { ...layer.paint, 'circle-radius': scaleZoomValue(layer.paint['circle-radius'], POINT_SYMBOL_SCALE) } }
+  }
+  return layer
 }

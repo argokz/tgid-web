@@ -13,8 +13,8 @@ export const META_TEXT_UOM = 'tgid:textUom'
 export const META_LABEL_POINT = 'tgid:labelPoint'
 
 /** Подпись в метрах на экране — не мельче и не крупнее, пикселей */
-export const METRE_TEXT_MIN_PX = 11
-export const METRE_TEXT_MAX_PX = 15
+export const METRE_TEXT_MIN_PX = 10.5
+export const METRE_TEXT_MAX_PX = 14
 /** За сколько зумов подпись дорастает от нижней границы до верхней */
 const METRE_TEXT_GROW_ZOOMS = 3
 

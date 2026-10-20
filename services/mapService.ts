@@ -1,6 +1,6 @@
 import type { Map } from 'maplibre-gl';
 import type { ExtendedLayerConfig } from '~/types';
-import { readableTextLayout } from '~/utils/mapStyleScale';
+import { largerPointLayer, readableTextLayout } from '~/utils/mapStyleScale';
 import { attachPolygonLabelPoints, interiorLabelLayout } from '~/utils/polygonLabelLayer';
 import { META_LABEL_POINT, META_TEXT_UOM } from '~/utils/sldToMapLibre';
 
@@ -221,6 +221,8 @@ export const mapService = {
             && mbLayer.metadata?.[META_TEXT_UOM] !== 'metre') {
             layerConfig.layout = readableTextLayout(layerConfig.layout);
           }
+          // Значки узлов и камер чуть крупнее стиля — видны и издали
+          Object.assign(layerConfig, largerPointLayer(layerConfig));
 
           // Подпись в середине полигона (interiorPoint в SLD): одна точка на объект, а не на каждый
           // кусок дома, разрезанного границами тайлов
