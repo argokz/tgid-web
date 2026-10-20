@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clipRing, computeLabelPoints, labelPointOf, tileBoundsMerc } from '../../utils/polygonLabelPoints'
+import { clipRing, computeLabelPoints, labelPointOf, textFit, tileBoundsMerc, wallsOf } from '../../utils/polygonLabelPoints'
 
 const R = 6378137
 const toLonLat = ([x, y]: number[]) => [x / R * 180 / Math.PI, (2 * Math.atan(Math.exp(y / R)) - Math.PI / 2) * 180 / Math.PI]
@@ -64,17 +64,50 @@ describe('точка подписи полигона', () => {
     expect(p[0] >= 0 && p[0] <= 30 && p[1] >= 0 && p[1] <= 30).toBe(true)
   })
 
-  it('подпись нагрузки: издали — Qсум, ближе — адрес и Qсум', () => {
+  it('подпись нагрузки: варианты и при каком шрифте каждый помещается в доме', () => {
     const fc = computeLabelPoints([{
       id: 1,
       properties: { txt: 'ул.Масанчи 81\r\nQот=0.092128\r\nQгвс=0.030851\r\nQсум=0.122979', otop: 0.09 },
-      geometry: polygon(rectMerc(0, 0, 10, 10)),
+      geometry: polygon(rectMerc(0, 0, 80, 20)),
     }])
     const p = fc.features[0].properties!
     expect(p.txt__short).toBe('Qсум=0.122979')
     expect(p.txt__mid).toBe('ул.Масанчи 81\nQсум=0.122979')
+    expect(p.txt__wide).toBe('ул.Масанчи 81\nQот=0.092128  Qгвс=0.030851\nQсум=0.122979')
     expect(p.otop).toBe(0.09)
     expect(p.otop__short).toBeUndefined()
+    // дом 80 × 20 м: короче и шире — помещается крупнее; 4 строки ниже, чем 3 широких
+    expect(p.txt__short__fit).toBeGreaterThan(p.txt__mid__fit)
+    expect(p.txt__mid__fit).toBeGreaterThan(p.txt__fit)
+    expect(p.txt__wide__fit).toBeGreaterThan(p.txt__fit)
+    // Qсум (13 знаков) по ширине: 80 / (13 × 0,56) ≈ 11; по высоте: 20 / 1,2 ≈ 16,7
+    expect(p.txt__short__fit).toBeCloseTo(80 / (13 * 0.56), 1)
+    // целиком (4 строки): по высоте 20 / 4,8 ≈ 4,2
+    expect(p.txt__fit).toBeCloseTo(20 / (4 * 1.2), 1)
+  })
+
+  it('размер подписи — по стенам, разрез по границе тайла стеной не считается', () => {
+    const a = tileBoundsMerc(18, 187090, 96080)
+    const edge = a[2]
+    const midY = (a[1] + a[3]) / 2
+    const left = clipRing(rectMerc(edge - 40, midY - 10, edge + 8, midY + 10) as Array<[number, number]>, a)
+    const b = tileBoundsMerc(18, 187091, 96080)
+    const right = clipRing(rectMerc(edge - 8, midY - 10, edge + 20, midY + 10) as Array<[number, number]>, b)
+    const walls = wallsOf([[left], [right]], [a, b])
+    expect(walls).toHaveLength(6)
+    const p = labelPointOf([[left], [right]], walls)!
+    expect(p[0]).toBeCloseTo(edge - 10, 3)
+    // одна строка 10 знаков: дом 60 м → шрифт 60 / 5,6 ≈ 10,7
+    expect(textFit('0123456789', p, walls)).toBeCloseTo(60 / 5.6, 1)
+  })
+
+  it('длинный Г-образный дом: подпись в просторной части, ближе к центру', () => {
+    // полка 100 × 20 и тонкая стойка 6 × 60 — центр тяжести в полке у стойки
+    const L = [[0, 0], [100, 0], [100, 20], [6, 20], [6, 80], [0, 80], [0, 0]] as Array<[number, number]>
+    const p = labelPointOf([[L]])!
+    expect(p[1]).toBeGreaterThan(5)
+    expect(p[1]).toBeLessThan(15)
+    expect(p[0]).toBeGreaterThan(8)
   })
 
   it('объекты без id — каждый своей подписью', () => {

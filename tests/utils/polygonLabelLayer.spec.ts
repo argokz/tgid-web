@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { attachPolygonLabelPoints, interiorLabelLayout, labelPointsSourceId } from '../../utils/polygonLabelLayer'
+import { attachPolygonLabelPoints, interiorLabelLayout, labelPointsSourceId, zoomValue } from '../../utils/polygonLabelLayer'
 
 function fakeMap(zoom: number) {
   const sources: Record<string, any> = {}
@@ -27,20 +27,43 @@ function fakeMap(zoom: number) {
 }
 
 describe('раскладка подписей по точкам', () => {
-  it('без наложений, крупные дома первыми, текст раскрывается с зумом', () => {
-    const layout = interiorLabelLayout({ 'text-field': '{txt}', 'text-allow-overlap': true, 'text-ignore-placement': true }, 16.77)
+  it('без наложений, крупные дома первыми, на зуме — самый полный вариант, что помещается в доме', () => {
+    const size = ['interpolate', ['linear'], ['zoom'], 16.67, 11, 19.67, 15]
+    const layout = interiorLabelLayout({ 'text-field': '{txt}', 'text-size': size, 'text-allow-overlap': true, 'text-ignore-placement': true }, 16.77)
     expect(layout['text-allow-overlap']).toBe(false)
     expect(layout['text-ignore-placement']).toBe(false)
     expect(layout['symbol-sort-key']).toEqual(['-', 0, ['coalesce', ['get', '__area'], 0]])
     const tf = layout['text-field']
     expect(tf[0]).toBe('step')
-    expect(tf[2]).toEqual(['coalesce', ['get', 'txt__short'], ['get', 'txt'], ''])
-    expect(tf[3]).toBe(18)
-    expect(tf[4]).toEqual(['coalesce', ['get', 'txt__mid'], ['get', 'txt'], ''])
-    expect(tf[5]).toBe(19)
-    expect(tf[6]).toEqual(['coalesce', ['get', 'txt'], ''])
+    // зумы 16, 17, 18, 19 — выбор по месту в доме; с 20-го — целиком
+    expect(tf.filter((v: any) => typeof v === 'number')).toEqual([17, 18, 19, 20])
+    expect(tf[tf.length - 1]).toEqual(['coalesce', ['get', 'txt'], ''])
+    const at16 = tf[2]
+    expect(at16[0]).toBe('case')
+    expect(at16[1][1]).toEqual(['coalesce', ['get', 'txt__fit'], 0])
+    expect(at16[3][1]).toEqual(['coalesce', ['get', 'txt__wide__fit'], 0])
+    expect(at16[5][1]).toEqual(['coalesce', ['get', 'txt__mid__fit'], 0])
+    expect(at16[at16.length - 1]).toEqual(['coalesce', ['get', 'txt__short'], ['coalesce', ['get', 'txt'], '']])
+    // порог: шрифт на зуме (м меркатора) с запасом 15% — на 17-м вдвое меньше, чем на 16-м (шрифт почти тот же)
+    const need16 = at16[1][2]
+    const at17 = tf[4]
+    expect(at17[1][2]).toBeLessThan(need16 / 1.8)
+    expect(need16).toBeCloseTo(11 * 78271.517 / (2 ** 16.25 * 1.15), 1)
+    // на 18-м меньше адреса и Qсум не бывает, на 19-м — все данные (целиком или в три строки)
+    expect(tf[6][tf[6].length - 1]).toEqual(['coalesce', ['get', 'txt__mid'], ['coalesce', ['get', 'txt'], '']])
+    const at19 = tf[8]
+    expect(at19).toHaveLength(6)
+    expect(at19[5]).toEqual(['coalesce', ['get', 'txt__wide'], ['coalesce', ['get', 'txt'], '']])
     // подпись из нескольких полей — как в стиле
     expect(interiorLabelLayout({ 'text-field': '{a}\n{b}' })['text-field']).toBe('{a}\n{b}')
+  })
+
+  it('размер шрифта на зуме', () => {
+    expect(zoomValue(13, 5)).toBe(13)
+    expect(zoomValue(['interpolate', ['linear'], ['zoom'], 10, 10, 20, 20], 15)).toBe(15)
+    expect(zoomValue(['interpolate', ['linear'], ['zoom'], 10, 10, 20, 20], 25)).toBe(20)
+    expect(zoomValue({ stops: [[10, 8], [12, 12]] }, 11)).toBe(10)
+    expect(zoomValue(['get', 'x'], 11, 7)).toBe(7)
   })
 })
 

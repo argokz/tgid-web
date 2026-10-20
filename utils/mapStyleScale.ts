@@ -46,3 +46,21 @@ export function scaleTextLayout(layout: Record<string, any>, k: number): Record<
   }
   return out;
 }
+
+/** Подпись в стиле GeoServer (px) на экране веба: ×0,9 издали (z13), как в стиле на z15, ×1,25 вблизи (z18) */
+export const READABLE_TEXT_STOPS: ReadonlyArray<[number, number]> = [[13, 0.9], [15, 1], [18, 1.25]]
+/** Мельче не бывает — иначе не прочесть */
+export const READABLE_TEXT_MIN_PX = 11
+
+/**
+ * Шрифт подписей узлов, камер, диаметров — читаемый на всех масштабах: постоянный размер из стиля
+ * растёт с зумом (издали чуть меньше, вблизи крупнее). Раньше веб уменьшал его на 20% (10–13 px).
+ * Размер, уже заданный по зуму, не трогаем. Смещение text-offset задано в em — растёт вместе со шрифтом.
+ */
+export function readableTextLayout(layout: Record<string, any>): Record<string, any> {
+  const size = layout['text-size']
+  if (!isNumber(size)) return layout
+  const expr: any[] = ['interpolate', ['linear'], ['zoom']]
+  for (const [z, k] of READABLE_TEXT_STOPS) expr.push(z, Math.max(READABLE_TEXT_MIN_PX, Math.round(size * k * 10) / 10))
+  return { ...layout, 'text-size': expr }
+}

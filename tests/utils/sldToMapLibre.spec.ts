@@ -3,7 +3,7 @@ import {
   convertSldToMapLibre, mergeIconLadders, scaleDenominatorToZoom,
   META_LABEL_POINT, META_TEXT_UOM, METRE_TEXT_MAX_PX, METRE_TEXT_MIN_PX, metreTextSize,
 } from '../../utils/sldToMapLibre'
-import { scaleTextLayout, scaleZoomValue } from '../../utils/mapStyleScale'
+import { readableTextLayout, scaleTextLayout, scaleZoomValue } from '../../utils/mapStyleScale'
 
 const wrapRules = (rules: string) => `
 <sld:StyledLayerDescriptor xmlns:sld="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc">
@@ -174,5 +174,15 @@ describe('масштаб шрифта стилей', () => {
     expect(layout['text-size']).toBe(16)
     expect(layout['text-offset'][1] * layout['text-size']).toBeCloseTo(-20, 6)
     expect(scaleTextLayout({ 'text-field': 'x' }, 0.8)).toEqual({ 'text-field': 'x' })
+  })
+
+  it('подписи узлов и диаметров: шрифт растёт с зумом, не мельче 11 px', () => {
+    expect(readableTextLayout({ 'text-size': 14, 'text-offset': [0, -0.5] })).toEqual({
+      'text-size': ['interpolate', ['linear'], ['zoom'], 13, 12.6, 15, 14, 18, 17.5],
+      'text-offset': [0, -0.5],
+    })
+    expect(readableTextLayout({ 'text-size': 10 })['text-size']).toEqual(['interpolate', ['linear'], ['zoom'], 13, 11, 15, 11, 18, 12.5])
+    const zoomed = ['interpolate', ['linear'], ['zoom'], 10, 12, 18, 16]
+    expect(readableTextLayout({ 'text-size': zoomed })['text-size']).toBe(zoomed)
   })
 })

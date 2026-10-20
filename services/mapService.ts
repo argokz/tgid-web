@@ -1,11 +1,8 @@
 import type { Map } from 'maplibre-gl';
 import type { ExtendedLayerConfig } from '~/types';
-import { scaleTextLayout } from '~/utils/mapStyleScale';
+import { readableTextLayout } from '~/utils/mapStyleScale';
 import { attachPolygonLabelPoints, interiorLabelLayout } from '~/utils/polygonLabelLayer';
 import { META_LABEL_POINT, META_TEXT_UOM } from '~/utils/sldToMapLibre';
-
-/** Шрифт подписей стилей GeoServer на экране веба (стили рассчитаны на крупный шрифт десктопа) */
-const TEXT_SIZE_SCALE = 0.8;
 
 const loadedSprites = new Set<string>();
 
@@ -218,11 +215,11 @@ export const mapService = {
           if (mbLayer.minzoom !== undefined) layerConfig.minzoom = mbLayer.minzoom;
           if (mbLayer.maxzoom !== undefined) layerConfig.maxzoom = mbLayer.maxzoom;
           
-          // Шрифт стилей GeoServer на экране веба на 20% меньше; размер по зуму — только значения.
-          // Размер в метрах (подписи нагрузок зданий) уже переведён в пиксели с нижней границей — не уменьшаем
+          // Подписи узлов, камер, диаметров: шрифт стиля растёт с зумом — читаем на всех масштабах.
+          // Размер в метрах (подписи нагрузок зданий) уже переведён в пиксели по зуму — не трогаем
           if (mbLayer.type === 'symbol' && mbLayer.layout?.['text-size'] != null
             && mbLayer.metadata?.[META_TEXT_UOM] !== 'metre') {
-            layerConfig.layout = scaleTextLayout(layerConfig.layout, TEXT_SIZE_SCALE);
+            layerConfig.layout = readableTextLayout(layerConfig.layout);
           }
 
           // Подпись в середине полигона (interiorPoint в SLD): одна точка на объект, а не на каждый

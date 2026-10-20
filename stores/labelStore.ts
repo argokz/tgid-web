@@ -164,7 +164,7 @@ export const useLabelStore = defineStore('label', {
       
       const style = this.labelStyles[layer.layerId] || {
         color: '#444444', // Dark gray instead of bright red
-        fontSize: 9,      // Smaller font size
+        fontSize: 12,     // читаемо на всех масштабах (было 9)
         anchor: 'center',
         offsetX: 0,
         offsetY: 0,
@@ -400,7 +400,7 @@ export const useLabelStore = defineStore('label', {
           if (!this.labelStyles[layerId]) {
             this.labelStyles[layerId] = {
               color: '#444444',
-              fontSize: 9,
+              fontSize: 12,
               anchor: 'top',
               offsetX: 0,
               offsetY: 2,
