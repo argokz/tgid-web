@@ -135,14 +135,14 @@ describe('SLD to MapLibre conversion', () => {
       </sld:TextSymbolizer></sld:Rule>`)
     const { layers } = convertSldToMapLibre(sld, { workspace: 'AlmatyGIS', latitude: 43.24 })
     const size = layers[0].layout['text-size']
-    expect(size.slice(0, 3)).toEqual(['interpolate', ['exponential', 2], ['zoom']])
+    expect(size.slice(0, 3)).toEqual(['interpolate', ['linear'], ['zoom']])
     expect(size[4]).toBe(METRE_TEXT_MIN_PX)
     expect(size[6]).toBe(METRE_TEXT_MAX_PX)
-    // 6 м на 17-м зуме у широты Алматы — ≈14 px: нижняя граница (12 px) — чуть раньше
+    // 6 м достигают 11 px у широты Алматы чуть раньше 17-го зума; дальше рост до 15 px за три зума
     expect(size[3]).toBeGreaterThan(16.5)
     expect(size[3]).toBeLessThan(17)
-    expect(size[5] - size[3]).toBeCloseTo(Math.log2(METRE_TEXT_MAX_PX / METRE_TEXT_MIN_PX), 2)
-    expect(layers[0].paint['text-halo-width']).toBe(1.5)
+    expect(size[5] - size[3]).toBe(3)
+    expect(layers[0].paint['text-halo-width']).toBe(2)
     expect(layers[0].metadata).toEqual({ [META_TEXT_UOM]: 'metre', [META_LABEL_POINT]: 'interior' })
     expect(metreTextSize(6)).not.toEqual(size)
   })

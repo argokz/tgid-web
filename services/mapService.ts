@@ -1,7 +1,7 @@
 import type { Map } from 'maplibre-gl';
 import type { ExtendedLayerConfig } from '~/types';
 import { scaleTextLayout } from '~/utils/mapStyleScale';
-import { attachPolygonLabelPoints } from '~/utils/polygonLabelLayer';
+import { attachPolygonLabelPoints, interiorLabelLayout } from '~/utils/polygonLabelLayer';
 import { META_LABEL_POINT, META_TEXT_UOM } from '~/utils/sldToMapLibre';
 
 /** Шрифт подписей стилей GeoServer на экране веба (стили рассчитаны на крупный шрифт десктопа) */
@@ -234,6 +234,7 @@ export const mapService = {
               layerId: mapLayerId,
             });
             delete layerConfig['source-layer'];
+            layerConfig.layout = interiorLabelLayout(layerConfig.layout, layerConfig.minzoom);
           }
           
           map.addLayer(layerConfig);

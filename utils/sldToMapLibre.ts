@@ -13,22 +13,26 @@ export const META_TEXT_UOM = 'tgid:textUom'
 export const META_LABEL_POINT = 'tgid:labelPoint'
 
 /** Подпись в метрах на экране — не мельче и не крупнее, пикселей */
-export const METRE_TEXT_MIN_PX = 12
-export const METRE_TEXT_MAX_PX = 32
+export const METRE_TEXT_MIN_PX = 11
+export const METRE_TEXT_MAX_PX = 15
+/** За сколько зумов подпись дорастает от нижней границы до верхней */
+const METRE_TEXT_GROW_ZOOMS = 3
 
 /** Метров в пикселе MapLibre (тайл 512) на нулевом зуме на экваторе */
 const METRES_PER_PX_Z0 = 78271.51696402048
 
 /**
- * Размер подписи, заданный в метрах (uom=metre), — пиксели по зуму: растёт вдвое с каждым зумом,
- * как сам дом, но в пределах [METRE_TEXT_MIN_PX, METRE_TEXT_MAX_PX] (6 м шрифта — 14 px на 17-м зуме).
+ * Размер подписи, заданный в метрах (uom=metre), — пиксели по зуму. С зума, где размер в метрах
+ * достигает METRE_TEXT_MIN_PX, подпись плавно растёт до METRE_TEXT_MAX_PX за три зума — не вдвое
+ * на каждый зум, как дом: тогда подписи нагрузок налезают друг на друга и на соседние дома
+ * (22.10: при 12–32 px квартал Алматы — сплошной текст).
  */
 export function metreTextSize(metres: number, latitude = 45): any {
   const k = METRES_PER_PX_Z0 * Math.cos((latitude * Math.PI) / 180)
-  const zoomAt = (px: number) => Math.round(Math.log2((px * k) / metres) * 1000) / 1000
-  return ['interpolate', ['exponential', 2], ['zoom'],
-    zoomAt(METRE_TEXT_MIN_PX), METRE_TEXT_MIN_PX,
-    zoomAt(METRE_TEXT_MAX_PX), METRE_TEXT_MAX_PX]
+  const z0 = Math.round(Math.log2((METRE_TEXT_MIN_PX * k) / metres) * 1000) / 1000
+  return ['interpolate', ['linear'], ['zoom'],
+    z0, METRE_TEXT_MIN_PX,
+    z0 + METRE_TEXT_GROW_ZOOMS, METRE_TEXT_MAX_PX]
 }
 
 const isMetreUom = (symbolizer: any): boolean => /metre|meter/i.test(String(symbolizer?.['@_uom'] || ''))
@@ -291,8 +295,8 @@ function textLayer(symbolizer: any, options: SldConversionOptions): any {
       'text-color': fill.fill || '#000000',
       'text-opacity': numberValue(fill['fill-opacity'], 1),
       'text-halo-color': halo.fill || '#ffffff',
-      // ореол в метрах (0,4 м) на экране — доли пикселя; читаемый — от 1,5 px
-      'text-halo-width': metre && haloRadius > 0 ? Math.max(1.5, haloRadius) : haloRadius
+      // ореол в метрах (0,4 м) на экране — доли пикселя; читаемый — от 2 px
+      'text-halo-width': metre && haloRadius > 0 ? Math.max(2, haloRadius) : haloRadius
     },
     ...(Object.keys(metadata).length ? { metadata } : {})
   }

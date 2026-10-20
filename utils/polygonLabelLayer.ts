@@ -5,7 +5,9 @@
  * тайлов после сдвига карты и догрузки тайлов — пока подписи видны (зум слоя, видимость).
  */
 import type { Map as MapLibreMap } from 'maplibre-gl'
-import { computeLabelPoints, type LabelPieceInput } from '~/utils/polygonLabelPoints'
+import {
+  computeLabelPoints, LABEL_AREA_PROP, LABEL_MID_SUFFIX, LABEL_SHORT_SUFFIX, type LabelPieceInput,
+} from '~/utils/polygonLabelPoints'
 
 interface Controller {
   layerIds: Set<string>
@@ -19,7 +21,36 @@ const registry = new WeakMap<MapLibreMap, Map<string, Controller>>()
 export const labelPointsSourceId = (vectorSourceId: string, sourceLayer: string): string =>
   `${vectorSourceId}--labelpts--${sourceLayer}`
 
-const toPiece = (f: any): LabelPieceInput => {
+/**
+ * Раскладка подписи по точкам: без наложений (подписи, которым нет места, скрываются; первыми — крупные
+ * дома), многострочный текст раскрывается с зумом — сначала последняя строка (Qсум), ближе — адрес и
+ * Qсум, совсем близко — целиком. Стиль десктопа (conflictResolution=false) рисует всё поверх — на
+ * экране веба квартал превращался в сплошной текст.
+ */
+export function interiorLabelLayout(layout: Record<string, any>, minzoom = 16): Record<string, any> {
+  const out: Record<string, any> = {
+    ...layout,
+    'text-allow-overlap': false,
+    'text-ignore-placement': false,
+    'text-padding': 3,
+    'text-max-width': 16,
+    'text-line-height': 1.15,
+    'symbol-sort-key': ['-', 0, ['coalesce', ['get', LABEL_AREA_PROP], 0]],
+  }
+  const field = typeof layout['text-field'] === 'string' ? /^\{([^{}]+)\}$/.exec(layout['text-field'].trim())?.[1] : undefined
+  if (field) {
+    // text-field считается на целом зуме тайла — пороги целые: подписи с 16,8 → Qсум до 18-го,
+    // адрес и Qсум на 18-м, целиком с 19-го
+    const z0 = Math.ceil(minzoom + 0.8)
+    out['text-field'] = ['step', ['zoom'],
+      ['coalesce', ['get', field + LABEL_SHORT_SUFFIX], ['get', field], ''],
+      z0, ['coalesce', ['get', field + LABEL_MID_SUFFIX], ['get', field], ''],
+      z0 + 1, ['coalesce', ['get', field], '']]
+  }
+  return out
+}
+
+const toPiece =(f: any): LabelPieceInput => {
   const vtf = f?._vectorTileFeature
   const tile = vtf && Number.isFinite(vtf._z) ? { z: vtf._z, x: vtf._x, y: vtf._y } : null
   return { id: f.id, properties: f.properties || {}, geometry: f.geometry, tile }

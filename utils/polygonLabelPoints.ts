@@ -156,10 +156,29 @@ export function labelPointOf(polys: Poly[]): Pt | null {
   return scanlinePoint(c[1], polys) ?? scanlinePoint((minY + maxY) / 2, polys) ?? polys[0][0][0]
 }
 
+/** Суффиксы свойств с сокращённой многострочной подписью: последняя строка; первая и последняя */
+export const LABEL_SHORT_SUFFIX = '__short'
+export const LABEL_MID_SUFFIX = '__mid'
+/** Свойство с площадью объекта (м² меркатора) — крупные дома подписываются первыми */
+export const LABEL_AREA_PROP = '__area'
+
 const cleanProperties = (props: Record<string, any>): Record<string, any> => {
   const out: Record<string, any> = {}
-  // «\r\n» из базы десктопа MapLibre рисует пустым квадратом
-  for (const [k, v] of Object.entries(props)) out[k] = typeof v === 'string' ? v.replace(/\r/g, '') : v
+  for (const [k, v] of Object.entries(props)) {
+    if (typeof v !== 'string') {
+      out[k] = v
+      continue
+    }
+    // «\r\n» из базы десктопа MapLibre рисует пустым квадратом
+    const text = v.replace(/\r/g, '').trim()
+    out[k] = text
+    // Многострочная подпись (адрес, Qот, Qгвс, Qсум): издали — только итог, ближе — адрес и итог
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+    if (lines.length > 1) {
+      out[k + LABEL_SHORT_SUFFIX] = lines[lines.length - 1]
+      out[k + LABEL_MID_SUFFIX] = lines.length > 2 ? `${lines[0]}\n${lines[lines.length - 1]}` : text
+    }
+  }
   return out
 }
 
@@ -212,7 +231,7 @@ export function computeLabelPoints(pieces: readonly LabelPieceInput[]): GeoJSON.
     features.push({
       type: 'Feature',
       ...(typeof k === 'number' || typeof k === 'string' ? { id: k } : {}),
-      properties: cleanProperties(list[0].properties || {}),
+      properties: { ...cleanProperties(list[0].properties || {}), [LABEL_AREA_PROP]: Math.round(best.area) },
       geometry: { type: 'Point', coordinates: toLonLat(p) },
     })
   }

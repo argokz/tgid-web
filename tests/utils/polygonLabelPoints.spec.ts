@@ -25,6 +25,9 @@ describe('точка подписи полигона', () => {
     const f = fc.features[0]
     expect(f.id).toBe(65028)
     expect(f.properties!.txt).toBe('ул.Шевченко 110\nQот=0.13')
+    expect(f.properties!.txt__short).toBe('Qот=0.13')
+    expect(f.properties!.txt__mid).toBe('ул.Шевченко 110\nQот=0.13')
+    expect(f.properties!.__area).toBeGreaterThan(0)
     const [cx, cy] = toLonLat([(house[0][0] + house[1][0]) / 2, midY])
     expect(f.geometry.coordinates[0]).toBeCloseTo(cx, 7)
     expect(f.geometry.coordinates[1]).toBeCloseTo(cy, 7)
@@ -59,6 +62,19 @@ describe('точка подписи полигона', () => {
     const p = labelPointOf([[outer, hole]])!
     expect(p[0] > 10 && p[0] < 20 && p[1] > 10 && p[1] < 20).toBe(false)
     expect(p[0] >= 0 && p[0] <= 30 && p[1] >= 0 && p[1] <= 30).toBe(true)
+  })
+
+  it('подпись нагрузки: издали — Qсум, ближе — адрес и Qсум', () => {
+    const fc = computeLabelPoints([{
+      id: 1,
+      properties: { txt: 'ул.Масанчи 81\r\nQот=0.092128\r\nQгвс=0.030851\r\nQсум=0.122979', otop: 0.09 },
+      geometry: polygon(rectMerc(0, 0, 10, 10)),
+    }])
+    const p = fc.features[0].properties!
+    expect(p.txt__short).toBe('Qсум=0.122979')
+    expect(p.txt__mid).toBe('ул.Масанчи 81\nQсум=0.122979')
+    expect(p.otop).toBe(0.09)
+    expect(p.otop__short).toBeUndefined()
   })
 
   it('объекты без id — каждый своей подписью', () => {

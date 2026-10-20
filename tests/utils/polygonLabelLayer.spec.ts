@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { attachPolygonLabelPoints, labelPointsSourceId } from '../../utils/polygonLabelLayer'
+import { attachPolygonLabelPoints, interiorLabelLayout, labelPointsSourceId } from '../../utils/polygonLabelLayer'
 
 function fakeMap(zoom: number) {
   const sources: Record<string, any> = {}
@@ -25,6 +25,24 @@ function fakeMap(zoom: number) {
     handlers,
   }
 }
+
+describe('раскладка подписей по точкам', () => {
+  it('без наложений, крупные дома первыми, текст раскрывается с зумом', () => {
+    const layout = interiorLabelLayout({ 'text-field': '{txt}', 'text-allow-overlap': true, 'text-ignore-placement': true }, 16.77)
+    expect(layout['text-allow-overlap']).toBe(false)
+    expect(layout['text-ignore-placement']).toBe(false)
+    expect(layout['symbol-sort-key']).toEqual(['-', 0, ['coalesce', ['get', '__area'], 0]])
+    const tf = layout['text-field']
+    expect(tf[0]).toBe('step')
+    expect(tf[2]).toEqual(['coalesce', ['get', 'txt__short'], ['get', 'txt'], ''])
+    expect(tf[3]).toBe(18)
+    expect(tf[4]).toEqual(['coalesce', ['get', 'txt__mid'], ['get', 'txt'], ''])
+    expect(tf[5]).toBe(19)
+    expect(tf[6]).toEqual(['coalesce', ['get', 'txt'], ''])
+    // подпись из нескольких полей — как в стиле
+    expect(interiorLabelLayout({ 'text-field': '{a}\n{b}' })['text-field']).toBe('{a}\n{b}')
+  })
+})
 
 describe('слой подписей по точкам полигонов', () => {
   beforeEach(() => vi.useFakeTimers())
