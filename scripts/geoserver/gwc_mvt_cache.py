@@ -25,6 +25,11 @@ requested TILEMATRIXSET»), формат MVT, параметр VIEWPARAMS (фр�
 
     python scripts/geoserver/gwc_mvt_cache.py --check-bounds
     python scripts/geoserver/gwc_mvt_cache.py --fix-bounds --backup-dir H:/tgid-backups/<дата>_gwc
+
+Где проверка через WFS не работает (ShaturaGIS: фильтр WITHIN падает на смешанных SRID view и
+слоя), — пересчёт границ слоёв по данным без проверки (SQL view: экстент всего запроса):
+
+    python scripts/geoserver/gwc_mvt_cache.py --recalc-bounds --layers ShaturaGIS:uzel,ShaturaGIS:heatpipesections         --backup-dir H:/tgid-backups/<дата>_gwc
 """
 from __future__ import annotations
 
@@ -207,18 +212,20 @@ def fmt_bbox(b: dict) -> str:
     return f"{b['minx']:.1f}..{b['maxx']:.1f} x {b['miny']:.1f}..{b['maxy']:.1f}"
 
 
-def fix_bounds(gwc: Gwc, layer: str, backup: Path | None, dry_run: bool = False):
+def fix_bounds(gwc: Gwc, layer: str, backup: Path | None, dry_run: bool = False, expand: bool = True):
     """Границы слоя — по данным, затем перечитать тайловый слой GWC (его сетка — по границам слоя).
 
     Сначала пересчёт GeoServer (recalculate). У обычной таблицы PostGIS он берёт ST_EstimatedExtent —
     оценку по выборке статистики, отдельные объекты на окраинах в неё не попадают (13.10: 429 зданий
-    AlmatyGIS:zdaniya_2). Тогда границы расширяются по объектам за ними (WFS) и задаются явно.
+    AlmatyGIS:zdaniya_2). Тогда границы расширяются по объектам за ними (WFS) и задаются явно
+    (expand=False — без этого шага: там, где WFS-фильтр по слою не работает).
     """
     ws, name = layer.split(':', 1)
     path = f'/rest/workspaces/{ws}/featuretypes/{name}'
     before = native_bbox(gwc, layer)
     if dry_run:
-        print(f'{layer}: границы {fmt_bbox(before)} -> {fmt_bbox(expanded_bbox(gwc, layer))} (пробный прогон)')
+        after = fmt_bbox(expanded_bbox(gwc, layer)) if expand else 'пересчёт по данным'
+        print(f'{layer}: границы {fmt_bbox(before)} -> {after} (пробный прогон)')
         return
     stamp = time.strftime('%Y%m%d-%H%M%S')
     (backup / f'{layer.replace(":", "__")}.featuretype-{stamp}.xml').write_text(
@@ -230,7 +237,7 @@ def fix_bounds(gwc: Gwc, layer: str, backup: Path | None, dry_run: bool = False)
     xml_headers = {'Content-Type': 'text/xml'}
     gwc.req('PUT', f'{put_path}?recalculate=nativebbox,latlonbbox',
             data='<featureType><enabled>true</enabled></featureType>'.encode('utf-8'), headers=xml_headers)
-    if outside_bbox(gwc, layer, sample=1):
+    if expand and outside_bbox(gwc, layer, sample=1):
         b = expanded_bbox(gwc, layer)
         body = ('<featureType><nativeBoundingBox>'
                 f"<minx>{b['minx']}</minx><maxx>{b['maxx']}</maxx><miny>{b['miny']}</miny><maxy>{b['maxy']}</maxy>"
@@ -250,12 +257,24 @@ def main() -> int:
     ap.add_argument('--dry-run', action='store_true', help='только показать изменения')
     ap.add_argument('--check-bounds', action='store_true',
                     help='только проверить, нет ли объектов за границами кеша (код выхода 2 — есть)')
+    ap.add_argument('--recalc-bounds', action='store_true',
+                    help='пересчитать границы слоёв --layers по данным без проверки WFS (нужен --backup-dir)')
     ap.add_argument('--fix-bounds', action='store_true',
                     help='пересчитать границы слоёв, у которых есть объекты за ними (нужен --backup-dir)')
     args = ap.parse_args()
 
     gwc = Gwc(args.geoserver, os.environ.get('GEOSERVER_REST_USER', 'admin'), os.environ['GEOSERVER_REST_PASSWORD'])
     layers = [s.strip() for s in args.layers.split(',') if s.strip()]
+
+    if args.recalc_bounds:
+        if not args.dry_run and not args.backup_dir:
+            ap.error('для --recalc-bounds нужен --backup-dir (или --dry-run)')
+        backup = Path(args.backup_dir) if args.backup_dir else None
+        if backup:
+            backup.mkdir(parents=True, exist_ok=True)
+        for layer in layers:
+            fix_bounds(gwc, layer, backup, dry_run=args.dry_run, expand=False)
+        return 0
 
     if args.check_bounds or args.fix_bounds:
         bad = check_bounds(gwc, layers)
