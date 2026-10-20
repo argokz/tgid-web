@@ -6,6 +6,7 @@ import {
   tileUrlWithViewparams,
   withTileRevision,
   wmtsLayerBounds,
+  wmtsLayerGridBounds,
   wmtsLayerHasGwcMvt,
 } from '~/utils/mvtTileUrl'
 
@@ -30,6 +31,29 @@ describe('mvtTileUrl', () => {
     expect(wmtsLayerBounds(box('71.66 51.03', '71.32 51.22'))).toBeNull()
     expect(wmtsLayerBounds(box('x 51', '71 52'))).toBeNull()
     expect(wmtsLayerBounds({})).toBeNull()
+  })
+
+  it('границы — по пределам сетки GWC; сетка на весь мир — без границ', () => {
+    const lim = (z: number, r0: number, r1: number, c0: number, c1: number) => ({
+      TileMatrix: `EPSG:900913:${z}`, MinTileRow: r0, MaxTileRow: r1, MinTileCol: c0, MaxTileCol: c1,
+    })
+    const layer = (limits: any[]) => ({
+      'ows:WGS84BoundingBox': { 'ows:LowerCorner': '39.51 55.55', 'ows:UpperCorner': '39.58 55.61' },
+      TileMatrixSetLink: [
+        { TileMatrixSet: 'EPSG:4326' },
+        { TileMatrixSet: 'EPSG:900913', TileMatrixSetLimits: { TileMatrixLimits: limits } },
+      ],
+    })
+    // Шатура на уровне 12: столбец 2497, строка 1277 — границы тайла вокруг 39,5° в. д., 55,6° с. ш.
+    const b = wmtsLayerGridBounds(layer([lim(0, 0, 0, 0, 0), lim(12, 1277, 1277, 2497, 2497), lim(13, 2554, 2555, 4994, 4995)]))!
+    expect(b[0]).toBeCloseTo(39.46, 1)
+    expect(b[2]).toBeCloseTo(39.55, 1)
+    expect(b[1]).toBeLessThan(b[3])
+    expect(b[1] > 55 && b[3] < 56).toBe(true)
+    // охват «весь мир»
+    expect(wmtsLayerGridBounds(layer([lim(0, 0, 0, 0, 0), lim(12, 0, 4095, 0, 4095)]))).toBeNull()
+    // пределов нет — границы слоя
+    expect(wmtsLayerGridBounds(layer([]))).toEqual([39.51, 55.55, 39.58, 55.61])
   })
 
   it('WMTS рабочей области с шаблоном XYZ', () => {

@@ -26,6 +26,12 @@ requested TILEMATRIXSET»), формат MVT, параметр VIEWPARAMS (фр�
     python scripts/geoserver/gwc_mvt_cache.py --check-bounds
     python scripts/geoserver/gwc_mvt_cache.py --fix-bounds --backup-dir H:/tgid-backups/<дата>_gwc
 
+Насовсем, без пересчётов (22.10): охват сетки EPSG:900913 — весь мир. Тогда кеш отдаёт тайлы везде,
+а веб берёт пределы сетки из WMTS (utils/mvtTileUrl.ts wmtsLayerGridBounds) — новые фрагменты и районы
+видны сразу. Основной режим (настройка слоёв) ставит его сам; для уже настроенных слоёв:
+
+    python scripts/geoserver/gwc_mvt_cache.py --world-extent --backup-dir H:/tgid-backups/<дата>_gwc
+
 Где проверка через WFS не работает (ShaturaGIS: фильтр WITHIN падает на смешанных SRID view и
 слоя), — пересчёт границ слоёв по данным без проверки (SQL view: экстент всего запроса):
 
@@ -50,7 +56,12 @@ DEFAULT_LAYERS = [
     'AlmatyGIS:zdaniya_2',
     'AstanaGIS:heatpipesections',
     'AstanaGIS:uzel',
+    'ShaturaGIS:heatpipesections',
+    'ShaturaGIS:uzel',
 ]
+# Охват сетки EPSG:900913 «весь мир»: кеш отдаёт тайлы везде, где есть объекты, — новый фрагмент или
+# район за прежними границами слоя виден сразу, без пересчёта границ (веб берёт пределы сетки из WMTS)
+WORLD_900913 = (-20037508.34, -20037508.34, 20037508.34, 20037508.34)
 
 
 class Gwc:
@@ -95,6 +106,7 @@ def configure(xml: str, expire: int) -> str:
     subsets = child(root, 'gridSubsets')
     if GRIDSET not in [g.findtext('gridSetName') for g in subsets.findall('gridSubset')]:
         ET.SubElement(ET.SubElement(subsets, 'gridSubset'), 'gridSetName').text = GRIDSET
+    set_world_extent(root)
 
     # Векторный тайл — один на запрос: метатайл 4×4 строил бы 16 тайлов на первом обращении
     meta = child(root, 'metaWidthHeight')
@@ -208,19 +220,37 @@ def expanded_bbox(gwc: Gwc, layer: str) -> dict:
     raise RuntimeError(f'{layer}: границы не сходятся за 5 шагов')
 
 
-def drop_grid_extent(xml: str) -> str:
-    """Тайловый слой без явного охвата сетки (gridSubset/extent): тогда GWC берёт границы слоя.
+def set_world_extent(root: ET.Element) -> bool:
+    """Охват сетки EPSG:900913 — весь мир; у других сеток явный охват снимается (границы слоя).
 
-    Явный охват остаётся от клонирования рабочей области (охват исходного города) или от прежних
-    границ — с ним пересчёт границ слоя до кеша не доходит (22.10, ShaturaGIS: 4398323..4406138).
+    Явный охват сетки остаётся от клонирования рабочей области (охват исходного города) или от
+    прежних границ слоя — тогда объекты за ним на карте не видны (22.10: фрагменты Шатуры в Москве и
+    Петербурге). → True — что-то изменилось.
     """
-    root = ET.fromstring(xml)
-    dropped = 0
+    changed = False
     for gs in root.iter('gridSubset'):
-        for ext in gs.findall('extent'):
+        exts = gs.findall('extent')
+        if gs.findtext('gridSetName') != GRIDSET:
+            for ext in exts:
+                gs.remove(ext)
+                changed = True
+            continue
+        want = [f'{v:.2f}' for v in WORLD_900913]
+        have = [d.text for ext in exts for d in ext.iter('double')]
+        if [f'{float(v):.2f}' for v in have if v] == want:
+            continue
+        for ext in exts:
             gs.remove(ext)
-            dropped += 1
-    return ET.tostring(root, encoding='unicode') if dropped else xml
+        coords = ET.SubElement(ET.SubElement(gs, 'extent'), 'coords')
+        for v in want:
+            ET.SubElement(coords, 'double').text = v
+        changed = True
+    return changed
+
+
+def world_grid_extent(xml: str) -> str:
+    root = ET.fromstring(xml)
+    return ET.tostring(root, encoding='unicode') if set_world_extent(root) else xml
 
 
 def fmt_bbox(b: dict) -> str:
@@ -258,8 +288,46 @@ def fix_bounds(gwc: Gwc, layer: str, backup: Path | None, dry_run: bool = False,
                 f"<minx>{b['minx']}</minx><maxx>{b['maxx']}</maxx><miny>{b['miny']}</miny><maxy>{b['maxy']}</maxy>"
                 f"<crs>{ft['srs']}</crs></nativeBoundingBox></featureType>")
         gwc.req('PUT', f'{put_path}?recalculate=latlonbbox', data=body.encode('utf-8'), headers=xml_headers)
-    gwc.put_layer(layer, drop_grid_extent(gwc.get_layer(layer)))
+    gwc.put_layer(layer, world_grid_extent(gwc.get_layer(layer)))
     print(f'{layer}: границы {fmt_bbox(before)} -> {fmt_bbox(native_bbox(gwc, layer))}')
+
+
+# тайл далеко за любым городом (уровень 12, юг Тихого океана, 150° з. д., 40° ю. ш.) — сетка «весь мир» отдаёт
+# его (пустой, 200/204), ограниченная — 400 TileOutOfRange
+PROBE_TILE = (12, 341, 2545)
+
+
+def probe_world_tile(gwc: Gwc, layer: str) -> int:
+    ws, name = layer.split(':', 1)
+    z, x, y = PROBE_TILE
+    r = gwc.s.get(f'{gwc.url}/{ws}/gwc/service/wmts', timeout=120, params={
+        'SERVICE': 'WMTS', 'VERSION': '1.0.0', 'REQUEST': 'GetTile', 'LAYER': name, 'STYLE': '',
+        'TILEMATRIXSET': GRIDSET, 'TILEMATRIX': f'{GRIDSET}:{z}', 'TILEROW': y, 'TILECOL': x, 'FORMAT': MVT,
+    })
+    return r.status_code
+
+
+def world_extent(gwc: Gwc, layer: str, backup: Path | None, dry_run: bool) -> bool:
+    """Охват сетки «весь мир» с проверкой тайлом за границами; не прошла — слой из бэкапа. → успех"""
+    before = gwc.get_layer(layer)
+    after = world_grid_extent(before)
+    if dry_run:
+        print(f'{layer}: {"уже весь мир" if after == before else "охват сетки -> весь мир"} (пробный прогон)')
+        return True
+    if after == before:
+        code = probe_world_tile(gwc, layer)
+        print(f'{layer}: охват уже весь мир, тайл за границами — HTTP {code}')
+        return code in (200, 204)
+    stamp = time.strftime('%Y%m%d-%H%M%S')
+    (backup / f'{layer.replace(":", "__")}.gwc-{stamp}.xml').write_text(before, encoding='utf-8')
+    gwc.put_layer(layer, after)
+    code = probe_world_tile(gwc, layer)
+    if code in (200, 204):
+        print(f'{layer}: охват сетки — весь мир, тайл за прежними границами — HTTP {code}')
+        return True
+    gwc.put_layer(layer, before)
+    print(f'{layer}: тайл за границами — HTTP {code}, охват возвращён как был', file=sys.stderr)
+    return False
 
 
 def main() -> int:
@@ -272,6 +340,8 @@ def main() -> int:
     ap.add_argument('--dry-run', action='store_true', help='только показать изменения')
     ap.add_argument('--check-bounds', action='store_true',
                     help='только проверить, нет ли объектов за границами кеша (код выхода 2 — есть)')
+    ap.add_argument('--world-extent', action='store_true',
+                    help='охват сетки EPSG:900913 слоёв --layers — весь мир (нужен --backup-dir); проверка тайлом')
     ap.add_argument('--recalc-bounds', action='store_true',
                     help='пересчитать границы слоёв --layers по данным без проверки WFS (нужен --backup-dir)')
     ap.add_argument('--fix-bounds', action='store_true',
@@ -280,6 +350,17 @@ def main() -> int:
 
     gwc = Gwc(args.geoserver, os.environ.get('GEOSERVER_REST_USER', 'admin'), os.environ['GEOSERVER_REST_PASSWORD'])
     layers = [s.strip() for s in args.layers.split(',') if s.strip()]
+
+    if args.world_extent:
+        if not args.dry_run and not args.backup_dir:
+            ap.error('для --world-extent нужен --backup-dir (или --dry-run)')
+        backup = Path(args.backup_dir) if args.backup_dir else None
+        if backup:
+            backup.mkdir(parents=True, exist_ok=True)
+        failed = 0
+        for layer in layers:
+            failed += 0 if world_extent(gwc, layer, backup, args.dry_run) else 1
+        return 2 if failed else 0
 
     if args.recalc_bounds:
         if not args.dry_run and not args.backup_dir:

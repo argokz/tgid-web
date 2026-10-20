@@ -36,6 +36,40 @@ export function wmtsLayerBounds(wmtsLayer: any): [number, number, number, number
   return [w, s, e, n]
 }
 
+/** Уровень, по пределам которого считаются границы сетки (тайл ~10 км — точности хватает) */
+const GRID_BOUNDS_ZOOM = 12
+
+const tileLat = (row: number, z: number) =>
+  (Math.atan(Math.sinh(Math.PI * (1 - (2 * row) / 2 ** z))) * 180) / Math.PI
+
+/**
+ * Где кеш GWC отдаёт тайлы — по пределам сетки EPSG:900913 (TileMatrixSetLimits) в WMTS
+ * GetCapabilities: [west, south, east, north]; null — по всему миру (тогда границ у источника нет).
+ * Пределов нет — границы слоя (wmtsLayerBounds), как раньше.
+ *
+ * Пределы задаёт охват сетки тайлового слоя (gridSubset): по умолчанию — границы слоя, посчитанные
+ * при публикации, и тогда новый фрагмент за ними не виден, пока их не пересчитать. С охватом «весь мир»
+ * (scripts/geoserver/gwc_mvt_cache.py) карта запрашивает тайлы везде — без пересчётов.
+ */
+export function wmtsLayerGridBounds(wmtsLayer: any): [number, number, number, number] | null {
+  const link = asArray(wmtsLayer?.TileMatrixSetLink).find((l: any) => String(l?.TileMatrixSet ?? '') === GWC_MVT_GRIDSET)
+  const limits = asArray(link?.TileMatrixSetLimits?.TileMatrixLimits)
+  const byZoom = new Map<number, any>()
+  for (const lim of limits) {
+    const z = Number(String(lim?.TileMatrix ?? '').split(':').pop())
+    if (Number.isInteger(z)) byZoom.set(z, lim)
+  }
+  const zooms = [...byZoom.keys()].filter((z) => z <= GRID_BOUNDS_ZOOM).sort((a, b) => b - a)
+  if (!zooms.length) return wmtsLayerBounds(wmtsLayer)
+  const z = zooms[0]!
+  const lim = byZoom.get(z)
+  const [r0, r1, c0, c1] = ['MinTileRow', 'MaxTileRow', 'MinTileCol', 'MaxTileCol'].map((k) => Number(lim?.[k]))
+  if (![r0, r1, c0, c1].every(Number.isInteger) || r0! > r1! || c0! > c1!) return wmtsLayerBounds(wmtsLayer)
+  const n = 2 ** z
+  if (r0 === 0 && c0 === 0 && r1 === n - 1 && c1 === n - 1) return null
+  return [(c0! / n) * 360 - 180, tileLat(r1! + 1, z), ((c1! + 1) / n) * 360 - 180, tileLat(r0!, z)]
+}
+
 /** Шаблон XYZ-тайла MVT из кеша GWC (WMTS рабочей области) */
 export function gwcMvtTileUrl(baseUrl: string, workspace: string, layerName: string): string {
   const base = baseUrl.replace(/\/$/, '')
