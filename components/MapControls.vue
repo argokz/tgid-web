@@ -667,6 +667,8 @@ import { useNotificationStore } from '~/stores/notificationStore'
 import { useCesiumStore } from '~/stores/cesiumStore'
 import { useUiStore } from '~/stores/uiStore'
 
+import { useFragmentStore } from '~/stores/fragmentStore'
+
 
 const props = withDefaults(defineProps<{
 
@@ -709,6 +711,8 @@ const { searchAddress } = useNominatim()
 const { layers, currentLayer, getCurrentLayer, setLayer, loadSavedLayer } = useBaseLayers()
 
 const notificationStore = useNotificationStore()
+
+const fragmentStore = useFragmentStore()
 
 const cesiumStore = useCesiumStore()
 const uiStore = useUiStore()
@@ -845,9 +849,17 @@ const addTemporaryMarker = (lon: number, lat: number, description: string) => {
 }
 
 
-const goHome = () => {
+// «Домой» — к видимым фрагментам (у города их может быть несколько в разных местах: в Шатуре —
+
+// Шатура, Москва, Петербург); охвата нет (нет узлов, ошибка) — центр города
+
+const goHome = async () => {
 
   if (!props.map) return
+
+  const ids = fragmentStore.activeFragmentIds.length ? fragmentStore.activeFragmentIds : fragmentStore.defaultFragmentIds
+
+  if (ids.length && await fragmentStore.zoomToFragments(ids)) return
 
   props.map.flyTo({ center: getCityConfig().center, zoom: 11, duration: 2000, essential: true })
 
