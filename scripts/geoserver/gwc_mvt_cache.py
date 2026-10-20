@@ -208,6 +208,21 @@ def expanded_bbox(gwc: Gwc, layer: str) -> dict:
     raise RuntimeError(f'{layer}: границы не сходятся за 5 шагов')
 
 
+def drop_grid_extent(xml: str) -> str:
+    """Тайловый слой без явного охвата сетки (gridSubset/extent): тогда GWC берёт границы слоя.
+
+    Явный охват остаётся от клонирования рабочей области (охват исходного города) или от прежних
+    границ — с ним пересчёт границ слоя до кеша не доходит (22.10, ShaturaGIS: 4398323..4406138).
+    """
+    root = ET.fromstring(xml)
+    dropped = 0
+    for gs in root.iter('gridSubset'):
+        for ext in gs.findall('extent'):
+            gs.remove(ext)
+            dropped += 1
+    return ET.tostring(root, encoding='unicode') if dropped else xml
+
+
 def fmt_bbox(b: dict) -> str:
     return f"{b['minx']:.1f}..{b['maxx']:.1f} x {b['miny']:.1f}..{b['maxy']:.1f}"
 
@@ -243,7 +258,7 @@ def fix_bounds(gwc: Gwc, layer: str, backup: Path | None, dry_run: bool = False,
                 f"<minx>{b['minx']}</minx><maxx>{b['maxx']}</maxx><miny>{b['miny']}</miny><maxy>{b['maxy']}</maxy>"
                 f"<crs>{ft['srs']}</crs></nativeBoundingBox></featureType>")
         gwc.req('PUT', f'{put_path}?recalculate=latlonbbox', data=body.encode('utf-8'), headers=xml_headers)
-    gwc.put_layer(layer, gwc.get_layer(layer))
+    gwc.put_layer(layer, drop_grid_extent(gwc.get_layer(layer)))
     print(f'{layer}: границы {fmt_bbox(before)} -> {fmt_bbox(native_bbox(gwc, layer))}')
 
 
