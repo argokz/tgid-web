@@ -288,7 +288,8 @@ export default defineEventHandler(async (event) => {
           });
           const converted = convertSldToMapLibre(sldText, {
             workspace: workspaceName,
-            resourceUrl: styleResourceUrl
+            resourceUrl: styleResourceUrl,
+            latitude: readCityConfig(runtimeConfig.public as any).center[1]
           });
           mbLayers = converted.layers.map((layer: any) => {
             if (layer.filter) layer.filter = sanitize(layer.filter);

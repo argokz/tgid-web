@@ -1,6 +1,8 @@
 import type { Map } from 'maplibre-gl';
 import type { ExtendedLayerConfig } from '~/types';
 import { scaleTextLayout } from '~/utils/mapStyleScale';
+import { attachPolygonLabelPoints } from '~/utils/polygonLabelLayer';
+import { META_LABEL_POINT, META_TEXT_UOM } from '~/utils/sldToMapLibre';
 
 /** Шрифт подписей стилей GeoServer на экране веба (стили рассчитаны на крупный шрифт десктопа) */
 const TEXT_SIZE_SCALE = 0.8;
@@ -216,9 +218,22 @@ export const mapService = {
           if (mbLayer.minzoom !== undefined) layerConfig.minzoom = mbLayer.minzoom;
           if (mbLayer.maxzoom !== undefined) layerConfig.maxzoom = mbLayer.maxzoom;
           
-          // Шрифт стилей GeoServer на экране веба на 20% меньше; размер по зуму — только значения
-          if (mbLayer.type === 'symbol' && mbLayer.layout?.['text-size'] != null) {
+          // Шрифт стилей GeoServer на экране веба на 20% меньше; размер по зуму — только значения.
+          // Размер в метрах (подписи нагрузок зданий) уже переведён в пиксели с нижней границей — не уменьшаем
+          if (mbLayer.type === 'symbol' && mbLayer.layout?.['text-size'] != null
+            && mbLayer.metadata?.[META_TEXT_UOM] !== 'metre') {
             layerConfig.layout = scaleTextLayout(layerConfig.layout, TEXT_SIZE_SCALE);
+          }
+
+          // Подпись в середине полигона (interiorPoint в SLD): одна точка на объект, а не на каждый
+          // кусок дома, разрезанного границами тайлов
+          if (mbLayer.type === 'symbol' && mbLayer.metadata?.[META_LABEL_POINT] === 'interior' && layer.sourceLayer) {
+            layerConfig.source = attachPolygonLabelPoints(map, {
+              vectorSourceId: layer.sourceId,
+              sourceLayer: layer.sourceLayer,
+              layerId: mapLayerId,
+            });
+            delete layerConfig['source-layer'];
           }
           
           map.addLayer(layerConfig);

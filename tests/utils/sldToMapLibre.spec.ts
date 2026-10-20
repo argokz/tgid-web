@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { convertSldToMapLibre, mergeIconLadders, scaleDenominatorToZoom } from '../../utils/sldToMapLibre'
+import {
+  convertSldToMapLibre, mergeIconLadders, scaleDenominatorToZoom,
+  META_LABEL_POINT, META_TEXT_UOM, METRE_TEXT_MAX_PX, METRE_TEXT_MIN_PX, metreTextSize,
+} from '../../utils/sldToMapLibre'
 import { scaleTextLayout, scaleZoomValue } from '../../utils/mapStyleScale'
 
 const wrapRules = (rules: string) => `
@@ -120,6 +123,39 @@ describe('SLD to MapLibre conversion', () => {
       </sld:TextSymbolizer></sld:Rule>`)
     const { layers } = convertSldToMapLibre(sld, { workspace: 'AlmatyGIS' })
     expect(layers[0].layout).toMatchObject({ 'text-padding': 10, 'text-allow-overlap': true, 'text-ignore-placement': true })
+  })
+
+  it('подпись в метрах (нагрузки зданий Алматы): размер по зуму, точка внутри дома', () => {
+    const sld = wrapRules(`
+      <sld:Rule><sld:TextSymbolizer uom="http://www.opengeospatial.org/se/units/metre">
+        <sld:Geometry><ogc:Function name="interiorPoint"><ogc:PropertyName>shape</ogc:PropertyName></ogc:Function></sld:Geometry>
+        <sld:Label><ogc:PropertyName>txt</ogc:PropertyName></sld:Label>
+        <sld:Font><sld:CssParameter name="font-size">6</sld:CssParameter></sld:Font>
+        <sld:Halo><sld:Radius>0.4</sld:Radius></sld:Halo>
+      </sld:TextSymbolizer></sld:Rule>`)
+    const { layers } = convertSldToMapLibre(sld, { workspace: 'AlmatyGIS', latitude: 43.24 })
+    const size = layers[0].layout['text-size']
+    expect(size.slice(0, 3)).toEqual(['interpolate', ['exponential', 2], ['zoom']])
+    expect(size[4]).toBe(METRE_TEXT_MIN_PX)
+    expect(size[6]).toBe(METRE_TEXT_MAX_PX)
+    // 6 м на 17-м зуме у широты Алматы — ≈14 px: нижняя граница (12 px) — чуть раньше
+    expect(size[3]).toBeGreaterThan(16.5)
+    expect(size[3]).toBeLessThan(17)
+    expect(size[5] - size[3]).toBeCloseTo(Math.log2(METRE_TEXT_MAX_PX / METRE_TEXT_MIN_PX), 2)
+    expect(layers[0].paint['text-halo-width']).toBe(1.5)
+    expect(layers[0].metadata).toEqual({ [META_TEXT_UOM]: 'metre', [META_LABEL_POINT]: 'interior' })
+    expect(metreTextSize(6)).not.toEqual(size)
+  })
+
+  it('подпись в пикселях — без метаданных', () => {
+    const sld = wrapRules(`
+      <sld:Rule><sld:TextSymbolizer>
+        <sld:Label><ogc:PropertyName>label</ogc:PropertyName></sld:Label>
+        <sld:Font><sld:CssParameter name="font-size">10</sld:CssParameter></sld:Font>
+      </sld:TextSymbolizer></sld:Rule>`)
+    const { layers } = convertSldToMapLibre(sld, { workspace: 'AlmatyGIS' })
+    expect(layers[0].layout['text-size']).toBe(10)
+    expect(layers[0].metadata).toBeUndefined()
   })
 })
 

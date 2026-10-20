@@ -3,6 +3,40 @@ import { XMLParser } from 'fast-xml-parser'
 export interface SldConversionOptions {
   workspace: string
   resourceUrl?: (workspace: string, resourcePath: string) => string
+  /** Широта города — для перевода размеров в метрах (uom=metre) в пиксели по зуму */
+  latitude?: number
+}
+
+/** Метаданные слоя подписи: размер шрифта в стиле задан в метрах */
+export const META_TEXT_UOM = 'tgid:textUom'
+/** Метаданные слоя подписи: точка подписи — внутри полигона (Geometry interiorPoint/centroid в SLD) */
+export const META_LABEL_POINT = 'tgid:labelPoint'
+
+/** Подпись в метрах на экране — не мельче и не крупнее, пикселей */
+export const METRE_TEXT_MIN_PX = 12
+export const METRE_TEXT_MAX_PX = 32
+
+/** Метров в пикселе MapLibre (тайл 512) на нулевом зуме на экваторе */
+const METRES_PER_PX_Z0 = 78271.51696402048
+
+/**
+ * Размер подписи, заданный в метрах (uom=metre), — пиксели по зуму: растёт вдвое с каждым зумом,
+ * как сам дом, но в пределах [METRE_TEXT_MIN_PX, METRE_TEXT_MAX_PX] (6 м шрифта — 14 px на 17-м зуме).
+ */
+export function metreTextSize(metres: number, latitude = 45): any {
+  const k = METRES_PER_PX_Z0 * Math.cos((latitude * Math.PI) / 180)
+  const zoomAt = (px: number) => Math.round(Math.log2((px * k) / metres) * 1000) / 1000
+  return ['interpolate', ['exponential', 2], ['zoom'],
+    zoomAt(METRE_TEXT_MIN_PX), METRE_TEXT_MIN_PX,
+    zoomAt(METRE_TEXT_MAX_PX), METRE_TEXT_MAX_PX]
+}
+
+const isMetreUom = (symbolizer: any): boolean => /metre|meter/i.test(String(symbolizer?.['@_uom'] || ''))
+
+/** Geometry TextSymbolizer — точка внутри полигона (interiorPoint, centroid) */
+function interiorLabelPoint(symbolizer: any): boolean {
+  const fn = String(symbolizer?.Geometry?.Function?.['@_name'] || '')
+  return /^(interiorPoint|centroid)$/i.test(fn)
 }
 
 export interface ConvertedSldStyle {
@@ -216,23 +250,25 @@ function vendorOptions(symbolizer: any): Record<string, string> {
   return out
 }
 
-function textLayer(symbolizer: any): any {
+function textLayer(symbolizer: any, options: SldConversionOptions): any {
   const font = cssParameters(symbolizer?.Font)
   const fill = cssParameters(symbolizer?.Fill)
   const halo = cssParameters(symbolizer?.Halo?.Fill)
   const size = numberValue(font['font-size'], 12) || 12
+  const metre = isMetreUom(symbolizer)
   const pointPlacement = symbolizer?.LabelPlacement?.PointPlacement
   const displacement = pointPlacement?.Displacement
   const dx = numberValue(displacement?.DisplacementX, 0) || 0
   const dy = numberValue(displacement?.DisplacementY, 0) || 0
   const layout: Record<string, any> = {
     'text-field': labelText(symbolizer?.Label),
-    'text-size': size,
+    // uom=metre (подписи нагрузок зданий: 6 м) — размер по зуму; раньше брались пиксели — 6 px, не прочесть
+    'text-size': metre ? metreTextSize(size, options.latitude) : size,
     'text-anchor': textAnchor(pointPlacement),
     'text-allow-overlap': false,
     'text-ignore-placement': false
   }
-  if (dx || dy) layout['text-offset'] = [dx / size, dy / size]
+  if ((dx || dy) && !metre) layout['text-offset'] = [dx / size, dy / size]
   // spaceAround — отступ между подписями (как text-padding); conflictResolution=false — без отсева
   const vendor = vendorOptions(symbolizer)
   const spaceAround = numberValue(vendor.spaceAround)
@@ -244,6 +280,10 @@ function textLayer(symbolizer: any): any {
   if (String(font['font-weight'] || '').toLowerCase() === 'bold') {
     layout['text-font'] = ['Open Sans Bold', 'Arial Unicode MS Bold']
   }
+  const metadata: Record<string, string> = {}
+  if (metre) metadata[META_TEXT_UOM] = 'metre'
+  if (interiorLabelPoint(symbolizer)) metadata[META_LABEL_POINT] = 'interior'
+  const haloRadius = numberValue(symbolizer?.Halo?.Radius, 0) || 0
   return {
     type: 'symbol',
     layout,
@@ -251,8 +291,10 @@ function textLayer(symbolizer: any): any {
       'text-color': fill.fill || '#000000',
       'text-opacity': numberValue(fill['fill-opacity'], 1),
       'text-halo-color': halo.fill || '#ffffff',
-      'text-halo-width': numberValue(symbolizer?.Halo?.Radius, 0) || 0
-    }
+      // ореол в метрах (0,4 м) на экране — доли пикселя; читаемый — от 1,5 px
+      'text-halo-width': metre && haloRadius > 0 ? Math.max(1.5, haloRadius) : haloRadius
+    },
+    ...(Object.keys(metadata).length ? { metadata } : {})
   }
 }
 
@@ -303,7 +345,7 @@ export function convertSldToMapLibre(
       }, index)
     })
     asArray(rule?.PointSymbolizer).forEach((symbolizer, index) => add('point', pointLayer(symbolizer, options), index))
-    asArray(rule?.TextSymbolizer).forEach((symbolizer, index) => add('text', textLayer(symbolizer), index))
+    asArray(rule?.TextSymbolizer).forEach((symbolizer, index) => add('text', textLayer(symbolizer, options), index))
   })
 
   return { layers: mergeIconLadders(layers) }
