@@ -20,6 +20,7 @@ import { combineWithFragmentFilter, fragmentFilterFor } from '~/utils/mapFragmen
 import { combineCql } from '~/utils/nodeKindLayers';
 import { buildViewparams, type PtsHighlight } from '~/utils/ptsHighlight';
 import { dataVersionRevision, mergeViewparamFields, tileUrlWithViewparams, withTileRevision } from '~/utils/mvtTileUrl';
+import { networkStackMoves } from '~/utils/networkLayerStack';
 
 const pbfAttributeRequests = new globalThis.Map<string, Promise<string[]>>();
 
@@ -297,6 +298,9 @@ export const useLayerStore = defineStore('layer', {
           // Re-map the mvtUrl in the layer config for loadMvtLayer
           const layerWithParams = { ...layer, mvtUrl };
           await mapService.loadMvtLayer(mapStore.map as any, layerWithParams);
+          // слой добавлен поверх всех — сразу на своё место, не дожидаясь idle карты
+          // (пока грузятся тайлы, участки иначе лежат поверх узлов и зданий)
+          this.syncMapLayerStackOrder();
           if (import.meta.dev) console.debug(`LayerStore: MVT layer ${layer.layerId} loading initiated`);
         } else if (layer.renderFormat === 'wms') {
           if (import.meta.dev) console.debug(`Loading WMS layer: ${layer.layerId}`);
@@ -777,42 +781,19 @@ export const useLayerStore = defineStore('layer', {
       const style = map.getStyle();
       if (!style || !style.layers) return;
 
-      // Строим упорядоченный список сублоев
-      // layerIds передаётся в порядке снизу вверх (последний = сверху на карте)
-      // Сначала собираем нон-точечные, затем точечные — чтобы точки всегда были над линиями
-      const pointTypes = new Set(['circle', 'symbol']);
-      const nonPointOrder: string[] = [];
-      const pointOrder: string[] = [];
-
-      layerIds.forEach(layerId => {
+      // layerIds — снизу вверх (последний = сверху). Порядок как в ГИС: здания → участки → узлы →
+      // подписи, внутри группы — по списку (utils/networkLayerStack). Раньше слои переставлялись
+      // «каждый перед следующим» снизу вверх, а следующий потом сам уезжал — итог зависел от того,
+      // в каком порядке слои догрузились, и участки время от времени ложились поверх узлов и зданий
+      const groups = layerIds.map((layerId) => {
         const relatedLayers = this.getLayerIdsOnMap(layerId);
-        const ids = relatedLayers.length > 0 ? relatedLayers : (map.getLayer(layerId) ? [layerId] : []);
-        
-        ids.forEach(subId => {
-          const sublayer = map.getLayer(subId) as any;
-          if (sublayer && pointTypes.has(sublayer.type)) {
-            pointOrder.push(subId);
-          } else if (sublayer) {
-            nonPointOrder.push(subId);
-          }
-        });
+        return relatedLayers.length > 0 ? relatedLayers : (map.getLayer(layerId) ? [layerId] : []);
       });
-
-      const newLayerOrder = [...nonPointOrder, ...pointOrder];
-      
-      // Применяем порядок: первый элемент — самый нижний, последний — самый верхний
-      for (let i = 0; i < newLayerOrder.length; i++) {
-        const layerId = newLayerOrder[i];
-        if (map.getLayer(layerId)) {
-          try {
-            if (i < newLayerOrder.length - 1) {
-              map.moveLayer(layerId, newLayerOrder[i + 1]);
-            } else {
-              map.moveLayer(layerId);
-            }
-          } catch (e) {
-            console.warn(`Could not move layer ${layerId}:`, e);
-          }
+      for (const { id, beforeId } of networkStackMoves(style.layers as any, groups)) {
+        try {
+          map.moveLayer(id, beforeId);
+        } catch (e) {
+          console.warn(`Could not move layer ${id}:`, e);
         }
       }
     },
