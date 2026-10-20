@@ -1,6 +1,32 @@
 <template>
-  <div class="editor-toolbar elevation-4">
+  <div
+    ref="rootEl"
+    class="editor-toolbar elevation-4"
+    :class="{ 'editor-toolbar--moved': pos, 'editor-toolbar--dragging': dragging }"
+    :style="posStyle"
+  >
     <div class="d-flex align-center flex-wrap ga-1 pa-1">
+      <!-- Ручка: перетащить панель по карте (если не закреплена), двойной щелчок — на место -->
+      <div
+        class="editor-toolbar__handle"
+        :class="{ 'editor-toolbar__handle--pinned': pinned }"
+        role="button"
+        aria-label="Переместить панель"
+        @pointerdown="onHandleDown"
+        @dblclick="resetPos"
+      >
+        <v-icon size="18">
+          mdi-drag
+        </v-icon>
+        <v-tooltip
+          activator="parent"
+          location="bottom"
+        >
+          {{ pinned
+            ? 'Панель закреплена — открепите её кнопкой с булавкой, чтобы переместить'
+            : 'Перетащите, чтобы переместить панель; двойной щелчок — вернуть на место' }}
+        </v-tooltip>
+      </div>
       <!-- Инструменты: один активный (V, L, N, E, M, B) -->
       <v-btn-toggle
         :model-value="activeTool"
@@ -367,12 +393,30 @@
           Горячие клавиши (?)
         </v-tooltip>
       </v-btn>
+      <v-btn
+        size="small"
+        :variant="pinned ? 'tonal' : 'text'"
+        :color="pinned ? 'primary' : undefined"
+        icon
+        :aria-pressed="pinned"
+        @click="togglePinned"
+      >
+        <v-icon size="18">
+          {{ pinned ? 'mdi-pin' : 'mdi-pin-off' }}
+        </v-icon>
+        <v-tooltip
+          activator="parent"
+          location="bottom"
+        >
+          {{ pinned ? 'Панель закреплена на месте — открепить' : 'Закрепить панель на месте (не перетаскивать случайно)' }}
+        </v-tooltip>
+      </v-btn>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { useTopologyEditor } from '~/composables/useTopologyEditor';
 import { EDITOR_TOOLS, toolAllowed, type EditorTool } from '~/utils/editorTools';
 import { useAuthStore } from '~/stores/authStore';
@@ -382,8 +426,105 @@ import { POLAR_STEP_ITEMS } from '~/utils/cadConstraint';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
 import { fragmentChoices, fragmentLabel } from '~/utils/editFragment';
 import { useFragmentStore } from '~/stores/fragmentStore';
+import { appStorage } from '~/utils/appStorage';
+import { clampPanelPos, parsePanelPos, type PanelPos } from '~/utils/floatingPanel';
 
 const props = defineProps<{ editor: ReturnType<typeof useTopologyEditor> }>();
+
+// === Положение панели: перетаскивание за ручку, закрепление, запоминание между сеансами ===
+const POS_KEY = 'editorToolbarPos';
+const PINNED_KEY = 'editorToolbarPinned';
+const readStorage = (key: string): string | null => {
+  try {
+    return appStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const writeStorage = (key: string, value: string | null) => {
+  try {
+    if (value == null) appStorage.removeItem(key);
+    else appStorage.setItem(key, value);
+  } catch {
+    // удобство: без хранилища положение живёт до перезагрузки
+  }
+};
+
+const rootEl = ref<HTMLElement | null>(null);
+/** null — на месте по умолчанию (сверху по центру карты) */
+const pos = ref<PanelPos | null>(parsePanelPos(readStorage(POS_KEY)));
+const pinned = ref(readStorage(PINNED_KEY) === '1');
+const dragging = ref(false);
+const posStyle = computed(() => (pos.value ? { left: `${pos.value.x}px`, top: `${pos.value.y}px` } : undefined));
+
+/** Положение в пределах карты (родителя панели) */
+const clampToArea = (p: PanelPos): PanelPos => {
+  const el = rootEl.value;
+  const area = el?.offsetParent as HTMLElement | null;
+  if (!el || !area) return p;
+  return clampPanelPos(p, { w: el.offsetWidth, h: el.offsetHeight }, { w: area.clientWidth, h: area.clientHeight });
+};
+
+let stopDrag: (() => void) | null = null;
+const onHandleDown = (e: PointerEvent) => {
+  if (pinned.value || e.button !== 0) return;
+  const el = rootEl.value;
+  const area = el?.offsetParent as HTMLElement | null;
+  if (!el || !area) return;
+  e.preventDefault();
+  const start = el.getBoundingClientRect();
+  const dx = e.clientX - start.left;
+  const dy = e.clientY - start.top;
+  dragging.value = true;
+  const move = (ev: PointerEvent) => {
+    const a = area.getBoundingClientRect();
+    pos.value = clampToArea({ x: ev.clientX - a.left - dx, y: ev.clientY - a.top - dy });
+  };
+  const up = () => stopDrag?.();
+  stopDrag = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
+    dragging.value = false;
+    stopDrag = null;
+    if (pos.value) writeStorage(POS_KEY, JSON.stringify(pos.value));
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+};
+
+const resetPos = () => {
+  if (pinned.value) return;
+  pos.value = null;
+  writeStorage(POS_KEY, null);
+};
+
+const togglePinned = () => {
+  pinned.value = !pinned.value;
+  writeStorage(PINNED_KEY, pinned.value ? '1' : null);
+};
+
+// панель сменила размер (другой инструмент) или окно уменьшилось — не уходить за край карты
+const reclamp = () => {
+  if (!pos.value || dragging.value) return;
+  const next = clampToArea(pos.value);
+  if (next.x !== pos.value.x || next.y !== pos.value.y) pos.value = next;
+};
+let observer: ResizeObserver | null = null;
+onMounted(() => {
+  if (typeof ResizeObserver !== 'undefined' && rootEl.value) {
+    observer = new ResizeObserver(reclamp);
+    observer.observe(rootEl.value);
+  }
+  window.addEventListener('resize', reclamp);
+  reclamp();
+});
+onBeforeUnmount(() => {
+  stopDrag?.();
+  observer?.disconnect();
+  window.removeEventListener('resize', reclamp);
+});
 
 // поля редактора — ссылки: в шаблоне разворачиваются как верхнеуровневые
 const {
@@ -470,6 +611,30 @@ const statusChips = computed(() => {
   border-radius: 24px;
   z-index: 10;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+/* перетащена оператором: угол — из style (left/top), без центрирования */
+.editor-toolbar--moved {
+  transform: none;
+}
+.editor-toolbar--dragging {
+  user-select: none;
+  opacity: 0.92;
+}
+.editor-toolbar__handle {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  padding: 0 2px;
+  cursor: grab;
+  touch-action: none;
+  opacity: 0.6;
+}
+.editor-toolbar--dragging .editor-toolbar__handle {
+  cursor: grabbing;
+}
+.editor-toolbar__handle--pinned {
+  cursor: default;
+  opacity: 0.25;
 }
 .editor-toolbar__tools {
   height: 36px !important;

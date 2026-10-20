@@ -44,7 +44,12 @@ import type { LngLat } from '~/utils/lineVertices';
 import { canMoveNodes, editorKeyAction, editorStatusHint, toolAllowed, type EditorTool } from '~/utils/editorTools';
 import { canDo, type Permissions } from '~/utils/permissions';
 import { useEditSelection } from '~/composables/useEditSelection';
-import { creationFragment, tracePointFragment } from '~/utils/editFragment';
+import {
+  creationFragment,
+  traceFragmentConflict,
+  traceFragmentConflictText,
+  tracePointFragment,
+} from '~/utils/editFragment';
 import type { DeleteDone, DeleteTarget, EditorContextAction, EditorContextTarget, ObjectDialog } from '~/utils/editorTools';
 
 export interface TopologyEditorOptions {
@@ -378,7 +383,9 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       // удобство: без хранилища действует до перезагрузки
     }
   });
-  const snapIndex = useSnapIndex(getMap, creationFragments);
+  // индекс — по всем видимым фрагментам (чтобы узнать узел чужого фрагмента под курсором),
+  // привязка трассы — только к фрагменту создания
+  const snapIndex = useSnapIndex(getMap, activeFragments);
   const contextSnap = useContextSnap(getMap);
   const cadNorms = getCityConfig().cadDefaults;
   const trace = useTraceDraw(getMap, snapIndex.index, creationFragments, {
@@ -387,13 +394,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     contextEnabled: contextSnapEnabled,
     norms: () => cadNorms,
   });
-  // сменили рабочий фрагмент — привязка к его объектам, без ожидания сдвига карты
-  // (сузили набор — например, фрагмент взят от начала трассы — загруженные данные его уже содержат)
-  watch(() => creationFragments().join(','), (now, before) => {
-    if (before === '') return; // были загружены все фрагменты
-    const had = new Set(before.split(','));
-    if (now === '' || !now.split(',').every((id) => had.has(id))) snapIndex.invalidate();
-  });
+  // сменили видимые фрагменты — перечитать окно, без ожидания сдвига карты
+  watch(() => activeFragments().join(','), () => snapIndex.invalidate());
 
   /** Фрагмент новых объектов не определён — попросить выбрать его на панели */
   const askFragment = (what: string) => {
@@ -429,6 +431,19 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     }
     trace.clear();
     askFragment('трассу');
+    return false;
+  };
+  /**
+   * Начальный и конечный узлы участка — в одном фрагменте: точка на узле/трубе чужого фрагмента
+   * снимается (последняя) или трасса сбрасывается. → false — трасса изменена, дальше не идти
+   */
+  const checkTraceFragment = (): boolean => {
+    const pts = trace.points.value;
+    const conflict = traceFragmentConflict(pts, snapIndex.index.value, creationFragmentId.value);
+    if (!conflict) return true;
+    if (conflict.index === pts.length - 1 && pts.length > 1) trace.removeLast();
+    else trace.clear();
+    useNotificationStore().showWarning(traceFragmentConflictText(conflict));
     return false;
   };
   const chainPreviewOpen = ref(false);
@@ -738,7 +753,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
       await snapIndex.reload();
     }
     const point = trace.addCoord([converted.lng, converted.lat]);
-    if (point && !ensureTraceFragment()) return { converted, point: null };
+    if (point && (!checkTraceFragment() || !ensureTraceFragment())) return { converted, point: null };
     return { converted, point };
   };
 
@@ -961,6 +976,11 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     if (outcome.action === 'split') {
       trace.clear();
       await openSplitPreview(outcome.lineId, outcome.coord[0], outcome.coord[1]);
+      return;
+    }
+    const conflict = traceFragmentConflict(outcome.points, snapIndex.index.value, creationFragmentId.value);
+    if (conflict) {
+      useNotificationStore().showWarning(traceFragmentConflictText(conflict));
       return;
     }
     chainPoints = outcome.points;
@@ -1475,7 +1495,23 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
           await onEntryClick(e);
           return;
         }
-        if (trace.onClick(e)) await finishTrace();
+        const foreign = trace.foreignNodeAt(e);
+        if (foreign?.nodeId != null && foreign.fragmentId != null) {
+          const expected = creationFragmentId.value
+            ?? tracePointFragment(trace.points.value[0], snapIndex.index.value);
+          useNotificationStore().showWarning(expected != null
+            ? traceFragmentConflictText({
+              index: trace.points.value.length,
+              point: { kind: 'node', coord: foreign.coord, nodeId: foreign.nodeId },
+              fragment: foreign.fragmentId,
+              expected,
+            })
+            : `Узел ${foreign.nodeId} — во фрагменте ${foreign.fragmentId}: выберите этот фрагмент на панели.`);
+          return;
+        }
+        const finished = trace.onClick(e);
+        if (!checkTraceFragment()) return;
+        if (finished) await finishTrace();
         else ensureTraceFragment();
         return;
       }
@@ -1567,7 +1603,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     const from = contextMenu.value?.fragmentId ?? null;
     if (from != null && creationFragmentId.value !== from) setWorkFragment(from);
     await snapIndex.reload();
-    if (trace.addCoord(coord)) ensureTraceFragment();
+    if (trace.addCoord(coord) && checkTraceFragment()) ensureTraceFragment();
   };
 
   const runContextAction = async (action: EditorContextAction) => {

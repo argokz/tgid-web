@@ -61,6 +61,8 @@ const LAYER_POINT = 'cad-trace-point';
 const LAYER_SNAP = 'cad-trace-snap';
 const LAYER_LABEL = 'cad-trace-label';
 export const TRACE_SNAP_RADIUS_PX = 14;
+/** узлы притягивают сильнее труб: конец участка ложится ровно в узел, а не врезкой рядом с ним */
+export const TRACE_NODE_SNAP_RADIUS_PX = 22;
 /** радиус дуги угла поворота на экране */
 const ARC_RADIUS_PX = 22;
 /** направляющая «вдоль трубы» — от трубы в стольких радиусах привязки от курсора */
@@ -307,7 +309,8 @@ export function useTraceDraw(
   const snapAt = (coord: LngLat): SnapResult | null => {
     const idx = snapIndex.value;
     const r = radiusM(coord[1]);
-    const net = idx ? findSnap(idx, coord, r, { fragmentIds: getFragmentIds() }) : null;
+    const nodeRadiusM = (r * TRACE_NODE_SNAP_RADIUS_PX) / TRACE_SNAP_RADIUS_PX;
+    const net = idx ? findSnap(idx, coord, r, { fragmentIds: getFragmentIds(), nodeRadiusM }) : null;
     if (net) return net;
     const ctx = contextIndex();
     const c = ctx ? findContextSnap(ctx, coord, r) : null;
@@ -425,12 +428,38 @@ export function useTraceDraw(
    * «точка у узла» на сервере), иначе ровно в координатах. null — точка совпала с предыдущей.
    */
   const addCoord = (coord: LngLat): TracePoint | null => {
-    const idx = snapIndex.value;
-    const s = idx ? findSnap(idx, coord, COORD_NODE_SNAP_M, { fragmentIds: getFragmentIds() }) : null;
-    const point: TracePoint = s?.kind === 'node' && s.nodeId != null
-      ? { kind: 'node', coord: s.coord, nodeId: s.nodeId }
-      : { kind: points.value.length ? 'vertex' : 'new', coord };
+    const point: TracePoint = nodePointNear(coord) ?? { kind: points.value.length ? 'vertex' : 'new', coord };
     return addPoint(point) ? point : null;
+  };
+
+  /**
+   * Узел сети в пределах COORD_NODE_SNAP_M от точки — точка становится этим узлом. Так и точка
+   * по замку длины/угла, и клик с Alt, попавшие в узел, соединяются с ним, а не дают новый узел
+   * в сантиметрах от существующего (сервер такой отклонит: «привяжитесь к узлу»).
+   */
+  const nodePointNear = (coord: LngLat): TracePoint | null => {
+    const idx = snapIndex.value;
+    const s = idx ? findSnap(idx, coord, COORD_NODE_SNAP_M, { fragmentIds: getFragmentIds(), lines: false }) : null;
+    return s?.kind === 'node' && s.nodeId != null ? { kind: 'node', coord: s.coord, nodeId: s.nodeId } : null;
+  };
+
+  /**
+   * Узел чужого фрагмента под курсором, к которому привязаться нельзя (участок соединяет узлы
+   * одного фрагмента) — для предупреждения вместо свободной точки рядом с ним. null — такого нет
+   * или своя привязка (узел, а то и труба ближе) важнее.
+   */
+  const foreignNodeAt = (e: MapMouseEvent): SnapResult | null => {
+    const idx = snapIndex.value;
+    const own = getFragmentIds();
+    if (!idx || !own.length) return null;
+    const coord: LngLat = [e.lngLat.lng, e.lngLat.lat];
+    const r = (radiusM(coord[1]) * TRACE_NODE_SNAP_RADIUS_PX) / TRACE_SNAP_RADIUS_PX;
+    const any = findSnap(idx, coord, r, { lines: false, nodeRadiusM: r });
+    if (!any || any.fragmentId == null || own.includes(any.fragmentId)) return null;
+    const alt = Boolean((e.originalEvent as MouseEvent | undefined)?.altKey);
+    const mine = alt ? null : snapAt(coord);
+    if (mine && (mine.kind === 'node' || mine.distM <= any.distM)) return null;
+    return any;
   };
 
   /** Клик: добавить точку; true — трасса завершена этим кликом (узел/труба без Shift) */
@@ -438,7 +467,8 @@ export function useTraceDraw(
     raw = rawFrom(e);
     compute();
     const s = snap.value;
-    const point = pointFromClick(s, cursor.value ?? raw.coord, points.value.length === 0);
+    const at = cursor.value ?? raw.coord;
+    const point = (s ? null : nodePointNear(at)) ?? pointFromClick(s, at, points.value.length === 0);
     const before = points.value;
     if (!addPoint(point)) return false;
     return finishesTrace(point, before, raw.shift);
@@ -457,7 +487,7 @@ export function useTraceDraw(
     if (step.place && cursor.value) {
       const last = points.value[points.value.length - 1];
       if (distanceM(last.coord, cursor.value) > 0) {
-        addPoint({ kind: 'vertex', coord: cursor.value });
+        addPoint(nodePointNear(cursor.value) ?? { kind: 'vertex', coord: cursor.value });
         return true;
       }
     }
@@ -541,6 +571,7 @@ export function useTraceDraw(
     lengths,
     onMove,
     onClick,
+    foreignNodeAt,
     addCoord,
     handleKey,
     hover,

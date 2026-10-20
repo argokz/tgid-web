@@ -146,6 +146,11 @@ export interface SnapOptions {
   excludeLines?: readonly number[];
   /** привязка к трубам (изломы, середины, врезка); false — только к узлам */
   lines?: boolean;
+  /**
+   * Радиус притяжения узлов, м (больше radiusM): узел «перетягивает» привязку у трубы рядом —
+   * участок ложится ровно в узел, а не врезкой в сантиметрах от него. По умолчанию — radiusM.
+   */
+  nodeRadiusM?: number;
 }
 
 const RANK: Record<SnapKind, number> = { node: 0, vertex: 1, midpoint: 2, segment: 3, corner: 4, wall: 5, road: 6 };
@@ -158,13 +163,14 @@ export const findSnap = (index: SnapIndex, cursor: LngLat, radiusM: number, opts
   const exLines = new Set(opts.excludeLines ?? []);
   const allowFragment = (f: number | null) => !fragments || (f != null && fragments.has(f));
   const r = Math.max(0, radiusM);
-  const c0x = Math.floor((p[0] - r) / index.cell);
-  const c1x = Math.floor((p[0] + r) / index.cell);
-  const c0y = Math.floor((p[1] - r) / index.cell);
-  const c1y = Math.floor((p[1] + r) / index.cell);
+  const rNode = Math.max(r, opts.nodeRadiusM ?? 0);
+  const c0x = Math.floor((p[0] - rNode) / index.cell);
+  const c1x = Math.floor((p[0] + rNode) / index.cell);
+  const c0y = Math.floor((p[1] - rNode) / index.cell);
+  const c1y = Math.floor((p[1] + rNode) / index.cell);
   let best: SnapResult | null = null;
   const consider = (cand: SnapResult) => {
-    if (cand.distM > r) return;
+    if (cand.distM > (cand.kind === 'node' ? rNode : r)) return;
     if (!best || RANK[cand.kind] < RANK[best.kind] || (RANK[cand.kind] === RANK[best.kind] && cand.distM < best.distM)) {
       best = cand;
     }

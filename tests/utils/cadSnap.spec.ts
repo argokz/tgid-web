@@ -99,6 +99,16 @@ describe('cadSnap', () => {
     expect(findSnap(index, at(25, 13), 5, { lines: false })).toBeNull();
     expect(findSnap(index, at(25, 40), 5)).toBeNull();
   });
+
+  it('узел притягивает сильнее трубы: у конца участка — узел, а не врезка рядом с ним', () => {
+    // 7 м от узла 1 вдоль трубы 10: в радиусе 5 м — только труба, в радиусе узлов 9 м — узел
+    const near = at(6.5, 2.6);
+    expect(findSnap(index, near, 5)?.kind).toBe('segment');
+    expect(findSnap(index, near, 5, { nodeRadiusM: 9 })).toMatchObject({ kind: 'node', nodeId: 1 });
+    // далеко от узлов радиус узлов ничего не меняет
+    expect(findSnap(index, at(25, 13), 5, { nodeRadiusM: 9 })?.kind).toBe('segment');
+    expect(findSnap(index, at(25, 40), 5, { nodeRadiusM: 9 })).toBeNull();
+  });
 });
 
 describe('cadChain', () => {

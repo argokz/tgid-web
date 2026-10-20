@@ -599,6 +599,26 @@ describe('useTopologyEditor', () => {
       expect(api.createChain.mock.calls[0][0].fileid).toBe(74);
     });
 
+    it('узел другого фрагмента — не конец участка: предупреждение, точка не ставится', async () => {
+      api.getSnapData.mockResolvedValue({
+        ...SNAP,
+        nodes: [...SNAP.nodes, { id: 3, c: [76.9006, 43.2405], f: 99, s: 1 }],
+      });
+      api.getLastRedoOperation.mockResolvedValue(null);
+      const { editor } = setup({ getActiveFragmentIds: () => [74, 99] }, true);
+      editor.toggleEditTopologyMode();
+      await flush();
+      editor.setWorkFragment(74);
+      await editor.onMapClickForTopology(ev(76.900001, 43.24));
+      expect(editor.trace.points.value.map((p) => p.kind)).toEqual(['node']);
+      await editor.onMapClickForTopology(ev(76.900601, 43.2405));
+      expect(editor.trace.points.value.length).toBe(1);
+      expect(notify.showWarning).toHaveBeenCalledWith(
+        expect.stringMatching(/^Узел 3 — во фрагменте 99, а трасса — во фрагменте 74/),
+      );
+      expect(api.createChain).not.toHaveBeenCalled();
+    });
+
     it('клик в пустоту + завершение — новый узел; Backspace и сброс правят трассу', async () => {
       const { editor } = await start({ getActiveFragmentIds: () => [74] });
       api.createNode.mockResolvedValue({ id: 900, fileid: 74 });

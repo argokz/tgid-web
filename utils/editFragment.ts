@@ -30,6 +30,40 @@ export const tracePointFragment = (p: TracePoint | undefined, idx: SnapIndex | n
   return null;
 };
 
+/** Точка трассы на объекте чужого фрагмента */
+export interface TraceFragmentConflict {
+  index: number;
+  point: TracePoint;
+  fragment: number;
+  expected: number;
+}
+
+/**
+ * Узлы и трубы трассы из разных фрагментов: участок соединяет узлы одного фрагмента (иначе сервер
+ * откажет — mixed_context). Фрагмент трассы — выбранный для создания, а если его нет — первой
+ * точки на узле/трубе. → первая точка не из него, null — всё в одном фрагменте
+ */
+export const traceFragmentConflict = (
+  points: readonly TracePoint[],
+  idx: SnapIndex | null,
+  chosen: number | null,
+): TraceFragmentConflict | null => {
+  let expected = chosen;
+  for (let i = 0; i < points.length; i++) {
+    const f = tracePointFragment(points[i], idx);
+    if (f == null) continue;
+    if (expected == null) expected = f;
+    else if (f !== expected) return { index: i, point: points[i]!, fragment: f, expected };
+  }
+  return null;
+};
+
+export const traceFragmentConflictText = (c: TraceFragmentConflict): string => {
+  const what = c.point.kind === 'node' ? `Узел ${c.point.nodeId}` : `Участок ${c.point.lineId}`;
+  return `${what} — во фрагменте ${c.fragment}, а трасса — во фрагменте ${c.expected}. `
+    + 'Начальный и конечный узлы участка должны быть в одном фрагменте.';
+};
+
 /** «42 · Магистраль 2026» — номер и имя фрагмента для панели и уведомлений */
 export const fragmentLabel = (id: number, name?: string | null): string => {
   const n = (name ?? '').trim();
