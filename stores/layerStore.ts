@@ -17,7 +17,6 @@ import {
 } from '~/utils/contextMapLayers';
 import { buildMvtLayerIdentifiers, buildWmsOnlyLayerIdentifiers, buildWmsRasterSourceId } from '~/utils/geoserverMvtIds';
 import { combineWithFragmentFilter, fragmentFilterFor } from '~/utils/mapFragmentFilter';
-import { combineCql } from '~/utils/nodeKindLayers';
 import { buildViewparams, type PtsHighlight } from '~/utils/ptsHighlight';
 import { dataVersionRevision, mergeViewparamFields, tileUrlWithViewparams, withTileRevision } from '~/utils/mvtTileUrl';
 import { networkStackMoves } from '~/utils/networkLayerStack';
@@ -305,14 +304,11 @@ export const useLayerStore = defineStore('layer', {
         } else if (layer.renderFormat === 'wms') {
           if (import.meta.dev) console.debug(`Loading WMS layer: ${layer.layerId}`);
           
-          // Get current fragment filter as CQL
+          // Фрагменты — параметром SQL-view (VIEWPARAMS), как в applyFragmentFilter. Раньше здесь
+          // добавлялся CQL_FILTER "fileid" IN (…): у слоёв без поля fileid (zdaniya_tu) GeoServer
+          // отвечал XML-ошибкой вместо картинки — в консоли «The source image could not be decoded»
           const fragmentStore = useFragmentStore();
-          let cqlFilterStr: string | undefined = undefined;
-          if (fragmentStore.visibleFragments.length > 0) {
-            const ids = fragmentStore.visibleFragments;
-            const allIds = [...new Set([...ids, ...ids.map(id => String(id))])];
-            cqlFilterStr = `"fileid" IN (${allIds.map(id => `'${id}'`).join(',')})`;
-          }
+          const viewparams = buildViewparams(fragmentStore.visibleFragments, this.getLayerVisibleFields(layer), this.ptsHighlight);
 
           const ws = layer.workspace || 'AlmatyGIS';
           const rastSid =
@@ -330,7 +326,8 @@ export const useLayerStore = defineStore('layer', {
             workspace: ws,
             layerName: layer.sourceLayer,
             url: baseUrl.replace(/\/$/, ''),
-            cqlFilter: combineCql(layer.cqlFilter, cqlFilterStr)
+            cqlFilter: layer.cqlFilter,
+            viewParams: { viewparams },
           });
         }
         

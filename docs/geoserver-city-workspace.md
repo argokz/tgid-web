@@ -265,3 +265,30 @@ ollback-tgid-cities.ps1`.
 
 Все слои узлов (`uzel`, источники, НС, потребители, обобщённые) берут одни и те же тайлы `uzel`
 из одного источника карты, а вид узла отделяет фильтр MapLibre по `code`.
+
+## Тараз, Актобе, Шымкент (21.10.2026)
+
+Базы `tarazgid`, `aktobegid`, `shymkentgid`. Конвертер записал сеть сразу в Web Mercator:
+`nodes.shape`/`linesobj.shape` — SRID 3857. Своя система координат (9998) не нужна, длины API считает
+по эллипсоиду (`topology.ground_length_sql`). Таблицы API, `tg_format*` и индекс узлов API создаёт сам
+(`database/city_schema.py`). В базе Шымкента (старая версия конвертера) не было
+`generalizedconsumers.name` — её добавляет общий пункт схемы (без неё падают `find_node`,
+`id_generalizedconsumers`).
+
+```
+python scripts/geoserver/clone_city_workspace.py --dst TarazGIS --database tarazgid --srid 3857 --skip zdaniya_2,id_zdaniya_2
+python scripts/geoserver/gid_desktop_style.py --workspace TarazGIS --backup-dir H:/tgid-backups/2026-10-21_kz_cities/style_TarazGIS
+python scripts/geoserver/gwc_mvt_cache.py --layers TarazGIS:heatpipesections,TarazGIS:uzel --backup-dir H:/tgid-backups/2026-10-21_kz_cities/gwc
+```
+(то же для `AktobeGIS`/`aktobegid` и `ShymkentGIS`/`shymkentgid`). SQL-view общие с Алматы: в них нет
+номеров SRID, слои объявлены `EPSG:3857` и совпадают с колонками — WFS `within` работает (в Шатуре нет).
+
+Фрагменты по умолчанию (`NUXT_PUBLIC_DEFAULT_FRAGMENTS`), расчётов в базах нет:
+- **Тараз** — всё, кроме копий магистрали 3106 «летний», 3109, 3110 «первоначальный», 4114 «на 2022-2023»
+  (лежат на 7 «Магистраль_Тараз отопительный»): `1-3105,3111-4113,4115-14114`;
+- **Актобе** — 1 «Исходная Актобе» (вся сеть; 16 «АТЭЦ» и районные фрагменты — её части, лежат на ней);
+- **Шымкент** — всё, кроме 329 «Шымкент Магистраль 2021-22» (копия 2): `1-328,330-10329`.
+
+Данные: в Шымкенте у 9,4 тыс. из 10,7 тыс. узлов основной сети и 10,2 тыс. участков нет геометрии
+(и x/y) — на карте только магистраль и часть сети. В Таразе и Шымкенте нет таблиц журналов
+дефектов/шурфов/опрессовки Алматы — эти разделы там пустые.

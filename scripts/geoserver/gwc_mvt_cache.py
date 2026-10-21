@@ -58,6 +58,12 @@ DEFAULT_LAYERS = [
     'AstanaGIS:uzel',
     'ShaturaGIS:heatpipesections',
     'ShaturaGIS:uzel',
+    'TarazGIS:heatpipesections',
+    'TarazGIS:uzel',
+    'AktobeGIS:heatpipesections',
+    'AktobeGIS:uzel',
+    'ShymkentGIS:heatpipesections',
+    'ShymkentGIS:uzel',
 ]
 # Охват сетки EPSG:900913 «весь мир»: кеш отдаёт тайлы везде, где есть объекты, — новый фрагмент или
 # район за прежними границами слоя виден сразу, без пересчёта границ (веб берёт пределы сетки из WMTS)
