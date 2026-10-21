@@ -64,6 +64,8 @@ DEFAULT_LAYERS = [
     'AktobeGIS:uzel',
     'ShymkentGIS:heatpipesections',
     'ShymkentGIS:uzel',
+    'KaragandaGIS:heatpipesections',
+    'KaragandaGIS:uzel',
 ]
 # Охват сетки EPSG:900913 «весь мир»: кеш отдаёт тайлы везде, где есть объекты, — новый фрагмент или
 # район за прежними границами слоя виден сразу, без пересчёта границ (веб берёт пределы сетки из WMTS)
