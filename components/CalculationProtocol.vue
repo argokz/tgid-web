@@ -255,7 +255,38 @@
                     </v-icon>
                     Пересчитать
                   </v-btn>
+                  <v-btn
+                    v-if="authStore.canUseAi && records.length"
+                    size="small"
+                    variant="text"
+                    color="primary"
+                    :loading="aiLoading"
+                    title="Объяснить протокол помощником ИИ: причины, что открыть, регуляторы с дефицитом"
+                    @click="explainWithAi(false)"
+                  >
+                    <v-icon
+                      size="small"
+                      class="mr-1"
+                    >
+                      mdiCreation
+                    </v-icon>
+                    Объяснить
+                  </v-btn>
                 </div>
+
+                <AiAnswerPanel
+                  v-if="aiShown"
+                  :answer="aiResult?.explanation ?? null"
+                  :regulators="aiResult?.regulators ?? []"
+                  :loading="aiLoading"
+                  :error="aiError"
+                  :cached="aiResult?.cached ?? false"
+                  :category-labels="summary?.category_labels ?? {}"
+                  @object="aiGoTo"
+                  @fix="aiFix"
+                  @refresh="explainWithAi(true)"
+                  @close="aiShown = false"
+                />
 
                 <!-- Записи -->
                 <div
@@ -469,6 +500,9 @@ import { fastApiService } from '~/services/fastApiService';
 import { useMapStore } from '~/stores/mapStore';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { useUiStore } from '~/stores/uiStore';
+import { useAuthStore } from '~/stores/authStore';
+import AiAnswerPanel from '~/components/ai/AiAnswerPanel.vue';
+import { aiService, type AiObjectRef, type ExplainProtocolResult, type RootCause } from '~/services/aiService';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { formatApiErrorWith } from '~/utils/apiError';
 import {
@@ -507,6 +541,7 @@ const emit = defineEmits<{
 
 const mapStore = useMapStore();
 const uiStore = useUiStore();
+const authStore = useAuthStore();
 const fragmentStore = useFragmentStore();
 const notify = useNotificationStore();
 
@@ -663,6 +698,66 @@ watch(filtered, (list) => {
 });
 
 const entryKey = (e: ProtocolEntry) => `${e.fragment_id ?? ''}:${e.seq}`;
+
+// --- Помощник ИИ: объяснение протокола (сервер ai/calc_protocol.py) ---
+const aiShown = ref(false);
+const aiLoading = ref(false);
+const aiError = ref('');
+const aiResult = ref<ExplainProtocolResult | null>(null);
+
+/** Объяснить загруженный протокол; refresh — спросить модель заново вместо кеша */
+const explainWithAi = async (refresh: boolean) => {
+  const first = records.value[0];
+  if (!first || aiLoading.value) return;
+  aiShown.value = true;
+  aiLoading.value = true;
+  aiError.value = '';
+  try {
+    const body = first.request_id ? { request_id: first.request_id, refresh } : { protocol_id: first.id, refresh };
+    aiResult.value = await aiService.explainProtocol(body);
+  } catch (err) {
+    aiResult.value = null;
+    aiError.value = formatApiErrorWith('Помощник ИИ не ответил', err);
+  } finally {
+    aiLoading.value = false;
+  }
+};
+
+const aiObjectToProtocol = (o: AiObjectRef): ProtocolObject | null => {
+  if (o.kind === 'line2' && o.id1 != null && o.id2 != null) return { kind: 'line2', id1: o.id1, id2: o.id2, label: o.label };
+  if ((o.kind === 'node' || o.kind === 'line') && o.id != null) return { kind: o.kind, id: o.id, label: o.label };
+  return null;
+};
+
+/** Запись протокола, к которой относится объект ответа — чтобы переход и fix работали как у записи */
+const aiEntryFor = (o: ProtocolObject): ProtocolEntry | undefined =>
+  entries.value.find((e) => e.objects.some((x) => objectKey(x) === objectKey(o)));
+
+const aiGoTo = async (o: AiObjectRef) => {
+  const po = aiObjectToProtocol(o);
+  if (!po) return;
+  const e = aiEntryFor(po);
+  if (e) activeKey.value = entryKey(e);
+  await goTo(po, e);
+};
+
+const aiFix = async (cause: RootCause) => {
+  const po = cause.objects.map(aiObjectToProtocol).find((x): x is ProtocolObject => x !== null) ?? null;
+  const e = po ? aiEntryFor(po) : entries.value.find((x) => x.fix === cause.fix && x.category === cause.category);
+  if (e) {
+    await runFix(e);
+    return;
+  }
+  if (cause.fix === 'calc_params') emit('open-calculation');
+  else if (cause.fix === 'temp_graph') uiStore.requestToolDialog('temperatureGraph');
+  else if (po) await goTo(po);
+};
+
+watch(records, () => {
+  aiResult.value = null;
+  aiError.value = '';
+  aiShown.value = false;
+});
 const rowRefs = new Map<string, Element>();
 const setRowRef = (key: string, el: any) => {
   if (el) rowRefs.set(key, el as Element);
