@@ -23,6 +23,9 @@ import { networkStackMoves } from '~/utils/networkLayerStack';
 
 const pbfAttributeRequests = new globalThis.Map<string, Promise<string[]>>();
 
+/** Слои контекста, пока пользователь сам их не переключал: здания и рельеф с 3D */
+const DEFAULT_CONTEXT_LAYERS: ContextLayerKey[] = ['buildings', 'terrain3d'];
+
 export const useLayerStore = defineStore('layer', {
   state: () => ({
     geoServerLayers: [] as ExtendedLayerConfig[],
@@ -37,8 +40,8 @@ export const useLayerStore = defineStore('layer', {
     loadingTotalLayers: 0,
     loadingCompletedLayers: 0,
     loadingFailedLayers: 0,
-    /** Видимые слои контекста MapTiler (ключи: contours | buildings | hillshade) */
-    visibleContextLayers: [] as ContextLayerKey[],
+    /** Видимые слои контекста MapTiler (ключи: contours | buildings | hillshade | terrain3d) */
+    visibleContextLayers: [...DEFAULT_CONTEXT_LAYERS] as ContextLayerKey[],
     /** Подсветка участков ПТС (начальник / участок МС / РС) — параметры view слоя участков */
     ptsHighlight: null as PtsHighlight | null,
     /** Версия данных в VIEWPARAMS тайлов (0 — нет); новая после расчёта/правки — мимо кеша GWC */
@@ -79,7 +82,7 @@ export const useLayerStore = defineStore('layer', {
           this.visibleContextLayers = [];
         }
       } else {
-        this.visibleContextLayers = [];
+        this.visibleContextLayers = [...DEFAULT_CONTEXT_LAYERS];
       }
     },
 

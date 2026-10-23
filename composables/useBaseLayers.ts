@@ -90,7 +90,7 @@ export const useBaseLayers = () => {
     })
   }
 
-  const currentLayer = ref<string>('stadia')
+  const currentLayer = ref<string>('planet-v4')
 
   const getCurrentLayer = computed(() => {
     return layers.find(l => l.id === currentLayer.value) || layers[0]

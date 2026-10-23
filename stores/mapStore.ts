@@ -95,7 +95,8 @@ export const useMapStore = defineStore('map', {
       { id: 'dg', label: '2GIS' },
       // VISICOM добавляется в initializeMap, только если заданы URL и ключ (utils/visicom.ts)
     ] as { id: string; label: string }[],
-    selectedBaseLayer: 'stadia',
+    // По умолчанию — векторная MapTiler Planet v4 (без ключа MapTiler addBaseLayer откатывается на OSM)
+    selectedBaseLayer: 'planet-v4',
 
     osmSource: {
       type: 'raster' as const,
@@ -296,13 +297,14 @@ export const useMapStore = defineStore('map', {
       if (this.map.getSource(this.baseSourceId)) this.map.removeSource(this.baseSourceId);
       this.removePlanetBaseLayers();
 
-      if (this.selectedBaseLayer === 'planet-v4') {
+      if (this.selectedBaseLayer === 'planet-v4' && getMapTilerKey()) {
         await this.addPlanetVectorBaseLayer();
         return;
       }
 
       let source;
       switch (this.selectedBaseLayer) {
+        case 'planet-v4': source = this.osmSource; break;
         case 'osm': source = this.osmSource; break;
         case 'streets-v4':
           source = getMapTilerKey() ? this.mapTilerStreetsSource : this.osmSource;
