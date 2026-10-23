@@ -25,7 +25,9 @@
         title="Спросить модель заново"
         @click="emit('refresh')"
       >
-        <v-icon size="14">mdiRefresh</v-icon>
+        <v-icon size="14">
+          mdiRefresh
+        </v-icon>
       </v-btn>
       <v-btn
         size="x-small"
@@ -34,7 +36,9 @@
         aria-label="Скрыть объяснение"
         @click="emit('close')"
       >
-        <v-icon size="14">mdiClose</v-icon>
+        <v-icon size="14">
+          mdiClose
+        </v-icon>
       </v-btn>
     </div>
 

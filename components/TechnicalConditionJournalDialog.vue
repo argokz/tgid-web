@@ -29,6 +29,16 @@
           <v-btn
             color="cyan-darken-1"
             variant="tonal"
+            prepend-icon="mdi-map-marker-radius"
+            class="mr-2"
+            title="Подобрать точку подключения для заявки: узлы рядом, режим по расчёту, рекомендация ИИ"
+            @click="connectionVisible = true"
+          >
+            Точка подключения
+          </v-btn>
+          <v-btn
+            color="cyan-darken-1"
+            variant="tonal"
             prepend-icon="mdi-chart-box-outline"
             class="mr-2"
             :loading="loadingBalance"
@@ -559,6 +569,7 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    <TuConnectionDialog v-model="connectionVisible" />
   </Teleport>
 </template>
 
@@ -569,6 +580,7 @@ import { formatApiError, formatApiErrorWith } from '~/utils/apiError'
 import { confirmAction } from '~/composables/useConfirm'
 import { computed, reactive, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
+import TuConnectionDialog from '~/components/ai/TuConnectionDialog.vue'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
 import { useNotificationStore } from '~/stores/notificationStore'
 import { changedColumns, filledColumns, identityColumns } from '~/utils/registryEdit'
@@ -586,6 +598,8 @@ const emit = defineEmits<{
 const { isMobile } = useMobile()
 const mutationsEnabled = useMutationsEnabled()
 const visible = ref(false), loading = ref(false), error = ref('')
+/** Диалог подбора точки подключения (этап 4 ИИ-плана) */
+const connectionVisible = ref(false)
 const items = ref<TechnicalConditionSummary[]>([])
 const total = ref(0), pages = ref(0), page = ref(1)
 const pageSize = 50
