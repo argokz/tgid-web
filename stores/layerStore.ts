@@ -1,4 +1,5 @@
 import { appStorage } from '~/utils/appStorage';
+import { resetStaleMapPrefs } from '~/utils/mapDefaults';
 import { defineStore } from 'pinia';
 import { mapService, isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 import type { LayerConfig, ExtendedLayerConfig, WmsLayerConfig } from '~/types';
@@ -70,6 +71,7 @@ export const useLayerStore = defineStore('layer', {
     },
 
     loadVisibleContextLayers() {
+      resetStaleMapPrefs();
       const saved = appStorage.getItem('visibleContextLayers');
       if (saved) {
         try {

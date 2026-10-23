@@ -1,4 +1,5 @@
 import { appStorage } from '~/utils/appStorage';
+import { resetStaleMapPrefs } from '~/utils/mapDefaults';
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import type {
@@ -194,6 +195,7 @@ export const useMapStore = defineStore('map', {
 
     loadSelectedBaseLayer() {
       this.syncConfigurableBaseLayers();
+      resetStaleMapPrefs();
       const savedLayer = appStorage.getItem('selectedBaseLayer') || appStorage.getItem('baseLayer');
       if (!savedLayer) return;
       const hasLayer = this.baseLayers.some((layer: { id: string }) => layer.id === savedLayer);

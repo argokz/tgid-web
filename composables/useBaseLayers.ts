@@ -2,6 +2,7 @@
  * Composable для управления базовыми слоями карты
  */
 import { appStorage } from '~/utils/appStorage'
+import { resetStaleMapPrefs } from '~/utils/mapDefaults'
 import { ref, computed } from 'vue'
 import { VISICOM_BASE_LAYER_ID, buildVisicomTiles, isVisicomEnabled, readVisicomConfig } from '~/utils/visicom'
 
@@ -108,6 +109,7 @@ export const useBaseLayers = () => {
 
   const loadSavedLayer = () => {
     if (typeof window !== 'undefined') {
+      resetStaleMapPrefs()
       const saved = appStorage.getItem('selectedBaseLayer') || appStorage.getItem('baseLayer')
       if (saved && layers.find(l => l.id === saved)) {
         currentLayer.value = saved
