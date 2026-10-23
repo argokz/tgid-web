@@ -60,6 +60,7 @@ export type ToolDialogKey =
   | 'technicalCondition'
   | 'corrosionIndicator'
   | 'outageSimulation'
+  | 'wearIndex'
   | 'throttlingCalculator'
   | 'hydraulicThematic'
   | 'alseko'
@@ -147,6 +148,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
       { label: 'Калькулятор дросселирования', hint: 'Расчёт шайб и сопел элеваторов', icon: 'mdi-calculator', color: 'teal-darken-3', event: 'open-throttling-calculator', dialog: 'throttlingCalculator' },
       { label: 'Диагностика расчётов', hint: 'Готовность исходных данных', icon: 'mdi-calculator-variant', color: 'primary', event: 'open-calculation-diagnostics', dialog: 'calculationDiagnostics' },
       { label: 'Диагностика топологии', hint: 'Разрывы и висячие узлы', icon: 'mdi-stethoscope', color: 'deep-purple-darken-2', event: 'open-topology-diagnostics', dialog: 'topologyDiagnostics' },
+      { label: 'Износ и план ремонтов', hint: 'Индекс износа участков (методика ТГИД), приоритет ремонта, записка ИИ', icon: 'mdi-pipe-wrench', color: 'brown-darken-2', event: 'open-wear-index', dialog: 'wearIndex' },
       { label: 'Поиск неисправностей', hint: 'Дефекты и коррозия на карте', icon: 'mdi-alert-octagon', color: 'error', event: 'open-fault-diagnostics', dialog: 'faultDiagnostics' },
       { label: 'Тепловые нагрузки', hint: 'Нулевые, закрытые, отключённые', icon: 'mdi-home-lightning-bolt-outline', color: 'teal-darken-3', event: 'open-consumer-load-diagnostics', dialog: 'consumerLoad' },
       { label: 'Запросы по сети', hint: 'Объём, длина, диаметры, теплопотребление (Zap)', icon: 'mdi-sigma', color: 'blue-grey-darken-2', event: 'open-network-queries', dialog: 'networkQueries' },
