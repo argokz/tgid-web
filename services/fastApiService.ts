@@ -1941,6 +1941,8 @@ export const fastApiService = {
     /** Город этого API (код и название) */
     city?: string;
     city_label?: string;
+    /** Помощник ИИ включён на сервере (AI_ENABLED + ключ) */
+    ai_enabled?: boolean;
   }> {
     return request('api/v1/auth/config');
   },

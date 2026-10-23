@@ -28,6 +28,8 @@ export const useAuthStore = defineStore('auth', {
     authRequiredGet: false as boolean,
     mutationsEnabledServer: false as boolean,
     topologyMutationsEnabledServer: false as boolean,
+    /** Помощник ИИ включён на сервере (/auth/config ai_enabled); кнопки ИИ видны только с ним */
+    aiEnabledServer: false as boolean,
     /** Счётчик запросов открыть форму входа (истёкшая сессия); layout открывает LoginDialog */
     loginPrompt: 0,
     /** Логин истёкшей сессии — подставляется в форму входа */
@@ -76,6 +78,10 @@ export const useAuthStore = defineStore('auth', {
     /** Роль calculator+ */
     canCalculate(): boolean {
       return this.permissions.canCalculate
+    },
+    /** Помощник ИИ: включён на сервере и есть право запускать расчёты (режимщик и выше) */
+    canUseAi(): boolean {
+      return this.aiEnabledServer && this.permissions.canCalculate
     },
     /** Правка журналов/атрибутов: editor+ и MUTATIONS_ENABLED на сервере */
     canEditData(): boolean {
@@ -161,6 +167,7 @@ export const useAuthStore = defineStore('auth', {
         this.authRequiredGet = Boolean(config.auth_required_get)
         this.mutationsEnabledServer = Boolean(config.mutations_enabled)
         this.topologyMutationsEnabledServer = Boolean(config.topology_mutations_enabled)
+        this.aiEnabledServer = Boolean(config.ai_enabled)
         this.city = config.city || ''
         this.cityLabel = config.city_label || ''
         this.configLoaded = true
