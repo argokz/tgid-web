@@ -30,16 +30,32 @@
         <v-card-text class="pa-4">
           <v-text-field
             v-model="searchText"
-            label="Поиск по узлам"
-            placeholder="Введите текст для поиска..."
-            prepend-inner-icon="mdi-magnify"
+            :label="aiMode ? 'Поиск фразой' : 'Поиск по узлам'"
+            :placeholder="aiMode ? 'например: потребители без нагрузки во фрагменте 74 или камера 3-47' : 'Введите текст для поиска...'"
+            :prepend-inner-icon="aiMode ? 'mdi-creation' : 'mdi-magnify'"
             clearable
             variant="outlined"
             density="comfortable"
             hide-details
             @update:model-value="onSearchInput"
+            @keyup.enter="aiMode && runAiSearch()"
             :loading="loading"
           />
+          <v-switch
+            v-if="authStore.canUseAi"
+            v-model="aiMode"
+            density="compact"
+            hide-details
+            color="primary"
+            label="Поиск фразой (помощник ИИ): узлы, участки, потребители, источники, инструменты"
+            @update:model-value="onAiModeChange"
+          />
+          <div
+            v-if="aiMode && aiNote"
+            class="text-caption text-medium-emphasis mt-1"
+          >
+            {{ aiNote }}
+          </div>
           <div
             v-if="!loading && nodes.length > 0"
             class="text-caption text-grey-darken-1 mt-2"
@@ -67,6 +83,36 @@
             />
             <div class="mt-6 text-h6 text-grey">Поиск узлов...</div>
           </div>
+
+          <!-- Результаты поиска фразой: узлы, участки, источники, потребители -->
+          <v-list
+            v-else-if="aiMode && aiItems.length > 0"
+            class="pa-2"
+            density="compact"
+          >
+            <v-list-item
+              v-for="(item, index) in aiItems"
+              :key="`ai-${index}`"
+              class="node-item mb-2"
+              rounded="lg"
+              @click="selectAiItem(item)"
+            >
+              <template #prepend>
+                <v-avatar
+                  color="primary"
+                  size="40"
+                >
+                  <v-icon color="white">mdi-map-marker</v-icon>
+                </v-avatar>
+              </template>
+              <v-list-item-title class="font-weight-medium">
+                {{ aiItemTitle(item) }}
+              </v-list-item-title>
+              <v-list-item-subtitle class="text-caption">
+                {{ aiItemSubtitle(item) }}
+              </v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
 
           <!-- Results (сгруппировано: тип → код РС → фрагмент) -->
           <v-list
@@ -209,6 +255,11 @@
 import { onBeforeUnmount, ref, computed } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { getCityConfig } from '~/utils/cityConfig'
+import { useAuthStore } from '~/stores/authStore'
+import { useFragmentStore } from '~/stores/fragmentStore'
+import { useUiStore } from '~/stores/uiStore'
+import { aiService } from '~/services/aiService'
+import { formatApiErrorWith } from '~/utils/apiError'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 
 interface Props {
@@ -228,6 +279,45 @@ const resultsScrollStyle = computed(() =>
 
 const dialog = ref(false)
 const searchText = ref('')
+
+// --- Поиск фразой (помощник ИИ): сервер разбирает фразу и выполняет выборку, SQL модель не пишет ---
+const authStore = useAuthStore()
+const fragmentStore = useFragmentStore()
+const uiStore = useUiStore()
+const aiMode = ref(false)
+const aiNote = ref('')
+interface AiSearchItem { id?: number; name?: string | null; node1?: string | null; node2?: string | null; fragment_id?: number | null; longitude?: number | null; latitude?: number | null; diameter?: number | null; node_type?: string | null; [key: string]: unknown }
+interface AiSearchResult { query: { kind: string; note?: string; confidence?: number }; items: AiSearchItem[]; total?: number; open_tool: { key: string; scope?: unknown } | null }
+const aiItems = ref<AiSearchItem[]>([])
+const onAiModeChange = () => { aiItems.value = []; aiNote.value = ''; nodes.value = [] }
+const aiItemTitle = (item: AiSearchItem) => item.name || (item.node1 ? `${item.node1} — ${item.node2 ?? '?'}` : `#${item.id ?? ''}`)
+const aiItemSubtitle = (item: AiSearchItem) => [item.node_type, item.fragment_id != null ? `фрагмент ${item.fragment_id}` : '', item.diameter != null ? `Ø${item.diameter}` : ''].filter(Boolean).join(' · ')
+const KIND_LABELS: Record<string, string> = { node: 'узлы', line: 'участки', consumer: 'потребители', source: 'источники', tool: 'инструмент', unknown: 'не понял запрос' }
+const runAiSearch = async () => {
+  const text = searchText.value.trim()
+  if (text.length < 2) return
+  loading.value = true
+  aiNote.value = ''
+  try {
+    const res = await aiService.call<AiSearchResult>('search', { text, fragment_ids: fragmentStore.visibleFragments ?? [] })
+    aiItems.value = res.items || []
+    if (res.open_tool) {
+      uiStore.requestToolDialog(res.open_tool.key, res.open_tool.scope)
+      if (!aiItems.value.length) dialog.value = false
+    }
+    aiNote.value = `${KIND_LABELS[res.query.kind] || res.query.kind}${res.total != null ? `, всего ${res.total}` : ''}${res.query.note ? ` — ${res.query.note}` : ''}`
+    if (!aiItems.value.length && !res.open_tool) showSnackbar('Ничего не найдено', 'info')
+  } catch (error) {
+    showSnackbar(formatApiErrorWith('Поиск фразой не выполнен', error), 'error')
+  } finally {
+    loading.value = false
+  }
+}
+const selectAiItem = (item: AiSearchItem) => {
+  if (!props.map || item.longitude == null || item.latitude == null) { showSnackbar('У объекта нет координат', 'info'); return }
+  props.map.flyTo({ center: [Number(item.longitude), Number(item.latitude)], zoom: Math.max(props.map.getZoom(), 17), duration: 1000 })
+  dialog.value = false
+}
 const nodes = ref<any[]>([])
 const loading = ref(false)
 const snackbar = ref(false)
@@ -332,6 +422,7 @@ const nodeGroups = computed((): NodeGroup[] => {
 })
 
 const onSearchInput = () => {
+  if (aiMode.value) return
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
     if (searchText.value) loadNodes()

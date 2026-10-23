@@ -91,6 +91,16 @@
           >
             Разобрать файл
           </v-btn>
+          <v-btn
+            v-if="inspect && authStore.canUseAi"
+            variant="text"
+            color="primary"
+            :loading="busy === 'inspect'"
+            title="Сопоставить колонки помощником ИИ по именам и образцам строк"
+            @click="aiMapping"
+          >
+            Сопоставить ИИ
+          </v-btn>
         </div>
 
         <template v-if="inspect">
@@ -351,6 +361,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
 import { fastApiService } from '~/services/fastApiService';
 import { useAuthStore } from '~/stores/authStore';
+import { aiService } from '~/services/aiService';
 import { allows } from '~/utils/permissions';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { useLayerStore } from '~/stores/layerStore';
@@ -460,6 +471,26 @@ function resetInspect() {
   layers.value = [];
   Object.keys(mapping).forEach((k) => delete mapping[k]);
 }
+
+/** Сопоставление колонок помощником ИИ по именам и образцам строк (эвристика сервера — фолбэк) */
+const aiMapping = async () => {
+  if (!inspect.value) return;
+  busy.value = 'inspect';
+  error.value = '';
+  try {
+    const columns: string[] = inspect.value.columns;
+    const samples = (inspect.value.sample || []).slice(0, 5).map((row) => columns.map((c) => (row as Record<string, unknown>)[c] ?? null));
+    const res = await aiService.call<{ mapping: Record<string, string>; note?: string }>('import/suggest-mapping', {
+      mode: mode.value, columns, samples, has_geometry: Boolean(inspect.value.geometry_type),
+    });
+    Object.keys(mapping).forEach((k) => delete mapping[k]);
+    Object.assign(mapping, res.mapping);
+  } catch (e: any) {
+    error.value = importApiError(e).message;
+  } finally {
+    busy.value = '';
+  }
+};
 
 const runInspect = async () => {
   if (!files.value.length) return;

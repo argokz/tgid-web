@@ -178,6 +178,7 @@
           @open-network-diaphragms="openLazyDialog('networkDiaphragm', $event)"
           @open-outage-simulation="openLazyDialog('outageSimulation', $event)"
           @open-wear-index="openLazyDialog('wearIndex', $event)"
+          @open-data-quality="openLazyDialog('dataQuality', $event)"
           @open-audit-history="openLazyDialog('auditHistory', $event)"
         />
 
@@ -1360,6 +1361,8 @@ const toolDialogs: ToolDialogEntry[] = [
   },
   // Износ участков и план ремонтов (этап 5 ИИ-плана)
   { key: 'wearIndex', component: lazyDialog(() => import('./WearIndexDialog.vue')) },
+  // Качество исходных данных (этап 6 ИИ-плана)
+  { key: 'dataQuality', component: lazyDialog(() => import('./DataQualityDialog.vue')) },
   // Калькулятор дросселирования (шайбы и элеваторы)
   { key: 'throttlingCalculator', component: lazyDialog(() => import('./ThrottlingCalculatorDialog.vue')) },
   // Гидравлический режим и стрелки потоков
