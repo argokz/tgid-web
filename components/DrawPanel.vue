@@ -38,35 +38,16 @@
     <v-divider />
 
     <div class="pa-2">
-      <div class="draw-panel__grid">
-        <HintTip
-          v-for="tool in measureTools"
-          :key="tool.mode"
-          :text="tool.label"
-          :hint="tool.hint"
-          location="bottom"
-        >
-          <template #default="{ props: tip }">
-            <button
-              v-bind="tip"
-              type="button"
-              class="draw-tile"
-              :class="{ 'draw-tile--active': draw.mode.value === tool.mode }"
-              :aria-label="tool.label"
-              :aria-pressed="draw.mode.value === tool.mode"
-              @click="toggleMode(tool.mode)"
-            >
-              <v-icon
-                size="20"
-                :color="draw.mode.value === tool.mode ? 'primary' : undefined"
-              >
-                {{ tool.icon }}
-              </v-icon>
-              <span class="draw-tile__label">{{ tool.label }}</span>
-            </button>
-          </template>
-        </HintTip>
-      </div>
+      <!-- Инструменты измерений — тот же FloatingToolbar, что у редактора: повторный щелчок снимает режим -->
+      <FloatingToolbar
+        :model-value="draw.mode.value === 'none' ? null : draw.mode.value"
+        :items="measureItems"
+        :mandatory="false"
+        aria-label="Инструменты измерений"
+        tip-location="bottom"
+        class="draw-panel__tools"
+        @update:model-value="draw.setMode($event ?? 'none')"
+      />
       <v-switch
         v-model="draw.snapEnabled.value"
         density="compact"
@@ -258,6 +239,7 @@
 <script setup lang="ts">
 import HintTip from '~/components/HintTip.vue';
 import GlassSurface from '~/components/GlassSurface.vue';
+import FloatingToolbar, { type FloatingToolbarItem } from '~/components/FloatingToolbar.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { computed, onBeforeUnmount, watch } from 'vue';
 import { useEscapeClose } from '~/composables/useEscape';
@@ -281,9 +263,9 @@ const open = defineModel<boolean>({ default: false });
 const draw = useMapDraw();
 const notificationStore = useNotificationStore();
 
-const measureTools: Array<{ mode: DrawMode; label: string; icon: string; hint: string }> = [
-  { mode: 'measure-distance', label: 'Расстояние', icon: 'mdi-ruler', hint: 'Кликайте точки линии, двойной клик — завершить' },
-  { mode: 'measure-area', label: 'Площадь', icon: 'mdi-vector-square', hint: 'Обведите контур, двойной клик — замкнуть' },
+const measureItems: FloatingToolbarItem<DrawMode>[] = [
+  { value: 'measure-distance', title: 'Расстояние', icon: 'mdi-ruler', hint: 'Кликайте точки линии, двойной клик — завершить' },
+  { value: 'measure-area', title: 'Площадь', icon: 'mdi-vector-square', hint: 'Обведите контур, двойной клик — замкнуть' },
 ];
 
 const liveMeasure = computed(() => {
@@ -316,10 +298,6 @@ const profileView = (m: Measurement) => {
 const fmt0 = (v: number) => v.toFixed(0);
 const fmt1 = (v: number) => v.toFixed(1).replace('.', ',');
 const signed = (v: number) => `${v > 0 ? '+' : ''}${fmt1(v)}`;
-
-const toggleMode = (mode: DrawMode) => {
-  draw.setMode(draw.mode.value === mode ? 'none' : mode);
-};
 
 const close = () => {
   draw.setMode('none');
@@ -396,39 +374,9 @@ onBeforeUnmount(() => draw.detach());
   align-items: center;
 }
 
-.draw-panel__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.draw-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 4px;
-  border-radius: 8px;
-  border: 1px solid rgba(var(--v-border-color), 0.2);
-  background: transparent;
-  cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.draw-tile:hover {
-  background: rgba(var(--v-theme-primary), 0.06);
-}
-
-.draw-tile--active {
-  background: rgba(var(--v-theme-primary), 0.12);
-  border-color: rgba(var(--v-theme-primary), 0.5);
-}
-
-.draw-tile__label {
-  font-size: 11px;
-  line-height: 1.1;
-  text-align: center;
-  color: rgb(var(--v-theme-on-surface));
+.draw-panel__tools {
+  width: 100%;
+  justify-content: center;
 }
 
 .draw-panel__live {

@@ -9,20 +9,21 @@
         elevation="16"
         rounded="xl"
       >
-        <v-card-title class="bg-gradient-info text-white py-4">
+        <v-card-title class="feature-menu__header py-3">
           <div class="d-flex align-center justify-space-between">
             <div class="d-flex align-center">
               <v-icon
                 class="mr-2"
-                size="large"
+                color="primary"
+                size="22"
               >mdi-cursor-default-click</v-icon>
-              <span class="text-h6 font-weight-bold">Выберите объект</span>
+              <span class="text-subtitle-1 font-weight-bold">Выберите объект</span>
             </div>
             <v-chip
               size="small"
-              color="white"
-              variant="flat"
-              class="font-weight-bold"
+              color="primary"
+              variant="tonal"
+              class="font-weight-bold num"
             >
               {{ mapStore.potentialFeatures.length }}
             </v-chip>
@@ -134,12 +135,11 @@
 
         <v-divider />
 
-        <v-card-actions class="pa-3 bg-grey-lighten-5">
-          <v-spacer />
+        <v-card-actions class="pa-3">
+          <span class="text-caption text-medium-emphasis me-auto">↑↓ — по списку, Esc — закрыть</span>
           <v-btn
             size="small"
             variant="text"
-            color="grey-darken-1"
             @click.stop="mapStore.featureMenuVisible = false"
           >
             <v-icon class="mr-1">mdi-close</v-icon>
@@ -152,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import type { CSSProperties } from 'vue'
 import { useMapStore } from '~/stores/mapStore'
 import { describeMenuFeature } from '~/utils/networkFeature'
@@ -338,16 +338,23 @@ const disposeHotkeys = registerHotkeys({
 })
 onBeforeUnmount(disposeHotkeys)
 
-// Меню закрыто без выбора («Закрыть», новый identify) — инструмент получает отказ
-watch(() => mapStore.featureMenuVisible, (visible) => {
-  if (!visible) mapStore.cancelFeatureChoice()
+// Меню закрыто без выбора («Закрыть», новый identify) — инструмент получает отказ.
+// Открылось — фокус на первый пункт: стрелки v-list и Enter работают сразу, Esc закрывает (реестр хоткеев)
+watch(() => mapStore.featureMenuVisible, async (visible) => {
+  if (!visible) {
+    mapStore.cancelFeatureChoice()
+    return
+  }
+  await nextTick()
+  await nextTick()
+  document.querySelector<HTMLElement>('.feature-menu .menu-item')?.focus()
 })
 </script>
 
 <style scoped>
 .feature-menu {
-  animation: slideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25) !important;
+  animation: slideIn var(--duration-base) var(--ease-out);
+  box-shadow: var(--shadow-3) !important;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -375,32 +382,32 @@ watch(() => mapStore.featureMenuVisible, (visible) => {
 
 .layer-header { margin: 4px 4px 6px; }
 
-.bg-gradient-info {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.feature-menu__header {
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
 .menu-item {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border-left: 4px solid transparent;
-  margin: 4px 8px;
-  border-radius: 12px !important;
+  transition: background-color var(--duration-fast) var(--ease-out);
+  margin: 2px 8px;
+  border-radius: var(--radius-md) !important;
   cursor: pointer;
 }
 
 .menu-item:hover {
-  background: linear-gradient(90deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
-  border-left-color: #667eea;
-  transform: translateX(4px);
+  background: rgba(var(--v-theme-primary), 0.06);
 }
 
-.menu-avatar { transition: all 0.2s; }
-.menu-item:hover .menu-avatar { transform: scale(1.1); }
+.menu-item:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: -2px;
+}
 
+/* растёт из точки щелчка — объясняет, откуда появилось; prefers-reduced-motion обнуляет длительность */
 @keyframes slideIn {
   from { opacity: 0; transform: scale(0.95) translateY(-10px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-active, .fade-leave-active { transition: opacity var(--duration-base) var(--ease-out); }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
