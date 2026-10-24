@@ -90,11 +90,15 @@ const scheduleGeometry = (g: NonNullable<typeof pendingGeometry>) => {
 const stopPointer = () => {
   if (move) window.removeEventListener('pointermove', move);
   window.removeEventListener('pointerup', stopPointer);
+  window.removeEventListener('pointercancel', stopPointer);
   move = null;
   if (geometryFrame) cancelAnimationFrame(geometryFrame);
   geometryFrame = 0;
   const g = pendingGeometry;
   pendingGeometry = null;
+  // Inline-style больше не нужен: итог идёт через shellStyle (иначе при равном итоге Vue не перепатчит
+  // стиль, и останется промежуточное положение из последнего кадра)
+  if (root.value) root.value.style.cssText = '';
   if (g) {
     const { panelWidth, ...float } = g;
     if (panelWidth != null) layout.panelWidth = panelWidth;
@@ -103,27 +107,32 @@ const stopPointer = () => {
   dragging.value = false;
 };
 
+const listenPointer = (handler: (e: PointerEvent) => void) => {
+  move = handler;
+  window.addEventListener('pointermove', handler);
+  window.addEventListener('pointerup', stopPointer);
+  window.addEventListener('pointercancel', stopPointer);
+};
+
 const onPointerDown = (e: PointerEvent) => {
   if (props.mobile || layout.mode !== 'float' || e.button !== 0) return;
   const target = e.target as HTMLElement | null;
   if (!target?.closest('[data-card-drag]') || target.closest('button, a, input, textarea, .v-field')) return;
   const start = { x: e.clientX, y: e.clientY, fx: layout.float.x, fy: layout.float.y };
   dragging.value = true;
-  move = (ev: PointerEvent) => {
+  listenPointer((ev: PointerEvent) => {
     const f = clampFloat(
       { ...layout.float, x: start.fx + ev.clientX - start.x, y: start.fy + ev.clientY - start.y },
       viewport.value.w, viewport.value.h,
     );
     scheduleGeometry({ x: f.x, y: f.y });
-  };
-  window.addEventListener('pointermove', move);
-  window.addEventListener('pointerup', stopPointer);
+  });
 };
 
 const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
   const start = { x: e.clientX, y: e.clientY, w: layout.panelWidth, fw: layout.float.w, fh: layout.float.h };
   dragging.value = true;
-  move = (ev: PointerEvent) => {
+  listenPointer((ev: PointerEvent) => {
     if (what === 'panel') {
       scheduleGeometry({ panelWidth: clampPanelWidth(start.w + start.x - ev.clientX, viewport.value.w) });
     } else {
@@ -131,11 +140,9 @@ const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
         { ...layout.float, w: start.fw + ev.clientX - start.x, h: start.fh + ev.clientY - start.y },
         viewport.value.w, viewport.value.h,
       );
-      scheduleGeometry({ w: f.w, h: f.h });
+      scheduleGeometry({ x: f.x, y: f.y, w: f.w, h: f.h });
     }
-  };
-  window.addEventListener('pointermove', move);
-  window.addEventListener('pointerup', stopPointer);
+  });
 };
 </script>
 

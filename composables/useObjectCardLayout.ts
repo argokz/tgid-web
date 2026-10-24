@@ -51,19 +51,29 @@ let state: ObjectCardLayout | null = null;
 export function useObjectCardLayout(): ObjectCardLayout {
   if (state) return state;
   state = reactive(typeof window === 'undefined' ? defaults() : load());
-  // Сохранение — с задержкой: при перетаскивании и resize значения меняются сериями
+  // Сохранение — с задержкой: значения меняются сериями (смена режима + размеры); при уходе со страницы — сразу
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
-  watch(state, (v) => {
+  const persist = () => {
+    saveTimer = null;
+    try {
+      appStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      // localStorage недоступен (приватный режим, квота) — размещение живёт до перезагрузки
+      if (import.meta.dev) console.warn('[objectCardLayout] не сохранено:', e);
+    }
+  };
+  watch(state, () => {
     if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      saveTimer = null;
-      try {
-        appStorage.setItem(STORAGE_KEY, JSON.stringify(v));
-      } catch {
-        // localStorage недоступен — размещение до перезагрузки
-      }
-    }, SAVE_DELAY_MS);
+    saveTimer = setTimeout(persist, SAVE_DELAY_MS);
   }, { deep: true });
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pagehide', () => {
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        persist();
+      }
+    });
+  }
   return state;
 }
 

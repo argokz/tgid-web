@@ -53,6 +53,8 @@ const SOURCE_DRAFT_ID = 'measure-draft-source';
 const LAYER_FILL = 'measure-fill';
 const LAYER_LINE = 'measure-line';
 const LAYER_VERTEX = 'measure-vertex';
+/** Радиус попадания в вершину измерения для курсора «переместить», px (точечный хит-тест mousedown) */
+const VERTEX_HIT_PX = 8;
 const LAYER_SEGMENT_LABEL = 'measure-segment-label';
 const LAYER_TOTAL_LABEL = 'measure-total-label';
 const LAYER_DRAFT_FILL = 'measure-draft-fill';
@@ -267,15 +269,29 @@ export function useMapDraw() {
    * Раньше вершины ловились делегированными mouseenter/mouseleave по слою — MapLibre опрашивал
    * слой на каждом mousemove ещё дважды (замер S6: 3 запроса на движение, docs/performance-baseline.md).
    */
-  const queryAround = (screenPoint: { x: number; y: number }): { snapped: number[] | null; vertex: boolean } => {
+  let queryErrorLogged = false;
+  const logQueryError = (e: unknown) => {
+    if (!import.meta.dev || queryErrorLogged) return;
+    queryErrorLogged = true;
+    console.warn('[useMapDraw] queryRenderedFeatures бросил — кадр пропущен:', e);
+  };
+  /** Слои сети для привязки — список из стиля кешируется до следующего styledata (getStyle() сериализует весь стиль) */
+  let networkLayerIds: string[] | null = null;
+  const invalidateNetworkLayers = () => { networkLayerIds = null; };
+  const getNetworkLayerIds = (map: MapLibreMap): string[] => {
+    if (!networkLayerIds) networkLayerIds = (map.getStyle()?.layers || []).map((l) => l.id).filter(isNetworkLayer);
+    return networkLayerIds;
+  };
+  const queryAround = (
+    screenPoint: { x: number; y: number },
+    withSnap = snapEnabled.value,
+  ): { snapped: number[] | null; vertex: boolean } => {
     const map = mapRef.value;
     const none = { snapped: null, vertex: false };
     if (!map) return none;
     const r = snapRadiusPx.value;
     try {
-      const layers = snapEnabled.value
-        ? (map.getStyle()?.layers || []).map((l) => l.id).filter(isNetworkLayer)
-        : [];
+      const layers = withSnap ? [...getNetworkLayerIds(map)] : [];
       if (measurements.value.length && map.getLayer(LAYER_VERTEX)) layers.push(LAYER_VERTEX);
       if (!layers.length) return none;
       const rendered = map.queryRenderedFeatures(
@@ -288,7 +304,9 @@ export function useMapDraw() {
       for (const f of rendered) {
         if (f.geometry?.type !== 'Point') continue;
         if (f.layer?.id === LAYER_VERTEX) {
-          vertex = true;
+          // курсор «переместить» — только там, где mousedown реально попадёт в вершину (точечный хит-тест ≈ половина значка)
+          const vp = map.project(f.geometry.coordinates as [number, number]);
+          if (Math.hypot(vp.x - screenPoint.x, vp.y - screenPoint.y) <= VERTEX_HIT_PX) vertex = true;
           continue;
         }
         const c = f.geometry.coordinates as number[];
@@ -300,17 +318,19 @@ export function useMapDraw() {
         }
       }
       return { snapped: best, vertex };
-    } catch {
-      // MapLibre may throw if query outside viewport
+    } catch (e) {
+      // Стиль в середине диффа (смена подложки, HMR) — getStyle/queryRenderedFeatures на таком кадре бросают;
+      // без привязки один кадр безвреден, но постоянную ошибку надо видеть хотя бы в dev
+      logQueryError(e);
       return none;
     }
   };
 
+  /** Точка привязки (если привязка включена); курсор над вершиной обновляется в любом случае */
   const findSnapPoint = (screenPoint: { x: number; y: number }): number[] | null => {
-    if (!snapEnabled.value) return null;
     const { snapped, vertex } = queryAround(screenPoint);
     setVertexCursor(vertex);
-    return snapped;
+    return snapEnabled.value ? snapped : null;
   };
 
   const isMeasuring = computed(() => mode.value !== 'none');
@@ -615,7 +635,7 @@ export function useMapDraw() {
       return;
     }
     if (mode.value === 'none') {
-      if (measurements.value.length) setVertexCursor(queryAround(e.point).vertex);
+      if (measurements.value.length) setVertexCursor(queryAround(e.point, false).vertex);
       return;
     }
     hoverPoint.value = pointFromEvent(e);
@@ -639,6 +659,7 @@ export function useMapDraw() {
 
   const onMapOut = () => {
     cancelPendingMove();
+    setVertexCursor(false);
     hoverPoint.value = null;
     hoverSnapped.value = false;
     refreshDraft();
@@ -711,6 +732,7 @@ export function useMapDraw() {
 
   const removeMeasurement = (id: string) => {
     measurements.value = measurements.value.filter((m) => m.id !== id);
+    if (!measurements.value.length) setVertexCursor(false);
     refresh();
   };
 
@@ -718,6 +740,7 @@ export function useMapDraw() {
     draftPoints.value = [];
     measurements.value = [];
     hoverPoint.value = null;
+    setVertexCursor(false);
     refresh();
   };
 
@@ -738,7 +761,9 @@ export function useMapDraw() {
     let f: any;
     try {
       f = map.queryRenderedFeatures(e.point, { layers: [LAYER_VERTEX] })[0];
-    } catch {
+    } catch (err) {
+      // как в queryAround: захват вершины на кадре диффа стиля теряется, карта просто панорамируется
+      logQueryError(err);
       return;
     }
     const id = f?.properties?.measureId;
@@ -763,6 +788,12 @@ export function useMapDraw() {
 
   const onVertexUp = () => {
     if (!dragging) return;
+    // mousemove и mouseup в одном кадре: доносим последнее положение, пока dragging ещё активен
+    if (pendingMove) {
+      if (moveFrame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(moveFrame);
+      moveFrame = 0;
+      flushMove();
+    }
     const { id } = dragging;
     dragging = null;
     suppressNextClick = true;
@@ -771,7 +802,6 @@ export function useMapDraw() {
     measurements.value = [...measurements.value];
     void loadProfile(id);
   };
-
 
   const onContextMenu = (e: MapMouseEvent) => {
     if (mode.value === 'none') return;
@@ -812,6 +842,7 @@ export function useMapDraw() {
     hoverSnapped.value = false;
     mode.value = next;
     activeDrawMode.value = next;
+    overVertex = false;
     const map = mapRef.value;
     if (map) {
       map.getCanvas().style.cursor = next === 'none' ? '' : 'crosshair';
@@ -839,6 +870,7 @@ export function useMapDraw() {
     map.on('dblclick', finishShape);
     map.on('contextmenu', onContextMenu);
     map.on('mousedown', onVertexDown);
+    map.on('styledata', invalidateNetworkLayers);
     if (typeof window !== 'undefined') window.addEventListener('keydown', onKeyDown);
     syncDoubleClickZoom(map, mode.value);
   };
@@ -858,6 +890,8 @@ export function useMapDraw() {
     map.off('dblclick', finishShape);
     map.off('contextmenu', onContextMenu);
     map.off('mousedown', onVertexDown);
+    map.off('styledata', invalidateNetworkLayers);
+    networkLayerIds = null;
     if (dragging) map.dragPan?.enable();
     dragging = null;
     syncDoubleClickZoom(map, 'none');

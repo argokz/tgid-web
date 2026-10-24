@@ -112,6 +112,7 @@ const rules = {
   differs: (v: string) => v !== current.value || 'Новый пароль совпадает с текущим',
 }
 
+// immediate: диалог ленивый и монтируется уже открытым (layouts/default.vue)
 watch(visible, (open) => {
   if (open) {
     current.value = ''
@@ -119,7 +120,7 @@ watch(visible, (open) => {
     repeat.value = ''
     error.value = ''
   }
-})
+}, { immediate: true })
 
 const later = () => {
   visible.value = false

@@ -563,16 +563,29 @@ const onDrawerItem = (item: HeaderMenuItem) => {
   runMenuAction(item);
 };
 
-const onCalculationLog = (log: any) => {
-  if (protocolRef.value) {
-    protocolRef.value.addLog(log);
+// Протокол — ленивый чанк: пока он грузится, строки лога и id протоколов копятся и отдаются после монтирования
+const pendingProtocolLogs: any[] = [];
+let pendingProtocolIds: number[] | null = null;
+watch(protocolRef, (panel) => {
+  if (!panel) return;
+  for (const log of pendingProtocolLogs.splice(0)) panel.addLog(log);
+  if (pendingProtocolIds) {
+    const ids = pendingProtocolIds;
+    pendingProtocolIds = null;
+    void panel.loadProtocols(ids, { keepPrevious: true });
   }
+});
+
+const onCalculationLog = (log: any) => {
+  if (protocolRef.value) protocolRef.value.addLog(log);
+  else pendingProtocolLogs.push(log);
 };
 
 /** Расчёт сохранил протоколы — панель переходит к анализу (сравнение с прошлым запуском тех же фрагментов) */
 const onProtocolReady = (ids: number[]) => {
   showProtocol.value = true;
-  void protocolRef.value?.loadProtocols(ids, { keepPrevious: true });
+  if (protocolRef.value) void protocolRef.value.loadProtocols(ids, { keepPrevious: true });
+  else pendingProtocolIds = ids;
 };
 
 const resolveExportFragmentIds = (): number[] | undefined => {

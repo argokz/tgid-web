@@ -9,17 +9,18 @@ export default defineNuxtPlugin((nuxtApp: any) => {
       if (isStaleChunkError(error)) {
         // один раз: сообщений может прийти несколько (ошибка импорта и отклонённый промис)
         if (staleChunkReported) return
-        staleChunkReported = true
         notificationStore.notify(
           'warning',
           'Приложение обновлено на сервере — откройте страницу заново, чтобы загрузить новую версию.',
           { label: 'Обновить', handler: () => window.location.reload() },
         )
+        staleChunkReported = true // только после показа: если стор ещё не готов, следующая попытка покажет
         return
       }
       notificationStore.showError('Произошла непредвиденная ошибка')
-    } catch {
-      // Store may not be ready
+    } catch (notifyError) {
+      // Pinia ещё не поднята (ошибка на старте) — сама ошибка уже в console.error у вызывающего хука
+      console.warn('[errorHandler] не удалось показать уведомление:', notifyError)
     }
   }
 
@@ -37,7 +38,8 @@ export default defineNuxtPlugin((nuxtApp: any) => {
   // Nuxt сам ловит ошибку импорта чанка после выкатки (hook app:chunkError) — тоже предлагаем обновить
   nuxtApp.hooks.hook('app:chunkError', ({ error }: { error: unknown }) => {
     console.error('[Chunk Error]:', error)
-    showErrorToUser(error ?? new Error('Failed to fetch dynamically imported module'))
+    // сам факт хука — ошибка загрузки чанка, какой бы текст ни был у браузера
+    showErrorToUser(new Error('Failed to fetch dynamically imported module'))
   })
 
   if (process.client) {

@@ -513,6 +513,7 @@ const loadTnRange = async () => {
   }
 };
 
+// immediate: окно ленивое и монтируется уже открытым (layouts/default.vue)
 watch(isOpen, (val) => {
   if (!val) return;
   calculationName.value = defaultCalculationName();
@@ -521,7 +522,7 @@ watch(isOpen, (val) => {
   if (selectedFragmentId.value === null && fragmentStore.selectedFragmentId !== null) {
     selectedFragmentId.value = fragmentStore.selectedFragmentId;
   }
-});
+}, { immediate: true });
 
 watch(calcMode, () => {
   // имя по умолчанию следует за режимом, пока пользователь его не менял

@@ -150,6 +150,7 @@ const roles = [
   { title: 'admin', value: 'admin' },
 ]
 
+// immediate: диалог ленивый и монтируется уже открытым (layouts/default.vue)
 watch(visible, async (open) => {
   if (!open) return
   error.value = ''
@@ -163,7 +164,7 @@ watch(visible, async (open) => {
   } catch {
     allowRolePick.value = false
   }
-})
+}, { immediate: true })
 
 const onPasswordKey = (event: KeyboardEvent) => {
   if (typeof event.getModifierState === 'function') capsLock.value = event.getModifierState('CapsLock')

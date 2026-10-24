@@ -218,9 +218,10 @@ const authStore = useAuthStore()
 const tab = ref<'profile' | 'users'>('profile')
 const usersPanel = ref<InstanceType<typeof UsersAdminPanel> | null>(null)
 
+// immediate: диалог ленивый и монтируется уже открытым (layouts/default.vue)
 watch(visible, (open) => {
   if (open) tab.value = props.initialTab === 'users' && authStore.isAdmin ? 'users' : 'profile'
-})
+}, { immediate: true })
 
 /** «Алматы (доступны: Алматы, Астана)» — города пользователя UsersDB */
 const cityAccess = computed(() => {

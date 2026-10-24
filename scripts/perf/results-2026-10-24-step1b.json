@@ -1,0 +1,170 @@
+{
+  "base": "http://127.0.0.1:3040/itwin-map/",
+  "cpu": 4,
+  "runs": 1,
+  "contextOff": [],
+  "date": "2026-10-24T02:18:01.437Z",
+  "results": [
+    {
+      "run": 1,
+      "name": "load",
+      "wallMs": 17110
+    },
+    {
+      "run": 1,
+      "name": "S4a изменение ширины панели (60 шагов)",
+      "wallMs": 22031,
+      "ms": 21987,
+      "frames": 349,
+      "fps": 15.9,
+      "frameP50": 19.2,
+      "frameP95": 318.2,
+      "frameMax": 598.9,
+      "longTasks": 97,
+      "longTaskMs": 16700,
+      "longTaskMax": 590,
+      "counters": {
+        "map.setFilter": 0,
+        "map.setLayoutProperty": 0,
+        "map.setPaintProperty": 0,
+        "map.addLayer": 0,
+        "map.removeLayer": 0,
+        "map.addSource": 0,
+        "map.removeSource": 0,
+        "map.easeTo": 0,
+        "map.jumpTo": 0,
+        "map.flyTo": 0,
+        "map.setPadding": 0,
+        "map.resize": 0,
+        "map.triggerRepaint": 66,
+        "map.setFeatureState": 0,
+        "map.queryRenderedFeatures": 0,
+        "geojson.setData": 1,
+        "map.render": 46
+      },
+      "repaintStacks": [
+        [
+          "Rp.L.Map._render (B6Z0M1oK.js:577:213888) < B6Z0M1oK.js:577:215280",
+          45
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.<anonymous> (B6Z0M1oK.js:577:195084) < Rp.L.Map.fire (B6Z0M1oK.js:1:10302) < kn.fire (B6Z0M1oK.js:1:10606)",
+          19
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.moveLayer (B6Z0M1oK.js:577:208059) < r (D4h7lvya.js:2:193401) < Object.s [as show] (D4h7lvya.js:2:193547)",
+          2
+        ]
+      ],
+      "cdp": {
+        "recalcStyle": 122,
+        "recalcStyleMs": 250,
+        "layout": 120,
+        "layoutMs": 808,
+        "scriptMs": 2755,
+        "taskMs": 20929,
+        "nodes": 9478,
+        "heapMb": "46.2"
+      }
+    },
+    {
+      "run": 1,
+      "name": "S4b перетаскивание окна карточки (120 шагов)",
+      "wallMs": 5743,
+      "ms": 5760,
+      "frames": 305,
+      "fps": 53,
+      "frameP50": 18.6,
+      "frameP95": 19.5,
+      "frameMax": 55.6,
+      "longTasks": 2,
+      "longTaskMs": 105,
+      "longTaskMax": 54,
+      "counters": {
+        "map.setFilter": 0,
+        "map.setLayoutProperty": 0,
+        "map.setPaintProperty": 0,
+        "map.addLayer": 0,
+        "map.removeLayer": 0,
+        "map.addSource": 0,
+        "map.removeSource": 0,
+        "map.easeTo": 0,
+        "map.jumpTo": 0,
+        "map.flyTo": 0,
+        "map.setPadding": 0,
+        "map.resize": 0,
+        "map.triggerRepaint": 0,
+        "map.setFeatureState": 0,
+        "map.queryRenderedFeatures": 0,
+        "geojson.setData": 0,
+        "map.render": 0
+      },
+      "repaintStacks": [],
+      "cdp": {
+        "recalcStyle": 124,
+        "recalcStyleMs": 209,
+        "layout": 121,
+        "layoutMs": 90,
+        "scriptMs": 209,
+        "taskMs": 4254,
+        "nodes": 9490,
+        "heapMb": "47.1"
+      }
+    },
+    {
+      "run": 1,
+      "name": "S6 ведение линии с привязкой (200 шагов, узлов в кадре 2)",
+      "wallMs": 65979,
+      "ms": 65809,
+      "frames": 202,
+      "fps": 3.1,
+      "frameP50": 303,
+      "frameP95": 507.5,
+      "frameMax": 578.4,
+      "longTasks": 206,
+      "longTaskMs": 58306,
+      "longTaskMax": 469,
+      "counters": {
+        "map.setFilter": 0,
+        "map.setLayoutProperty": 0,
+        "map.setPaintProperty": 0,
+        "map.addLayer": 0,
+        "map.removeLayer": 0,
+        "map.addSource": 0,
+        "map.removeSource": 0,
+        "map.easeTo": 0,
+        "map.jumpTo": 0,
+        "map.flyTo": 0,
+        "map.setPadding": 0,
+        "map.resize": 0,
+        "map.triggerRepaint": 3610,
+        "map.setFeatureState": 0,
+        "map.queryRenderedFeatures": 201,
+        "geojson.setData": 201,
+        "map.render": 203
+      },
+      "repaintStacks": [
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.<anonymous> (B6Z0M1oK.js:577:195084) < Rp.L.Map.fire (B6Z0M1oK.js:1:10302) < kn.fire (B6Z0M1oK.js:1:10606)",
+          3407
+        ],
+        [
+          "Rp.L.Map._render (B6Z0M1oK.js:577:213888) < B6Z0M1oK.js:577:215280",
+          203
+        ]
+      ],
+      "cdp": {
+        "recalcStyle": 144,
+        "recalcStyleMs": 24,
+        "layout": 347,
+        "layoutMs": 475,
+        "scriptMs": 34953,
+        "taskMs": 66131,
+        "nodes": 8566,
+        "heapMb": "83.4"
+      },
+      "nodesOnScreen": 2
+    }
+  ],
+  "consoleErrors": []
+}
