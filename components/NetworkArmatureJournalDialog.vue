@@ -61,16 +61,21 @@
 
       <v-window v-model="activeTab">
         <v-window-item value="inventory">
-          <div class="metric-row pa-3 pb-0">
-            <v-chip
+          <div
+            class="metric-row pa-3 pb-0"
+            role="group"
+            aria-label="Качество привязки: фильтр по состоянию"
+          >
+            <KpiTile
               v-for="metric in qualityMetrics"
               :key="metric.value"
-              :color="metric.color"
-              :variant="filters.quality_status === metric.value ? 'flat' : 'tonal'"
-              @click="setQualityStatus(metric.value)"
-            >
-              {{ metric.label }}: {{ lookups.counts[metric.value] || 0 }}
-            </v-chip>
+              :label="metric.label"
+              :value="lookups.counts[metric.value] || 0"
+              :status="metric.status"
+              selectable
+              :active="filters.quality_status === metric.value"
+              @select="setQualityStatus(metric.value)"
+            />
           </div>
 
           <div class="filters pa-3">
@@ -641,6 +646,7 @@
 </template>
 
 <script setup lang="ts">
+import type { KpiStatus } from '~/components/KpiTile.vue'
 import { formatApiError } from '~/utils/apiError'
 import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { useMobile } from '~/composables/useMobile'
@@ -769,12 +775,12 @@ const qualityOptions = [
   { title: 'Назначение не распознано', value: 'purpose_unknown' },
   { title: 'Подозрительный диаметр', value: 'diameter_suspicious' }
 ]
-const qualityMetrics: Array<{ value: NetworkArmatureQualityStatus; label: string; color: string }> = [
-  { value: 'ready', label: 'Готовы', color: 'green' },
-  { value: 'line_missing', label: 'Нет линии', color: 'red' },
-  { value: 'line_removed', label: 'Удалённая линия', color: 'grey' },
-  { value: 'purpose_unknown', label: 'Неизвестное назначение', color: 'orange' },
-  { value: 'diameter_suspicious', label: 'Диаметр', color: 'amber-darken-3' }
+const qualityMetrics: Array<{ value: NetworkArmatureQualityStatus; label: string; status: KpiStatus }> = [
+  { value: 'ready', label: 'Готовы', status: 'good' },
+  { value: 'line_missing', label: 'Нет линии', status: 'critical' },
+  { value: 'line_removed', label: 'Удалённая линия', status: 'serious' },
+  { value: 'purpose_unknown', label: 'Неизвестное назначение', status: 'warning' },
+  { value: 'diameter_suspicious', label: 'Диаметр под вопросом', status: 'warning' }
 ]
 const purposeOptions = computed(() => lookups.value.purposes.filter(item => !filters.value.equipment_type || item.equipment_type === filters.value.equipment_type))
 const detailTitle = computed(() => itemDetails.value?.display_name || catalogDetails.value?.name_zc || 'Паспорт арматуры')

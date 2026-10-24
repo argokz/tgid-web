@@ -48,8 +48,8 @@
 | `AppSelect` | плотный `v-select`/`v-autocomplete`: поиск при > 50 пунктов, виртуальный список Vuetify, единицы, «создать?» | все 166 списков | `v-select` ×145, `v-autocomplete` ×18 | есть: тест, применён в фильтрах арматуры (5) |
 | `SegmentedToggle` | переключение режимов с иконкой и подписью, обязательный выбор | режимы, вкладки-фильтры | `v-btn-toggle` ×14, `v-switch` ×12 | есть: тест, применён в `OutageSimulationDialog` |
 | `FieldGrid` | поле формы: label сверху/inline, focus / error / readonly / dirty, единицы | формы журналов и карточки | `CardFieldEditor`, `SetterValueInput` | — |
-| `DataTable` | липкая шапка, сортировка, числа вправо, выбор строки, виртуализация | журналы, протоколы, диагностика | сырой `<table>` ×35, `v-table` ×23 | — |
-| `KpiTile`, `Sparkline` | плитка числа и мини-график (inline SVG) | шапки журналов, итоги расчётов | — (по `dataviz`) | — |
+| `DataTable` | липкая шапка, сортировка, числа вправо, зебра по токенам, выбор строки, виртуализация от 200 строк | журналы, протоколы, диагностика | сырой `<table>` ×35, `v-table` ×23 | есть: тест, применён в «Очереди опрессовок» |
+| `KpiTile`, `Sparkline` | плитка числа (подпись · значение · дельта · тренд · состояние) и мини-график inline SVG | шапки журналов, итоги расчётов | чипы качества в журналах (по `dataviz`) | есть: тесты; `KpiTile` — счётчики качества арматуры; `Sparkline` — внутри `KpiTile`, первое реальное место с рядом данных — этап 6 |
 | `GlassSurface`, `FloatingToolbar` | стеклянная поверхность; кнопка-инструмент с подсказкой и индикатором активного | тулбар, поповеры | `EditorToolbar`, `DrawPanel`, `MapControls` | — |
 | `InspectorPanel` | панель справа / окно, вкладки, секции, поиск по полям | карточка объекта, формы записей | `ObjectCardShell` + `useObjectCardLayout` | — |
 | `MapPopover` | поповер у точки карты, следует за ней при pan | клик по объекту | `popupStore` + popup MapLibre | — |
@@ -102,3 +102,23 @@
 
 Пропсы: `modelValue`, `items: { value, label, icon?, disabled?, hint? }[]`, `mandatory` (true), `disabled`, `wrap` (true),
 `iconOnly`, `ariaLabel`. Семантика `radiogroup` / `radio` + `aria-checked`; недоступный пункт виден, с `title` из `hint`.
+
+### KpiTile и Sparkline
+
+`KpiTile`: `label`, `value` (число → `14,9 тыс.`, полное в title; строка — как есть), `units`, `compact`, `digits`, `delta`
+(со знаком, тон = направление × `upIsGood`; `deltaLabel` — «за неделю»), `trend` (ряд чисел → `Sparkline`), `status`
+(`good` / `warning` / `serious` / `critical` — иконка + цвет, подпись остаётся), `selectable` + `active` → кнопка-фильтр
+(`aria-pressed`, событие `select`). Крупное число — пропорциональные цифры, `tabular-nums` только в колонках (`dataviz`).
+
+`Sparkline`: `values` (null — пропуск), `width` / `height` (72×20), `area`, `label` (иначе подпись строится сама:
+«12 значений, от 0,8 до 1,4, сейчас 1,2: рост»), `min` / `max` (по умолчанию — диапазон ряда). Линия в приглушённом тоне,
+последняя точка — акцент. Без ECharts: десятки экземпляров в виртуальном списке стоят как SVG-пути.
+
+### DataTable
+
+Пропсы: `columns: { key, title, type?: text | number | date | actions, width?, sortable?, align? }[]` (порядок и набор —
+как в десктопе), `items`, `itemKey` (`id`), `loading`, `density` (`compact`), `virtual` (null → от `virtualFrom` = 200 строк),
+`height` (480, для виртуальной), `selectable` + `selectedKey` → событие `select(item)` и подсветка строки акцентом,
+`sortBy` + `update:sortBy`, `noDataText`, `loadingText`. Слоты `v-data-table` (`item.<key>`, `top`, `bottom`) проходят
+насквозь. Числовые колонки — вправо и `tabular-nums`; длинный текст обрезается (полный — в title/инспекторе);
+высота строки одна строка — иначе виртуальная прокрутка Vuetify считает неверно.

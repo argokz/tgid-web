@@ -31,55 +31,26 @@
           density="compact"
           class="ma-3"
         >{{ note }}</v-alert>
-        <v-alert
-          v-if="error"
-          type="error"
-          variant="tonal"
-          density="compact"
-          class="ma-3"
-        >{{ error }}</v-alert>
-        <div
-          class="pa-3"
-          style="min-height: 280px; overflow: auto"
+        <StateView
+          class="pa-3 ochered-body"
+          variant="table"
+          :rows="8"
+          :loading="loading && !items.length"
+          :error="error"
+          :empty="!items.length"
+          empty-title="Нет данных очереди"
+          empty-text="Нужен дамп таблицы ochered_opressovok или opressovki_uchastok_ocheredi"
+          error-title="Не удалось загрузить очередь опрессовок"
+          :retrying="loading"
+          @retry="load"
         >
-          <v-progress-linear
-            v-if="loading"
-            indeterminate
-            color="blue-darken-2"
-            class="mb-3"
+          <DataTable
+            :columns="tableColumns"
+            :items="tableRows"
+            item-key="__key"
+            :loading="loading"
           />
-          <v-table
-            v-else-if="items.length"
-            density="compact"
-            hover
-          >
-            <thead>
-              <tr>
-                <th
-                  v-for="col in columns"
-                  :key="col"
-                >{{ col }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="(row, idx) in items"
-                :key="idx"
-              >
-                <td
-                  v-for="col in columns"
-                  :key="col"
-                >{{ formatCell(row[col]) }}</td>
-              </tr>
-            </tbody>
-          </v-table>
-          <div
-            v-else
-            class="text-medium-emphasis text-center py-10"
-          >
-            Нет данных очереди. Нужен дамп `ochered_opressovok` / `opressovki_uchastok_ocheredi`.
-          </div>
-        </div>
+        </StateView>
         <v-card-actions class="px-4 py-2">
           <span class="text-caption text-medium-emphasis">Стр. {{ page }}{{ pages ? ` / ${pages}` : '' }}</span>
           <v-spacer />
@@ -100,6 +71,7 @@
 import { formatApiError } from '~/utils/apiError'
 import { useMobile } from '~/composables/useMobile'
 import { fastApiService } from '~/services/fastApiService'
+import type { DataTableColumn } from '~/components/DataTable.vue'
 
 const { isMobile } = useMobile()
 const visible = ref(false)
@@ -124,6 +96,22 @@ const formatCell = (value: unknown) => {
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
 }
+
+/** Колонки для DataTable: числовые — по первому значению, остальное текстом */
+const tableColumns = computed<DataTableColumn[]>(() =>
+  columns.value.map((col) => ({
+    key: col,
+    title: col,
+    type: typeof items.value[0]?.[col] === 'number' ? 'number' : 'text',
+  })),
+)
+const tableRows = computed(() =>
+  items.value.map((row, idx) => {
+    const out: Record<string, unknown> = { __key: idx }
+    for (const col of columns.value) out[col] = typeof row[col] === 'number' ? row[col] : formatCell(row[col])
+    return out
+  }),
+)
 
 const load = async () => {
   loading.value = true
@@ -155,3 +143,9 @@ watch(page, () => {
 
 defineExpose({ openDialog })
 </script>
+
+<style scoped>
+.ochered-body {
+  min-height: 280px;
+}
+</style>
