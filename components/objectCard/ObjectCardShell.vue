@@ -28,7 +28,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue';
-import { cardPanelInset, clampFloat, clampPanelWidth, useObjectCardLayout } from '~/composables/useObjectCardLayout';
+import { cardPanelInset, clampFloat, clampPanelWidth, useObjectCardLayout, type ObjectCardLayout } from '~/composables/useObjectCardLayout';
 
 const props = defineProps<{ modelValue: boolean; mobile?: boolean }>();
 defineEmits<{ 'update:modelValue': [value: boolean] }>();
@@ -65,12 +65,41 @@ const shellStyle = computed(() => {
   return { left: `${f.x}px`, top: `${f.y}px`, width: `${f.w}px`, height: `${f.h}px` };
 });
 
-// Перетаскивание плавающего окна — за элемент с data-card-drag (шапка карточки), не за кнопки
+// Перетаскивание плавающего окна — за элемент с data-card-drag (шапка карточки), не за кнопки.
+// Пока кнопка нажата, геометрия пишется прямо в style корня один раз на кадр (rAF), а в реактивный
+// layout — только на pointerup: иначе каждый pointermove перерисовывал всю карточку (замер S4a:
+// 185 мс на шаг, docs/performance-baseline.md).
 let move: ((e: PointerEvent) => void) | null = null;
+let pendingGeometry: Partial<ObjectCardLayout['float']> & { panelWidth?: number } | null = null;
+let geometryFrame = 0;
+const applyPendingToDom = () => {
+  geometryFrame = 0;
+  const el = root.value;
+  const g = pendingGeometry;
+  if (!el || !g) return;
+  if (g.panelWidth != null) el.style.width = `${g.panelWidth}px`;
+  if (g.x != null) el.style.left = `${g.x}px`;
+  if (g.y != null) el.style.top = `${g.y}px`;
+  if (g.w != null) el.style.width = `${g.w}px`;
+  if (g.h != null) el.style.height = `${g.h}px`;
+};
+const scheduleGeometry = (g: NonNullable<typeof pendingGeometry>) => {
+  pendingGeometry = { ...pendingGeometry, ...g };
+  if (!geometryFrame) geometryFrame = requestAnimationFrame(applyPendingToDom);
+};
 const stopPointer = () => {
   if (move) window.removeEventListener('pointermove', move);
   window.removeEventListener('pointerup', stopPointer);
   move = null;
+  if (geometryFrame) cancelAnimationFrame(geometryFrame);
+  geometryFrame = 0;
+  const g = pendingGeometry;
+  pendingGeometry = null;
+  if (g) {
+    const { panelWidth, ...float } = g;
+    if (panelWidth != null) layout.panelWidth = panelWidth;
+    if (Object.keys(float).length) Object.assign(layout.float, float);
+  }
   dragging.value = false;
 };
 
@@ -81,10 +110,11 @@ const onPointerDown = (e: PointerEvent) => {
   const start = { x: e.clientX, y: e.clientY, fx: layout.float.x, fy: layout.float.y };
   dragging.value = true;
   move = (ev: PointerEvent) => {
-    Object.assign(layout.float, clampFloat(
+    const f = clampFloat(
       { ...layout.float, x: start.fx + ev.clientX - start.x, y: start.fy + ev.clientY - start.y },
       viewport.value.w, viewport.value.h,
-    ));
+    );
+    scheduleGeometry({ x: f.x, y: f.y });
   };
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', stopPointer);
@@ -95,12 +125,13 @@ const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
   dragging.value = true;
   move = (ev: PointerEvent) => {
     if (what === 'panel') {
-      layout.panelWidth = clampPanelWidth(start.w + start.x - ev.clientX, viewport.value.w);
+      scheduleGeometry({ panelWidth: clampPanelWidth(start.w + start.x - ev.clientX, viewport.value.w) });
     } else {
-      Object.assign(layout.float, clampFloat(
+      const f = clampFloat(
         { ...layout.float, w: start.fw + ev.clientX - start.x, h: start.fh + ev.clientY - start.y },
         viewport.value.w, viewport.value.h,
-      ));
+      );
+      scheduleGeometry({ w: f.w, h: f.h });
     }
   };
   window.addEventListener('pointermove', move);

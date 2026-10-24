@@ -389,6 +389,13 @@ export function useMapDraw() {
     (map.getSource(SOURCE_DRAFT_ID) as any)?.setData(draftCollection());
   };
 
+  /** Только черновик (курсор, текущий отрезок): готовые измерения при движении мыши не меняются */
+  const refreshDraft = () => {
+    const map = mapRef.value;
+    if (!map) return;
+    (map.getSource(SOURCE_DRAFT_ID) as any)?.setData(draftCollection());
+  };
+
   const ensureLayers = (map: MapLibreMap) => {
     if (map.getSource(SOURCE_ID)) return;
     // isStyleLoaded() иногда возвращает true, пока стиль ещё диффится (HMR,
@@ -560,20 +567,47 @@ export function useMapDraw() {
     refresh();
   };
 
-  const onMapMove = (e: MapMouseEvent) => {
+  /**
+   * mousemove приходит чаще кадра; привязка (queryRenderedFeatures) и setData — один раз на кадр
+   * по последнему событию. Без этого ведение линии шло на 2,5 fps: по два setData и три
+   * queryRenderedFeatures на каждое движение (замер S6, docs/performance-baseline.md).
+   */
+  let pendingMove: MapMouseEvent | null = null;
+  let moveFrame = 0;
+  const flushMove = () => {
+    moveFrame = 0;
+    const e = pendingMove;
+    pendingMove = null;
+    if (!e) return;
     if (dragging) {
       moveVertex(e);
       return;
     }
     if (mode.value === 'none') return;
     hoverPoint.value = pointFromEvent(e);
-    refresh();
+    refreshDraft();
+  };
+  const cancelPendingMove = () => {
+    pendingMove = null;
+    if (moveFrame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(moveFrame);
+    moveFrame = 0;
+  };
+  const onMapMove = (e: MapMouseEvent) => {
+    if (!dragging && mode.value === 'none') return;
+    pendingMove = e;
+    if (moveFrame) return;
+    if (typeof requestAnimationFrame !== 'function') {
+      flushMove();
+      return;
+    }
+    moveFrame = requestAnimationFrame(flushMove);
   };
 
   const onMapOut = () => {
+    cancelPendingMove();
     hoverPoint.value = null;
     hoverSnapped.value = false;
-    refresh();
+    refreshDraft();
   };
 
   /** Профиль высот вдоль линии (модель рельефа MapTiler) */
@@ -779,6 +813,7 @@ export function useMapDraw() {
   };
 
   const detach = () => {
+    cancelPendingMove();
     activeDrawMode.value = 'none';
     mode.value = 'none';
     if (typeof window !== 'undefined') window.removeEventListener('keydown', onKeyDown);

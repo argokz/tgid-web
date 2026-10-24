@@ -273,12 +273,18 @@
       </div>
     </v-main>
 
-    <LoginDialog
+    <!-- Диалоги шапки монтируются при первом открытии и остаются (ленивые чанки не входят в критический путь) -->
+    <LazyLoginDialog
+      v-if="mountedOnce.login"
       v-model="showLogin"
       :required="authStore.loginRequired"
     />
-    <ChangePasswordDialog v-model="showChangePassword" />
-    <AccountDialog
+    <LazyChangePasswordDialog
+      v-if="mountedOnce.changePassword"
+      v-model="showChangePassword"
+    />
+    <LazyAccountDialog
+      v-if="mountedOnce.account"
       v-model="showAccount"
       :initial-tab="accountTab"
       @change-password="showChangePassword = true"
@@ -287,8 +293,8 @@
     <ConfirmDialogHost />
 
     <!-- Модальное окно расчёта -->
-    <PlanningCalculationModal
-      v-if="isHydrated && authStore.canCalculate"
+    <LazyPlanningCalculationModal
+      v-if="mountedOnce.calculation && authStore.canCalculate"
       ref="calculationModalRef"
       v-model="showCalculationModal"
       @protocol-log="onCalculationLog"
@@ -298,7 +304,8 @@
     />
 
     <!-- Окно протокола: анализ ошибок с переходом к объектам, «Исправить», «Пересчитать» -->
-    <CalculationProtocol
+    <LazyCalculationProtocol
+      v-if="mountedOnce.protocol"
       ref="protocolRef"
       v-model:show="showProtocol"
       :can-recalculate="!!calculationModalRef?.canRerun"
@@ -336,7 +343,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useMobile } from '~/composables/useMobile';
 import {
@@ -352,11 +359,8 @@ import { useNotificationStore } from '~/stores/notificationStore';
 import { useAuthStore } from '~/stores/authStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { useUiStore } from '~/stores/uiStore';
-import PlanningCalculationModal from '~/components/PlanningCalculationModal.vue';
-import CalculationProtocol from '~/components/CalculationProtocol.vue';
-import LoginDialog from '~/components/LoginDialog.vue';
-import ChangePasswordDialog from '~/components/ChangePasswordDialog.vue';
-import AccountDialog from '~/components/AccountDialog.vue';
+import type PlanningCalculationModal from '~/components/PlanningCalculationModal.vue';
+import type CalculationProtocol from '~/components/CalculationProtocol.vue';
 import ConfirmDialogHost from '~/components/ConfirmDialogHost.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { ROLE_LABELS, type Role } from '~/utils/permissions';
@@ -383,6 +387,17 @@ const exportingDxf = ref(false);
 const exportingGeoJson = ref(false);
 const protocolRef = ref<InstanceType<typeof CalculationProtocol> | null>(null);
 const calculationModalRef = ref<InstanceType<typeof PlanningCalculationModal> | null>(null);
+
+/**
+ * Диалоги шапки — ленивые чанки, монтируются при первом открытии и дальше живут (v-dialog сохраняет
+ * состояние и анимацию закрытия). До этого в entry-чанк шапки входили протокол расчёта (1 400 строк),
+ * окно расчёта, вход, кабинет и смена пароля — замер S0 этапа 0 (docs/performance-baseline.md).
+ * Протокол монтируется вместе с окном расчёта: лог расчёта (addLog) приходит в него ещё до показа.
+ */
+const mountedOnce = reactive({ login: false, changePassword: false, account: false, calculation: false, protocol: false });
+watch(showLogin, (v) => { if (v) mountedOnce.login = true; }, { immediate: true });
+watch(showCalculationModal, (v) => { if (v) { mountedOnce.calculation = true; mountedOnce.protocol = true; } }, { immediate: true });
+watch(showProtocol, (v) => { if (v) mountedOnce.protocol = true; }, { immediate: true });
 
 onMounted(() => {
   isHydrated.value = true;
@@ -435,6 +450,9 @@ const logout = () => {
 
 // Смена пароля; временный пароль от администратора (AUTH_BACKEND=pg) — предложить сразу после входа
 const showChangePassword = ref(false);
+// showAccount и showChangePassword объявлены ниже mountedOnce — наблюдатели здесь
+watch(showAccount, (v) => { if (v) mountedOnce.account = true; }, { immediate: true });
+watch(showChangePassword, (v) => { if (v) mountedOnce.changePassword = true; }, { immediate: true });
 watch(() => authStore.mustChangePassword, (must) => {
   if (must) showChangePassword.value = true;
 });

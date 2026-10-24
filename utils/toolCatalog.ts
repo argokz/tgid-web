@@ -8,6 +8,8 @@ import type { Cap, GeneralPerm, Role } from '~/utils/permissions'
 
 export type ToolEvent =
   | 'open-topology-diagnostics'
+  | 'open-wear-index'
+  | 'open-data-quality'
   | 'open-fault-diagnostics'
   | 'open-calculation-diagnostics'
   | 'open-passport-dialog'

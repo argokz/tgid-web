@@ -21,6 +21,8 @@ const CPU = Number(args.cpu || 4);
 const RUNS = Number(args.runs || 2);
 const ONLY = args.only ? String(args.only).split(',') : null;
 let FRAGMENT = Number(args.fragment || 74);
+/** --context-off=terrain3d,buildings — выключить слои контекста перед сценариями (A/B рельефа и зданий) */
+const CONTEXT_OFF = args['context-off'] ? String(args['context-off']).split(',') : [];
 const OUT = args.out || `scripts/perf/results-${new Date().toISOString().slice(0, 10)}.json`;
 
 const PINIA = "document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$pinia._s";
@@ -130,6 +132,10 @@ async function openMap(page) {
   }
   await page.evaluate(INSTRUMENT_MAP);
   const loadMs = Date.now() - t0;
+  if (CONTEXT_OFF.length) {
+    await piniaEval(page, "for (const k of arg) s.get('layer').setContextLayerVisible(k, false); return true", CONTEXT_OFF);
+    await waitIdle(page, 30000);
+  }
   // Фрагмент сценариев: запрошенный, если он есть в базе, иначе видимый по умолчанию
   const st = await piniaEval(page, "const f = s.get('fragment'); return { visible: [...f.visibleFragments], ids: f.fragments.map(x => x.id) }");
   if (!st.visible.includes(FRAGMENT)) {
@@ -439,7 +445,7 @@ const cdp = await context.newCDPSession(page);
 await cdp.send('Performance.enable');
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU });
 
-const all = { base: BASE, cpu: CPU, runs: RUNS, date: new Date().toISOString(), results: [] };
+const all = { base: BASE, cpu: CPU, runs: RUNS, contextOff: CONTEXT_OFF, date: new Date().toISOString(), results: [] };
 for (let run = 1; run <= RUNS; run++) {
   log(`\n=== прогон ${run}/${RUNS}, CPU ×${CPU} ===`);
   const loadMs = await openMap(page);

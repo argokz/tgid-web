@@ -86,7 +86,7 @@ const qs = (params: Record<string, unknown>): string => {
 
 export const tuConnectionService = {
   candidates(query: TuConnectionQuery): Promise<ConnectionCandidates> {
-    return fastApiService.request<ConnectionCandidates>(`api/v1/technical-conditions/connection-candidates${qs(query)}`);
+    return fastApiService.request<ConnectionCandidates>(`api/v1/technical-conditions/connection-candidates${qs({ ...query })}`);
   },
   loadEstimate(params: { floors?: number; area_m2?: number }): Promise<LoadEstimate> {
     return fastApiService.request<LoadEstimate>(`api/v1/technical-conditions/load-estimate${qs(params)}`);

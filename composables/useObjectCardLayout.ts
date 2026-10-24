@@ -20,6 +20,7 @@ export interface ObjectCardLayout {
 export const cardPanelInset = ref(0);
 
 const STORAGE_KEY = 'objectCardLayout';
+const SAVE_DELAY_MS = 300;
 export const PANEL_MIN_WIDTH = 360;
 export const PANEL_MAX_WIDTH = 900;
 
@@ -50,12 +51,18 @@ let state: ObjectCardLayout | null = null;
 export function useObjectCardLayout(): ObjectCardLayout {
   if (state) return state;
   state = reactive(typeof window === 'undefined' ? defaults() : load());
+  // Сохранение — с задержкой: при перетаскивании и resize значения меняются сериями
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
   watch(state, (v) => {
-    try {
-      appStorage.setItem(STORAGE_KEY, JSON.stringify(v));
-    } catch {
-      // localStorage недоступен — размещение до перезагрузки
-    }
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      try {
+        appStorage.setItem(STORAGE_KEY, JSON.stringify(v));
+      } catch {
+        // localStorage недоступен — размещение до перезагрузки
+      }
+    }, SAVE_DELAY_MS);
   }, { deep: true });
   return state;
 }
