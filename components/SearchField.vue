@@ -1,5 +1,4 @@
 <template>
-  <!-- Поле поиска: debounce, очистка, Esc, счётчик результатов. Один вид для поиска узлов и фильтров журналов -->
   <v-text-field
     ref="field"
     :model-value="modelValue"

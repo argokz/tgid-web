@@ -1,5 +1,4 @@
 <template>
-  <!-- Таблица данных одного вида для журналов и протоколов: липкая шапка, сортировка, числа вправо, выбор строки -->
   <component
     :is="virtual ? VDataTableVirtual : VDataTable"
     class="data-table num"

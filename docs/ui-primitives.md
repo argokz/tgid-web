@@ -50,7 +50,7 @@
 | `FieldGrid` | поле формы: label сверху/inline, focus / error / readonly / dirty, единицы | формы журналов и карточки | `CardFieldEditor`, `SetterValueInput` | — |
 | `DataTable` | липкая шапка, сортировка, числа вправо, зебра по токенам, выбор строки, виртуализация от 200 строк | журналы, протоколы, диагностика | сырой `<table>` ×35, `v-table` ×23 | есть: тест, применён в «Очереди опрессовок» |
 | `KpiTile`, `Sparkline` | плитка числа (подпись · значение · дельта · тренд · состояние) и мини-график inline SVG | шапки журналов, итоги расчётов | чипы качества в журналах (по `dataviz`) | есть: тесты; `KpiTile` — счётчики качества арматуры; `Sparkline` — внутри `KpiTile`, первое реальное место с рядом данных — этап 6 |
-| `GlassSurface`, `FloatingToolbar` | стеклянная поверхность; кнопка-инструмент с подсказкой и индикатором активного | тулбар, поповеры | `EditorToolbar`, `DrawPanel`, `MapControls` | — |
+| `GlassSurface`, `FloatingToolbar` | стеклянная поверхность по токенам; группа кнопок-инструментов с `HintTip`, активный — акцентом | тулбар, поповеры, панели над картой | `EditorToolbar`, `DrawPanel`, `MapControls` | есть: тесты; `FloatingToolbar` — инструменты редактора топологии, `GlassSurface` — панель измерений; тулбар редактора на токенах стекла |
 | `InspectorPanel` | панель справа / окно, вкладки, секции, поиск по полям | карточка объекта, формы записей | `ObjectCardShell` + `useObjectCardLayout` | — |
 | `MapPopover` | поповер у точки карты, следует за ней при pan | клик по объекту | `popupStore` + popup MapLibre | — |
 | `BottomSheet` | 3 положения, свайп | инспектор и графики на телефоне | `useSwipe` | — |
@@ -122,3 +122,14 @@
 `sortBy` + `update:sortBy`, `noDataText`, `loadingText`. Слоты `v-data-table` (`item.<key>`, `top`, `bottom`) проходят
 насквозь. Числовые колонки — вправо и `tabular-nums`; длинный текст обрезается (полный — в title/инспекторе);
 высота строки одна строка — иначе виртуальная прокрутка Vuetify считает неверно.
+
+### GlassSurface и FloatingToolbar
+
+`GlassSurface`: `level` (`1` — тулбары и поповеры с blur; `solid` — инспектор и формы без blur), `rounded`
+(`sm` / `md` / `lg` / `pill`), `padded`, `tag`. Всё оформление — из токенов `--glass-*`; на время движения карты
+корень карты получает `.map-moving`, и blur снимается у всех поверхностей уровня 1.
+
+`FloatingToolbar`: `modelValue`, `items: { value, title, icon, hotkey?, hint?, disabled? }[]`, `mandatory` (true),
+`disabled`, `showActiveLabel` (подпись у активного), `tipLocation`, `ariaLabel`. Семантика `toolbar` + `aria-pressed`,
+у каждой кнопки `HintTip` (название · хоткей · строка «что сделает»). Активный инструмент — акцент `--accent-soft` /
+`--accent-text`, единственное место акцента на тулбаре.

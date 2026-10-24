@@ -1,9 +1,9 @@
 <template>
-  <v-card
+  <GlassSurface
     v-if="open"
-    class="draw-panel"
-    elevation="8"
+    level="solid"
     rounded="lg"
+    class="draw-panel"
     role="region"
     aria-label="Панель измерений"
   >
@@ -252,7 +252,7 @@
         Очистить
       </v-btn>
     </div>
-  </v-card>
+  </GlassSurface>
 </template>
 
 <script setup lang="ts">
@@ -377,7 +377,7 @@ onBeforeUnmount(() => draw.detach());
   position: absolute;
   top: 16px;
   left: 72px;
-  z-index: 5;
+  z-index: var(--z-controls);
   width: min(360px, calc(100vw - 32px));
   max-height: calc(100% - 32px);
   display: flex;

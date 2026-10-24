@@ -1,5 +1,4 @@
 <template>
-  <!-- Выпадающий список одного вида для всех форм: плотный, с очисткой; при длинном списке — с поиском внутри -->
   <component
     :is="searchable ? VAutocomplete : VSelect"
     :model-value="modelValue"

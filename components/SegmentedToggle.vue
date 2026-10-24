@@ -1,5 +1,4 @@
 <template>
-  <!-- Переключение режимов одним видом: сегменты с иконкой и подписью, обязательный выбор -->
   <v-btn-toggle
     :model-value="modelValue"
     :mandatory="mandatory"

@@ -1,5 +1,4 @@
 <template>
-  <!-- Мини-график в строке: inline SVG без зависимостей (десятки штук в виртуальном списке — без ECharts) -->
   <svg
     class="sparkline"
     :width="width"

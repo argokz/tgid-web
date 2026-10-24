@@ -28,39 +28,12 @@
         </v-tooltip>
       </div>
       <!-- Инструменты: один активный (V, L, N, E, M, B) -->
-      <v-btn-toggle
+      <FloatingToolbar
         :model-value="activeTool"
-        mandatory
-        density="comfortable"
-        divided
-        rounded="xl"
-        variant="outlined"
-        color="primary"
-        class="editor-toolbar__tools"
-        @update:model-value="(t: EditorTool) => void setTool(t)"
-      >
-        <v-btn
-          v-for="t in tools"
-          :key="t.value"
-          :value="t.value"
-          size="small"
-          :aria-label="t.title"
-        >
-          <v-icon size="18">
-            {{ t.icon }}
-          </v-icon>
-          <span
-            v-if="t.value === activeTool"
-            class="ml-1"
-          >{{ t.title }}</span>
-          <v-tooltip
-            activator="parent"
-            location="bottom"
-          >
-            <b>{{ t.title }}</b> <kbd>{{ t.key }}</kbd><br>{{ t.hint }}
-          </v-tooltip>
-        </v-btn>
-      </v-btn-toggle>
+        :items="toolbarItems"
+        aria-label="Инструменты редактора"
+        @update:model-value="(t: unknown) => void setTool(t as EditorTool)"
+      />
 
       <!-- Фрагмент новых узлов и участков: копии сети разных фрагментов лежат друг на друге -->
       <v-menu
@@ -575,6 +548,7 @@ const fragmentText = (id: number) =>
 const authStore = useAuthStore();
 /** Инструменты по правам пользователя: без права создания — нет «Трассы», «Узла», «Ввода в здание» */
 const tools = computed(() => EDITOR_TOOLS.filter((t) => toolAllowed(t.value, authStore.permissions)));
+const toolbarItems = computed(() => tools.value.map((t) => ({ value: t.value, title: t.title, icon: t.icon, hotkey: t.key, hint: t.hint })));
 
 /** Состояние привязок трассы — только когда что-то не так */
 const statusChips = computed(() => {
@@ -611,11 +585,14 @@ const statusChips = computed(() => {
   top: 72px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(var(--v-theme-surface), 0.96);
-  backdrop-filter: blur(8px);
+  /* стекло уровня 1 — из токенов (fallback и .map-moving в _tokens.scss) */
+  background: var(--glass-1-bg);
+  -webkit-backdrop-filter: var(--glass-1-filter);
+  backdrop-filter: var(--glass-1-filter);
+  border: var(--glass-border);
   border-radius: 24px;
-  z-index: 10;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: var(--z-toolbar);
+  box-shadow: var(--shadow-2);
 }
 /* перетащена оператором: угол — из style (left/top), без центрирования */
 .editor-toolbar--moved {
@@ -640,9 +617,6 @@ const statusChips = computed(() => {
 .editor-toolbar__handle--pinned {
   cursor: default;
   opacity: 0.25;
-}
-.editor-toolbar__tools {
-  height: 36px !important;
 }
 .editor-toolbar__select {
   width: 190px;

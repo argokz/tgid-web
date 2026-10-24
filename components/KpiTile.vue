@@ -1,5 +1,4 @@
 <template>
-  <!-- Плитка числа (stat tile по dataviz): подпись · значение · дельта · тренд; состояние — иконка + подпись, не только цвет -->
   <component
     :is="selectable ? 'button' : 'div'"
     :type="selectable ? 'button' : undefined"
