@@ -13,7 +13,7 @@ const Form = defineComponent({
         default: ({ id }: { id: string }) => h('input', { id, value: '6,5' }),
       }),
       h(FieldCell, { label: 'Примечание', span: true, dirty: true, error: 'Не больше 255 символов' }, {
-        default: ({ id }: { id: string }) => h('textarea', { id }),
+        default: ({ id, errorId, invalid }: { id: string; errorId?: string; invalid: boolean }) => h('textarea', { id, 'aria-describedby': errorId, 'aria-invalid': invalid ? 'true' : undefined }),
       }),
       h(FieldCell, { label: 'Только чтение', readonly: true }, { default: () => h('input') }),
     ]);
@@ -32,11 +32,14 @@ describe('FieldGrid / FieldCell', () => {
     expect(label.text()).toContain('Давление');
     expect(first.find('.field-cell__required').exists()).toBe(true);
     expect(first.find('.field-cell__units').text()).toBe('кгс/см²');
-    expect(first.find('.field-cell__hint-icon').attributes('aria-label')).toBe('Давление в подающем трубопроводе');
+    expect(first.find('button.field-cell__hint').attributes('aria-label')).toBe('Подсказка: Давление в подающем трубопроводе');
+    expect(first.find('label').text()).not.toContain('Подсказка');
     const second = cells[1];
     expect(second.classes()).toContain('field-cell--span');
     expect(second.classes()).toContain('field-cell--dirty');
     expect(second.find('[role="alert"]').text()).toBe('Не больше 255 символов');
+    expect(second.find('[role="alert"]').attributes('id')).toBe(second.find('textarea').attributes('aria-describedby'));
+    expect(second.find('textarea').attributes('aria-invalid')).toBe('true');
     expect(cells[2].classes()).toContain('field-cell--readonly');
   });
 

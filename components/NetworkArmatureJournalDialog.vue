@@ -82,7 +82,7 @@
             <SearchField
               :model-value="String(filters.search ?? '')"
               label="Назначение, узел, линия или ID"
-              @update:model-value="filters.search = $event"
+              @update:model-value="filters.search = $event || undefined"
               :debounce="300"
               @search="reloadInventory"
             />

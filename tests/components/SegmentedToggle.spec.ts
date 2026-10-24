@@ -9,13 +9,13 @@ const items = [
 ];
 
 describe('SegmentedToggle', () => {
-  it('рендерит сегменты с подписями, выбранный помечен aria-checked', () => {
+  it('рендерит сегменты с подписями, выбранный помечен aria-pressed', () => {
     const w = mountWithVuetify(SegmentedToggle, { props: { modelValue: 'node', items, ariaLabel: 'Что отключаем' } });
     const buttons = w.findAll('button');
     expect(buttons.map((b) => b.text())).toEqual(['Трубопровод', 'Узел', 'Область']);
-    expect(buttons[1].attributes('aria-checked')).toBe('true');
-    expect(buttons[0].attributes('aria-checked')).toBe('false');
-    expect(w.find('[role="radiogroup"]').attributes('aria-label')).toBe('Что отключаем');
+    expect(buttons[1].attributes('aria-pressed')).toBe('true');
+    expect(buttons[0].attributes('aria-pressed')).toBe('false');
+    expect(w.find('[role="group"]').attributes('aria-label')).toBe('Что отключаем');
   });
 
   it('клик по сегменту меняет значение; недоступный сегмент виден с пояснением, но не активен', async () => {

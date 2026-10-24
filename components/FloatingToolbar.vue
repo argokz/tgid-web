@@ -3,6 +3,7 @@
     class="floating-toolbar"
     role="toolbar"
     :aria-label="ariaLabel"
+    @keydown="onKeydown"
   >
     <HintTip
       v-for="item in items"
@@ -17,11 +18,13 @@
           v-bind="tip"
           type="button"
           class="floating-toolbar__item"
-          :class="{ 'floating-toolbar__item--active': item.value === modelValue }"
+          :class="{ 'floating-toolbar__item--active': item.value === modelValue, 'floating-toolbar__item--disabled': disabled || item.disabled }"
           :aria-label="item.title"
           :aria-pressed="item.value === modelValue"
-          :disabled="disabled || item.disabled"
-          @click="select(item.value)"
+          :aria-disabled="disabled || item.disabled ? 'true' : undefined"
+          :tabindex="item.value === focusValue ? 0 : -1"
+          :data-value="String(item.value)"
+          @click="select(item.value, disabled || item.disabled)"
         >
           <v-icon
             size="18"
@@ -38,13 +41,15 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref } from 'vue';
 import HintTip from '~/components/HintTip.vue';
 
 /**
  * FloatingToolbar — кнопки инструментов одного вида (docs/ui-primitives.md). Активный инструмент подсвечен
  * акцентом (`--accent`), у каждой кнопки `HintTip` с названием, хоткеем и одной строкой пояснения,
- * семантика `toolbar` + `aria-pressed`. Обязательный выбор: клик по активному ничего не делает
- * (`mandatory`), иначе снимает выбор (`null`).
+ * семантика `toolbar` + `aria-pressed`, один tab-stop и стрелки между кнопками (roving tabindex).
+ * Недоступные кнопки — `aria-disabled`, а не `disabled`: подсказка объясняет, почему инструмент недоступен.
+ * Обязательный выбор: клик по активному ничего не делает (`mandatory`), иначе снимает выбор (`null`).
  */
 export interface FloatingToolbarItem<T = string> {
   value: T;
@@ -74,12 +79,33 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ 'update:modelValue': [value: unknown] }>();
 
-const select = (value: unknown) => {
+const select = (value: unknown, isDisabled = false) => {
+  if (isDisabled) return;
   if (value === props.modelValue) {
     if (!props.mandatory) emit('update:modelValue', null);
     return;
   }
   emit('update:modelValue', value);
+};
+
+/** Какая кнопка в табе: активный инструмент, иначе первая; стрелки двигают фокус по кольцу */
+const focused = ref<unknown>(undefined);
+const focusValue = computed(() => {
+  if (focused.value !== undefined && props.items.some((i) => i.value === focused.value)) return focused.value;
+  if (props.items.some((i) => i.value === props.modelValue)) return props.modelValue;
+  return props.items[0]?.value;
+});
+const onKeydown = (e: KeyboardEvent) => {
+  const keys: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Home: 0, End: 0 };
+  if (!(e.key in keys)) return;
+  const n = props.items.length;
+  if (!n) return;
+  const current = Math.max(0, props.items.findIndex((i) => i.value === focusValue.value));
+  const next = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : (current + keys[e.key] + n) % n;
+  e.preventDefault();
+  focused.value = props.items[next].value;
+  const el = (e.currentTarget as HTMLElement).querySelector<HTMLElement>(`[data-value="${String(props.items[next].value)}"]`);
+  el?.focus();
 };
 </script>
 
@@ -119,9 +145,9 @@ const select = (value: unknown) => {
   outline-offset: 1px;
 }
 
-.floating-toolbar__item:disabled {
+.floating-toolbar__item--disabled {
   opacity: 0.4;
-  cursor: default;
+  cursor: not-allowed;
 }
 
 /* активный инструмент — единственное место акцента на тулбаре */

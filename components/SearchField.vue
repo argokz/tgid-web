@@ -18,18 +18,20 @@
     class="search-field"
     @update:model-value="onInput"
     @click:clear="clear"
-    @keydown.esc.prevent="onEscape"
+    @keydown.esc.stop.prevent="onEscape"
     @keydown.enter="onEnter"
   >
-    <template
-      v-if="countLabel"
-      #append-inner
-    >
+    <template #append-inner>
       <span
+        v-if="countLabel"
         class="search-field__count num"
-        role="status"
-        aria-live="polite"
+        aria-hidden="true"
       >{{ countLabel }}</span>
+      <!-- живая область существует всегда, иначе читалки не озвучивают появившийся текст -->
+      <span
+        class="d-sr-only"
+        role="status"
+      >{{ countAnnouncement }}</span>
     </template>
   </v-text-field>
 </template>
@@ -40,7 +42,8 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 /**
  * SearchField — обёртка над v-text-field (docs/ui-primitives.md): `update:modelValue` сразу (для подсветки
  * и локальной фильтрации), `search` — после паузы ввода (`debounce`, по умолчанию 200 мс; результат поиска
- * должен появляться < 300 мс после паузы). Esc очищает поле, повторный Esc — событие `escape` (закрыть панель).
+ * должен появляться < 300 мс после паузы). Esc очищает поле, повторный Esc — событие `escape` (закрыть панель);
+ * оба не всплывают до v-dialog, иначе первый Esc закрывал бы весь диалог.
  */
 const props = withDefaults(defineProps<{
   /** Текст; null/undefined от фильтров журналов — как пустая строка */
@@ -123,6 +126,10 @@ const countLabel = computed(() => {
   if (props.resultCount == null || !props.modelValue) return '';
   if (props.resultCount === 0) return 'ничего';
   return `${props.resultCount.toLocaleString('ru-RU')}`;
+});
+const countAnnouncement = computed(() => {
+  if (props.resultCount == null || !props.modelValue || props.loading) return '';
+  return props.resultCount === 0 ? 'Ничего не найдено' : `Найдено: ${props.resultCount.toLocaleString('ru-RU')}`;
 });
 
 onBeforeUnmount(() => { if (timer) clearTimeout(timer); });

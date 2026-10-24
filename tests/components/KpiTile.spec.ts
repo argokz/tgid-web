@@ -34,7 +34,7 @@ describe('KpiTile', () => {
     const btn = w.find('button.kpi-tile');
     expect(btn.exists()).toBe(true);
     expect(btn.attributes('aria-pressed')).toBe('true');
-    expect(btn.attributes('aria-label')).toContain('Нет линии: 5');
+    expect(btn.attributes('aria-label')).toBe('Нет линии: 5, проблема');
     expect(w.find('.kpi-tile__status-icon').exists()).toBe(true);
     await btn.trigger('click');
     expect(w.emitted('select')).toHaveLength(1);

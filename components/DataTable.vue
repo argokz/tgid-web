@@ -1,6 +1,7 @@
 <template>
   <component
     :is="virtual ? VDataTableVirtual : VDataTable"
+    v-bind="tableProps"
     class="data-table num"
     :class="{ 'data-table--selectable': selectable, 'data-table--dense': density === 'compact' }"
     :headers="tableHeaders"
@@ -8,20 +9,14 @@
     :item-value="itemKey"
     :loading="loading"
     :density="density"
-    :height="virtual ? height : undefined"
-    :fixed-header="true"
     :hover="selectable"
-    :items-per-page="virtual ? undefined : -1"
-    :hide-default-footer="!virtual"
-    :sort-by="sortBy"
+    :sort-by="internalSort"
     :multi-sort="false"
     :must-sort="false"
     :no-data-text="noDataText"
     :loading-text="loadingText"
     :row-props="rowProps"
-    :item-selectable="selectable"
-    @update:sort-by="$emit('update:sortBy', $event)"
-    @click:row="onRowClick"
+    @update:sort-by="onSort"
   >
     <template
       v-for="(_, name) in $slots"
@@ -36,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { VDataTable, VDataTableVirtual } from 'vuetify/components/VDataTable';
 
 /**
@@ -44,8 +39,16 @@ import { VDataTable, VDataTableVirtual } from 'vuetify/components/VDataTable';
  * как в десктопе: заголовок, ключ, тип (число — выравнивание вправо и tabular-nums), ширина, сортируемость.
  * Виртуализация включается от `virtualFrom` строк (200): высота строки предсказуема (одна строка текста,
  * длинное — обрезается с полным текстом в title), иначе ломается расчёт прокрутки Vuetify.
- * Выбор строки — событие `select(item)` и подсветка `selectedKey`; слоты `item.<key>` проходят насквозь.
+ * Выбор строки — событие `select(item)` мышью и с клавиатуры (Enter / пробел), подсветка `selectedKey`;
+ * слоты `item.<key>` проходят насквозь. Сортировка работает сама; родитель может задать `sortBy` и слушать
+ * `update:sortBy` (например, для серверной сортировки).
  */
+/** Элемент сортировки v-data-table */
+export interface SortItem {
+  key: string;
+  order?: boolean | 'asc' | 'desc';
+}
+
 export interface DataTableColumn {
   key: string;
   title: string;
@@ -69,7 +72,7 @@ const props = withDefaults(defineProps<{
   height?: number | string;
   selectable?: boolean;
   selectedKey?: string | number | null;
-  sortBy?: readonly { key: string; order?: 'asc' | 'desc' | boolean }[];
+  sortBy?: readonly SortItem[];
   noDataText?: string;
   loadingText?: string;
 }>(), {
@@ -88,27 +91,55 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   select: [item: Record<string, unknown>];
-  'update:sortBy': [value: unknown];
+  'update:sortBy': [value: SortItem[]];
 }>();
 
 const virtual = computed(() => props.virtual ?? props.items.length >= props.virtualFrom);
 
+/** Пропсы, которые есть только у одной из таблиц: у виртуальной — высота и липкая шапка, у обычной — без футера */
+const tableProps = computed(() => (virtual.value
+  ? { height: props.height, fixedHeader: true }
+  : { itemsPerPage: -1, hideDefaultFooter: true }));
+
+/** Сортировка — своё состояние (иначе controlled-модель Vuetify не меняется без родителя), проп — начальное/внешнее */
+const internalSort = ref<SortItem[]>([...props.sortBy]);
+watch(() => props.sortBy, (v) => { internalSort.value = [...v]; }, { deep: true });
+const onSort = (value: SortItem[]) => {
+  internalSort.value = value;
+  emit('update:sortBy', value);
+};
+
+const LONG_TEXT = 24;
 const tableHeaders = computed(() => props.columns.map((c) => ({
   key: c.key,
   title: c.title,
   width: c.width,
   sortable: c.sortable ?? c.type !== 'actions',
   align: c.align ?? (c.type === 'number' ? 'end' : 'start'),
-  cellProps: c.type === 'number' ? { class: 'data-table__num' } : undefined,
+  // длинный текст обрезается — полный остаётся в title
+  cellProps: ({ value }: { value: unknown }) => ({
+    class: c.type === 'number' ? 'data-table__num' : undefined,
+    title: typeof value === 'string' && value.length > LONG_TEXT ? value : undefined,
+  }),
 })));
 
 const rowProps = ({ item }: { item: Record<string, unknown> }) => {
   const selected = props.selectedKey != null && item[props.itemKey] === props.selectedKey;
-  return { class: selected ? 'data-table__row--selected' : undefined, 'aria-selected': selected ? 'true' : undefined };
-};
-
-const onRowClick = (_event: Event, { item }: { item: Record<string, unknown> }) => {
-  if (props.selectable) emit('select', item);
+  if (!props.selectable) {
+    return { class: selected ? 'data-table__row--selected' : undefined };
+  }
+  return {
+    class: selected ? 'data-table__row--selected' : undefined,
+    'aria-selected': selected ? 'true' : 'false',
+    tabindex: 0,
+    onClick: () => emit('select', item),
+    onKeydown: (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        emit('select', item);
+      }
+    },
+  };
 };
 
 defineExpose({ virtual });

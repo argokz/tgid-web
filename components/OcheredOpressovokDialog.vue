@@ -41,7 +41,6 @@
           empty-title="Нет данных очереди"
           empty-text="Нужен дамп таблицы ochered_opressovok или opressovki_uchastok_ocheredi"
           error-title="Не удалось загрузить очередь опрессовок"
-          :retrying="loading"
           @retry="load"
         >
           <DataTable
@@ -99,18 +98,23 @@ const formatCell = (value: unknown) => {
   return String(value)
 }
 
-/** Колонки для DataTable: числовые — по первому значению, остальное текстом */
+/** Колонки для DataTable: числовая — если первое непустое значение колонки число; сортировка на клиенте
+ *  охватила бы только текущую страницу, поэтому выключена */
+const isNumeric = (col: string) => {
+  const first = items.value.find((row) => row[col] !== null && row[col] !== undefined && row[col] !== '')
+  return typeof first?.[col] === 'number'
+}
 const tableColumns = computed<DataTableColumn[]>(() =>
-  columns.value.map((col) => ({
-    key: col,
-    title: col,
-    type: typeof items.value[0]?.[col] === 'number' ? 'number' : 'text',
-  })),
+  columns.value.map((col) => ({ key: col, title: col, type: isNumeric(col) ? 'number' : 'text', sortable: false })),
 )
+const numberFormat = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 3 })
 const tableRows = computed(() =>
   items.value.map((row, idx) => {
     const out: Record<string, unknown> = { __key: idx }
-    for (const col of columns.value) out[col] = typeof row[col] === 'number' ? row[col] : formatCell(row[col])
+    for (const col of columns.value) {
+      const v = row[col]
+      out[col] = typeof v === 'number' ? numberFormat.format(v) : formatCell(v)
+    }
     return out
   }),
 )
@@ -134,6 +138,9 @@ const load = async () => {
 }
 
 const openDialog = async () => {
+  // loading — до показа: иначе первый кадр диалога — «нет данных»
+  loading.value = true
+  items.value = []
   visible.value = true
   page.value = 1
   await load()
@@ -147,7 +154,9 @@ defineExpose({ openDialog })
 </script>
 
 <style scoped>
+/* scrollable-диалог прокручивает только этот блок: без overflow 50 строк вытолкнули бы пагинацию */
 .ochered-body {
   min-height: 280px;
+  overflow: auto;
 }
 </style>

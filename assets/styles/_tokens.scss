@@ -125,9 +125,9 @@
 }
 
 // Пока карта движется, стекло с blur дорого (замер S1, performance-baseline.md): на время movestart…moveend
-// компонент карты вешает .map-moving на корень — стекло становится плотным без перерисовки дерева
-.map-moving .glass-1 {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background: var(--glass-solid-bg);
+// компонент карты вешает .map-moving на корень — переменные уровня 1 становятся плотными у всех поверхностей
+// (и у тех, что берут --glass-1-* напрямую), без перерисовки дерева
+.map-moving {
+  --glass-1-bg: var(--glass-solid-bg);
+  --glass-1-filter: none;
 }

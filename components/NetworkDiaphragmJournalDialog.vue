@@ -658,6 +658,8 @@ const openDetails = async (diaphragmId: number) => {
   finally { detailLoading.value = false }
 }
 const openDialog = async (scope: { diaphragmId?: number; lineId?: number } = {}) => {
+  // loading — до показа и справочников: иначе первый кадр — «не найдены» или прошлый список
+  loading.value = true; items.value = []; error.value = ''
   visible.value = true; await loadLookups(); filters.value = { line_id: scope.lineId }; page.value = 1; await loadItems()
   if (scope.diaphragmId) await openDetails(scope.diaphragmId)
 }

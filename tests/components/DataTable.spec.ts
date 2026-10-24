@@ -21,6 +21,14 @@ describe('DataTable', () => {
     expect((w.vm as any).virtual).toBe(false);
   });
 
+  it('сортировка по заголовку работает без привязки sortBy у родителя', async () => {
+    const w = mountWithVuetify(DataTable, { props: { columns, items: [{ id: 1, name: 'Б', du: 50 }, { id: 2, name: 'А', du: 100 }] } });
+    const nameHeader = w.findAll('thead th')[1];
+    await nameHeader.trigger('click');
+    expect(w.findAll('tbody tr').map((tr) => tr.findAll('td')[1].text())).toEqual(['А', 'Б']);
+    expect(w.emitted('update:sortBy')?.[0]?.[0]).toEqual([{ key: 'name', order: 'asc' }]);
+  });
+
   it('виртуализация включается от virtualFrom строк', () => {
     const w = mountWithVuetify(DataTable, { props: { columns, items: rows(250), virtualFrom: 200 } });
     expect((w.vm as any).virtual).toBe(true);
@@ -34,12 +42,17 @@ describe('DataTable', () => {
     expect(trs[1].attributes('aria-selected')).toBe('true');
     await trs[2].trigger('click');
     expect(w.emitted('select')?.[0]?.[0]).toMatchObject({ id: 3 });
+    // клавиатура: строка в табе, Enter выбирает
+    expect(trs[0].attributes('tabindex')).toBe('0');
+    await trs[0].trigger('keydown', { key: 'Enter' });
+    expect(w.emitted('select')?.[1]?.[0]).toMatchObject({ id: 1 });
   });
 
-  it('без selectable клик ничего не отдаёт; пустая таблица — текст', async () => {
+  it('без selectable клик ничего не отдаёт, строки не в табе; пустая таблица — текст', async () => {
     const w = mountWithVuetify(DataTable, { props: { columns, items: rows(1) } });
     await w.findAll('tbody tr')[0].trigger('click');
     expect(w.emitted('select')).toBeUndefined();
+    expect(w.findAll('tbody tr')[0].attributes('tabindex')).toBeUndefined();
     const empty = mountWithVuetify(DataTable, { props: { columns, items: [], noDataText: 'Диафрагм нет' } });
     expect(empty.text()).toContain('Диафрагм нет');
   });

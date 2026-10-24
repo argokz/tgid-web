@@ -6,42 +6,62 @@
       { 'field-cell--error': Boolean(error), 'field-cell--readonly': readonly, 'field-cell--dirty': dirty, 'field-cell--span': span },
     ]"
   >
-    <label
+    <div
       v-if="label"
-      class="field-cell__label"
-      :for="controlId"
+      class="field-cell__head"
     >
-      <span>{{ label }}</span>
-      <span
-        v-if="required"
-        class="field-cell__required"
-        aria-hidden="true"
-      >*</span>
+      <label
+        class="field-cell__label"
+        :for="controlId"
+      >
+        <span>{{ label }}</span>
+        <span
+          v-if="required"
+          class="field-cell__required"
+          aria-hidden="true"
+        >*</span>
+        <span
+          v-if="required"
+          class="d-sr-only"
+        >, обязательное</span>
+      </label>
+      <!-- Подсказка — отдельная кнопка вне label: иначе её текст склеивается с именем поля, а v-icon без click скрыт от читалок -->
       <HintTip
         v-if="hint"
         :text="hint"
         location="top"
       >
         <template #default="{ props: tip }">
-          <v-icon
+          <button
             v-bind="tip"
-            size="14"
-            class="field-cell__hint-icon"
-            tabindex="0"
-            role="img"
-            :aria-label="hint"
-          >mdi-help-circle-outline</v-icon>
+            type="button"
+            class="field-cell__hint"
+            :aria-label="`Подсказка: ${hint}`"
+          >
+            <v-icon
+              size="14"
+              aria-hidden="true"
+            >mdi-help-circle-outline</v-icon>
+          </button>
         </template>
       </HintTip>
       <span
         v-if="dirty"
         class="field-cell__dirty"
         title="Изменено, не сохранено"
-        aria-label="изменено, не сохранено"
+        aria-hidden="true"
       />
-    </label>
+      <span
+        v-if="dirty"
+        class="d-sr-only"
+      >изменено, не сохранено</span>
+    </div>
     <div class="field-cell__control">
-      <slot :id="controlId" />
+      <slot
+        :id="controlId"
+        :error-id="error ? errorId : undefined"
+        :invalid="Boolean(error)"
+      />
       <span
         v-if="units"
         class="field-cell__units"
@@ -49,7 +69,7 @@
     </div>
     <div
       v-if="error"
-      :id="`${controlId}-error`"
+      :id="errorId"
       class="field-cell__error"
       role="alert"
     >{{ error }}</div>
@@ -65,7 +85,7 @@ import { FIELD_GRID_KEY } from '~/utils/fieldGrid';
  * FieldCell — ячейка формы (docs/ui-primitives.md): видимая подпись (над полем или слева — по FieldGrid),
  * обязательность, подсказка у неочевидных полей (HintTip), единицы справа от поля, ошибка под полем
  * (`role="alert"`), признаки `readonly` и `dirty` («изменено, не сохранено»). Само поле — в слоте;
- * слот получает `id`, чтобы связать label и control.
+ * слот получает `id` (связь с label), `errorId` (для `aria-describedby`) и `invalid` (для `aria-invalid`).
  */
 const props = withDefaults(defineProps<{
   label?: string;
@@ -94,8 +114,9 @@ const props = withDefaults(defineProps<{
 const grid = inject(FIELD_GRID_KEY, null);
 const position = computed(() => props.labelPosition ?? grid?.labelPosition() ?? 'top');
 const controlId = `field-${useId()}`;
+const errorId = `${controlId}-error`;
 
-defineExpose({ position, controlId });
+defineExpose({ position, controlId, errorId });
 </script>
 
 <style scoped>
@@ -121,6 +142,13 @@ defineExpose({ position, controlId });
   grid-column: 2;
 }
 
+.field-cell__head {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
 .field-cell__label {
   display: inline-flex;
   align-items: center;
@@ -130,9 +158,12 @@ defineExpose({ position, controlId });
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
+.field-cell--label-inline .field-cell__head {
+  justify-content: flex-end;
+}
+
 .field-cell--label-inline .field-cell__label {
   font-size: var(--text-sm);
-  justify-content: flex-end;
   text-align: right;
 }
 
@@ -140,14 +171,22 @@ defineExpose({ position, controlId });
   color: rgb(var(--v-theme-error));
 }
 
-.field-cell__hint-icon {
+.field-cell__hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
   cursor: help;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
-.field-cell__hint-icon:focus-visible {
+.field-cell__hint:focus-visible {
   outline: 2px solid rgb(var(--v-theme-primary));
-  border-radius: 50%;
 }
 
 /* точка «изменено»: акцент, но не единственный носитель — есть title и aria-label */
@@ -182,7 +221,9 @@ defineExpose({ position, controlId });
   color: rgb(var(--v-theme-error));
 }
 
+/* readonly — не disabled: подпись остаётся читаемой (контраст ≥ 4,5:1) */
 .field-cell--readonly .field-cell__label {
-  color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  font-style: italic;
 }
 </style>

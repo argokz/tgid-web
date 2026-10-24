@@ -39,6 +39,7 @@
             density="comfortable"
             @search="onSearch"
             @enter="aiMode && runAiSearch()"
+            @escape="dialog = false"
           />
           <v-switch
             v-if="authStore.canUseAi"

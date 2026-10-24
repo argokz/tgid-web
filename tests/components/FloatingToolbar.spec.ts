@@ -20,7 +20,10 @@ describe('FloatingToolbar', () => {
     expect(buttons[1].text()).toBe('Трасса');
     expect(buttons[0].text()).toBe('');
     expect(buttons[0].attributes('aria-label')).toBe('Выбор');
-    expect(buttons[2].attributes('disabled')).toBeDefined();
+    expect(buttons[2].attributes('aria-disabled')).toBe('true');
+    // один tab-stop: активная кнопка в табе, остальные — по стрелкам
+    expect(buttons[1].attributes('tabindex')).toBe('0');
+    expect(buttons[0].attributes('tabindex')).toBe('-1');
   });
 
   it('клик меняет инструмент; клик по активному при mandatory ничего не делает, без mandatory — снимает', async () => {
@@ -33,6 +36,19 @@ describe('FloatingToolbar', () => {
     const free = mountWithVuetify(FloatingToolbar, { props: { modelValue: 'select', items, mandatory: false }, global: { stubs: { VTooltip: false } } });
     await free.findAll('button')[0].trigger('click');
     expect(free.emitted('update:modelValue')).toEqual([[null]]);
+  });
+
+  it('недоступная кнопка не меняет инструмент; стрелки переводят фокус по кольцу', async () => {
+    const w = mountWithVuetify(FloatingToolbar, { props: { modelValue: 'select', items }, global: { stubs: { VTooltip: false } } });
+    const buttons = w.findAll('button');
+    await buttons[2].trigger('click');
+    expect(w.emitted('update:modelValue')).toBeUndefined();
+    await w.find('[role="toolbar"]').trigger('keydown', { key: 'ArrowRight' });
+    expect(buttons[1].attributes('tabindex')).toBe('0');
+    expect(buttons[0].attributes('tabindex')).toBe('-1');
+    await w.find('[role="toolbar"]').trigger('keydown', { key: 'ArrowLeft' });
+    await w.find('[role="toolbar"]').trigger('keydown', { key: 'ArrowLeft' });
+    expect(buttons[2].attributes('tabindex')).toBe('0');
   });
 });
 

@@ -4,6 +4,8 @@ import { mountWithVuetify, findButton } from './mountHelper';
 
 const mountState = (props: Record<string, unknown>, slot = '<table class="data">данные</table>') =>
   mountWithVuetify(StateView, { props, slots: { default: slot } });
+const mountWithRetry = (props: Record<string, unknown>) =>
+  mountWithVuetify(StateView, { props: { ...props, onRetry: () => {} }, slots: { default: '<table class="data">данные</table>' } });
 
 describe('StateView: четыре состояния', () => {
   it('данные — рендерит слот без обёрток состояний', () => {
@@ -33,7 +35,7 @@ describe('StateView: четыре состояния', () => {
   });
 
   it('ошибка важнее загрузки и пустоты: текст причины и «Повторить»', async () => {
-    const w = mountState({ loading: true, empty: true, error: 'Сервер API недоступен' });
+    const w = mountWithRetry({ loading: true, empty: true, error: 'Сервер API недоступен' });
     expect((w.vm as any).state).toBe('error');
     expect(w.find('[role="alert"]').exists()).toBe(true);
     expect(w.text()).toContain('Сервер API недоступен');
@@ -41,8 +43,10 @@ describe('StateView: четыре состояния', () => {
     expect(w.emitted('retry')).toHaveLength(1);
   });
 
-  it('без retry кнопки «Повторить» нет', () => {
-    const w = mountState({ error: 'ошибка', retry: false });
+  it('без retry или без слушателя кнопки «Повторить» нет', () => {
+    const w = mountWithRetry({ error: 'ошибка', retry: false });
     expect(w.findAll('button').some((b) => b.text().includes('Повторить'))).toBe(false);
+    const noListener = mountState({ error: 'ошибка' });
+    expect(noListener.findAll('button').some((b) => b.text().includes('Повторить'))).toBe(false);
   });
 });

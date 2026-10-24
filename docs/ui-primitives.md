@@ -101,7 +101,8 @@
 ### SegmentedToggle
 
 Пропсы: `modelValue`, `items: { value, label, icon?, disabled?, hint? }[]`, `mandatory` (true), `disabled`, `wrap` (true),
-`iconOnly`, `ariaLabel`. Семантика `radiogroup` / `radio` + `aria-checked`; недоступный пункт виден, с `title` из `hint`.
+`iconOnly`, `ariaLabel`. Семантика — группа кнопок-переключателей (`role="group"` + `aria-pressed`), не radio: у
+`v-btn-toggle` нет стрелочной навигации; недоступный пункт виден, с `title` из `hint`.
 
 ### KpiTile и Sparkline
 
@@ -118,8 +119,9 @@
 
 Пропсы: `columns: { key, title, type?: text | number | date | actions, width?, sortable?, align? }[]` (порядок и набор —
 как в десктопе), `items`, `itemKey` (`id`), `loading`, `density` (`compact`), `virtual` (null → от `virtualFrom` = 200 строк),
-`height` (480, для виртуальной), `selectable` + `selectedKey` → событие `select(item)` и подсветка строки акцентом,
-`sortBy` + `update:sortBy`, `noDataText`, `loadingText`. Слоты `v-data-table` (`item.<key>`, `top`, `bottom`) проходят
+`height` (480, для виртуальной), `selectable` + `selectedKey` → событие `select(item)` мышью и с клавиатуры (строки в табе, Enter / пробел), подсветка
+акцентом; сортировка по заголовкам работает сама, `sortBy` + `update:sortBy` — для внешнего/серверного управления
+(при серверной пагинации колонкам ставить `sortable: false`), `noDataText`, `loadingText`. Слоты `v-data-table` (`item.<key>`, `top`, `bottom`) проходят
 насквозь. Числовые колонки — вправо и `tabular-nums`; длинный текст обрезается (полный — в title/инспекторе);
 высота строки одна строка — иначе виртуальная прокрутка Vuetify считает неверно.
 
@@ -131,6 +133,7 @@
 
 `FloatingToolbar`: `modelValue`, `items: { value, title, icon, hotkey?, hint?, disabled? }[]`, `mandatory` (true),
 `disabled`, `showActiveLabel` (подпись у активного), `tipLocation`, `ariaLabel`. Семантика `toolbar` + `aria-pressed`,
+один tab-stop и стрелки / Home / End между кнопками; недоступные — `aria-disabled`, чтобы подсказка объясняла причину;
 у каждой кнопки `HintTip` (название · хоткей · строка «что сделает»). Активный инструмент — акцент `--accent-soft` /
 `--accent-text`, единственное место акцента на тулбаре.
 
@@ -139,6 +142,6 @@
 `FieldGrid`: `columns` (`auto` — по `minWidth`, или 1–3; на телефоне всегда одна), `minWidth` (220), `labelPosition`
 (`top` / `inline` — наследуют ячейки). `FieldCell`: `label`, `required` (звёздочка), `hint` (иконка «?» с `HintTip`,
 доступна с клавиатуры), `units` (справа от поля), `error` (под полем, `role="alert"`), `readonly`, `dirty`
-(точка акцента + «изменено, не сохранено»), `span` (на всю ширину), `labelPosition`. Слот по умолчанию получает `id` —
-повесить на поле, чтобы `label for` работал; само поле — `v-text-field`/`AppSelect`/`CardFieldEditor` с `hide-details`
+(точка акцента + «изменено, не сохранено»), `span` (на всю ширину), `labelPosition`. Слот по умолчанию получает `id` (повесить на поле, чтобы `label for`
+работал), `errorId` (в `aria-describedby`) и `invalid` (в `aria-invalid`); само поле — `v-text-field`/`AppSelect`/`CardFieldEditor` с `hide-details`
 (ошибку показывает ячейка). Порядок Tab — порядок ячеек в сетке, как в десктопе.

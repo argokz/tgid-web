@@ -30,7 +30,7 @@
         </slot>
       </template>
       <template
-        v-if="retry"
+        v-if="retry && hasRetryListener"
         #actions
       >
         <v-btn
@@ -76,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, getCurrentInstance } from 'vue';
 
 /**
  * StateView — загрузка (скелетон той же формы, что и данные), пусто (что это, почему пусто, что сделать),
@@ -145,6 +145,10 @@ const skeletonType = computed(() => {
     default: return `list-item-two-line@${n}`;
   }
 });
+
+/** Кнопка «Повторить» без обработчика была бы мёртвой — показываем только тем, кто слушает retry */
+const instance = getCurrentInstance();
+const hasRetryListener = computed(() => Boolean(instance?.vnode.props?.onRetry));
 
 defineExpose({ state });
 </script>

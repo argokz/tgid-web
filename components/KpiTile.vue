@@ -18,6 +18,10 @@
         class="kpi-tile__status-icon"
       >{{ statusIcon }}</v-icon>
       <span>{{ label }}</span>
+      <span
+        v-if="statusText"
+        class="d-sr-only"
+      >, {{ statusText }}</span>
     </div>
     <div class="kpi-tile__row">
       <span
@@ -103,7 +107,8 @@ const displayValue = computed(() => {
   if (v == null || v === '') return '—';
   if (typeof v !== 'number') return v;
   if (!Number.isFinite(v)) return '—';
-  if (props.compact && Math.abs(v) >= 1_000_000) return `${formatNumber(v / 1_000_000, 1)} млн`;
+  // пороги после округления до десятых: 999 950 → «1,0 млн», а не «1 000,0 тыс.»
+  if (props.compact && Math.abs(v) >= 999_950) return `${formatNumber(v / 1_000_000, 1)} млн`;
   if (props.compact && Math.abs(v) >= COMPACT_FROM) return `${formatNumber(v / 1_000, 1)} тыс.`;
   return formatNumber(v, props.digits);
 });
@@ -131,8 +136,11 @@ const STATUS_ICONS: Record<KpiStatus, string> = {
   critical: 'mdi-close-octagon-outline',
 };
 const statusIcon = computed(() => STATUS_ICONS[props.status]);
+const STATUS_TEXT: Record<KpiStatus, string> = { none: '', good: 'в порядке', warning: 'внимание', serious: 'проблема', critical: 'критично' };
+/** Словесное состояние для читалок — цвет и иконка не единственный носитель */
+const statusText = computed(() => STATUS_TEXT[props.status]);
 
-const ariaLabel = computed(() => `${props.label}: ${displayValue.value}${props.units ? ` ${props.units}` : ''}${props.active ? ', фильтр включён' : ''}`);
+const ariaLabel = computed(() => `${props.label}: ${displayValue.value}${props.units ? ` ${props.units}` : ''}${statusText.value ? `, ${statusText.value}` : ''}`);
 
 defineExpose({ displayValue, deltaTone });
 </script>

@@ -6,7 +6,6 @@
     :close-delay="0"
     open-on-focus
     content-class="hint-tip"
-    :aria-label="ariaText"
   >
     <template #activator="{ props: activatorProps }">
       <slot :props="activatorProps" />

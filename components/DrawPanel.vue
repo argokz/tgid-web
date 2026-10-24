@@ -384,7 +384,7 @@ onBeforeUnmount(() => draw.detach());
   max-height: calc(100% - 32px);
   display: flex;
   flex-direction: column;
-  background: rgb(var(--v-theme-surface));
+  overflow: hidden;
 }
 
 .draw-panel__header {

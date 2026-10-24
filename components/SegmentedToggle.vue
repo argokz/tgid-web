@@ -10,7 +10,7 @@
     rounded="lg"
     class="segmented-toggle"
     :class="{ 'segmented-toggle--wrap': wrap }"
-    role="radiogroup"
+    role="group"
     :aria-label="ariaLabel"
     @update:model-value="onUpdate"
   >
@@ -21,8 +21,7 @@
       :disabled="item.disabled"
       :prepend-icon="item.icon"
       :aria-label="item.label"
-      role="radio"
-      :aria-checked="item.value === modelValue"
+      :aria-pressed="item.value === modelValue"
       :title="item.hint || undefined"
       size="small"
       class="segmented-toggle__item"
@@ -40,6 +39,7 @@
  * SegmentedToggle — обёртка над v-btn-toggle (docs/ui-primitives.md): один вид для всех переключений режимов
  * (вместо 14 `v-btn-toggle` и части `v-switch` с разным оформлением). Обязательный выбор по умолчанию: режим
  * не может быть «никаким». Недоступные пункты показываются, но не активны, с пояснением в `hint`.
+ * Семантика — группа кнопок-переключателей (`aria-pressed`), а не radio: у v-btn-toggle нет стрелочной навигации.
  */
 export interface SegmentedToggleItem<T = string> {
   value: T;
