@@ -8,6 +8,7 @@ import {
 } from '~/utils/geoserverMvtIds';
 import type { GeoCatalogLayerEntry, GeoWorkspaceCatalogEntry } from '~/utils/geoserverLayerCatalog';
 import { convertSldToMapLibre } from '~/utils/sldToMapLibre';
+import { mergeLineLayers } from '~/utils/mergeStyleLayers';
 import {
   NODE_BASE_LAYER,
   combineWithNodeCodes,
@@ -160,6 +161,7 @@ export default defineEventHandler(async (event) => {
   const cacheKey = 'geoServerLayers';
   const cache = useStorage();
   const mvtProbeTiles = Boolean((runtimeConfig as any).geoserverMvtProbeTiles);
+  const mergeStyleLayers = (process.env.GEOSERVER_MERGE_STYLE_LAYERS || 'true') !== 'false';
 
   const query = getQuery(event);
   const refresh = query.refresh === 'true';
@@ -490,6 +492,15 @@ export default defineEventHandler(async (event) => {
               ...l,
               filter: combineWithNodeCodes(l.filter, nodeCodes, excludeCodes)
             }));
+        }
+        // Одинаково оформленные линейные подслои (участки: 16 слоёв-копий) — в один слой с выражениями:
+        // меньше проходов отрисовки и setFilter при смене фрагмента. GEOSERVER_MERGE_STYLE_LAYERS=false — как было
+        if (mvtPack && mergeStyleLayers) {
+          const before = mvtPack.mbLayers.length;
+          mvtPack.mbLayers = mergeLineLayers(mvtPack.mbLayers);
+          if (mvtPack.mbLayers.length !== before) {
+            console.log(`[GEO-STYLE] ${qualified}: подслои ${before} → ${mvtPack.mbLayers.length}`);
+          }
         }
         if (mvtPack && mvtProbeTiles) {
           const ok = await verifyMvtTileUrl(mvtUrl, readCityConfig(runtimeConfig.public as any).center);

@@ -24,8 +24,12 @@ import { networkStackMoves } from '~/utils/networkLayerStack';
 
 const pbfAttributeRequests = new globalThis.Map<string, Promise<string[]>>();
 
-/** Слои контекста, пока пользователь сам их не переключал: здания и рельеф с 3D */
-const DEFAULT_CONTEXT_LAYERS: ContextLayerKey[] = ['buildings', 'terrain3d'];
+/**
+ * Слои контекста, пока пользователь сам их не переключал: здания. «Рельеф и 3D» остаётся в списке,
+ * но выключен: с ним MapLibre рисует все слои через текстуры рельефа — 5–10 fps против 35–40
+ * (решение заказчика 24.10.2026, A/B в docs/performance-baseline.md; сброс сохранённого — utils/mapDefaults.ts)
+ */
+const DEFAULT_CONTEXT_LAYERS: ContextLayerKey[] = ['buildings'];
 
 export const useLayerStore = defineStore('layer', {
   state: () => ({
