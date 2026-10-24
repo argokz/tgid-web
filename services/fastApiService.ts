@@ -1494,6 +1494,8 @@ export const apiHealth = reactive({
   outdatedRoutes: false,
   redisOk: true,
   lastError: '' as string,
+  /** Сколько запросов сейчас ждут повтора после сетевого сбоя или 5xx — индикатор «повторяем…» в шапке */
+  retrying: 0,
 });
 
 /** Итог последнего /health: устаревший API или Redis — баннер держится, пока health не скажет иначе */
@@ -1557,6 +1559,12 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
   const headers = { ...authHeaders(), ...(options?.headers || {}) };
 
   let lastError: any = null;
+  let retrying = false;
+  const endRetry = () => {
+    if (!retrying) return;
+    retrying = false;
+    apiHealth.retrying = Math.max(0, apiHealth.retrying - 1);
+  };
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
@@ -1567,6 +1575,7 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
         // встроенные ретраи ofetch (GET на 409/5xx) выключены: повторы только по maxAttempts выше
         retry: 0,
       });
+      endRetry();
       markApiResponded();
       return result;
     } catch (error: any) {
@@ -1577,9 +1586,14 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
         // экспоненциальная пауза с джиттером — чтобы не «долбить» сервер синхронно
         const backoff = 400 * 2 ** (attempt - 1) + Math.random() * 200;
         console.warn(`[api] ${method} ${path} → ${status}, повтор через ${Math.round(backoff)}ms`);
+        if (!retrying) {
+          retrying = true;
+          apiHealth.retrying += 1;
+        }
         await sleep(backoff);
         continue;
       }
+      endRetry();
 
       const apiError = await toApiError(error, path, Boolean(headers.Authorization), status);
 
@@ -1595,6 +1609,7 @@ const request = async <T>(path: string, options?: any): Promise<T> => {
     }
   }
 
+  endRetry();
   throw lastError;
 };
 

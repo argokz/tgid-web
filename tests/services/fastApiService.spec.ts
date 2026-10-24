@@ -1097,4 +1097,26 @@ describe('fastApiService: мутации не повторяются (QA F44)', 
     vi.useRealTimers()
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
+
+  it('пока идёт повтор, apiHealth.retrying > 0; после ответа или отказа — снова 0', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockRejectedValueOnce({ statusCode: 503 })
+    fetchMock.mockResolvedValueOnce({ items: [], total: 0, page: 1, page_size: 50, pages: 0 })
+    const pending = fastApiService.getCorrosionIndicators({})
+    await vi.advanceTimersByTimeAsync(10)
+    expect(apiHealth.retrying).toBe(1)
+    await vi.runAllTimersAsync()
+    await pending
+    expect(apiHealth.retrying).toBe(0)
+
+    // все попытки исчерпаны — счётчик тоже сброшен
+    fetchMock.mockRejectedValue({ statusCode: 503 })
+    const failing = fastApiService.getCorrosionIndicators({}).catch((e: unknown) => e)
+    await vi.advanceTimersByTimeAsync(10)
+    expect(apiHealth.retrying).toBe(1)
+    await vi.runAllTimersAsync()
+    expect(await failing).toBeInstanceOf(ApiError)
+    expect(apiHealth.retrying).toBe(0)
+    vi.useRealTimers()
+  })
 })

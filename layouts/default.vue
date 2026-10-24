@@ -254,6 +254,18 @@
     >
       <span class="text-body-2">{{ apiHealth.lastError }}</span>
     </v-alert>
+    <!-- Транспорт повторяет запрос после сбоя (ретраи только для чтения): пользователь видит, что ждём не зря -->
+    <v-alert
+      v-else-if="apiHealth.retrying > 0"
+      type="info"
+      variant="tonal"
+      density="compact"
+      class="api-health-alert"
+      icon="mdi-refresh"
+      role="status"
+    >
+      <span class="text-body-2">Сервер не ответил — повторяем запрос…</span>
+    </v-alert>
 
     <v-main class="app-main">
       <!-- Карту монтируем, только когда ясно, что вход не нужен (или он уже выполнен): иначе она

@@ -11,7 +11,7 @@
  * измерение (второй Esc — выйти из режима). Вершины готовых измерений можно перетаскивать.
  */
 import { computed, ref, shallowRef } from 'vue';
-import type { Map as MapLibreMap, MapLayerMouseEvent, MapMouseEvent } from 'maplibre-gl';
+import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
 import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 import { sampleElevation } from '~/utils/terrainSample';
 import { formatDeg, formatTurn, signedTurnDeg, vertexAngles } from '~/utils/cadGeometry';
@@ -252,21 +252,45 @@ export function useMapDraw() {
   let dragging: { id: string; index: number } | null = null;
   let suppressNextClick = false;
 
-  const findSnapPoint = (screenPoint: { x: number; y: number }): number[] | null => {
+  /** Курсор над вершиной готового измерения (рука «переместить»); обновляется из того же запроса, что и привязка */
+  let overVertex = false;
+  const setVertexCursor = (over: boolean) => {
     const map = mapRef.value;
-    if (!map || !snapEnabled.value) return null;
+    if (!map || over === overVertex) return;
+    overVertex = over;
+    if (dragging) return;
+    map.getCanvas().style.cursor = over ? 'move' : mode.value === 'none' ? '' : 'crosshair';
+  };
+
+  /**
+   * Один queryRenderedFeatures на кадр: узлы сети для привязки и вершины измерений для курсора.
+   * Раньше вершины ловились делегированными mouseenter/mouseleave по слою — MapLibre опрашивал
+   * слой на каждом mousemove ещё дважды (замер S6: 3 запроса на движение, docs/performance-baseline.md).
+   */
+  const queryAround = (screenPoint: { x: number; y: number }): { snapped: number[] | null; vertex: boolean } => {
+    const map = mapRef.value;
+    const none = { snapped: null, vertex: false };
+    if (!map) return none;
     const r = snapRadiusPx.value;
     try {
-      const layers = (map.getStyle()?.layers || []).map((l) => l.id).filter(isNetworkLayer);
-      if (!layers.length) return null;
+      const layers = snapEnabled.value
+        ? (map.getStyle()?.layers || []).map((l) => l.id).filter(isNetworkLayer)
+        : [];
+      if (measurements.value.length && map.getLayer(LAYER_VERTEX)) layers.push(LAYER_VERTEX);
+      if (!layers.length) return none;
       const rendered = map.queryRenderedFeatures(
         [[screenPoint.x - r, screenPoint.y - r], [screenPoint.x + r, screenPoint.y + r]],
         { layers },
       );
       let best: number[] | null = null;
       let bestDist = Infinity;
+      let vertex = false;
       for (const f of rendered) {
         if (f.geometry?.type !== 'Point') continue;
+        if (f.layer?.id === LAYER_VERTEX) {
+          vertex = true;
+          continue;
+        }
         const c = f.geometry.coordinates as number[];
         const p = map.project(c as [number, number]);
         const dist = Math.hypot(p.x - screenPoint.x, p.y - screenPoint.y);
@@ -275,11 +299,18 @@ export function useMapDraw() {
           bestDist = dist;
         }
       }
-      return best;
+      return { snapped: best, vertex };
     } catch {
       // MapLibre may throw if query outside viewport
-      return null;
+      return none;
     }
+  };
+
+  const findSnapPoint = (screenPoint: { x: number; y: number }): number[] | null => {
+    if (!snapEnabled.value) return null;
+    const { snapped, vertex } = queryAround(screenPoint);
+    setVertexCursor(vertex);
+    return snapped;
   };
 
   const isMeasuring = computed(() => mode.value !== 'none');
@@ -583,7 +614,10 @@ export function useMapDraw() {
       moveVertex(e);
       return;
     }
-    if (mode.value === 'none') return;
+    if (mode.value === 'none') {
+      if (measurements.value.length) setVertexCursor(queryAround(e.point).vertex);
+      return;
+    }
     hoverPoint.value = pointFromEvent(e);
     refreshDraft();
   };
@@ -593,7 +627,7 @@ export function useMapDraw() {
     moveFrame = 0;
   };
   const onMapMove = (e: MapMouseEvent) => {
-    if (!dragging && mode.value === 'none') return;
+    if (!dragging && mode.value === 'none' && !measurements.value.length) return;
     pendingMove = e;
     if (moveFrame) return;
     if (typeof requestAnimationFrame !== 'function') {
@@ -698,14 +732,21 @@ export function useMapDraw() {
   };
 
   // --- перетаскивание вершин готовых измерений ---
-  const onVertexDown = (e: MapLayerMouseEvent) => {
-    const f = e.features?.[0];
+  const onVertexDown = (e: MapMouseEvent) => {
+    const map = mapRef.value;
+    if (!map || !measurements.value.length || !map.getLayer(LAYER_VERTEX)) return;
+    let f: any;
+    try {
+      f = map.queryRenderedFeatures(e.point, { layers: [LAYER_VERTEX] })[0];
+    } catch {
+      return;
+    }
     const id = f?.properties?.measureId;
     const index = Number(f?.properties?.index);
     if (!id || !Number.isInteger(index)) return;
     e.preventDefault();
     dragging = { id: String(id), index };
-    mapRef.value?.dragPan.disable();
+    map.dragPan.disable();
   };
 
   const moveVertex = (e: MapMouseEvent) => {
@@ -731,14 +772,6 @@ export function useMapDraw() {
     void loadProfile(id);
   };
 
-  const onVertexEnter = () => {
-    const map = mapRef.value;
-    if (map && !dragging) map.getCanvas().style.cursor = 'move';
-  };
-  const onVertexLeave = () => {
-    const map = mapRef.value;
-    if (map && !dragging) map.getCanvas().style.cursor = mode.value === 'none' ? '' : 'crosshair';
-  };
 
   const onContextMenu = (e: MapMouseEvent) => {
     if (mode.value === 'none') return;
@@ -805,15 +838,14 @@ export function useMapDraw() {
     map.on('mouseup', onVertexUp);
     map.on('dblclick', finishShape);
     map.on('contextmenu', onContextMenu);
-    map.on('mousedown', LAYER_VERTEX, onVertexDown);
-    map.on('mouseenter', LAYER_VERTEX, onVertexEnter);
-    map.on('mouseleave', LAYER_VERTEX, onVertexLeave);
+    map.on('mousedown', onVertexDown);
     if (typeof window !== 'undefined') window.addEventListener('keydown', onKeyDown);
     syncDoubleClickZoom(map, mode.value);
   };
 
   const detach = () => {
     cancelPendingMove();
+    overVertex = false;
     activeDrawMode.value = 'none';
     mode.value = 'none';
     if (typeof window !== 'undefined') window.removeEventListener('keydown', onKeyDown);
@@ -825,9 +857,7 @@ export function useMapDraw() {
     map.off('mouseup', onVertexUp);
     map.off('dblclick', finishShape);
     map.off('contextmenu', onContextMenu);
-    map.off('mousedown', LAYER_VERTEX, onVertexDown);
-    map.off('mouseenter', LAYER_VERTEX, onVertexEnter);
-    map.off('mouseleave', LAYER_VERTEX, onVertexLeave);
+    map.off('mousedown', onVertexDown);
     if (dragging) map.dragPan?.enable();
     dragging = null;
     syncDoubleClickZoom(map, 'none');
