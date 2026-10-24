@@ -100,7 +100,15 @@ defineEmits<{ select: [] }>();
 
 const COMPACT_FROM = 10_000;
 
-const formatNumber = (n: number, digits: number) => n.toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+const formatters = new Map<number, Intl.NumberFormat>();
+const formatNumber = (n: number, digits: number) => {
+  let f = formatters.get(digits);
+  if (!f) {
+    f = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    formatters.set(digits, f);
+  }
+  return f.format(n);
+};
 
 const displayValue = computed(() => {
   const v = props.value;

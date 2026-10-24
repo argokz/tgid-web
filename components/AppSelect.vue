@@ -1,6 +1,6 @@
 <template>
   <component
-    :is="searchable ? VAutocomplete : VSelect"
+    :is="hasSearch ? VAutocomplete : VSelect"
     :model-value="modelValue"
     :items="items"
     :item-title="itemTitle"
@@ -20,18 +20,18 @@
     :error-messages="errorMessages"
     :no-data-text="noDataText"
     :menu-props="menuProps"
-    :auto-select-first="searchable ? 'exact' : undefined"
+    :auto-select-first="hasSearch ? 'exact' : undefined"
     density="compact"
     variant="outlined"
     hide-details="auto"
     class="app-select"
     :class="{ 'app-select--readonly': readonly }"
     @update:model-value="$emit('update:modelValue', $event)"
-    @update:search="onSearch"
     @keydown.enter="onEnter"
+    v-on="hasSearch ? { 'update:search': onSearch } : {}"
   >
     <template
-      v-if="allowCreate && searchable"
+      v-if="allowCreate && hasSearch"
       #no-data
     >
       <v-list-item
@@ -59,7 +59,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { VAutocomplete, VSelect } from 'vuetify/components';
+import { VAutocomplete } from 'vuetify/components/VAutocomplete';
+import { VSelect } from 'vuetify/components/VSelect';
 
 /**
  * AppSelect — обёртка над v-select / v-autocomplete (docs/ui-primitives.md): единая плотность и вид,
@@ -117,7 +118,8 @@ const emit = defineEmits<{
 
 const SEARCH_THRESHOLD_DEFAULT = 50;
 
-const searchable = computed(() =>
+/** Поиск внутри списка: явный `searchable` или число пунктов больше порога */
+const hasSearch = computed(() =>
   props.searchable ?? props.items.length > (props.searchThreshold ?? SEARCH_THRESHOLD_DEFAULT),
 );
 
@@ -134,7 +136,7 @@ const create = () => {
 
 const onEnter = () => {
   // Enter в пустом результате поиска — то же, что «создать?»
-  if (props.allowCreate && searchable.value && search.value.trim() && !hasMatch.value) create();
+  if (props.allowCreate && hasSearch.value && search.value.trim() && !hasMatch.value) create();
 };
 
 const titleOf = (item: unknown): string => {
@@ -151,7 +153,7 @@ const hasMatch = computed(() => {
 /** Длинные списки: ограничить высоту меню, чтобы виртуальный список работал, и не выходить за экран */
 const menuProps = computed(() => ({ maxHeight: 320, contentClass: 'app-select__menu' }));
 
-defineExpose({ searchable });
+defineExpose({ searchable: hasSearch });
 </script>
 
 <style scoped>

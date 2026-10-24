@@ -40,7 +40,7 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends string | number">
 import { computed, ref } from 'vue';
 import HintTip from '~/components/HintTip.vue';
 
@@ -61,8 +61,8 @@ export interface FloatingToolbarItem<T = string> {
 }
 
 const props = withDefaults(defineProps<{
-  modelValue: unknown;
-  items: readonly FloatingToolbarItem<any>[];
+  modelValue: T | null;
+  items: readonly FloatingToolbarItem<T>[];
   mandatory?: boolean;
   disabled?: boolean;
   /** Подпись рядом с иконкой у активного инструмента */
@@ -77,9 +77,9 @@ const props = withDefaults(defineProps<{
   ariaLabel: 'Инструменты',
 });
 
-const emit = defineEmits<{ 'update:modelValue': [value: unknown] }>();
+const emit = defineEmits<{ 'update:modelValue': [value: T | null] }>();
 
-const select = (value: unknown, isDisabled = false) => {
+const select = (value: T, isDisabled = false) => {
   if (isDisabled) return;
   if (value === props.modelValue) {
     if (!props.mandatory) emit('update:modelValue', null);
@@ -89,8 +89,8 @@ const select = (value: unknown, isDisabled = false) => {
 };
 
 /** Какая кнопка в табе: активный инструмент, иначе первая; стрелки двигают фокус по кольцу */
-const focused = ref<unknown>(undefined);
-const focusValue = computed(() => {
+const focused = ref<T | undefined>(undefined);
+const focusValue = computed<T | null | undefined>(() => {
   if (focused.value !== undefined && props.items.some((i) => i.value === focused.value)) return focused.value;
   if (props.items.some((i) => i.value === props.modelValue)) return props.modelValue;
   return props.items[0]?.value;

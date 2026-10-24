@@ -75,7 +75,8 @@
 
 Пропсы: `text` (название действия в повелительном наклонении), `hotkey` («Esc», «Ctrl+K»), `hint` (одна строка),
 `location`, `disabled`, `openDelay` (400 мс). Активатор — слот по умолчанию с `props`, которые надо повесить на кнопку;
-`aria-label` у кнопки остаётся. Открывается по наведению и фокусу (клавиатура); тач-эквивалент — этап 7.
+`aria-label` у кнопки остаётся. Открывается по наведению и фокусу (клавиатура), закрывается по Esc; на содержимое
+можно навести курсор и выделить текст (WCAG 1.4.13, пауза 80 мс на переход). Тач-эквивалент — этап 7.
 
 ```vue
 <HintTip text="Закрыть панель измерений" hotkey="Esc" location="bottom">
@@ -131,7 +132,7 @@
 (`sm` / `md` / `lg` / `pill`), `padded`, `tag`. Всё оформление — из токенов `--glass-*`; на время движения карты
 корень карты получает `.map-moving`, и blur снимается у всех поверхностей уровня 1.
 
-`FloatingToolbar`: `modelValue`, `items: { value, title, icon, hotkey?, hint?, disabled? }[]`, `mandatory` (true),
+`FloatingToolbar<T>`: `modelValue: T | null`, `items: { value: T, title, icon, hotkey?, hint?, disabled? }[]`, `mandatory` (true),
 `disabled`, `showActiveLabel` (подпись у активного), `tipLocation`, `ariaLabel`. Семантика `toolbar` + `aria-pressed`,
 один tab-stop и стрелки / Home / End между кнопками; недоступные — `aria-disabled`, чтобы подсказка объясняла причину;
 у каждой кнопки `HintTip` (название · хоткей · строка «что сделает»). Активный инструмент — акцент `--accent-soft` /

@@ -3,7 +3,7 @@
     :location="location"
     :disabled="disabled || !text"
     :open-delay="openDelay"
-    :close-delay="0"
+    :close-delay="HOVER_BRIDGE_MS"
     open-on-focus
     content-class="hint-tip"
   >
@@ -50,6 +50,9 @@ const props = withDefaults(defineProps<{
   openDelay: 400,
 });
 
+/** Пауза перед скрытием: успеть перевести курсор с кнопки на подсказку (WCAG 1.4.13 hoverable) */
+const HOVER_BRIDGE_MS = 80;
+
 /** Полный текст подсказки одной строкой (читалки экрана, тесты) */
 const ariaText = computed(() => [props.text, props.hotkey && `(${props.hotkey})`, props.hint].filter(Boolean).join(' '));
 
@@ -59,6 +62,7 @@ defineExpose({ ariaText });
 <style>
 /* Содержимое тултипа живёт в оверлее Vuetify — стили без scoped, через content-class */
 .hint-tip {
+  pointer-events: auto; /* Vuetify ставит none — подсказку нельзя было навести и выделить */
   max-width: 280px;
   padding: var(--space-2) var(--space-3) !important;
   border-radius: var(--radius-sm) !important;
