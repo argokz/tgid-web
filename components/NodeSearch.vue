@@ -256,6 +256,7 @@ import SearchField from '~/components/SearchField.vue'
 import { onBeforeUnmount, ref, computed } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { getCityConfig } from '~/utils/cityConfig'
+import { findNodesUrl, getNodeFragment, getNodeRsCode, getNodeSubtitle, getNodeTitle, getNodeType, nodeGeometryUrl } from '~/utils/nodeSearch'
 import { useAuthStore } from '~/stores/authStore'
 import { useFragmentStore } from '~/stores/fragmentStore'
 import { useUiStore } from '~/stores/uiStore'
@@ -333,60 +334,6 @@ const getGeoServerUrl = () => {
   return (config.public as any)?.geoserver?.url || ''
 }
 
-/** Непустая строка после trim (пробелы и пустые значения не считаем). */
-const meaningfulStr = (v: unknown): string | null => {
-  if (v == null) return null
-  const s = String(v).trim()
-  return s.length ? s : null
-}
-
-/** Первое непустое значение по списку ключей (WFS часто отдаёт русские имена полей). */
-const pickProp = (node: Record<string, unknown>, ...keys: string[]): string | null => {
-  for (const k of keys) {
-    const m = meaningfulStr(node[k])
-    if (m) return m
-  }
-  return null
-}
-
-const getNodeType = (node: any) =>
-  pickProp(node, 'Тип', 'tip', 'type', 'node_type')
-
-const getNodeRsCode = (node: any) =>
-  pickProp(node, 'Код РС', 'Kod_RS', 'kod_rs', 'rs_code')
-
-const getNodeFragment = (node: any) =>
-  pickProp(node, 'Фрагмент', 'fragment', 'Fragment')
-
-const getNodeTitle = (node: any) => {
-  return pickProp(node,
-    'Наименование узла', 'naimenovanie_uzla', 'naimenovanie', 'name', 'Наименование'
-  ) || pickProp(node, 'adres', 'Адрес')
-    || (meaningfulStr(node.nomer) ? `Узел № ${node.nomer}` : null)
-    || (meaningfulStr(node.number) ? `Узел № ${node.number}` : null)
-    || (node.id != null ? `Узел #${node.id}` : 'Узел')
-}
-
-const getNodeSubtitle = (node: any) => {
-  const opis = pickProp(node, 'Описание', 'description', 'opisanie')
-  const kod = pickProp(node, 'Код', 'kod', 'code')
-  const priznak = pickProp(node, 'Признак', 'priznak')
-  const parts: string[] = []
-  if (node.id != null) parts.push(`id: ${node.id}`)
-  if (kod) parts.push(`Код: ${kod}`)
-  if (opis) parts.push(opis)
-  if (priznak) parts.push(`Признак: ${priznak}`)
-  if (parts.length) return parts.join(' · ')
-
-  const used = new Set([
-    'id', 'Тип', 'Код РС', 'Фрагмент', 'Наименование узла', 'Наименование', 'Описание', 'Код',
-    'Признак', 'naimenovanie', 'naimenovanie_uzla', 'name', 'adres', 'nomer', 'number', 'tip', 'type'
-  ])
-  const keys = Object.keys(node).filter(k => !used.has(k) && meaningfulStr(node[k]))
-  if (keys.length > 0) return `${keys[0]}: ${meaningfulStr(node[keys[0]])}`
-  return null
-}
-
 type NodeGroup = { key: string; label: string; nodes: any[] }
 
 const nodeGroups = computed((): NodeGroup[] => {
@@ -438,10 +385,7 @@ const loadNodes = async () => {
   if (searchAbortController) searchAbortController.abort()
   searchAbortController = new AbortController()
   try {
-    const workspace = getCityConfig().workspace
-    const url = `${baseUrl}/${workspace}/ows?service=WFS&version=1.1.0&request=GetFeature` +
-      `&typeName=${workspace}:find_node&outputFormat=application/json` +
-      `&viewparams=${encodeURIComponent(`text:${searchText.value.trim()}`)}`
+    const url = findNodesUrl(baseUrl, getCityConfig().workspace, searchText.value)
 
     const response = await fetch(url, { signal: searchAbortController.signal })
     const contentType = response.headers.get('content-type')
@@ -481,9 +425,7 @@ const getNodeGeometry = async (nodeId: string) => {
   try {
     if (geometryAbortController) geometryAbortController.abort()
     geometryAbortController = new AbortController()
-    const workspace = getCityConfig().workspace
-    const url = `${baseUrl}/${workspace}/ows?service=WFS&version=1.1.0&request=GetFeature` +
-      `&typeName=${workspace}:id_nodes&viewparams=id:${nodeId}&outputFormat=application/json`
+    const url = nodeGeometryUrl(baseUrl, getCityConfig().workspace, nodeId)
 
     const response = await fetch(url, { signal: geometryAbortController.signal })
     const contentType = response.headers.get('content-type')

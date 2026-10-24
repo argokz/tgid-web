@@ -105,6 +105,28 @@
 
       <v-spacer />
 
+      <!-- Палитра команд: журналы, инструменты, узлы, адреса -->
+      <HintTip
+        text="Команды и поиск"
+        hotkey="Ctrl+K"
+        hint="Журналы, инструменты, узлы сети и адреса"
+        location="bottom"
+      >
+        <template #default="{ props: tip }">
+          <v-btn
+            v-bind="tip"
+            icon
+            variant="text"
+            size="small"
+            class="me-1"
+            aria-label="Команды и поиск (Ctrl+K)"
+            @click="paletteOpen = true"
+          >
+            <v-icon size="22">mdi-magnify</v-icon>
+          </v-btn>
+        </template>
+      </HintTip>
+
       <!-- Пользователь -->
       <v-menu
         location="bottom end"
@@ -319,6 +341,12 @@
     />
     <ConfirmDialogHost />
 
+    <LazyCommandPalette
+      v-if="mountedOnce.palette"
+      v-model="paletteOpen"
+      @open-hotkeys="hotkeysHelpOpen = true"
+    />
+
     <!-- «?» — справка по клавишам (вне редактора; в редакторе — его экземпляр в MapViewer) -->
     <LazyHotkeysHelp
       v-if="mountedOnce.hotkeys"
@@ -397,6 +425,7 @@ import { useUiStore } from '~/stores/uiStore';
 import type PlanningCalculationModal from '~/components/PlanningCalculationModal.vue';
 import type CalculationProtocol from '~/components/CalculationProtocol.vue';
 import ConfirmDialogHost from '~/components/ConfirmDialogHost.vue';
+import HintTip from '~/components/HintTip.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { ROLE_LABELS, type Role } from '~/utils/permissions';
 import { deviceClass } from '~/utils/breakpoints';
@@ -432,9 +461,11 @@ const calculationModalRef = ref<InstanceType<typeof PlanningCalculationModal> | 
  * окно расчёта, вход, кабинет и смена пароля — замер S0 этапа 0 (docs/performance-baseline.md).
  * Протокол монтируется вместе с окном расчёта: лог расчёта (addLog) приходит в него ещё до показа.
  */
-const mountedOnce = reactive({ login: false, changePassword: false, account: false, calculation: false, protocol: false, hotkeys: false });
+const mountedOnce = reactive({ login: false, changePassword: false, account: false, calculation: false, protocol: false, hotkeys: false, palette: false });
 const hotkeysHelpOpen = ref(false);
 watch(hotkeysHelpOpen, (v) => { if (v) mountedOnce.hotkeys = true; });
+const paletteOpen = ref(false);
+watch(paletteOpen, (v) => { if (v) mountedOnce.palette = true; });
 watch(showLogin, (v) => { if (v) mountedOnce.login = true; }, { immediate: true });
 watch(showCalculationModal, (v) => { if (v) { mountedOnce.calculation = true; mountedOnce.protocol = true; } }, { immediate: true });
 watch(showProtocol, (v) => { if (v) mountedOnce.protocol = true; }, { immediate: true });
@@ -526,10 +557,11 @@ watch(navCollapsed, (collapsed) => {
 // Временный v-navigation-drawer сам по Esc не закрывается — меню в стеке Esc менеджера панелей (docs/ui-zones.md)
 useEscapeClose({ open: mainMenuOpen, close: () => { mainMenuOpen.value = false; } });
 useGlobalEscape();
-// «?» вне полей ввода — справка по клавишам (область global; в редакторе её берёт сам редактор)
-let disposeHelpHotkey: (() => void) | null = null;
+// Глобальные клавиши: «?» — справка (в редакторе её берёт сам редактор); Ctrl/Cmd+K — палитра команд,
+// в том числе из поля ввода и поверх диалога (это и есть способ переключиться)
+const disposeGlobalHotkeys: (() => void)[] = [];
 onMounted(() => {
-  disposeHelpHotkey = registerHotkeys({
+  disposeGlobalHotkeys.push(registerHotkeys({
     id: 'hotkeys-help',
     area: 'global',
     handle: (ev) => {
@@ -538,9 +570,20 @@ onMounted(() => {
       hotkeysHelpOpen.value = true;
       return true;
     },
-  });
+  }));
+  disposeGlobalHotkeys.push(registerHotkeys({
+    id: 'command-palette',
+    area: 'global',
+    allowInInput: true,
+    allowInOverlay: true,
+    handle: (ev) => {
+      if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.code !== 'KeyK') return false;
+      paletteOpen.value = !paletteOpen.value;
+      return true;
+    },
+  }));
 });
-onBeforeUnmount(() => disposeHelpHotkey?.());
+onBeforeUnmount(() => disposeGlobalHotkeys.forEach((d) => d()));
 
 const menuItems = computed(() => buildHeaderMenu(
   { canCalculate: isHydrated.value && authStore.canCalculate },

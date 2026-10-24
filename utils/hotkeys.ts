@@ -71,6 +71,7 @@ export const MAP_HOTKEYS: HotkeyGroup = {
 export const GLOBAL_HOTKEYS: HotkeyGroup = {
   title: 'Везде',
   items: [
+    { keys: ['Ctrl+K'], text: 'Палитра команд: журналы, инструменты, узлы сети, адреса' },
     { keys: ['?'], text: 'Эта справка' },
     { keys: ['Esc'], text: 'Закрыть верхнюю панель: меню, «Инструменты», «Измерения», меню объекта' },
   ],
