@@ -13,13 +13,16 @@ export interface GeoJsonGeometry {
 const wfsBase = (baseUrl: string, workspace: string) =>
   `${baseUrl.replace(/\/$/, '')}/${workspace}/ows?service=WFS&version=1.1.0&request=GetFeature&outputFormat=application/json`;
 
+/** Значение viewparams: GeoServer делит параметры по `;` и `,`, экранирование — обратный слэш */
+export const viewParamValue = (value: string): string => value.replace(/[\\,;]/g, (ch) => `\\${ch}`);
+
 /** URL поиска узлов по тексту (viewparams `text:`) */
 export const findNodesUrl = (baseUrl: string, workspace: string, text: string): string =>
-  `${wfsBase(baseUrl, workspace)}&typeName=${workspace}:find_node&viewparams=${encodeURIComponent(`text:${text.trim()}`)}`;
+  `${wfsBase(baseUrl, workspace)}&typeName=${workspace}:find_node&viewparams=${encodeURIComponent(`text:${viewParamValue(text.trim())}`)}`;
 
 /** URL геометрии узла по id */
 export const nodeGeometryUrl = (baseUrl: string, workspace: string, id: number | string): string =>
-  `${wfsBase(baseUrl, workspace)}&typeName=${workspace}:id_nodes&viewparams=id:${encodeURIComponent(String(id))}`;
+  `${wfsBase(baseUrl, workspace)}&typeName=${workspace}:id_nodes&viewparams=${encodeURIComponent(`id:${viewParamValue(String(id))}`)}`;
 
 /** Непустая строка после trim (пробелы и пустые значения не считаем) */
 export const meaningfulStr = (v: unknown): string | null => {

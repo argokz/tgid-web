@@ -46,7 +46,8 @@ describe('CommandPalette', () => {
     const search = w.findComponent(SearchField);
     await search.setValue('наруш');
     await nextTick();
-    expect(titles()).toEqual(['Нарушения']);
+    // «Искать адрес» — явный пункт для внешнего геокодера, всегда при запросе от 3 символов
+    expect(titles()).toEqual(['Нарушения', 'Искать адрес «наруш»']);
     expect(w.find('.command-palette__item--active').text()).toContain('Нарушения');
 
     await w.find('.command-palette__card').trigger('keydown', { key: 'Enter' });
@@ -61,14 +62,17 @@ describe('CommandPalette', () => {
     await w.findComponent(SearchField).setValue('ТК-5 Абая');
     await vm.onSearch('ТК-5 Абая');
     await nextTick();
-    const sections = vm.sections.map((s: any) => [s.kind, s.items.map((i: any) => i.title)]);
-    expect(sections).toContainEqual(['node', ['ТК-5']]);
-    expect(sections).toContainEqual(['address', ['проспект Абая, Алматы']]);
+    const sectionsOf = () => vm.sections.map((s: any) => [s.kind, s.items.map((i: any) => i.title)]);
+    expect(sectionsOf()).toContainEqual(['node', ['ТК-5']]);
+    // адреса — внешний геокодер: только по явному пункту «Искать адрес», а не на каждую паузу ввода
+    expect(sectionsOf()).toContainEqual(['address', ['Искать адрес «ТК-5 Абая»']]);
+    await vm.loadAddresses('ТК-5 Абая');
+    await nextTick();
+    expect(sectionsOf()).toContainEqual(['address', ['проспект Абая, Алматы']]);
 
-    await w.findComponent(SearchField).setValue('zzz');
-    await vm.onSearch('zzz');
     (fetch as any).mockImplementationOnce(async () => ({ ok: true, headers: { get: () => 'application/json' }, json: async () => ({ features: [] }) }));
-    await vm.onSearch('zzzz');
+    await w.findComponent(SearchField).setValue('zz');
+    await vm.onSearch('zz');
     await nextTick();
     expect(w.text()).toContain('Ничего не найдено');
   });

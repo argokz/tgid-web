@@ -175,7 +175,7 @@ const copy = async (format: CoordCopyFormat) => {
 
 /** C над картой — скопировать в текущей системе; область `map` реестра хоткеев (поля ввода отсекает диспетчер) */
 const onKeyDown = (ev: KeyboardEvent): boolean => {
-  if (!overMap || ev.ctrlKey || ev.metaKey || ev.altKey || ev.shiftKey) return false;
+  if (!overMap || ev.repeat || ev.ctrlKey || ev.metaKey || ev.altKey || ev.shiftKey) return false;
   if (ev.code !== 'KeyC') return false;
   void copy(copyFormatFor(crs.value));
   return true;

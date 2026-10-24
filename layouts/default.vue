@@ -105,8 +105,9 @@
 
       <v-spacer />
 
-      <!-- Палитра команд: журналы, инструменты, узлы, адреса -->
+      <!-- Палитра команд: журналы, инструменты, узлы, адреса (после входа: поиск узлов идёт в GeoServer) -->
       <HintTip
+        v-if="paletteAvailable"
         text="Команды и поиск"
         hotkey="Ctrl+K"
         hint="Журналы, инструменты, узлы сети и адреса"
@@ -466,6 +467,8 @@ const hotkeysHelpOpen = ref(false);
 watch(hotkeysHelpOpen, (v) => { if (v) mountedOnce.hotkeys = true; });
 const paletteOpen = ref(false);
 watch(paletteOpen, (v) => { if (v) mountedOnce.palette = true; });
+const paletteAvailable = computed(() => isHydrated.value && (authStore.isAuthenticated || authStore.authDisabled));
+watch(paletteAvailable, (ok) => { if (!ok) paletteOpen.value = false; });
 watch(showLogin, (v) => { if (v) mountedOnce.login = true; }, { immediate: true });
 watch(showCalculationModal, (v) => { if (v) { mountedOnce.calculation = true; mountedOnce.protocol = true; } }, { immediate: true });
 watch(showProtocol, (v) => { if (v) mountedOnce.protocol = true; }, { immediate: true });
@@ -578,6 +581,7 @@ onMounted(() => {
     allowInOverlay: true,
     handle: (ev) => {
       if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.code !== 'KeyK') return false;
+      if (!paletteAvailable.value) return false;
       paletteOpen.value = !paletteOpen.value;
       return true;
     },

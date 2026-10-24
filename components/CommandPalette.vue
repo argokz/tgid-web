@@ -6,12 +6,12 @@
     scrollable
     content-class="command-palette"
     :transition="mobile ? 'dialog-bottom-transition' : 'dialog-transition'"
-    aria-label="Команды и поиск"
   >
     <v-card
       :rounded="mobile ? '0' : 'lg'"
       class="command-palette__card"
-      @keydown="onKeydown"
+      aria-label="Команды и поиск"
+      @keydown.capture="onKeydown"
     >
       <div class="px-3 pt-3 pb-2">
         <SearchField
@@ -20,7 +20,8 @@
           aria-label="Команда, журнал, узел или адрес"
           autofocus
           :debounce="150"
-          :loading="loading"
+          :loading="busy"
+          :result-count="query.trim() ? flat.length : null"
           @search="onSearch"
           @escape="open = false"
         />
@@ -32,11 +33,16 @@
         role="listbox"
         aria-label="Результаты"
       >
-        <template
+        <div
           v-for="section in sections"
           :key="section.kind"
+          role="group"
+          :aria-labelledby="`cp-section-${section.kind}`"
         >
-          <div class="command-palette__section text-overline text-medium-emphasis px-4 pt-2">
+          <div
+            :id="`cp-section-${section.kind}`"
+            class="command-palette__section text-overline text-medium-emphasis px-4 pt-2"
+          >
             {{ section.title }}
           </div>
           <button
@@ -45,6 +51,7 @@
             :key="item.id"
             type="button"
             role="option"
+            tabindex="-1"
             class="command-palette__item"
             :class="{ 'command-palette__item--active': item.id === activeId }"
             :aria-selected="item.id === activeId"
@@ -63,11 +70,11 @@
               >{{ item.subtitle }}</span>
             </span>
           </button>
-        </template>
+        </div>
         <StateView
           v-if="!sections.length"
-          :loading="loading"
-          :empty="!loading"
+          :loading="busy"
+          :empty="!busy"
           :rows="3"
           :empty-title="query.trim() ? 'Ничего не найдено' : 'Начните вводить'"
           :empty-text="query.trim() ? 'Попробуйте другое название, номер узла или адрес' : 'Журналы, инструменты, узлы сети и адреса — в одной строке'"
@@ -105,9 +112,9 @@ import { TOOL_GROUPS } from '~/utils/toolCatalog';
 
 /**
  * Палитра команд Ctrl+K (docs/ui-zones.md): журналы и инструменты из `toolCatalog` (по правам),
- * действия (панели, справка), узлы сети (WFS `find_node`, как в окне поиска узлов), адреса (геокодер,
- * если доступен), недавние команды. Открывает диалоги через `uiStore.requestToolDialog`, к объектам
- * перелетает с маркером `useLocateMarkers`.
+ * действия (панели, справка), узлы сети (WFS `find_node`, как в окне поиска узлов), адреса (геокодер —
+ * внешний сервис, только по явному пункту «Искать адрес»), недавние команды. Открывает диалоги через
+ * `uiStore.requestToolDialog`, к объектам перелетает с маркером `useLocateMarkers`.
  */
 const open = defineModel<boolean>({ default: false });
 const emit = defineEmits<{ 'open-hotkeys': [] }>();
@@ -117,6 +124,7 @@ const ui = useUiStore();
 const authStore = useAuthStore();
 const mapStore = useMapStore();
 const notify = useNotificationStore();
+const config = useRuntimeConfig();
 const { searchAddress } = useNominatim();
 const locateMarkers = useLocateMarkers(() => mapStore.map);
 
@@ -125,17 +133,27 @@ const ADDRESS_QUERY_MIN = 3;
 const NODE_ZOOM = 17;
 const ADDRESS_ZOOM = 16;
 const MAX_PER_SECTION = 8;
+const RECENT_PREFIX = 'recent:';
+const ADDRESS_SEARCH_ID = 'address-search';
 
 const query = ref('');
+/** Запрос, для которого показаны узлы (результаты старого запроса не показываются) */
 const searched = ref('');
 const loading = ref(false);
 const nodeItems = ref<CommandItem[]>([]);
+/** Запрос, для которого искали адреса (по явному действию) */
+const addressQuery = ref('');
 const addressItems = ref<CommandItem[]>([]);
+const addressLoading = ref(false);
 const recent = ref<RecentEntry[]>([]);
 const activeId = ref<string | null>(null);
 const listEl = ref<{ $el?: HTMLElement } | null>(null);
 
-const geoServerUrl = () => String((useRuntimeConfig().public as any)?.geoserver?.url || '');
+const geoServerUrl = () => String((config.public as { geoserver?: { url?: string } }).geoserver?.url || '');
+const trimmed = computed(() => query.value.trim());
+/** Узлы ещё ищутся или ждут паузы ввода — не показывать «ничего не найдено» раньше времени */
+const busy = computed(() => loading.value || addressLoading.value
+  || (trimmed.value.length >= NODE_QUERY_MIN && searched.value !== trimmed.value));
 
 /** Перелёт к точке с маркером палитры */
 const goTo = (center: [number, number], label: string, zoom: number) => {
@@ -169,7 +187,6 @@ const toolItems = computed<CommandItem[]>(() =>
 const staticItems = computed(() => [...actionItems.value, ...toolItems.value]);
 
 /** Недавние — как команды: статические по id, узлы и адреса — по сохранённым координатам */
-const RECENT_PREFIX = 'recent:';
 const recentItems = computed<CommandItem[]>(() => recent.value.flatMap((entry) => {
   // свой id у «недавнего» — иначе подсветка активного падала бы и на такую же команду в списке ниже
   const known = staticItems.value.find((i) => i.id === entry.id);
@@ -186,6 +203,19 @@ const recentItems = computed<CommandItem[]>(() => recent.value.flatMap((entry) =
   }];
 }));
 
+/** Явный пункт «Искать адрес»: геокодер — внешний сервис, по нему не ищем на каждую паузу ввода */
+const addressSearchItem = computed<CommandItem | null>(() => (trimmed.value.length >= ADDRESS_QUERY_MIN && addressQuery.value !== trimmed.value
+  ? {
+    id: ADDRESS_SEARCH_ID,
+    kind: 'address',
+    title: `Искать адрес «${trimmed.value}»`,
+    subtitle: 'Геокодер OpenStreetMap — внешний сервис',
+    icon: 'mdi-map-search-outline',
+    keepOpen: true,
+    run: () => loadAddresses(trimmed.value),
+  }
+  : null));
+
 interface Section {
   kind: CommandKind | 'recent';
   title: string;
@@ -193,7 +223,7 @@ interface Section {
 }
 
 const sections = computed<Section[]>(() => {
-  const q = query.value.trim();
+  const q = trimmed.value;
   const out: Section[] = [];
   if (!q) {
     if (recentItems.value.length) out.push({ kind: 'recent', title: 'Недавние', items: recentItems.value });
@@ -205,8 +235,13 @@ const sections = computed<Section[]>(() => {
   const tools = rankCommands(q, toolItems.value).slice(0, MAX_PER_SECTION);
   if (actions.length) out.push({ kind: 'action', title: KIND_TITLES.action, items: actions });
   if (tools.length) out.push({ kind: 'tool', title: KIND_TITLES.tool, items: tools });
-  if (nodeItems.value.length) out.push({ kind: 'node', title: KIND_TITLES.node, items: nodeItems.value });
-  if (addressItems.value.length) out.push({ kind: 'address', title: KIND_TITLES.address, items: addressItems.value });
+  // результаты — только для текущего запроса: иначе Enter выполнил бы узел от прежнего текста
+  if (searched.value === q && nodeItems.value.length) out.push({ kind: 'node', title: KIND_TITLES.node, items: nodeItems.value });
+  const addresses = [
+    ...(addressQuery.value === q ? addressItems.value : []),
+    ...(addressSearchItem.value ? [addressSearchItem.value] : []),
+  ];
+  if (addresses.length) out.push({ kind: 'address', title: KIND_TITLES.address, items: addresses });
   return out;
 });
 
@@ -243,41 +278,57 @@ const goToNode = async (node: NodeRecord, title: string) => {
 
 let abort: AbortController | null = null;
 
-/** Узлы (WFS find_node) и адреса (геокодер) — после паузы ввода; результаты только для последнего запроса */
+/** Узлы (WFS find_node) — после паузы ввода; результаты только для последнего запроса и открытой палитры */
 const onSearch = async (q: string) => {
-  searched.value = q;
   abort?.abort();
   abort = null;
+  if (!open.value) return;
   if (q.length < NODE_QUERY_MIN) {
     nodeItems.value = [];
-    addressItems.value = [];
+    searched.value = q;
     loading.value = false;
+    return;
+  }
+  const base = geoServerUrl();
+  if (!base) {
+    nodeItems.value = [];
+    searched.value = q;
     return;
   }
   const controller = new AbortController();
   abort = controller;
   loading.value = true;
-  const base = geoServerUrl();
-  const workspace = getCityConfig().workspace;
-  const nodesTask: Promise<CommandItem[]> = base
-    ? fetch(findNodesUrl(base, workspace, q), { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok || !response.headers.get('content-type')?.includes('json')) return [];
-        const data = await response.json();
-        const nodes: NodeRecord[] = data.features?.map((f: { properties: NodeRecord }) => f.properties) || [];
-        return nodes.slice(0, MAX_PER_SECTION).map((node) => {
-          const title = getNodeTitle(node);
-          return { id: `node:${node.id}`, kind: 'node' as const, title, subtitle: nodeSubtitle(node), icon: 'mdi-map-marker-radius-outline', run: () => goToNode(node, title) };
-        });
-      })
-      .catch((error: unknown) => {
-        if ((error as Error).name !== 'AbortError') notify.showWarning('Поиск узлов недоступен');
-        return [];
-      })
-    : Promise.resolve([]);
-  // Геокодер — внешний сервис: в интранете его может не быть, тогда адресов просто нет
-  const addressTask: Promise<CommandItem[]> = q.length >= ADDRESS_QUERY_MIN
-    ? searchAddress(q).then((results) => results.slice(0, MAX_PER_SECTION).map((r) => {
+  try {
+    const response = await fetch(findNodesUrl(base, getCityConfig().workspace, q), { signal: controller.signal });
+    const ok = response.ok && response.headers.get('content-type')?.includes('json');
+    const data = ok ? await response.json() : { features: [] };
+    if (controller.signal.aborted) return;
+    const nodes: NodeRecord[] = data.features?.map((f: { properties: NodeRecord }) => f.properties) || [];
+    nodeItems.value = nodes.slice(0, MAX_PER_SECTION).map((node) => {
+      const title = getNodeTitle(node);
+      return { id: `node:${node.id}`, kind: 'node' as const, title, subtitle: nodeSubtitle(node), icon: 'mdi-map-marker-radius-outline', run: () => goToNode(node, title) };
+    });
+    searched.value = q;
+  } catch (error) {
+    if ((error as Error).name === 'AbortError') return;
+    notify.showWarning('Поиск узлов недоступен');
+    nodeItems.value = [];
+    searched.value = q;
+  } finally {
+    if (abort === controller) {
+      loading.value = false;
+      abort = null;
+    }
+  }
+};
+
+/** Адреса — только по явному пункту; геокодера в интранете может не быть, тогда раздел пуст */
+const loadAddresses = async (q: string) => {
+  addressLoading.value = true;
+  try {
+    const results = await searchAddress(q);
+    if (!open.value || trimmed.value !== q) return;
+    addressItems.value = results.slice(0, MAX_PER_SECTION).map((r) => {
       const center: [number, number] = [Number(r.lon), Number(r.lat)];
       return {
         id: `addr:${r.place_id}`,
@@ -289,19 +340,18 @@ const onSearch = async (q: string) => {
           goTo(center, r.display_name, ADDRESS_ZOOM);
         },
       };
-    }))
-    : Promise.resolve([]);
-  const [nodes, addresses] = await Promise.all([nodesTask, addressTask]);
-  if (controller.signal.aborted || searched.value !== q) return;
-  nodeItems.value = nodes;
-  addressItems.value = addresses;
-  loading.value = false;
+    });
+    addressQuery.value = q;
+    if (!results.length) notify.showInfo('Адрес не найден (или геокодер недоступен)');
+  } finally {
+    addressLoading.value = false;
+  }
 };
 
 const run = async (item: CommandItem) => {
   const id = item.id.startsWith(RECENT_PREFIX) ? item.id.slice(RECENT_PREFIX.length) : item.id;
   if (item.kind === 'action' || item.kind === 'tool') pushRecent(appStorage, { id, kind: item.kind, title: item.title, subtitle: item.subtitle });
-  open.value = false;
+  if (!item.keepOpen) open.value = false;
   await item.run();
 };
 
@@ -311,7 +361,10 @@ const scrollActiveIntoView = () => {
   el?.scrollIntoView({ block: 'nearest' });
 };
 
-/** Стрелки, Home/End, Enter — по плоскому списку; Esc закрывает диалог сам Vuetify */
+/**
+ * Стрелки, Home/End, Enter — по плоскому списку (capture: Enter перехватывается раньше SearchField, иначе
+ * она запускала бы ещё один поиск); Esc закрывает диалог сам Vuetify.
+ */
 const onKeydown = (e: KeyboardEvent) => {
   const items = flat.value;
   if (!items.length) return;
@@ -330,24 +383,26 @@ const onKeydown = (e: KeyboardEvent) => {
     return;
   }
   e.preventDefault();
+  e.stopPropagation();
   scrollActiveIntoView();
 };
 
 watch(open, (isOpen) => {
-  if (!isOpen) {
-    abort?.abort();
-    loading.value = false;
-    return;
-  }
+  abort?.abort();
+  abort = null;
+  loading.value = false;
+  addressLoading.value = false;
+  if (!isOpen) return;
   query.value = '';
   searched.value = '';
   nodeItems.value = [];
   addressItems.value = [];
+  addressQuery.value = '';
   recent.value = readRecent(appStorage);
   activeId.value = flat.value[0]?.id ?? null;
 }, { immediate: true });
 
-defineExpose({ sections, activeId, onSearch });
+defineExpose({ sections, activeId, onSearch, loadAddresses });
 </script>
 
 <style>

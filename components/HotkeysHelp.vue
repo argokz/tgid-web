@@ -2,6 +2,7 @@
   <v-dialog
     v-model="open"
     max-width="720"
+    aria-label="Горячие клавиши"
   >
     <v-card>
       <v-card-title class="d-flex align-center">
@@ -40,21 +41,21 @@
               <div class="text-subtitle-2 mb-1">
                 {{ g.title }}
               </div>
-            <div
-              v-for="item in g.items"
-              :key="item.text"
-              class="hotkeys-row"
-            >
-              <span class="hotkeys-keys">
-                <template
-                  v-for="(k, i) in item.keys"
-                  :key="k"
-                >
-                  <span v-if="i">/</span><kbd>{{ k }}</kbd>
-                </template>
-              </span>
-              <span>{{ item.text }}</span>
-            </div>
+              <div
+                v-for="item in g.items"
+                :key="item.text"
+                class="hotkeys-row"
+              >
+                <span class="hotkeys-keys">
+                  <template
+                    v-for="(k, i) in item.keys"
+                    :key="k"
+                  >
+                    <span v-if="i">/</span><kbd>{{ k }}</kbd>
+                  </template>
+                </span>
+                <span>{{ item.text }}</span>
+              </div>
             </section>
           </div>
         </div>

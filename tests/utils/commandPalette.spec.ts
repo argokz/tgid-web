@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { matchScore, pushRecent, rankCommands, readRecent, RECENT_LIMIT, type RecentEntry } from '~/utils/commandPalette';
-import { findNodesUrl, geometryCenter, getNodeSubtitle, getNodeTitle, nodeGeometryUrl } from '~/utils/nodeSearch';
+import { findNodesUrl, geometryCenter, getNodeSubtitle, getNodeTitle, nodeGeometryUrl, viewParamValue } from '~/utils/nodeSearch';
 
 const memStorage = () => {
   const m = new Map<string, string>();
@@ -53,7 +53,10 @@ describe('поиск узлов — подписи и адреса WFS', () => {
     expect(findNodesUrl('http://gs/geoserver/', 'AlmatyGIS', ' ТК-12 ')).toBe(
       'http://gs/geoserver/AlmatyGIS/ows?service=WFS&version=1.1.0&request=GetFeature&outputFormat=application/json&typeName=AlmatyGIS:find_node&viewparams=text%3A%D0%A2%D0%9A-12',
     );
-    expect(nodeGeometryUrl('http://gs/geoserver', 'AlmatyGIS', 42)).toContain('typeName=AlmatyGIS:id_nodes&viewparams=id:42');
+    expect(nodeGeometryUrl('http://gs/geoserver', 'AlmatyGIS', 42)).toContain('typeName=AlmatyGIS:id_nodes&viewparams=id%3A42');
+    // разделители viewparams GeoServer экранируются, чужой параметр через «;» не подсунуть
+    expect(viewParamValue('a,b;id:1\\')).toBe('a\\,b\\;id:1\\\\');
+    expect(decodeURIComponent(findNodesUrl('http://gs', 'W', 'x;id:1').split('viewparams=')[1])).toBe('text:x\\;id:1');
     expect(getNodeTitle({ id: 7, 'Наименование узла': ' ТК-12 ' })).toBe('ТК-12');
     expect(getNodeTitle({ id: 7, nomer: '15' })).toBe('Узел № 15');
     expect(getNodeTitle({ id: 7 })).toBe('Узел #7');

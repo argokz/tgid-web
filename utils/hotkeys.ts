@@ -45,7 +45,12 @@ export function dispatchHotkey(entries: readonly HotkeyEntry[], ev: KeyboardEven
     if (ctx.typing && !entry.allowInInput) continue;
     if (ctx.overlay && !entry.allowInOverlay) continue;
     if (entry.enabled && !entry.enabled()) continue;
-    if (entry.handle(ev)) return entry;
+    try {
+      if (entry.handle(ev)) return entry;
+    } catch (error) {
+      // один сломанный обработчик не должен отнимать клавишу у остальных (Esc у панелей)
+      console.error(`[hotkeys] обработчик ${entry.id}:`, error);
+    }
   }
   return null;
 }

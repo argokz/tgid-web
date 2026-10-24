@@ -42,6 +42,17 @@ describe('реестр хоткеев', () => {
     expect(dispatchHotkey(entries, esc(), { typing: true, overlay: true })).toBeNull();
   });
 
+  it('исключение в обработчике не отнимает клавишу у остальных', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const entries: HotkeyEntry[] = [
+      { id: 'broken', area: 'editor', handle: () => { throw new Error('boom'); } },
+      { id: 'panels', area: 'panels', handle: () => true },
+    ];
+    expect(dispatchHotkey(entries, esc(), { typing: false, overlay: false })?.id).toBe('panels');
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
   it('справка «?» покрывает общие клавиши, измерения и редактор', () => {
     expect(HOTKEY_DOCS.map((s) => s.area)).toEqual(['global', 'measure', 'editor']);
     const texts = HOTKEY_DOCS.flatMap((s) => s.groups.flatMap((g) => g.items.map((i) => i.keys.join('/'))));

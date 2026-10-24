@@ -30,6 +30,9 @@ const ensureListener = () => {
 export function registerHotkeys(entry: HotkeyEntry): () => void {
   if (import.meta.server || typeof window === 'undefined') return () => {};
   ensureListener();
+  // повторная регистрация с тем же id (HMR, двойной attach) заменяет прежнюю
+  const stale = entries.findIndex((e) => e.id === entry.id);
+  if (stale >= 0) entries.splice(stale, 1);
   entries.push(entry);
   return () => {
     const i = entries.indexOf(entry);

@@ -3,6 +3,7 @@
     <Transition name="fade">
       <v-card
         v-if="mapStore.featureMenuVisible"
+        ref="cardRef"
         class="feature-menu"
         :class="menuSizeClass"
         :style="menuStyle"
@@ -159,6 +160,7 @@ import { describeMenuFeature } from '~/utils/networkFeature'
 import { getCityConfig } from '~/utils/cityConfig'
 import { BREAKPOINTS } from '~/utils/breakpoints'
 import { registerHotkeys } from '~/composables/useHotkeys'
+import { holdsEscape } from '~/utils/escapeKey'
 
 const mapStore = useMapStore()
 
@@ -330,24 +332,37 @@ const disposeHotkeys = registerHotkeys({
   id: 'feature-menu-escape',
   area: 'popover',
   enabled: () => mapStore.featureMenuVisible,
+  allowInInput: true, // пустое поле Esc отпускает — решает holdsEscape
   handle: (ev) => {
-    if (ev.key !== 'Escape') return false
+    if (ev.key !== 'Escape' || holdsEscape(ev.target)) return false
     mapStore.featureMenuVisible = false
     return true
   },
 })
 onBeforeUnmount(disposeHotkeys)
 
-// Меню закрыто без выбора («Закрыть», новый identify) — инструмент получает отказ.
-// Открылось — фокус на первый пункт: стрелки v-list и Enter работают сразу, Esc закрывает (реестр хоткеев)
+// Меню закрыто без выбора («Закрыть», новый identify) — инструмент получает отказ; фокус возвращается туда,
+// где был (холст карты). Открылось — фокус на первый пункт (стрелки v-list и Enter работают сразу),
+// пока v-virtual-scroll его не отрисовал — на саму карточку
+const cardRef = ref<{ $el?: HTMLElement } | null>(null)
+let focusBefore: HTMLElement | null = null
 watch(() => mapStore.featureMenuVisible, async (visible) => {
   if (!visible) {
     mapStore.cancelFeatureChoice()
+    focusBefore?.focus?.()
+    focusBefore = null
     return
   }
+  focusBefore = document.activeElement instanceof HTMLElement ? document.activeElement : null
   await nextTick()
-  await nextTick()
-  document.querySelector<HTMLElement>('.feature-menu .menu-item')?.focus()
+  const card = cardRef.value?.$el
+  if (!card) return
+  const first = card.querySelector<HTMLElement>('.menu-item')
+  if (first) first.focus()
+  else {
+    card.tabIndex = -1
+    card.focus()
+  }
 })
 </script>
 

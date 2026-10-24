@@ -263,7 +263,7 @@ const open = defineModel<boolean>({ default: false });
 const draw = useMapDraw();
 const notificationStore = useNotificationStore();
 
-const measureItems: FloatingToolbarItem<DrawMode>[] = [
+const measureItems: FloatingToolbarItem<Exclude<DrawMode, 'none'>>[] = [
   { value: 'measure-distance', title: 'Расстояние', icon: 'mdi-ruler', hint: 'Кликайте точки линии, двойной клик — завершить' },
   { value: 'measure-area', title: 'Площадь', icon: 'mdi-vector-square', hint: 'Обведите контур, двойной клик — замкнуть' },
 ];

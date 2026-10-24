@@ -14,8 +14,10 @@ export interface CommandItem {
   icon: string;
   /** Дополнительные слова для поиска (группа, событие) */
   keywords?: string;
-  /** Выполнить; палитра закрывается после */
+  /** Выполнить; палитра закрывается после, если не keepOpen */
   run: () => void | Promise<void>;
+  /** Команда наполняет палитру (поиск адреса) — не закрывать */
+  keepOpen?: boolean;
 }
 
 export const KIND_TITLES: Record<CommandKind, string> = {

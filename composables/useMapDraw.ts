@@ -815,6 +815,8 @@ export function useMapDraw() {
     if (e.key === 'Escape') {
       cancel();
     } else if (e.key === 'Enter') {
+      // Enter на кнопке или пункте меню — нажатие, а не завершение измерения (клавиатурный пользователь)
+      if ((e.target as HTMLElement | null)?.closest?.('button,a,[role="option"],[role="menuitem"]')) return false;
       finishShape();
     } else if (e.key === 'Backspace' || e.key === 'Delete') {
       if (!draftPoints.value.length) return false;
