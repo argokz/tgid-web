@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { focusOnMapCanvas, hasBlockingOverlay, isTypingTarget, shouldHandleEscape } from '~/utils/escapeKey';
+import { hasBlockingOverlay, holdsEscape, isTypingTarget, shouldHandleEscape } from '~/utils/escapeKey';
 
 const esc = (target: EventTarget | null, init: KeyboardEventInit = {}) => {
   const event = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true, ...init });
@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 describe('escapeKey', () => {
-  it('поля ввода с текстом и contenteditable забирают Esc себе, пустое поле — нет', () => {
+  it('поля ввода и contenteditable — печатающие цели; Esc держит только поле с текстом', () => {
     const input = document.createElement('input');
     input.value = 'текст';
     const area = document.createElement('textarea');
@@ -27,7 +27,12 @@ describe('escapeKey', () => {
     expect(isTypingTarget(editable)).toBe(true);
     expect(isTypingTarget(button)).toBe(false);
     expect(isTypingTarget(null)).toBe(false);
-    expect(isTypingTarget(document.createElement('input'))).toBe(false);
+    const empty = document.createElement('input');
+    expect(isTypingTarget(empty)).toBe(true);
+    expect(holdsEscape(empty)).toBe(false);
+    expect(holdsEscape(input)).toBe(true);
+    expect(holdsEscape(editable)).toBe(true);
+    expect(holdsEscape(button)).toBe(false);
   });
 
   it('открытый диалог или меню Vuetify блокирует Esc для панелей, тултип и уведомление — нет', () => {
@@ -53,16 +58,9 @@ describe('escapeKey', () => {
     expect(shouldHandleEscape(esc(button))).toBe(false);
   });
 
-  it('фокус на холсте карты блокирует Esc для панелей только при активном инструменте карты', () => {
-    document.body.innerHTML = '<button id="btn"></button><div class="maplibregl-canvas-container"><canvas id="map" tabindex="0"></canvas></div>';
-    expect(focusOnMapCanvas(document)).toBe(false);
-    document.getElementById('btn')!.focus();
-    expect(focusOnMapCanvas(document)).toBe(false);
-    expect(shouldHandleEscape(esc(document.getElementById('btn')), document, true)).toBe(true);
-    const map = document.getElementById('map')!;
-    map.focus();
-    expect(focusOnMapCanvas(document)).toBe(true);
-    expect(shouldHandleEscape(esc(map), document, true)).toBe(false);
-    expect(shouldHandleEscape(esc(map), document, false)).toBe(true);
+  it('Esc из пустого поля доходит до панелей', () => {
+    const empty = document.createElement('input');
+    document.body.appendChild(empty);
+    expect(shouldHandleEscape(esc(empty))).toBe(true);
   });
 });

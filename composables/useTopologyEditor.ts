@@ -18,7 +18,7 @@ import { useLineVertexEditor } from '~/composables/useLineVertexEditor';
 import { pickNetworkFeature } from '~/utils/networkFeature';
 import type { PickCandidate, PickOptions } from '~/utils/networkFeature';
 import { pickNetworkSnap } from '~/utils/networkSnap';
-import { isTopologyEditing } from '~/utils/mapToolFlags';
+import { registerHotkeys } from '~/composables/useHotkeys';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
 import { appStorage } from '~/utils/appStorage';
 import type { CardKind, CardTemplate } from '~/utils/objectCard';
@@ -134,7 +134,6 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   watch(enabled, (on: boolean) => {
     if (!on) isEditTopologyMode.value = false;
   });
-  watch(isEditTopologyMode, (on) => { isTopologyEditing.value = on; }, { immediate: true });
 
   // === Инструмент (один активный, как в ГИС) — прежние флаги режимов производные от него ===
   const activeTool = ref<EditorTool>('select');
@@ -1112,59 +1111,53 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     await onDeleteFeature(sel.id, undefined, { kind: sel.kind });
   };
 
-  const isTypingTarget = (target: EventTarget | null) => {
-    const el = target as HTMLElement | null;
-    return Boolean(el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)));
-  };
-
-  /** Клавиши редактора (utils/editorTools): инструменты, Esc, Del, F, ?, Ctrl+Z / Ctrl+Y; в трассе — её клавиши */
-  const onKeyDown = (ev: KeyboardEvent) => {
-    if (!isEditTopologyMode.value || isTypingTarget(ev.target)) return;
+  /**
+   * Клавиши редактора (utils/editorTools): инструменты, Esc, Del, F, ?, Ctrl+Z / Ctrl+Y; в трассе — её клавиши.
+   * Область `editor` реестра хоткеев (utils/hotkeys.ts): поля ввода и диалоги Vuetify отсекает диспетчер,
+   * true — клавиша взята (диспетчер делает preventDefault).
+   */
+  const onKeyDown = (ev: KeyboardEvent): boolean => {
+    if (!isEditTopologyMode.value) return false;
     if (chainPreviewOpen.value || splitPreviewOpen.value || mergeConfirmDialogOpen.value || hotkeysHelpOpen.value
-      || historyOpen.value || deleteOpen.value) return;
+      || historyOpen.value || deleteOpen.value) return false;
     const action = editorKeyAction(ev);
     if (action?.type === 'redo') {
-      ev.preventDefault();
       void redoLastTopologyOperation();
-      return;
+      return true;
     }
     if (action?.type === 'undo') {
-      ev.preventDefault();
       if (chainActive() && trace.active.value) trace.removeLast();
       else void undoLastTopologyOperation();
-      return;
+      return true;
     }
     // Esc во время перетаскивания узла — узел остаётся на месте
     if (draggedNodeId !== null && ev.key === 'Escape') {
-      ev.preventDefault();
       resetNodeDrag();
       suppressTopologyClickUntil = Date.now() + 250;
-      return;
+      return true;
     }
     if (chainActive() && trace.active.value) {
       if (ev.key === 'Shift') {
         trace.setShift(true);
-        return;
+        return false;
       }
       // длина и угол с клавиатуры: цифры, Tab, Enter со значением
-      if (trace.handleKey(ev)) {
-        ev.preventDefault();
-        return;
-      }
+      if (trace.handleKey(ev)) return true;
       if (ev.key === 'Enter') {
-        ev.preventDefault();
         void finishTrace();
-      } else if (ev.key === 'Escape') {
-        ev.preventDefault();
-        trace.clear();
-      } else if (ev.key === 'Backspace') {
-        ev.preventDefault();
-        trace.removeLast();
+        return true;
       }
-      return;
+      if (ev.key === 'Escape') {
+        trace.clear();
+        return true;
+      }
+      if (ev.key === 'Backspace') {
+        trace.removeLast();
+        return true;
+      }
+      return false;
     }
-    if (!action) return;
-    ev.preventDefault();
+    if (!action) return false;
     switch (action.type) {
       case 'tool':
         void setTool(action.tool);
@@ -1191,6 +1184,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
         if (isVertexMode.value && vertexEditor.dirty.value) void vertexEditor.save();
         break;
     }
+    return true;
   };
 
   const onKeyUp = (ev: KeyboardEvent) => {
@@ -1697,6 +1691,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
 
   const onDeleteFailed = (err: unknown) => reportTopologyError(err, 'Ошибка удаления', () => closeCard());
 
+  let disposeHotkeys: (() => void) | null = null;
   /** Подписка на события карты (порядок: mousedown, mousemove, mouseup, click, contextmenu) */
   const attach = (map: maplibregl.Map) => {
     map.on('mousedown', onMapMouseDownForTopology);
@@ -1705,10 +1700,9 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     map.on('click', onMapClickForTopology);
     map.on('contextmenu', onMapContextMenuForTopology);
     map.on('dblclick', onMapDblClickForTopology);
-    if (typeof window !== 'undefined') {
-      window.addEventListener('keydown', onKeyDown);
-      window.addEventListener('keyup', onKeyUp);
-    }
+    disposeHotkeys?.();
+    disposeHotkeys = registerHotkeys({ id: 'topology-editor', area: 'editor', enabled: () => isEditTopologyMode.value, handle: onKeyDown });
+    if (typeof window !== 'undefined') window.addEventListener('keyup', onKeyUp);
   };
 
   const detach = (map: maplibregl.Map | null | undefined) => {
@@ -1718,10 +1712,9 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     map?.off('click', onMapClickForTopology);
     map?.off('contextmenu', onMapContextMenuForTopology);
     map?.off('dblclick', onMapDblClickForTopology);
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-    }
+    disposeHotkeys?.();
+    disposeHotkeys = null;
+    if (typeof window !== 'undefined') window.removeEventListener('keyup', onKeyUp);
     trace.clear();
     snapIndex.stop();
     contextSnap.stop();

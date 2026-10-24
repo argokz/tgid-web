@@ -1,11 +1,7 @@
 import { onBeforeUnmount, onMounted, watch, type Ref } from 'vue';
-import { isMapMeasureActive } from '~/composables/useMapDraw';
-import { isTopologyEditing } from '~/utils/mapToolFlags';
+import { registerHotkeys } from '~/composables/useHotkeys';
 import { useUiStore } from '~/stores/uiStore';
 import { shouldHandleEscape } from '~/utils/escapeKey';
-
-/** На карте активен инструмент, которому принадлежит Esc при фокусе на холсте */
-const mapToolActive = () => isMapMeasureActive() || isTopologyEditing.value;
 
 export interface EscapeCloseOptions {
   /** Панель открыта — пока да, она в стеке Esc */
@@ -43,20 +39,19 @@ export function useEscapeClose(options: EscapeCloseOptions): void {
 }
 
 /**
- * Один слушатель Esc на приложение (layout). Клавиша уходит верхней панели стека, если её не забрали
- * поле ввода, холст карты (фокус там — у инструментов) или открытый диалог Vuetify. Слушаем на capture-фазе окна: обработчики инструментов
- * (`useMapDraw`, `useTopologyEditor`) висят на окне обычным образом и получают клавишу только если
- * панели от неё отказались — иначе одно нажатие и отменяло бы измерение, и закрывало панель.
+ * Стек панелей — последняя область реестра хоткеев (`utils/hotkeys.ts`): Esc доходит сюда, когда от него
+ * отказались поповер, измерение и редактор. Вызывать в layout.
  */
 export function useGlobalEscape(): void {
   const ui = useUiStore();
-  const onKeydown = (event: KeyboardEvent) => {
-    if (!shouldHandleEscape(event, document, mapToolActive())) return;
-    if (ui.handleEscape()) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-  };
-  onMounted(() => window.addEventListener('keydown', onKeydown, { capture: true }));
-  onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown, { capture: true }));
+  let dispose: (() => void) | null = null;
+  onMounted(() => {
+    dispose = registerHotkeys({
+      id: 'panels-escape',
+      area: 'panels',
+      allowInInput: true, // пустое поле Esc отпускает — решает shouldHandleEscape
+      handle: (event) => shouldHandleEscape(event) && ui.handleEscape(),
+    });
+  });
+  onBeforeUnmount(() => dispose?.());
 }

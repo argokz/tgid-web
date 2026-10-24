@@ -11,7 +11,7 @@
 | 1 — производительность и надёжность | **шаги 1а–1в сделаны 24.10.2026**, ждёт решения по рельефу 3D | `64dd752`, `a0c98fe`, правки по ревью; цифры «было → стало» в `performance-baseline.md` |
 | 2 — токены и примитивы | **сделан 24.10.2026** (11 примитивов из 14, ревью закрыто) | `9682fb3`…`a99b654`; остались `InspectorPanel`, `MapPopover`, `BottomSheet` — их реальные места (`AttributePanel`, `MapViewer`, `popupStore`) заняты чужим WIP, делаются первым шагом этапа 5 |
 | 3 — каркас и зоны | **сделан 24.10.2026** | `docs/ui-zones.md`; менеджер панелей и стек Esc в `uiStore`, брейкпоинты 600/960/1280, заголовок вкладки, город · роль в шапке |
-| 4 — тулбар и хоткеи | не начат | |
+| 4 — тулбар и хоткеи | **в работе с 24.10.2026**: 4а реестр хоткеев | `utils/hotkeys.ts`, `composables/useHotkeys.ts`; дальше палитра Ctrl+K, единый тулбар, меню |
 | 5 — поповер, инспектор, журналы | не начат | |
 | 6 — графики | не начат | |
 | 7 — движение, drag, адаптив | не начат | |
@@ -231,9 +231,26 @@
   `openLazyDialog` (`MapViewer`, WIP) будет сообщать активный диалог; z-числа в `MapControls`/`MapSidebar`/`MapViewer`
   и `.v-navigation-drawer` (1000, `main.scss`); логотип в шапке — этап 8.
 
+## Этап 4 — ход работ (24.10)
+
+### 4а. Реестр хоткеев
+- `utils/hotkeys.ts` + `composables/useHotkeys.ts`: один слушатель окна, области `popover → measure → editor → map →
+  global → panels`, первый согласившийся берёт клавишу; поля ввода и диалоги Vuetify отсекает диспетчер.
+- Переехали: `useMapDraw` (Esc/Enter/Backspace измерения), `useTopologyEditor` (все клавиши редактора; обработчик
+  возвращает `true`/`false`, свой слушатель `keydown` снят, `keyup` Shift остался), `CursorCoords` (C), `FeatureMenu`
+  (Esc, область `popover`), стек панелей `uiStore` (область `panels`, вместо capture-слушателя этапа 3).
+- `HotkeysHelp` — из `HOTKEY_DOCS` (общие, измерения, редактор); «?» открывает справку и вне редактора (layout).
+- Убрано правило «фокус на холсте при активном инструменте» этапа 3 (`utils/mapToolFlags.ts`): приоритет областей
+  решает то же без проверки фокуса.
+
 ## Следующий шаг
 
-Этап 4: реестр хоткеев (слить `EDITOR_HOTKEYS` и обработчики `useMapDraw` / `useTopologyEditor` / `CursorCoords` /
+Этап 4 продолжение: 4б палитра команд Ctrl+K (инструменты `toolCatalog` → `uiStore.requestToolDialog`, узлы через
+WFS `find_node` как в `NodeSearch`, адреса `useNominatim`, последние команды); 4в `DrawPanel` на `FloatingToolbar`
+(полное слияние с `EditorToolbar` — после коммита WIP `MapViewer`, где оба монтируются); 4г `EditorContextMenu` /
+`FeatureMenu` в стиле примитивов с клавиатурой и пояснением недоступных пунктов.
+
+Ранее: этап 4: реестр хоткеев (слить `EDITOR_HOTKEYS` и обработчики `useMapDraw` / `useTopologyEditor` / `CursorCoords` /
 layout в один композабл с областями; стек Esc из `uiStore` становится его последним уровнем), `Ctrl+K` палитра команд
 на `toolCatalog` + `NodeSearch`, `DrawPanel` + `EditorToolbar` → один `FloatingToolbar` с группами (снимает конфликт
 левой колонки), `EditorContextMenu` / `FeatureMenu` в стиле примитивов. `InspectorPanel` / `MapPopover` / `BottomSheet`

@@ -13,6 +13,7 @@
 import { computed, ref, shallowRef } from 'vue';
 import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
 import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
+import { registerHotkeys } from '~/composables/useHotkeys';
 import { sampleElevation } from '~/utils/terrainSample';
 import { formatDeg, formatTurn, signedTurnDeg, vertexAngles } from '~/utils/cadGeometry';
 
@@ -809,22 +810,21 @@ export function useMapDraw() {
     finishShape();
   };
 
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (mode.value === 'none') return;
-    const target = e.target as HTMLElement | null;
-    if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+  /** Клавиши измерения — область `measure` реестра хоткеев (utils/hotkeys.ts), активна только в режиме */
+  const onKeyDown = (e: KeyboardEvent): boolean => {
     if (e.key === 'Escape') {
       cancel();
     } else if (e.key === 'Enter') {
       finishShape();
     } else if (e.key === 'Backspace' || e.key === 'Delete') {
-      if (!draftPoints.value.length) return;
+      if (!draftPoints.value.length) return false;
       undoPoint();
     } else {
-      return;
+      return false;
     }
-    e.preventDefault();
+    return true;
   };
+  let disposeHotkeys: (() => void) | null = null;
 
   // Двойной клик завершает измерение — во время измерения он не должен зумить карту (QA F25)
   const syncDoubleClickZoom = (map: MapLibreMap, drawMode: DrawMode) => {
@@ -871,7 +871,8 @@ export function useMapDraw() {
     map.on('contextmenu', onContextMenu);
     map.on('mousedown', onVertexDown);
     map.on('styledata', invalidateNetworkLayers);
-    if (typeof window !== 'undefined') window.addEventListener('keydown', onKeyDown);
+    disposeHotkeys?.();
+    disposeHotkeys = registerHotkeys({ id: 'map-measure', area: 'measure', enabled: () => mode.value !== 'none', handle: onKeyDown });
     syncDoubleClickZoom(map, mode.value);
   };
 
@@ -880,7 +881,8 @@ export function useMapDraw() {
     overVertex = false;
     activeDrawMode.value = 'none';
     mode.value = 'none';
-    if (typeof window !== 'undefined') window.removeEventListener('keydown', onKeyDown);
+    disposeHotkeys?.();
+    disposeHotkeys = null;
     const map = mapRef.value;
     if (!map) return;
     map.off('click', onMapClick);

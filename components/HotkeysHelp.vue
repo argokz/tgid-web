@@ -11,7 +11,7 @@
         >
           mdi-keyboard-outline
         </v-icon>
-        Горячие клавиши редактора сети
+        Горячие клавиши
         <v-spacer />
         <v-btn
           icon
@@ -24,14 +24,22 @@
         </v-btn>
       </v-card-title>
       <v-card-text>
-        <div class="hotkeys-grid">
-          <section
-            v-for="g in EDITOR_HOTKEYS"
-            :key="g.title"
-          >
-            <div class="text-subtitle-2 mb-1">
-              {{ g.title }}
-            </div>
+        <div
+          v-for="section in HOTKEY_DOCS"
+          :key="section.area"
+          class="hotkeys-section"
+        >
+          <div class="text-overline text-medium-emphasis">
+            {{ section.title }}
+          </div>
+          <div class="hotkeys-grid">
+            <section
+              v-for="g in section.groups"
+              :key="g.title"
+            >
+              <div class="text-subtitle-2 mb-1">
+                {{ g.title }}
+              </div>
             <div
               v-for="item in g.items"
               :key="item.text"
@@ -47,7 +55,8 @@
               </span>
               <span>{{ item.text }}</span>
             </div>
-          </section>
+            </section>
+          </div>
         </div>
       </v-card-text>
     </v-card>
@@ -55,12 +64,15 @@
 </template>
 
 <script setup lang="ts">
-import { EDITOR_HOTKEYS } from '~/utils/editorTools';
+import { HOTKEY_DOCS } from '~/utils/hotkeys';
 
 const open = defineModel<boolean>({ default: false });
 </script>
 
 <style scoped>
+.hotkeys-section + .hotkeys-section {
+  margin-top: var(--space-4);
+}
 .hotkeys-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));

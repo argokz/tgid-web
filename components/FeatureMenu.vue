@@ -158,7 +158,7 @@ import { useMapStore } from '~/stores/mapStore'
 import { describeMenuFeature } from '~/utils/networkFeature'
 import { getCityConfig } from '~/utils/cityConfig'
 import { BREAKPOINTS } from '~/utils/breakpoints'
-import { useEscapeClose } from '~/composables/useEscape'
+import { registerHotkeys } from '~/composables/useHotkeys'
 
 const mapStore = useMapStore()
 
@@ -325,10 +325,20 @@ const selectFeature = (feature: any, index: number) => {
   mapStore.selectFeature(feature)
 }
 
-// Меню закрыто без выбора («Закрыть», новый identify) — инструмент получает отказ
-// Меню объекта над картой — не v-overlay, в стек Esc менеджера панелей заходит само (docs/ui-zones.md)
-useEscapeClose({ open: () => mapStore.featureMenuVisible, close: () => { mapStore.featureMenuVisible = false } })
+// Меню объекта над картой — не v-overlay: Esc берёт сам, раньше инструментов (область popover реестра хоткеев)
+const disposeHotkeys = registerHotkeys({
+  id: 'feature-menu-escape',
+  area: 'popover',
+  enabled: () => mapStore.featureMenuVisible,
+  handle: (ev) => {
+    if (ev.key !== 'Escape') return false
+    mapStore.featureMenuVisible = false
+    return true
+  },
+})
+onBeforeUnmount(disposeHotkeys)
 
+// Меню закрыто без выбора («Закрыть», новый identify) — инструмент получает отказ
 watch(() => mapStore.featureMenuVisible, (visible) => {
   if (!visible) mapStore.cancelFeatureChoice()
 })

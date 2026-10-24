@@ -319,6 +319,12 @@
     />
     <ConfirmDialogHost />
 
+    <!-- «?» — справка по клавишам (вне редактора; в редакторе — его экземпляр в MapViewer) -->
+    <LazyHotkeysHelp
+      v-if="mountedOnce.hotkeys"
+      v-model="hotkeysHelpOpen"
+    />
+
     <!-- Модальное окно расчёта -->
     <LazyPlanningCalculationModal
       v-if="mountedOnce.calculation && authStore.canCalculate"
@@ -370,10 +376,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useMobile } from '~/composables/useMobile';
 import { useEscapeClose, useGlobalEscape } from '~/composables/useEscape';
+import { registerHotkeys } from '~/composables/useHotkeys';
 import {
   apiHealth,
   describeExcelReportTruncation,
@@ -425,7 +432,9 @@ const calculationModalRef = ref<InstanceType<typeof PlanningCalculationModal> | 
  * окно расчёта, вход, кабинет и смена пароля — замер S0 этапа 0 (docs/performance-baseline.md).
  * Протокол монтируется вместе с окном расчёта: лог расчёта (addLog) приходит в него ещё до показа.
  */
-const mountedOnce = reactive({ login: false, changePassword: false, account: false, calculation: false, protocol: false });
+const mountedOnce = reactive({ login: false, changePassword: false, account: false, calculation: false, protocol: false, hotkeys: false });
+const hotkeysHelpOpen = ref(false);
+watch(hotkeysHelpOpen, (v) => { if (v) mountedOnce.hotkeys = true; });
 watch(showLogin, (v) => { if (v) mountedOnce.login = true; }, { immediate: true });
 watch(showCalculationModal, (v) => { if (v) { mountedOnce.calculation = true; mountedOnce.protocol = true; } }, { immediate: true });
 watch(showProtocol, (v) => { if (v) mountedOnce.protocol = true; }, { immediate: true });
@@ -517,6 +526,21 @@ watch(navCollapsed, (collapsed) => {
 // Временный v-navigation-drawer сам по Esc не закрывается — меню в стеке Esc менеджера панелей (docs/ui-zones.md)
 useEscapeClose({ open: mainMenuOpen, close: () => { mainMenuOpen.value = false; } });
 useGlobalEscape();
+// «?» вне полей ввода — справка по клавишам (область global; в редакторе её берёт сам редактор)
+let disposeHelpHotkey: (() => void) | null = null;
+onMounted(() => {
+  disposeHelpHotkey = registerHotkeys({
+    id: 'hotkeys-help',
+    area: 'global',
+    handle: (ev) => {
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return false;
+      if (ev.key !== '?' && !(ev.shiftKey && ev.code === 'Slash')) return false;
+      hotkeysHelpOpen.value = true;
+      return true;
+    },
+  });
+});
+onBeforeUnmount(() => disposeHelpHotkey?.());
 
 const menuItems = computed(() => buildHeaderMenu(
   { canCalculate: isHydrated.value && authStore.canCalculate },

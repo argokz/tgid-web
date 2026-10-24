@@ -73,6 +73,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import type maplibregl from 'maplibre-gl';
 import { useMapStore } from '~/stores/mapStore';
+import { registerHotkeys } from '~/composables/useHotkeys';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { fastApiService } from '~/services/fastApiService';
 import { appStorage } from '~/utils/appStorage';
@@ -172,14 +173,12 @@ const copy = async (format: CoordCopyFormat) => {
   }
 };
 
-/** C над картой — скопировать в текущей системе (не в полях ввода) */
-const onKeyDown = (ev: KeyboardEvent) => {
-  if (!overMap || ev.ctrlKey || ev.metaKey || ev.altKey || ev.shiftKey) return;
-  if (ev.code !== 'KeyC') return;
-  const el = ev.target as HTMLElement | null;
-  if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
-  ev.preventDefault();
+/** C над картой — скопировать в текущей системе; область `map` реестра хоткеев (поля ввода отсекает диспетчер) */
+const onKeyDown = (ev: KeyboardEvent): boolean => {
+  if (!overMap || ev.ctrlKey || ev.metaKey || ev.altKey || ev.shiftKey) return false;
+  if (ev.code !== 'KeyC') return false;
   void copy(copyFormatFor(crs.value));
+  return true;
 };
 
 const mapStore = useMapStore();
@@ -197,11 +196,11 @@ watch(() => mapStore.map as maplibregl.Map | null, (map) => {
   map.getCanvasContainer().addEventListener('mouseleave', onOut);
   attached = map;
 }, { immediate: true });
-if (typeof window !== 'undefined') window.addEventListener('keydown', onKeyDown);
+const disposeHotkeys = registerHotkeys({ id: 'cursor-coords-copy', area: 'map', handle: onKeyDown });
 onBeforeUnmount(() => {
   detach();
   if (convertTimer) clearTimeout(convertTimer);
-  if (typeof window !== 'undefined') window.removeEventListener('keydown', onKeyDown);
+  disposeHotkeys();
 });
 </script>
 
