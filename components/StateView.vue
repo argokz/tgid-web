@@ -168,6 +168,17 @@ defineExpose({ state });
   padding: var(--space-6) var(--space-4);
 }
 
+/* плотный интерфейс: заголовок пустого состояния — обычный размер текста, не display */
+.state-view__empty :deep(.v-empty-state__headline) {
+  font-size: var(--text-md);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.state-view__empty :deep(.v-empty-state__text) {
+  font-size: var(--text-sm);
+}
+
 .state-view__icon {
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }

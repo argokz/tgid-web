@@ -17,7 +17,7 @@
       <v-spacer />
       <HintTip
         text="Закрыть панель измерений"
-        hotkey="Esc"
+        hint="Измерения на карте останутся"
         location="bottom"
       >
         <template #default="{ props: tip }">
