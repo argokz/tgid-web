@@ -32,28 +32,11 @@
           class="mb-4 pa-3 rounded-lg bg-surface"
         >
           <div class="d-flex flex-wrap align-center ga-3">
-            <v-btn-toggle
+            <SegmentedToggle
               v-model="targetType"
-              mandatory
-              density="compact"
-              color="primary"
-              variant="outlined"
-            >
-              <v-btn value="line">
-                <v-icon
-                  start
-                  size="18"
-                >mdi-pipe</v-icon>
-                Трубопровод (Line ID)
-              </v-btn>
-              <v-btn value="node">
-                <v-icon
-                  start
-                  size="18"
-                >mdi-map-marker-radius</v-icon>
-                Узел сети (Node ID)
-              </v-btn>
-            </v-btn-toggle>
+              :items="targetTypeItems"
+              aria-label="Что отключаем"
+            />
 
             <v-text-field
               v-model.number="targetId"
@@ -491,6 +474,10 @@ const { shown: overlayShown, keepOnMap } = overlay;
 const { isMobile } = useMobile();
 
 const targetType = ref<'line' | 'node'>('line');
+const targetTypeItems = [
+  { value: 'line', label: 'Трубопровод (Line ID)', icon: 'mdi-pipe' },
+  { value: 'node', label: 'Узел сети (Node ID)', icon: 'mdi-map-marker-radius' },
+];
 const targetId = ref<number | null>(null);
 const loading = ref(false);
 const errorMessage = ref('');

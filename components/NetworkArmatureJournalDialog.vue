@@ -74,66 +74,43 @@
           </div>
 
           <div class="filters pa-3">
-            <v-text-field
-              v-model="filters.search"
+            <SearchField
+              :model-value="String(filters.search ?? '')"
               label="Назначение, узел, линия или ID"
-              prepend-inner-icon="mdi-magnify"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
-              @keyup.enter="reloadInventory"
+              @update:model-value="filters.search = $event"
+              :debounce="300"
+              @search="reloadInventory"
             />
-            <v-select
+            <AppSelect
               v-model="filters.equipment_type"
               :items="equipmentTypeOptions"
               label="Тип оборудования"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
             />
-            <v-select
+            <AppSelect
               v-model="filters.quality_status"
               :items="qualityOptions"
               label="Качество привязки"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
             />
-            <v-select
+            <AppSelect
               v-model="filters.state_id"
               :items="lookups.states"
               item-title="name"
               item-value="id"
               label="Состояние"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
             />
-            <v-select
+            <AppSelect
               v-model="filters.fragment_id"
               :items="lookups.fragments"
               item-title="name"
               item-value="id"
               label="Фрагмент"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
             />
-            <v-select
+            <AppSelect
               v-model="filters.purpose"
               :items="purposeOptions"
               item-title="name"
               item-value="name"
               label="Назначение"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
             />
             <v-btn
               color="deep-purple-darken-3"

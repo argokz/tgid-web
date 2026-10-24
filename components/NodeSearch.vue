@@ -28,18 +28,17 @@
         <v-divider />
 
         <v-card-text class="pa-4">
-          <v-text-field
+          <SearchField
             v-model="searchText"
             :label="aiMode ? 'Поиск фразой' : 'Поиск по узлам'"
             :placeholder="aiMode ? 'например: потребители без нагрузки во фрагменте 74 или камера 3-47' : 'Введите текст для поиска...'"
-            :prepend-inner-icon="aiMode ? 'mdi-creation' : 'mdi-magnify'"
-            clearable
-            variant="outlined"
-            density="comfortable"
-            hide-details
-            @update:model-value="onSearchInput"
-            @keyup.enter="aiMode && runAiSearch()"
+            :icon="aiMode ? 'mdi-creation' : 'mdi-magnify'"
             :loading="loading"
+            :debounce="300"
+            :result-count="aiMode || loading ? null : nodes.length"
+            density="comfortable"
+            @search="onSearch"
+            @enter="aiMode && runAiSearch()"
           />
           <v-switch
             v-if="authStore.canUseAi"
@@ -324,7 +323,6 @@ const snackbar = ref(false)
 const snackbarText = ref('')
 const snackbarColor = ref('success')
 
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
 let animationFrame: number | null = null
 let searchAbortController: AbortController | null = null
 let geometryAbortController: AbortController | null = null
@@ -421,13 +419,11 @@ const nodeGroups = computed((): NodeGroup[] => {
   })
 })
 
-const onSearchInput = () => {
+/** Текст после паузы ввода (SearchField): в режиме фразы ищет только Enter */
+const onSearch = (query: string) => {
   if (aiMode.value) return
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    if (searchText.value) loadNodes()
-    else nodes.value = []
-  }, 500)
+  if (query) loadNodes()
+  else nodes.value = []
 }
 
 const loadNodes = async () => {
@@ -584,10 +580,6 @@ const showSnackbar = (text: string, color: string = 'success') => {
 defineExpose({ openDialog, removeMarker })
 
 onBeforeUnmount(() => {
-  if (searchTimeout) {
-    clearTimeout(searchTimeout)
-    searchTimeout = null
-  }
   if (animationFrame) {
     cancelAnimationFrame(animationFrame)
     animationFrame = null

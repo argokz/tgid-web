@@ -15,39 +15,57 @@
       >mdi-ruler</v-icon>
       <span class="text-subtitle-2 font-weight-bold">Измерения</span>
       <v-spacer />
-      <v-btn
-        icon
-        size="x-small"
-        variant="text"
-        aria-label="Закрыть панель измерений"
-        @click="close"
+      <HintTip
+        text="Закрыть панель измерений"
+        hotkey="Esc"
+        location="bottom"
       >
-        <v-icon size="18">mdi-close</v-icon>
-      </v-btn>
+        <template #default="{ props: tip }">
+          <v-btn
+            v-bind="tip"
+            icon
+            size="x-small"
+            variant="text"
+            aria-label="Закрыть панель измерений"
+            @click="close"
+          >
+            <v-icon size="18">mdi-close</v-icon>
+          </v-btn>
+        </template>
+      </HintTip>
     </div>
 
     <v-divider />
 
     <div class="pa-2">
       <div class="draw-panel__grid">
-        <button
+        <HintTip
           v-for="tool in measureTools"
           :key="tool.mode"
-          type="button"
-          class="draw-tile"
-          :class="{ 'draw-tile--active': draw.mode.value === tool.mode }"
-          :aria-label="tool.label"
-          :aria-pressed="draw.mode.value === tool.mode"
-          @click="toggleMode(tool.mode)"
+          :text="tool.label"
+          :hint="tool.hint"
+          location="bottom"
         >
-          <v-icon
-            size="20"
-            :color="draw.mode.value === tool.mode ? 'primary' : undefined"
-          >
-            {{ tool.icon }}
-          </v-icon>
-          <span class="draw-tile__label">{{ tool.label }}</span>
-        </button>
+          <template #default="{ props: tip }">
+            <button
+              v-bind="tip"
+              type="button"
+              class="draw-tile"
+              :class="{ 'draw-tile--active': draw.mode.value === tool.mode }"
+              :aria-label="tool.label"
+              :aria-pressed="draw.mode.value === tool.mode"
+              @click="toggleMode(tool.mode)"
+            >
+              <v-icon
+                size="20"
+                :color="draw.mode.value === tool.mode ? 'primary' : undefined"
+              >
+                {{ tool.icon }}
+              </v-icon>
+              <span class="draw-tile__label">{{ tool.label }}</span>
+            </button>
+          </template>
+        </HintTip>
       </div>
       <v-switch
         v-model="draw.snapEnabled.value"
@@ -260,9 +278,9 @@ const open = defineModel<boolean>({ default: false });
 const draw = useMapDraw();
 const notificationStore = useNotificationStore();
 
-const measureTools: Array<{ mode: DrawMode; label: string; icon: string }> = [
-  { mode: 'measure-distance', label: 'Расстояние', icon: 'mdi-ruler' },
-  { mode: 'measure-area', label: 'Площадь', icon: 'mdi-vector-square' },
+const measureTools: Array<{ mode: DrawMode; label: string; icon: string; hint: string }> = [
+  { mode: 'measure-distance', label: 'Расстояние', icon: 'mdi-ruler', hint: 'Кликайте точки линии, двойной клик — завершить' },
+  { mode: 'measure-area', label: 'Площадь', icon: 'mdi-vector-square', hint: 'Обведите контур, двойной клик — замкнуть' },
 ];
 
 const liveMeasure = computed(() => {

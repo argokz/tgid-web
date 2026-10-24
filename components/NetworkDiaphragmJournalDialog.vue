@@ -150,11 +150,21 @@
         >Найти</v-btn>
       </div>
 
-      <div
-        v-if="error"
-        class="journal-error"
-      >{{ error }}</div>
-      <div class="table-wrap">
+      <StateView
+        class="table-wrap"
+        variant="table"
+        :rows="12"
+        :loading="loading && !items.length"
+        :error="error"
+        :empty="!items.length"
+        empty-title="Диафрагмы по выбранным условиям не найдены"
+        empty-text="Измените фильтры или сбросьте их"
+        action-label="Сбросить фильтры"
+        error-title="Не удалось загрузить диафрагмы"
+        :retrying="loading"
+        @retry="reload"
+        @action="resetFilters"
+      >
         <table class="journal-table">
           <thead>
             <tr><th>ID</th><th>Место установки</th><th>Линия / узлы</th><th>Диаметр</th><th>Количество</th><th>Запись расчёта</th><th>Линия</th><th>Состояние</th><th>Качество</th><th /></tr>
@@ -215,16 +225,12 @@
             </tr>
           </tbody>
         </table>
-        <div
-          v-if="!loading && !items.length"
-          class="empty"
-        >Диафрагмы по выбранным условиям не найдены</div>
         <v-progress-linear
           v-if="loading"
           indeterminate
           color="teal-darken-4"
         />
-      </div>
+      </StateView>
       <v-pagination
         v-if="pages > 1"
         v-model="page"
@@ -642,6 +648,7 @@ const loadItems = async () => {
   catch (reason) { error.value = formatApiError(reason, 'Не удалось загрузить диафрагмы') } finally { loading.value = false }
 }
 const reload = () => { page.value = 1; void loadItems() }
+const resetFilters = () => { filters.value = {}; reload() }
 const setQualityStatus = (status: NetworkDiaphragmQualityStatus) => { filters.value.quality_status = filters.value.quality_status === status ? undefined : status; reload() }
 const openDetails = async (diaphragmId: number) => {
   detailVisible.value = true; detailLoading.value = true; details.value = null; isEditing.value = false

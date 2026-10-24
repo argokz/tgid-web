@@ -161,7 +161,9 @@ export default defineEventHandler(async (event) => {
   const cacheKey = 'geoServerLayers';
   const cache = useStorage();
   const mvtProbeTiles = Boolean((runtimeConfig as any).geoserverMvtProbeTiles);
-  const mergeStyleLayers = (process.env.GEOSERVER_MERGE_STYLE_LAYERS || 'true') !== 'false';
+  // Замер 24.10.2026: 20 → 12 слоёв участков не дал выигрыша (S1 26–28 fps против 27–31, S8 в шуме) — выключено,
+  // включается GEOSERVER_MERGE_STYLE_LAYERS=true для экспериментов (docs/ui-modernization-progress.md)
+  const mergeStyleLayers = process.env.GEOSERVER_MERGE_STYLE_LAYERS === 'true';
 
   const query = getQuery(event);
   const refresh = query.refresh === 'true';
@@ -493,8 +495,8 @@ export default defineEventHandler(async (event) => {
               filter: combineWithNodeCodes(l.filter, nodeCodes, excludeCodes)
             }));
         }
-        // Одинаково оформленные линейные подслои (участки: 16 слоёв-копий) — в один слой с выражениями:
-        // меньше проходов отрисовки и setFilter при смене фрагмента. GEOSERVER_MERGE_STYLE_LAYERS=false — как было
+        // Одинаково оформленные линейные подслои (участки: 16 слоёв-копий) — в один слой с выражениями
+        // (utils/mergeStyleLayers). По умолчанию выключено: выигрыша по замеру нет, см. флаг выше
         if (mvtPack && mergeStyleLayers) {
           const before = mvtPack.mbLayers.length;
           mvtPack.mbLayers = mergeLineLayers(mvtPack.mbLayers);

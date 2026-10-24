@@ -42,11 +42,11 @@
 
 | Примитив | Что | Когда применять | Из чего обобщён | Статус |
 |---|---|---|---|---|
-| `StateView` | загрузка-скелетон / пусто / ошибка с «Повторить» / данные | любой список, таблица, график, форма | 48 локальных спиннеров, 8 текстов «нет данных» | — |
-| `HintTip` | тултип: название, хоткей, одна строка «что сделает» | каждая иконочная кнопка (389) | `v-tooltip` (10 файлов) | — |
-| `SearchField` | debounce, подсветка, очистка, Esc, счётчик | поиск узлов, фильтры журналов | `NodeSearch`, поле в `MapControls` | — |
-| `AppSelect` | плотный `v-select`/`v-autocomplete`: поиск при > 50, виртуализация при > 200 | все 166 списков | `v-select` ×145, `v-autocomplete` ×18 | — |
-| `SegmentedToggle` | переключение режимов с иконкой и подписью | режимы, вкладки-фильтры | `v-btn-toggle` ×14, `v-switch` ×12 | — |
+| `StateView` | загрузка-скелетон / пусто / ошибка с «Повторить» / данные | любой список, таблица, график, форма | 48 локальных спиннеров, 8 текстов «нет данных» | есть: `components/StateView.vue`, тест, применён в `NetworkDiaphragmJournalDialog` |
+| `HintTip` | тултип: название, хоткей, одна строка «что сделает» | каждая иконочная кнопка (389) | `v-tooltip` (10 файлов) | есть: `components/HintTip.vue`, тест, применён в `DrawPanel` |
+| `SearchField` | debounce, очистка, Esc, счётчик результатов | поиск узлов, фильтры журналов | `NodeSearch`, поле в `MapControls` | есть: тест, применён в `NodeSearch` и фильтрах арматуры |
+| `AppSelect` | плотный `v-select`/`v-autocomplete`: поиск при > 50 пунктов, виртуальный список Vuetify, единицы, «создать?» | все 166 списков | `v-select` ×145, `v-autocomplete` ×18 | есть: тест, применён в фильтрах арматуры (5) |
+| `SegmentedToggle` | переключение режимов с иконкой и подписью, обязательный выбор | режимы, вкладки-фильтры | `v-btn-toggle` ×14, `v-switch` ×12 | есть: тест, применён в `OutageSimulationDialog` |
 | `FieldGrid` | поле формы: label сверху/inline, focus / error / readonly / dirty, единицы | формы журналов и карточки | `CardFieldEditor`, `SetterValueInput` | — |
 | `DataTable` | липкая шапка, сортировка, числа вправо, выбор строки, виртуализация | журналы, протоколы, диагностика | сырой `<table>` ×35, `v-table` ×23 | — |
 | `KpiTile`, `Sparkline` | плитка числа и мини-график (inline SVG) | шапки журналов, итоги расчётов | — (по `dataviz`) | — |
@@ -54,3 +54,51 @@
 | `InspectorPanel` | панель справа / окно, вкладки, секции, поиск по полям | карточка объекта, формы записей | `ObjectCardShell` + `useObjectCardLayout` | — |
 | `MapPopover` | поповер у точки карты, следует за ней при pan | клик по объекту | `popupStore` + popup MapLibre | — |
 | `BottomSheet` | 3 положения, свайп | инспектор и графики на телефоне | `useSwipe` | — |
+
+### StateView
+
+Пропсы: `loading`, `error` (строка; ошибка важнее загрузки), `empty`, `variant` (`table` | `list` | `form` | `chart` | `card` | `inline`
+— форма скелетона), `rows`, `emptyTitle` / `emptyText` / `emptyIcon`, `actionLabel` (событие `action`), `errorTitle`, `retry`
+(событие `retry`, по умолчанию есть), `retrying`, `loadingLabel`. Слоты: `default` (данные), `illustration-empty`,
+`illustration-error` (иллюстрации этапа 8). Скелетон показывать только при первой загрузке (`loading && !items.length`),
+при перезагрузке таблицы с данными — тонкий `v-progress-linear` внутри слота, чтобы не мигать.
+
+```vue
+<StateView variant="table" :rows="12" :loading="loading && !items.length" :error="error" :empty="!items.length"
+  empty-title="Диафрагмы по выбранным условиям не найдены" action-label="Сбросить фильтры"
+  @retry="reload" @action="resetFilters">
+  <table class="journal-table">…</table>
+</StateView>
+```
+
+### HintTip
+
+Пропсы: `text` (название действия в повелительном наклонении), `hotkey` («Esc», «Ctrl+K»), `hint` (одна строка),
+`location`, `disabled`, `openDelay` (400 мс). Активатор — слот по умолчанию с `props`, которые надо повесить на кнопку;
+`aria-label` у кнопки остаётся. Открывается по наведению и фокусу (клавиатура); тач-эквивалент — этап 7.
+
+```vue
+<HintTip text="Закрыть панель измерений" hotkey="Esc" location="bottom">
+  <template #default="{ props: tip }"><v-btn v-bind="tip" icon aria-label="Закрыть панель измерений" … /></template>
+</HintTip>
+```
+
+### SearchField
+
+Пропсы: `modelValue`, `label`, `placeholder`, `icon`, `debounce` (200 мс), `loading`, `disabled`, `autofocus`, `density`,
+`resultCount` (число → показывается справа, 0 → «ничего», null → не показывать), `ariaLabel`. События: `update:modelValue`
+(сразу), `search` (обрезанный текст после паузы; пустая строка — сброс), `clear`, `escape` (Esc на пустом поле),
+`enter` (искать сейчас). `type="search"`, очистка крестиком.
+
+### AppSelect
+
+Пропсы: как у `v-select` (`modelValue`, `items`, `itemTitle`, `itemValue`, `label`, `placeholder`, `multiple`,
+`errorMessages`, `loading`, `disabled`, `readonly`, `clearable`), плюс `hint`, `units` (suffix), `searchThreshold` (50),
+`searchable` (принудительно), `allowCreate` → событие `create(text)` из пункта «Нет варианта … — создать?» или Enter без
+совпадения, `search(text)`. При `items.length > searchThreshold` рендерится `v-autocomplete`; длинные списки
+виртуализирует сам Vuetify (`VVirtualScroll` в меню), высота меню 320 px. `readonly` показывает значение серым полем без очистки.
+
+### SegmentedToggle
+
+Пропсы: `modelValue`, `items: { value, label, icon?, disabled?, hint? }[]`, `mandatory` (true), `disabled`, `wrap` (true),
+`iconOnly`, `ariaLabel`. Семантика `radiogroup` / `radio` + `aria-checked`; недоступный пункт виден, с `title` из `hint`.
