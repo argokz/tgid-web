@@ -1,0 +1,133 @@
+// Дизайн-токены ITwin Map (этап 2 модернизации UI, docs/ui-primitives.md).
+//
+// Одна тема — светлая. Цвета берутся из темы Vuetify (`--v-theme-*`, plugins/vuetify.ts), здесь — только то,
+// чего у Vuetify нет: шкалы отступов и радиусов, тени, z-слои, движение, стекло и акцент «живой сети».
+// Значения в SCSS-переменных (_variables.scss) дублируют эти токены для медиазапросов и расчётов на этапе сборки.
+
+:root {
+  // --- Отступы: плотная шкала 4 px (рабочий инструмент, а не лендинг) ---
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  // --- Радиусы ---
+  --radius-sm: 6px;   // поля, чипы, кнопки
+  --radius-md: 10px;  // карточки, поповеры
+  --radius-lg: 14px;  // плавающие панели, тулбар
+
+  // --- Тени: три уровня, без цветных ---
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.08), 0 1px 1px rgba(15, 23, 42, 0.04);
+  --shadow-2: 0 4px 12px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-3: 0 12px 32px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08);
+
+  // --- Z-слои (снизу вверх). Vuetify: v-overlay (диалоги, меню) 2400, v-snackbar 10000 ---
+  --z-map: 0;
+  --z-hud: 100;        // полосы над картой: TraceHud, PtsHighlightBar, JournalContourPickBar, статус-бар, координаты
+  --z-controls: 200;   // правые контролы карты, кнопка панели слоёв
+  --z-toolbar: 300;    // плавающий тулбар инструментов
+  --z-inspector: 1010; // карточка объекта (панель справа / окно)
+  --z-popover: 2000;   // поповер у точки карты, палитра команд
+  --z-overlay: 2400;   // = Vuetify v-overlay (v-dialog, v-menu): свои оверлеи не выше
+  --z-toast: 10000;    // = Vuetify v-snackbar
+
+  // --- Движение: вход плавнее, выход быстрее; пружина без перелёта для панелей ---
+  --duration-fast: 120ms;   // нажатие, переключатель, подсветка
+  --duration-base: 200ms;   // поповер, тултип, строка после сохранения
+  --duration-slow: 280ms;   // панель, окно, bottom sheet
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  // критически демпфированная пружина (без перелёта); для браузеров без linear() — ease-out
+  --ease-spring: cubic-bezier(0.2, 0, 0, 1);
+
+  // --- Акцент «живой сети»: тёплый, в паре с primary #1565C0. Только активный инструмент,
+  //     выделенный объект, прогресс. Текст по акценту — --accent-text (контраст 5,0:1 на белом) ---
+  --accent: #d97706;
+  --accent-rgb: 217, 119, 6;
+  --accent-text: #b45309;
+  --accent-soft: rgba(217, 119, 6, 0.12);
+
+  // --- Стекло: два уровня и бюджет. --glass-1 — тулбары и поповеры, --glass-solid — инспектор и формы ---
+  --glass-1-bg: rgba(255, 255, 255, 0.78);
+  --glass-1-filter: blur(20px) saturate(180%);
+  --glass-solid-bg: rgba(255, 255, 255, 0.96);
+  --glass-solid-filter: none;
+  --glass-border: 1px solid rgba(15, 23, 42, 0.10);
+
+  // --- Типографика: Roboto variable (assets/styles/roboto.css); шкала 12 / 14 / 16 / 20 / 24 ---
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --leading: 1.45;
+}
+
+// Пружина через linear() — только там, где поддерживается (Chrome 113+, Safari 17.2+, Firefox 112+)
+@supports (animation-timing-function: linear(0, 1)) {
+  :root {
+    --ease-spring: linear(
+      0, 0.108 2.6%, 0.336 6%, 0.55 9.6%, 0.72 13.3%, 0.842 17.2%, 0.92 21.3%, 0.964 25.6%,
+      0.988 30.6%, 0.998 36.5%, 1.002 43.8%, 1 100%
+    );
+  }
+}
+
+// Без backdrop-filter стекло становится плотным: читаемость важнее эффекта
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-1-bg: rgba(255, 255, 255, 0.96);
+    --glass-1-filter: none;
+  }
+}
+
+// Настройки доступности ОС: меньше прозрачности / больше контраста — то же плотное стекло и чёткие границы
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root {
+    --glass-1-bg: rgba(255, 255, 255, 0.98);
+    --glass-1-filter: none;
+    --glass-solid-bg: #fff;
+    --glass-border: 1px solid rgba(15, 23, 42, 0.32);
+  }
+}
+
+// Меньше движения: мгновенная смена состояния, анимации только через opacity
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}
+
+// --- Утилиты токенов ---
+
+// Числа, координаты, давления, расходы: моноширинные цифры, чтобы колонки не «плясали»
+.num,
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+// Поверхности
+.glass-1 {
+  background: var(--glass-1-bg);
+  -webkit-backdrop-filter: var(--glass-1-filter);
+  backdrop-filter: var(--glass-1-filter);
+  border: var(--glass-border);
+  box-shadow: var(--shadow-2);
+}
+
+.glass-solid {
+  background: var(--glass-solid-bg);
+  border: var(--glass-border);
+  box-shadow: var(--shadow-2);
+}
+
+// Пока карта движется, стекло с blur дорого (замер S1, performance-baseline.md): на время movestart…moveend
+// компонент карты вешает .map-moving на корень — стекло становится плотным без перерисовки дерева
+.map-moving .glass-1 {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--glass-solid-bg);
+}

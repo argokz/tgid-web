@@ -12,26 +12,20 @@ import { resolveMdiSvgPath } from '~/utils/mdiSvgPaths'
 
 export default defineNuxtPlugin((app) => {
   const vuetify = createVuetify({
+    // Тема одна — светлая (решение этапа 2 модернизации UI, docs/ui-primitives.md): тёмной палитры
+    // и переключателя нет. Остальные токены (отступы, тени, движение, стекло) — assets/styles/_tokens.scss
     theme: {
-        defaultTheme: 'light', // Указываем тему по умолчанию
+        defaultTheme: 'light',
         themes: {
           light: {
             dark: false,
             colors: {
               primary: '#1565C0',
               secondary: '#546E7A',
-              accent: '#82B1FF',
+              // акцент «живой сети»: активный инструмент, выделенный объект, прогресс — и больше нигде
+              accent: '#D97706',
               surface: '#FFFFFF',
               background: '#F5F7FA',
-            },
-          },
-          dark: {
-            dark: true,
-            colors: {
-              primary: '#90CAF9',
-              secondary: '#80CBC4',
-              surface: '#1E1E2E',
-              background: '#121212',
             },
           },
         },

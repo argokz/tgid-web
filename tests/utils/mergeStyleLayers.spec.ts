@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { expression as styleExpression, featureFilter, v8 } from '@maplibre/maplibre-gl-style-spec';
 import {
+  equalityConstraints,
+  filtersDisjoint,
   legacyFilterToExpression,
   mergeLineLayers,
   stopsValueAt,
@@ -31,10 +33,11 @@ const pipeLayer = (id: string, filter: unknown, color: string, offsetSign: 1 | -
     ...(dashed ? { 'line-dasharray': [2, 1] } : {}),
   },
 });
-const obr = ['all', legacyAny('obr', '1'), legacyAny('nadz', '0')];
-const obrZakr = ['all', legacyAny('obr', '1'), legacyAny('zakr', '1')];
-const pod = ['all', legacyAny('pod', '1'), legacyAny('nadz', '0')];
-const obrNadz = ['all', legacyAny('obr', '1'), legacyAny('nadz', '1')];
+// как в стиле GeoServer: у каждого класса заданы все признаки, классы одного направления попарно различимы
+const obr = ['all', legacyAny('obr', '1'), legacyAny('nadz', '0'), legacyAny('zakr', '0')];
+const obrZakr = ['all', legacyAny('obr', '1'), legacyAny('nadz', '0'), legacyAny('zakr', '1')];
+const pod = ['all', legacyAny('pod', '1'), legacyAny('nadz', '0'), legacyAny('zakr', '0')];
+const obrNadz = ['all', legacyAny('obr', '1'), legacyAny('nadz', '1'), legacyAny('zakr', '0')];
 
 describe('mergeLineLayers: подслои участков', () => {
   it('сливает линии с одинаковым оформлением, пунктирные — отдельно, подписи не трогает', () => {
@@ -47,40 +50,42 @@ describe('mergeLineLayers: подслои участков', () => {
       symbol,
     ];
     const out = mergeLineLayers(input);
-    expect(out.map((l) => l.id)).toEqual(['Обратка +2', 'Обратка надземная', 'Диаметр']);
+    // подача не сливается с обраткой: у участка оба флага, исходный стиль рисует его дважды
+    expect(out.map((l) => l.id)).toEqual(['Обратка +1', 'Обратка надземная', 'Подача', 'Диаметр']);
     const merged = out[0];
-    expect(merged.metadata?.mergedFrom).toEqual(['Обратка', 'Обратка закрытая', 'Подача']);
+    expect(merged.metadata?.mergedFrom).toEqual(['Обратка', 'Обратка закрытая']);
     expect(merged.minzoom).toBe(12);
     expect(merged.layout).toEqual({ 'line-cap': 'butt', 'line-join': 'round' });
     // фильтр — объединение классов в синтаксисе выражений
     expect((merged.filter as unknown[])[0]).toBe('any');
-    expect((merged.filter as unknown[]).length).toBe(4);
-    expect(featureFilter(merged.filter as any).filter({ zoom: 14 } as any, { type: 2, properties: { obr: 1, nadz: 0 } } as any)).toBe(true);
-    expect(featureFilter(merged.filter as any).filter({ zoom: 14 } as any, { type: 2, properties: { obr: 1, nadz: 1 } } as any)).toBe(false);
-    // цвет — case по классам, ширина одинакова и осталась как была, смещение — interpolate с case на каждом зуме
+    expect((merged.filter as unknown[]).length).toBe(3);
+    expect(featureFilter(merged.filter as any).filter({ zoom: 14 } as any, { type: 2, properties: { obr: 1, nadz: 0, zakr: 0 } } as any)).toBe(true);
+    expect(featureFilter(merged.filter as any).filter({ zoom: 14 } as any, { type: 2, properties: { obr: 1, nadz: 0, zakr: 1 } } as any)).toBe(true);
+    expect(featureFilter(merged.filter as any).filter({ zoom: 14 } as any, { type: 2, properties: { obr: 1, nadz: 1, zakr: 0 } } as any)).toBe(false);
+    // цвет — case по классам; ширина, смещение и прозрачность одинаковы и остались legacy-функциями stops
     expect((merged.paint!['line-color'] as unknown[])[0]).toBe('case');
     expect(merged.paint!['line-width']).toEqual({ stops: [[12, 0.5], [14, 0.9], [16, 1.2]] });
-    const offset = merged.paint!['line-offset'] as unknown[];
-    expect(offset.slice(0, 3)).toEqual(['interpolate', ['linear'], ['zoom']]);
-    expect(offset[3]).toBe(12);
-    expect((offset[4] as unknown[])[0]).toBe('case');
-    // одинаковая у всех прозрачность остаётся legacy-функцией stops (это не выражение — проверяем только выражения)
-    expect(merged.paint!['line-opacity']).toEqual({ stops: [[12, 0.55], [14, 0.9], [15, 1]] });
-    for (const key of ['line-color', 'line-offset']) assertPaintExpression(key, merged.paint![key]);
+    expect(merged.paint!['line-offset']).toEqual({ stops: [[12, 0], [13, 0.3], [15, 0.9]] });
+    assertPaintExpression('line-color', merged.paint!['line-color']);
     // пунктирный слой остался нетронутым
     expect(out[1]).toEqual(input[2]);
   });
 
-  it('значение paint считается по классу: подача получает отрицательное смещение', () => {
-    const [merged] = mergeLineLayers([pipeLayer('Обратка', obr, '#00007f', 1), pipeLayer('Подача', pod, '#7f0000', -1)]);
+  it('значение paint считается по классу: зависящее от зума смещение становится interpolate с case', () => {
+    const [merged] = mergeLineLayers([pipeLayer('Обратка', obr, '#00007f', 1), pipeLayer('Обратка закрытая', obrZakr, '#808000', -1)]);
+    const offset = merged.paint!['line-offset'] as unknown[];
+    expect(offset.slice(0, 3)).toEqual(['interpolate', ['linear'], ['zoom']]);
+    expect(offset[3]).toBe(12);
+    expect((offset[4] as unknown[])[0]).toBe('case');
+    assertPaintExpression('line-offset', offset);
     const spec = (v8.paint_line as Record<string, any>)['line-offset'];
     const expr = styleExpression.createPropertyExpression(merged.paint!['line-offset'] as any, spec);
     expect(expr.result).toBe('success');
     const evalAt = (zoom: number, properties: Record<string, unknown>) =>
       (expr as any).value.evaluate({ zoom }, { type: 2, properties } as any);
-    expect(evalAt(15, { obr: 1, nadz: 0 })).toBeCloseTo(0.9, 3);
-    expect(evalAt(15, { pod: 1, nadz: 0 })).toBeCloseTo(-0.9, 3);
-    expect(evalAt(14, { obr: 1, nadz: 0 })).toBeCloseTo(0.6, 3);
+    expect(evalAt(15, { obr: 1, nadz: 0, zakr: 0 })).toBeCloseTo(0.9, 3);
+    expect(evalAt(15, { obr: 1, nadz: 0, zakr: 1 })).toBeCloseTo(-0.9, 3);
+    expect(evalAt(14, { obr: 1, nadz: 0, zakr: 0 })).toBeCloseTo(0.6, 3);
   });
 
   it('не сливает слои без фильтра, с разным minzoom или layout, с выражениями в paint', () => {
@@ -94,8 +99,27 @@ describe('mergeLineLayers: подслои участков', () => {
 
   it('группа ставится на место первого слоя, порядок остальных сохраняется', () => {
     const fill: StyleLayerLike = { id: 'fill', type: 'fill', filter: ['==', 'kind', 'x'], paint: { 'fill-color': '#fff' } };
-    const out = mergeLineLayers([fill, pipeLayer('A', obr, '#00007f', 1), pipeLayer('X', obrNadz, '#00007f', 1, true), pipeLayer('B', pod, '#7f0000', -1)]);
+    const out = mergeLineLayers([fill, pipeLayer('A', obr, '#00007f', 1), pipeLayer('X', obrNadz, '#00007f', 1, true), pipeLayer('B', obrZakr, '#808000', 1)]);
     expect(out.map((l) => l.id)).toEqual(['fill', 'A +1', 'X']);
+  });
+
+  it('объект, подходящий под два слоя, после слияния рисуется столько же раз: подача и обратка раздельно', () => {
+    const out = mergeLineLayers([pipeLayer('Обратка', obr, '#00007f', 1), pipeLayer('Подача', pod, '#7f0000', -1)]);
+    expect(out.map((l) => l.id)).toEqual(['Обратка', 'Подача']);
+    const both = { type: 2, properties: { obr: 1, pod: 1, nadz: 0, zakr: 0 } } as any;
+    expect(out.filter((l) => featureFilter(l.filter as any).filter({ zoom: 14 } as any, both)).length).toBe(2);
+  });
+
+  it('полный набор участков: 16 линейных слоёв → 8', () => {
+    const mk = (dir: 'obr' | 'pod', mag: '0' | '1', nadz: '0' | '1', zakr: '0' | '1') => ({
+      ...pipeLayer(`${dir}-${mag}-${nadz}-${zakr}`, ['all', legacyAny(dir, '1'), legacyAny('mag_gid', mag), legacyAny('nadz', nadz), legacyAny('zakr', zakr)], zakr === '1' ? '#808000' : dir === 'obr' ? '#00007f' : '#7f0000', dir === 'obr' ? 1 : -1, nadz === '1'),
+      minzoom: mag === '1' ? 9 : 12,
+    });
+    const all: StyleLayerLike[] = [];
+    for (const dir of ['obr', 'pod'] as const) for (const mag of ['0', '1'] as const) for (const nadz of ['0', '1'] as const) for (const zakr of ['0', '1'] as const) all.push(mk(dir, mag, nadz, zakr));
+    const out = mergeLineLayers(all);
+    expect(out.length).toBe(8);
+    for (const l of out) expect((l.metadata?.mergedFrom as string[]).length).toBe(2);
   });
 });
 
@@ -124,6 +148,18 @@ describe('legacyFilterToExpression', () => {
       const feature = { type: 2, properties } as any;
       expect(f2({ zoom: 14 } as any, feature), JSON.stringify(properties)).toBe(f1({ zoom: 14 } as any, feature));
     }
+  });
+});
+
+describe('equalityConstraints / filtersDisjoint', () => {
+  it('собирает допустимые значения и находит непересекающиеся классы', () => {
+    const c = equalityConstraints(['all', legacyAny('obr', '1'), ['==', 'zakr', 0]]);
+    expect([...c.get('obr')!]).toEqual(['1', 'true']);
+    expect([...c.get('zakr')!]).toEqual(['0']);
+    expect(filtersDisjoint(['all', legacyAny('obr', '1'), legacyAny('zakr', '0')], ['all', legacyAny('obr', '1'), legacyAny('zakr', '1')])).toBe(true);
+    expect(filtersDisjoint(legacyAny('obr', '1'), legacyAny('pod', '1'))).toBe(false);
+    expect(filtersDisjoint(['==', ['get', 'a'], 1], ['==', ['get', 'a'], 2])).toBe(true);
+    expect(filtersDisjoint(['>', 'du', 100], ['<', 'du', 50])).toBe(false);
   });
 });
 

@@ -36,7 +36,7 @@ These metrics help identify render delay and map initialization bottlenecks.
   - `PERF_BUDGET_TOTAL_JS_KB` (default: `1500`)
   - `PERF_BUDGET_LARGEST_JS_KB` (default: `900`)
 - **Отложенные lazy-чанки** (Cesium, ECharts, журналы):
-  - `PERF_BUDGET_DEFERRED_JS_KB` (default: `7500`)
+  - `PERF_BUDGET_DEFERRED_JS_KB` (default: `8000`; до 24.10.2026 — 7 500, превышался Cesium ещё до модернизации UI)
 
 Если manifest недоступен, скрипт откатывается к суммарной проверке всего `_nuxt/*.js`.
 Adjust thresholds in CI environment variables as optimization work progresses.

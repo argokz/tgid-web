@@ -11,8 +11,9 @@
  *
  * Что не сливается (остаётся как есть): не-линии, слои без фильтра, legacy-фильтры с неизвестными операторами,
  * paint в виде выражений (кроме полностью одинаковых), функции stops с `base`, цвет через stops.
- * Порядок отрисовки: объединённый слой встаёт на место первого из группы; внутри группы порядок классов
- * теряется — для не пересекающихся классов участков это незаметно.
+ * Сливаются только слои с доказуемо непересекающимися фильтрами (одно свойство — разные значения): участок
+ * с pod=1 и obr=1 исходный стиль рисует дважды (подача и обратка со смещением в разные стороны), и в один
+ * слой их класть нельзя. Объединённый слой встаёт на место первого из группы.
  */
 
 export interface StyleLayerLike {
@@ -211,6 +212,73 @@ function mergePaintProperty(
   return out;
 }
 
+/**
+ * Ограничения равенства из фильтра: свойство → допустимые значения (строками). `all` пересекает множества,
+ * `any` объединяет (только если все ветви про одно свойство). Остальные операторы не дают ограничений.
+ */
+export function equalityConstraints(filter: unknown): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  if (!Array.isArray(filter) || !filter.length) return out;
+  const [op, ...rest] = filter as unknown[];
+  const propName = (key: unknown): string | null => {
+    if (typeof key === 'string') return key;
+    if (Array.isArray(key) && key[0] === 'get' && typeof key[1] === 'string') return key[1];
+    return null;
+  };
+  if (op === '==' && rest.length === 2) {
+    const name = propName(rest[0]);
+    if (name && (typeof rest[1] === 'string' || typeof rest[1] === 'number' || typeof rest[1] === 'boolean')) {
+      out.set(name, new Set([String(rest[1])]));
+    }
+    return out;
+  }
+  if (op === 'all') {
+    for (const part of rest) {
+      for (const [name, values] of equalityConstraints(part)) {
+        const prev = out.get(name);
+        out.set(name, prev ? new Set([...prev].filter((v) => values.has(v))) : values);
+      }
+    }
+    return out;
+  }
+  if (op === 'any') {
+    const parts = rest.map(equalityConstraints);
+    if (!parts.length || parts.some((p) => p.size !== 1)) return out;
+    const names = new Set(parts.map((p) => [...p.keys()][0]));
+    if (names.size !== 1) return out;
+    const name = [...names][0];
+    out.set(name, new Set(parts.flatMap((p) => [...p.get(name)!])));
+  }
+  return out;
+}
+
+/** Доказуемо непересекающиеся фильтры: есть свойство, у которого допустимые значения не пересекаются */
+export function filtersDisjoint(a: unknown, b: unknown): boolean {
+  const ca = equalityConstraints(a);
+  const cb = equalityConstraints(b);
+  for (const [name, va] of ca) {
+    const vb = cb.get(name);
+    if (!vb) continue;
+    if (![...va].some((v) => vb.has(v))) return true;
+  }
+  return false;
+}
+
+/**
+ * Разбить слои на подгруппы попарно непересекающихся фильтров (жадно, порядок сохраняется).
+ * Иначе объект, подходящий под два слоя (участок с pod=1 и obr=1 рисуется и как подача, и как обратка),
+ * после слияния был бы нарисован один раз — первой ветвью case.
+ */
+function splitDisjoint(layers: StyleLayerLike[]): StyleLayerLike[][] {
+  const groups: StyleLayerLike[][] = [];
+  for (const layer of layers) {
+    const fits = groups.find((g) => g.every((other) => filtersDisjoint(other.filter, layer.filter)));
+    if (fits) fits.push(layer);
+    else groups.push([layer]);
+  }
+  return groups;
+}
+
 function mergeGroup(layers: StyleLayerLike[]): StyleLayerLike | null {
   const filters = layers.map((l) => toExpressionFilter(l.filter));
   if (filters.some((f) => f == null)) return null;
@@ -247,12 +315,17 @@ export function mergeLineLayers(layers: StyleLayerLike[]): StyleLayerLike[] {
   });
   const replacement = new Map<number, StyleLayerLike>();
   const dropped = new Set<number>();
+  const indexOf = new Map(layers.map((l, i) => [l, i]));
   for (const indexes of groups.values()) {
     if (indexes.length < 2) continue;
-    const merged = mergeGroup(indexes.map((i) => layers[i]));
-    if (!merged) continue;
-    replacement.set(indexes[0], merged);
-    indexes.slice(1).forEach((i) => dropped.add(i));
+    for (const part of splitDisjoint(indexes.map((i) => layers[i]))) {
+      if (part.length < 2) continue;
+      const merged = mergeGroup(part);
+      if (!merged) continue;
+      const partIndexes = part.map((l) => indexOf.get(l)!);
+      replacement.set(partIndexes[0], merged);
+      partIndexes.slice(1).forEach((i) => dropped.add(i));
+    }
   }
   return layers.flatMap((layer, index) => {
     if (dropped.has(index)) return [];
