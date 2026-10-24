@@ -18,6 +18,7 @@ import { useLineVertexEditor } from '~/composables/useLineVertexEditor';
 import { pickNetworkFeature } from '~/utils/networkFeature';
 import type { PickCandidate, PickOptions } from '~/utils/networkFeature';
 import { pickNetworkSnap } from '~/utils/networkSnap';
+import { isTopologyEditing } from '~/utils/mapToolFlags';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
 import { appStorage } from '~/utils/appStorage';
 import type { CardKind, CardTemplate } from '~/utils/objectCard';
@@ -133,6 +134,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   watch(enabled, (on: boolean) => {
     if (!on) isEditTopologyMode.value = false;
   });
+  watch(isEditTopologyMode, (on) => { isTopologyEditing.value = on; }, { immediate: true });
 
   // === Инструмент (один активный, как в ГИС) — прежние флаги режимов производные от него ===
   const activeTool = ref<EditorTool>('select');

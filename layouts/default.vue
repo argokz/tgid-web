@@ -34,6 +34,21 @@
         <span class="brand-subtitle">Map</span>
       </div>
 
+      <!-- Город и роль видны всегда; на узком экране роль остаётся в меню пользователя -->
+      <div
+        v-if="isHydrated && (authStore.isAuthenticated || authStore.authDisabled) && authStore.cityLabel"
+        class="app-context d-flex align-center me-2"
+        :title="`${authStore.cityLabel} · ${roleLabel}`"
+      >
+        <v-icon
+          size="16"
+          class="me-1"
+          aria-hidden="true"
+        >mdi-map-marker</v-icon>
+        <span class="app-context__city">{{ authStore.cityLabel }}</span>
+        <span class="app-context__role d-none d-md-inline">· {{ roleLabel }}</span>
+      </div>
+
       <!-- Навигация: кнопки в шапке, на узком экране — в выдвижном меню (QA F1, F57) -->
       <nav
         v-if="!navCollapsed"
@@ -355,9 +370,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onBeforeUnmount, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useMobile } from '~/composables/useMobile';
+import { useEscapeClose, useGlobalEscape } from '~/composables/useEscape';
 import {
   apiHealth,
   describeExcelReportTruncation,
@@ -376,6 +392,8 @@ import type CalculationProtocol from '~/components/CalculationProtocol.vue';
 import ConfirmDialogHost from '~/components/ConfirmDialogHost.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { ROLE_LABELS, type Role } from '~/utils/permissions';
+import { deviceClass } from '~/utils/breakpoints';
+import { buildPageTitle } from '~/utils/pageTitle';
 import { buildHeaderMenu, isHeaderNavCollapsed, type HeaderMenuItem } from '~/utils/headerMenu';
 
 const { screenWidth } = useMobile();
@@ -390,6 +408,7 @@ const route = useRoute();
 const authStore = useAuthStore();
 const notificationStore = useNotificationStore();
 const uiStore = useUiStore();
+const fragmentStore = useFragmentStore();
 const mainMenuOpen = ref(false);
 const showLogin = ref(false);
 const showCalculationModal = ref(false);
@@ -421,6 +440,22 @@ const otherCities = computed(() =>
   authStore.isAuthenticated ? authStore.cities.filter((c) => c.code !== authStore.city) : [],
 );
 const roleLabel = computed(() => ROLE_LABELS[authStore.role as Role] || authStore.role || 'пользователь');
+
+// Класс устройства для менеджера панелей (телефон — одна панель на экране); на рендер не влияет, 0 — окно ещё не измерено (SSR)
+watch(screenWidth, (w) => {
+  if (w > 0) uiStore.setViewport(deviceClass(w));
+}, { immediate: true });
+
+// Заголовок вкладки: открытая панель или текущий фрагмент — город — ITwin Map
+const titleContext = computed(() => {
+  if (uiStore.drawPanelOpen) return 'Измерения';
+  if (uiStore.toolsPanelOpen) return 'Инструменты';
+  const id = fragmentStore.selectedFragmentId;
+  return id == null ? null : fragmentStore.fragments.find((f) => Number(f.id) === Number(id))?.name ?? null;
+});
+useHead({
+  title: computed(() => buildPageTitle({ context: titleContext.value, city: isHydrated.value ? authStore.cityLabel : '' })),
+});
 
 // Сессия истекла (exp или 401) — открыть форму входа (QA F71)
 watch(() => authStore.loginPrompt, () => {
@@ -479,15 +514,9 @@ watch(navCollapsed, (collapsed) => {
   if (!collapsed) mainMenuOpen.value = false;
 });
 
-// Временный v-navigation-drawer сам по Esc не закрывается
-const onMenuKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape') mainMenuOpen.value = false;
-};
-watch(mainMenuOpen, (open) => {
-  if (open) window.addEventListener('keydown', onMenuKeydown);
-  else window.removeEventListener('keydown', onMenuKeydown);
-});
-onBeforeUnmount(() => window.removeEventListener('keydown', onMenuKeydown));
+// Временный v-navigation-drawer сам по Esc не закрывается — меню в стеке Esc менеджера панелей (docs/ui-zones.md)
+useEscapeClose({ open: mainMenuOpen, close: () => { mainMenuOpen.value = false; } });
+useGlobalEscape();
 
 const menuItems = computed(() => buildHeaderMenu(
   { canCalculate: isHydrated.value && authStore.canCalculate },
@@ -683,13 +712,27 @@ const downloadExcel = async (docType: string) => {
   top: 60px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 2000;
+  z-index: var(--z-popover); /* над картой и карточкой, под диалогами */
   max-width: min(760px, calc(100vw - 32px));
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 
 .app-brand {
   user-select: none;
+}
+.app-context {
+  flex: 0 0 auto; /* не сжимается: иначе flex прятал город, оставляя одну роль */
+  font-size: var(--text-xs);
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  white-space: nowrap;
+}
+.app-context__city {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-context__role {
+  margin-left: 4px;
 }
 .brand-title {
   font-weight: 700;

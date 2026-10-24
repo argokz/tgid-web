@@ -1,7 +1,9 @@
 /**
- * Composable для определения мобильных устройств и адаптивности
+ * Composable для определения мобильных устройств и адаптивности.
+ * Границы — utils/breakpoints.ts (одни и те же в TS и SCSS): isMobile < 960, isTablet 960–1279, иначе десктоп.
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, type Ref } from 'vue'
+import { deviceClass } from '~/utils/breakpoints'
 
 export const useMobile = () => {
   if (typeof window === 'undefined') {
@@ -9,7 +11,6 @@ export const useMobile = () => {
       isMobile: ref(false),
       isTablet: ref(false),
       isMobileOrTablet: ref(false),
-      isSmallMobile: ref(false),
       isLandscape: ref(false),
       isTouchDevice: ref(false),
       screenWidth: ref(0),
@@ -20,14 +21,10 @@ export const useMobile = () => {
   const screenWidth = ref(window.innerWidth)
   const screenHeight = ref(window.innerHeight)
 
-  const MOBILE_MAX = 768
-  const TABLET_MAX = 1024
-  const MOBILE_SMALL = 375
-
-  const isMobile = computed(() => screenWidth.value <= MOBILE_MAX)
-  const isTablet = computed(() => screenWidth.value > MOBILE_MAX && screenWidth.value <= TABLET_MAX)
-  const isMobileOrTablet = computed(() => screenWidth.value <= TABLET_MAX)
-  const isSmallMobile = computed(() => screenWidth.value <= MOBILE_SMALL)
+  const device = computed(() => deviceClass(screenWidth.value))
+  const isMobile = computed(() => device.value === 'phone')
+  const isTablet = computed(() => device.value === 'tablet')
+  const isMobileOrTablet = computed(() => device.value !== 'desktop')
   const isLandscape = computed(() => screenWidth.value > screenHeight.value)
 
   const isTouchDevice = computed(() => {
@@ -51,7 +48,7 @@ export const useMobile = () => {
     window.removeEventListener('orientationchange', updateScreenSize)
   })
 
-  return { isMobile, isTablet, isMobileOrTablet, isSmallMobile, isLandscape, isTouchDevice, screenWidth, screenHeight }
+  return { isMobile, isTablet, isMobileOrTablet, isLandscape, isTouchDevice, screenWidth, screenHeight }
 }
 
 export const useSwipe = (

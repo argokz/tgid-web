@@ -150,7 +150,7 @@ const guideText = computed(() => {
 <style scoped>
 .trace-hud {
   position: absolute;
-  z-index: 6;
+  z-index: var(--z-hud);
   pointer-events: none;
   padding: 3px 8px;
   border-radius: 6px;

@@ -157,6 +157,8 @@ import type { CSSProperties } from 'vue'
 import { useMapStore } from '~/stores/mapStore'
 import { describeMenuFeature } from '~/utils/networkFeature'
 import { getCityConfig } from '~/utils/cityConfig'
+import { BREAKPOINTS } from '~/utils/breakpoints'
+import { useEscapeClose } from '~/composables/useEscape'
 
 const mapStore = useMapStore()
 
@@ -182,8 +184,8 @@ onBeforeUnmount(() => {
   }
 })
 
-const isMobile = computed(() => viewportWidth.value <= 600)
-const isTablet = computed(() => viewportWidth.value > 600 && viewportWidth.value <= 960)
+const isMobile = computed(() => viewportWidth.value < BREAKPOINTS.sm)
+const isTablet = computed(() => viewportWidth.value >= BREAKPOINTS.sm && viewportWidth.value < BREAKPOINTS.md)
 
 const menuSizeClass = computed(() => {
   if (isMobile.value) return 'feature-menu--mobile'
@@ -203,7 +205,7 @@ const menuStyle = computed<CSSProperties>(() => {
       right: '12px',
       bottom: '12px',
       maxHeight: `${maxHeight}px`,
-      zIndex: 9999
+      zIndex: 'var(--z-popover)'
     }
   }
 
@@ -226,7 +228,7 @@ const menuStyle = computed<CSSProperties>(() => {
     left: `${Math.max(12, left)}px`,
     top: `${Math.max(12, top)}px`,
     maxHeight: `${maxHeight}px`,
-    zIndex: 9999
+    zIndex: 'var(--z-popover)'
   }
 })
 
@@ -324,6 +326,9 @@ const selectFeature = (feature: any, index: number) => {
 }
 
 // Меню закрыто без выбора («Закрыть», новый identify) — инструмент получает отказ
+// Меню объекта над картой — не v-overlay, в стек Esc менеджера панелей заходит само (docs/ui-zones.md)
+useEscapeClose({ open: () => mapStore.featureMenuVisible, close: () => { mapStore.featureMenuVisible = false } })
+
 watch(() => mapStore.featureMenuVisible, (visible) => {
   if (!visible) mapStore.cancelFeatureChoice()
 })

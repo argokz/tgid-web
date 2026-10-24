@@ -45,6 +45,14 @@ describe('дизайн-токены', () => {
     }
   });
 
+  it('брейкпоинты SCSS совпадают с utils/breakpoints.ts', () => {
+    const breakpoints = readFileSync(resolve(__dirname, '../../utils/breakpoints.ts'), 'utf8');
+    for (const [name, value] of [['sm', '600'], ['md', '960'], ['lg', '1280']]) {
+      expect(breakpoints, name).toMatch(new RegExp(name + ':[ ]*' + value + '[^0-9]'));
+      expect(variables).toContain(`$breakpoint-${name}: ${value}px`);
+    }
+  });
+
   it('тема Vuetify одна — светлая, с тёплым акцентом', () => {
     expect(vuetify).not.toMatch(/dark:\s*\{/);
     expect(vuetify).not.toMatch(/dark:\s*true/);

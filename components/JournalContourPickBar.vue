@@ -58,13 +58,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useJournalMapBridge } from '~/composables/useJournalMapBridge';
-import { cardPanelInset } from '~/composables/useObjectCardLayout';
+import { useUiStore } from '~/stores/uiStore';
 
 const bridge = useJournalMapBridge();
+const ui = useUiStore();
 
 // Карточка объекта открыта панелью справа — панель выбора по центру видимой части карты
-const barStyle = computed(() => (cardPanelInset.value
-  ? { left: `calc(50% - ${cardPanelInset.value / 2}px)`, maxWidth: `calc(100% - ${cardPanelInset.value + 32}px)` }
+const barStyle = computed(() => (ui.rightInset
+  ? { left: `calc(50% - ${ui.rightInset / 2}px)`, maxWidth: `calc(100% - ${ui.rightInset + 32}px)` }
   : {}));
 
 const clearAll = () => {
@@ -78,7 +79,7 @@ const clearAll = () => {
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
-  z-index: 6;
+  z-index: var(--z-hud);
   max-width: calc(100% - 32px);
 }
 .bar-text {

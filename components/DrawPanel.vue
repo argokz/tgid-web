@@ -260,6 +260,7 @@ import HintTip from '~/components/HintTip.vue';
 import GlassSurface from '~/components/GlassSurface.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { computed, onBeforeUnmount, watch } from 'vue';
+import { useEscapeClose } from '~/composables/useEscape';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import {
   formatArea,
@@ -324,6 +325,9 @@ const close = () => {
   draw.setMode('none');
   open.value = false;
 };
+
+// Esc: пока идёт измерение, клавиша принадлежит ему (useMapDraw); иначе закрывает панель
+useEscapeClose({ open, close, allow: () => draw.mode.value === 'none' });
 
 const copy = async (m: Measurement) => {
   const view = m.kind === 'distance' ? profileView(m) : null;

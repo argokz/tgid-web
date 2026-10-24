@@ -27,13 +27,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue';
-import { cardPanelInset, clampFloat, clampPanelWidth, useObjectCardLayout, type ObjectCardLayout } from '~/composables/useObjectCardLayout';
+import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
+import { clampFloat, clampPanelWidth, useObjectCardLayout, type ObjectCardLayout } from '~/composables/useObjectCardLayout';
+import { useUiStore } from '~/stores/uiStore';
 
 const props = defineProps<{ modelValue: boolean; mobile?: boolean }>();
 defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 const layout = useObjectCardLayout();
+const ui = useUiStore();
 const root = ref<HTMLElement | null>(null);
 const dragging = ref(false);
 const viewport = ref({ w: 1280, h: 800 });
@@ -47,13 +49,18 @@ onMounted(() => {
   updateViewport();
   window.addEventListener('resize', updateViewport);
 });
+// Ширина панели справа — в менеджер панелей: полосы над картой центрируются по видимой части карты
 watchEffect(() => {
-  cardPanelInset.value = props.modelValue && !props.mobile && layout.mode === 'panel'
+  ui.setRightInset(props.modelValue && !props.mobile && layout.mode === 'panel'
     ? clampPanelWidth(layout.panelWidth, viewport.value.w)
-    : 0;
+    : 0);
 });
+// Карточка — панель менеджера (docs/ui-zones.md): на телефоне вытесняет «Инструменты» и «Измерения».
+// Сама она менеджером не закрывается (evictable: false) — закрывает владелец с подтверждением правок
+watch(() => props.modelValue, (open) => ui.setPanel('card', open), { immediate: true });
 onBeforeUnmount(() => {
-  cardPanelInset.value = 0;
+  ui.setRightInset(0);
+  ui.setPanel('card', false);
   window.removeEventListener('resize', updateViewport);
   stopPointer();
 });
@@ -149,7 +156,7 @@ const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
 <style scoped>
 .oc-shell {
   position: fixed;
-  z-index: 1006;
+  z-index: var(--z-inspector);
   display: flex;
   flex-direction: column;
   background: rgb(var(--v-theme-surface));
@@ -167,7 +174,7 @@ const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
 }
 .oc-shell--mobile {
   inset: 0;
-  z-index: 2400;
+  z-index: var(--z-overlay);
 }
 .oc-shell--dragging {
   user-select: none;

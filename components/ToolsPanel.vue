@@ -110,6 +110,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useEscapeClose } from '~/composables/useEscape';
 import { useMobile } from '~/composables/useMobile';
 import { useAuthStore } from '~/stores/authStore';
 import { filterByRole } from '~/utils/permissions';
@@ -139,6 +140,9 @@ const filteredGroups = computed(() => {
     }))
     .filter((g) => g.items.length > 0);
 });
+
+// Esc закрывает панель (docs/ui-zones.md); фокус на холсте карты — Esc у редактора или измерения
+useEscapeClose({ open, close: () => { open.value = false; } });
 
 const runTool = (tool: ToolDescriptor) => {
   emit('open-tool', tool.event);

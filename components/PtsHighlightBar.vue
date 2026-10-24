@@ -29,7 +29,7 @@ const layerStore = useLayerStore();
   /* справа, у кнопок карты: слева её закрывает боковая панель */
   top: 12px;
   right: 68px;
-  z-index: 6;
+  z-index: var(--z-hud);
   max-width: min(480px, calc(100% - 140px));
 }
 .pts-highlight-bar :deep(.v-chip) {

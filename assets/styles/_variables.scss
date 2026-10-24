@@ -1,7 +1,8 @@
-// Breakpoints (Vuetify-aligned)
+// Брейкпоинты — зеркало utils/breakpoints.ts (Vuetify display: sm 600, md 960, lg 1280);
+// совпадение проверяет tests/styles/tokens.spec.ts
 $breakpoint-sm: 600px;
-$breakpoint-md: 768px;
-$breakpoint-lg: 960px;
+$breakpoint-md: 960px;
+$breakpoint-lg: 1280px;
 
 // Шкалы дизайн-токенов (_tokens.scss) для медиазапросов и расчётов на сборке — значения те же
 $space-1: 4px;

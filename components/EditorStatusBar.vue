@@ -30,7 +30,7 @@ const toolInfo = computed(() => EDITOR_TOOLS.find((t) => t.value === props.tool)
   left: 50%;
   transform: translateX(-50%);
   max-width: calc(100% - 32px);
-  z-index: 10;
+  z-index: var(--z-hud);
   display: flex;
   align-items: center;
   padding: 4px 14px;
