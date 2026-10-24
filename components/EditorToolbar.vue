@@ -389,6 +389,7 @@
 </template>
 
 <script setup lang="ts">
+import FloatingToolbar from '~/components/FloatingToolbar.vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { useTopologyEditor } from '~/composables/useTopologyEditor';
 import { EDITOR_TOOLS, toolAllowed, type EditorTool } from '~/utils/editorTools';

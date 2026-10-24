@@ -251,6 +251,7 @@
 </template>
 
 <script setup lang="ts">
+import SearchField from '~/components/SearchField.vue'
 import { onBeforeUnmount, ref, computed } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { getCityConfig } from '~/utils/cityConfig'

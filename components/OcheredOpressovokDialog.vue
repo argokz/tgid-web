@@ -68,6 +68,8 @@
 </template>
 
 <script setup lang="ts">
+import StateView from '~/components/StateView.vue'
+import DataTable from '~/components/DataTable.vue'
 import { formatApiError } from '~/utils/apiError'
 import { useMobile } from '~/composables/useMobile'
 import { fastApiService } from '~/services/fastApiService'

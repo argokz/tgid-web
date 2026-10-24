@@ -256,6 +256,8 @@
 </template>
 
 <script setup lang="ts">
+import HintTip from '~/components/HintTip.vue';
+import GlassSurface from '~/components/GlassSurface.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { computed, onBeforeUnmount, watch } from 'vue';
 import type { Map as MapLibreMap } from 'maplibre-gl';

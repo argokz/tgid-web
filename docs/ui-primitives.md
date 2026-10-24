@@ -47,7 +47,7 @@
 | `SearchField` | debounce, очистка, Esc, счётчик результатов | поиск узлов, фильтры журналов | `NodeSearch`, поле в `MapControls` | есть: тест, применён в `NodeSearch` и фильтрах арматуры |
 | `AppSelect` | плотный `v-select`/`v-autocomplete`: поиск при > 50 пунктов, виртуальный список Vuetify, единицы, «создать?» | все 166 списков | `v-select` ×145, `v-autocomplete` ×18 | есть: тест, применён в фильтрах арматуры (5) |
 | `SegmentedToggle` | переключение режимов с иконкой и подписью, обязательный выбор | режимы, вкладки-фильтры | `v-btn-toggle` ×14, `v-switch` ×12 | есть: тест, применён в `OutageSimulationDialog` |
-| `FieldGrid` | поле формы: label сверху/inline, focus / error / readonly / dirty, единицы | формы журналов и карточки | `CardFieldEditor`, `SetterValueInput` | — |
+| `FieldGrid` + `FieldCell` | сетка полей и ячейка: видимая подпись сверху/inline, обязательность, подсказка, единицы, ошибка, readonly / dirty | формы журналов и карточки | `CardFieldEditor`, `SetterValueInput`, `v-row/v-col` форм | есть: тест, применён в форме утверждения плана (`JournalRecordPanels`) |
 | `DataTable` | липкая шапка, сортировка, числа вправо, зебра по токенам, выбор строки, виртуализация от 200 строк | журналы, протоколы, диагностика | сырой `<table>` ×35, `v-table` ×23 | есть: тест, применён в «Очереди опрессовок» |
 | `KpiTile`, `Sparkline` | плитка числа (подпись · значение · дельта · тренд · состояние) и мини-график inline SVG | шапки журналов, итоги расчётов | чипы качества в журналах (по `dataviz`) | есть: тесты; `KpiTile` — счётчики качества арматуры; `Sparkline` — внутри `KpiTile`, первое реальное место с рядом данных — этап 6 |
 | `GlassSurface`, `FloatingToolbar` | стеклянная поверхность по токенам; группа кнопок-инструментов с `HintTip`, активный — акцентом | тулбар, поповеры, панели над картой | `EditorToolbar`, `DrawPanel`, `MapControls` | есть: тесты; `FloatingToolbar` — инструменты редактора топологии, `GlassSurface` — панель измерений; тулбар редактора на токенах стекла |
@@ -133,3 +133,12 @@
 `disabled`, `showActiveLabel` (подпись у активного), `tipLocation`, `ariaLabel`. Семантика `toolbar` + `aria-pressed`,
 у каждой кнопки `HintTip` (название · хоткей · строка «что сделает»). Активный инструмент — акцент `--accent-soft` /
 `--accent-text`, единственное место акцента на тулбаре.
+
+### FieldGrid и FieldCell
+
+`FieldGrid`: `columns` (`auto` — по `minWidth`, или 1–3; на телефоне всегда одна), `minWidth` (220), `labelPosition`
+(`top` / `inline` — наследуют ячейки). `FieldCell`: `label`, `required` (звёздочка), `hint` (иконка «?» с `HintTip`,
+доступна с клавиатуры), `units` (справа от поля), `error` (под полем, `role="alert"`), `readonly`, `dirty`
+(точка акцента + «изменено, не сохранено»), `span` (на всю ширину), `labelPosition`. Слот по умолчанию получает `id` —
+повесить на поле, чтобы `label for` работал; само поле — `v-text-field`/`AppSelect`/`CardFieldEditor` с `hide-details`
+(ошибку показывает ячейка). Порядок Tab — порядок ячеек в сетке, как в десктопе.

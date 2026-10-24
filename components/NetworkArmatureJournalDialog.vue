@@ -646,6 +646,9 @@
 </template>
 
 <script setup lang="ts">
+import KpiTile from '~/components/KpiTile.vue'
+import SearchField from '~/components/SearchField.vue'
+import AppSelect from '~/components/AppSelect.vue'
 import type { KpiStatus } from '~/components/KpiTile.vue'
 import { formatApiError } from '~/utils/apiError'
 import { computed, defineComponent, h, ref, type PropType } from 'vue'

@@ -71,60 +71,55 @@
             v-if="!approval.approved && approveFormOpen"
             class="approve-form mt-2"
           >
-            <v-row dense>
-              <v-col
-                cols="12"
-                sm="4"
+            <FieldGrid :min-width="200">
+              <FieldCell
+                label="Дата утверждения"
+                required
               >
-                <v-text-field
-                  v-model="approveForm.approved_on"
-                  type="date"
-                  label="Дата утверждения"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                />
-              </v-col>
-              <v-col
+                <template #default="{ id }">
+                  <v-text-field
+                    :id="id"
+                    v-model="approveForm.approved_on"
+                    type="date"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                  />
+                </template>
+              </FieldCell>
+              <FieldCell
                 v-for="(signer, key) in schema.approval.signers"
                 :key="key"
-                cols="12"
-                sm="4"
+                :label="signer.label"
               >
-                <v-select
-                  v-if="signer.ref === 'dolzhnosti'"
-                  v-model="approveForm.signers[key]"
-                  :items="schema.positions || []"
-                  item-title="name"
-                  item-value="id"
-                  :label="signer.label"
-                  density="compact"
-                  variant="outlined"
-                  clearable
-                  hide-details
-                />
-                <v-select
-                  v-else-if="signer.ref === 'subdivisions'"
-                  v-model="approveForm.signers[key]"
-                  :items="schema.subdivisions || []"
-                  item-title="name"
-                  item-value="id"
-                  :label="signer.label"
-                  density="compact"
-                  variant="outlined"
-                  clearable
-                  hide-details
-                />
-                <v-text-field
-                  v-else
-                  v-model="approveForm.signers[key]"
-                  :label="signer.label"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                />
-              </v-col>
-            </v-row>
+                <template #default="{ id }">
+                  <AppSelect
+                    v-if="signer.ref === 'dolzhnosti'"
+                    :id="id"
+                    v-model="approveForm.signers[key]"
+                    :items="schema.positions || []"
+                    item-title="name"
+                    item-value="id"
+                  />
+                  <AppSelect
+                    v-else-if="signer.ref === 'subdivisions'"
+                    :id="id"
+                    v-model="approveForm.signers[key]"
+                    :items="schema.subdivisions || []"
+                    item-title="name"
+                    item-value="id"
+                  />
+                  <v-text-field
+                    v-else
+                    :id="id"
+                    v-model="approveForm.signers[key]"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                  />
+                </template>
+              </FieldCell>
+            </FieldGrid>
           </div>
           <div class="d-flex flex-wrap ga-2 mt-2">
             <template v-if="!approval.approved">
@@ -455,6 +450,9 @@
 </template>
 
 <script setup lang="ts">
+import FieldGrid from '~/components/FieldGrid.vue';
+import FieldCell from '~/components/FieldCell.vue';
+import AppSelect from '~/components/AppSelect.vue';
 import { localToday } from '~/utils/journalFields';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled';
