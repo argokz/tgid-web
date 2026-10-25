@@ -36,6 +36,8 @@ export interface PaginatedResponse<T> {
   page: number;
   page_size: number;
   pages: number;
+  /** Счётчики по состояниям при тех же фильтрах (журнал нарушений; старый API поля не отдаёт) */
+  state_counts?: { state_id: number | null; count: number }[];
 }
 
 export interface JournalSummary {
