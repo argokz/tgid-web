@@ -436,30 +436,36 @@ const routeWaypoints = (): number[] => {
   return ids.length >= 2 ? [ids[0], ids[ids.length - 1]] : [];
 };
 
+/** Номер последнего запроса времени: ответ по прежнему маршруту, пришедший после смены, отбрасывается */
+let travelSeq = 0;
 const loadTravelTime = async () => {
   const nodes = routeWaypoints();
-  if (nodes.length < 2 || travelLoading.value) return;
+  if (nodes.length < 2) return;
+  const seq = ++travelSeq;
   travelLoading.value = true;
   travelError.value = null;
   try {
-    travel.value = await fastApiService.getTravelTime(nodes);
-  } catch (err: any) {
-    travelError.value = formatApiError(err, 'Ошибка расчёта времени прохождения');
+    const result = await fastApiService.getTravelTime(nodes);
+    if (seq === travelSeq) travel.value = result;
+  } catch (err: unknown) {
+    if (seq === travelSeq) travelError.value = formatApiError(err, 'Ошибка расчёта времени прохождения');
   } finally {
-    travelLoading.value = false;
+    if (seq === travelSeq) travelLoading.value = false;
   }
 };
 
 watch(
   () => [props.waypoints, props.pathData],
   () => {
+    travelSeq += 1; // запрос по прежнему маршруту больше не нужен
     travel.value = null;
     travelError.value = null;
+    travelLoading.value = false;
     if (tab.value === 'time' && props.modelValue) loadTravelTime();
   }
 );
 watch(tab, (t) => {
-  if (t === 'time' && !travel.value) loadTravelTime();
+  if (t === 'time' && !travel.value && !travelLoading.value) loadTravelTime();
 });
 
 const cumText = (side: TravelTimeSide | null | undefined): string => {

@@ -282,8 +282,15 @@ const notificationStore = useNotificationStore()
 const mapStore = useMapStore()
 let fetchSeq = 0
 
-watch(() => mapStore.isDefectsLayerVisible, () => mapStore.toggleDefectsLayer())
-watch(() => mapStore.isCorrosionLayerVisible, () => mapStore.toggleCorrosionLayer())
+// слой не загрузился — переключатель вернулся в «выкл.», пользователь видит причину, а не пустую карту
+watch(() => mapStore.isDefectsLayerVisible, () => {
+  mapStore.toggleDefectsLayer().catch((err: unknown) =>
+    notificationStore.showError(formatApiErrorWith('Дефекты не показаны на карте', err)))
+})
+watch(() => mapStore.isCorrosionLayerVisible, () => {
+  mapStore.toggleCorrosionLayer().catch((err: unknown) =>
+    notificationStore.showError(formatApiErrorWith('Индикаторы коррозии не показаны на карте', err)))
+})
 
 const text = (value: unknown) => (value == null ? '' : String(value).trim())
 const coord = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : null)
@@ -334,10 +341,12 @@ const fetchData = async () => {
   if (seq !== fetchSeq) return
   loading.value = false
   const failures: string[] = []
+  // сбойный журнал очищается: его прежние строки не должны выглядеть свежими рядом с обновлёнными
+  const empty = { items: [], total: 0, state_counts: [] }
   if (defectRes.status === 'fulfilled') apply(defects, defectRes.value, toDefectRow)
-  else failures.push(describeFailure('дефекты', defectRes.reason))
+  else { apply(defects, empty, toDefectRow); failures.push(describeFailure('дефекты', defectRes.reason)) }
   if (corrosionRes.status === 'fulfilled') apply(corrosion, corrosionRes.value, toCorrosionRow)
-  else failures.push(describeFailure('индикаторы коррозии', corrosionRes.reason))
+  else { apply(corrosion, empty, toCorrosionRow); failures.push(describeFailure('индикаторы коррозии', corrosionRes.reason)) }
   if (lookupsRes.status === 'fulfilled' && lookupsRes.value) defectStates.value = lookupsRes.value.states as { id: number; name: string }[]
   if (failures.length === 2) {
     error.value = failures.join('; ')

@@ -557,6 +557,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { fastApiService } from '~/services/fastApiService';
+import { isStyleMutable } from '~/services/mapService';
 import { useMapStore } from '~/stores/mapStore';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { useUiStore } from '~/stores/uiStore';
@@ -833,36 +834,43 @@ const setRowRef = (key: string, el: any) => {
   else rowRefs.delete(key);
 };
 
+/** Номер последней загрузки протокола: ответ, который пришёл позже следующего запроса, отбрасывается */
+let loadSeq = 0;
+
 /** Загрузить протоколы (id из результата задачи); keepPrevious — сравнить с текущими */
 const loadProtocols = async (ids: number[], opts: { keepPrevious?: boolean } = {}) => {
   if (!ids.length) return;
+  const seq = ++loadSeq;
   loading.value = true;
   loadError.value = '';
   try {
     const items = await Promise.all(ids.map((id) => fastApiService.getCalcProtocol(id)));
-    setRecords(items, opts.keepPrevious);
+    if (seq === loadSeq) setRecords(items, opts.keepPrevious);
   } catch (err) {
-    loadError.value = formatApiErrorWith('Протокол не загружен', err);
+    if (seq === loadSeq) loadError.value = formatApiErrorWith('Протокол не загружен', err);
   } finally {
-    loading.value = false;
+    if (seq === loadSeq) loading.value = false;
   }
 };
 
 const loadByRequest = async (requestId: string) => {
+  const seq = ++loadSeq;
   loading.value = true;
   loadError.value = '';
   try {
     const items = (await fastApiService.getCalcProtocolsByRequest(requestId, true)).items;
+    if (seq !== loadSeq) return;
     showSavedOutput(items);
     setRecords(items, true);
   } catch (err) {
-    loadError.value = formatApiErrorWith('Протокол не загружен', err);
+    if (seq === loadSeq) loadError.value = formatApiErrorWith('Протокол не загружен', err);
   } finally {
-    loading.value = false;
+    if (seq === loadSeq) loading.value = false;
   }
 };
 
 const loadByCalculation = async (calculationId: number) => {
+  const seq = ++loadSeq;
   emit('update:show', true);
   activeTab.value = 'analysis';
   loading.value = true;
@@ -871,14 +879,16 @@ const loadByCalculation = async (calculationId: number) => {
     const rec = await fastApiService.getCalculationProtocol(calculationId, true);
     // расчёт по списку: весь запрос
     const all = rec.request_id ? (await fastApiService.getCalcProtocolsByRequest(rec.request_id, true)).items : [];
+    if (seq !== loadSeq) return;
     const items = all.length ? all : [rec];
     showSavedOutput(items);
     setRecords(items, false);
   } catch (err) {
+    if (seq !== loadSeq) return;
     loadError.value = formatApiErrorWith('Протокол этого расчёта не найден', err);
     records.value = [];
   } finally {
-    loading.value = false;
+    if (seq === loadSeq) loading.value = false;
   }
 };
 
@@ -910,6 +920,8 @@ const setRecords = (items: CalcProtocolRecord[], keepPrevious = false) => {
 /** Геометрия всех объектов протокола одним-двумя запросами (не более 500 в запросе) */
 const locateAll = async (): Promise<ProtocolLocateResult | null> => {
   if (located.value) return located.value;
+  // протокол сменился, пока искали, — результат относится к старым записям и не кешируется
+  const forRecords = records.value;
   const seen = new Set<string>();
   const objects: ProtocolObject[] = [];
   for (const e of entries.value) {
@@ -931,9 +943,10 @@ const locateAll = async (): Promise<ProtocolLocateResult | null> => {
     }
   } catch (err) {
     // без этого переход молча сообщал бы «нет координат» у существующих объектов
-    notify.showError(formatApiErrorWith('Не удалось найти объекты протокола на карте', err));
+    if (records.value === forRecords) notify.showError(formatApiErrorWith('Не удалось найти объекты протокола на карте', err));
     return null;
   }
+  if (records.value !== forRecords) return located.value ?? locateAll();
   located.value = result;
   return result;
 };
@@ -1103,6 +1116,8 @@ const goToDirect = async (o: ProtocolObject) => {
 const MARKER_SOURCE = 'calc-protocol-markers';
 const MARKER_LAYER = 'calc-protocol-markers-circle';
 const markersShown = ref(false);
+/** Растёт при каждом «скрыть»: показ, который дождался поиска объектов после скрытия, ничего не рисует */
+let markersSeq = 0;
 
 const onMarkerClick = (ev: any) => {
   const key = ev?.features?.[0]?.properties?.key;
@@ -1115,8 +1130,9 @@ const onMarkerClick = (ev: any) => {
 
 const showMarkers = async () => {
   const map = mapStore.map;
+  const seq = markersSeq;
   const loc = await locateAll();
-  if (!map || !loc) return;
+  if (!map || !loc || seq !== markersSeq || !props.show) return;
   const features: any[] = [];
   let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
   for (const e of filtered.value) {
@@ -1137,6 +1153,10 @@ const showMarkers = async () => {
   if (source) {
     source.setData(data);
   } else {
+    if (!isStyleMutable(map)) {
+      notify.showWarning('Карта ещё загружает стиль — повторите «Все на карте» через секунду');
+      return;
+    }
     map.addSource(MARKER_SOURCE, { type: 'geojson', data });
     map.addLayer({
       id: MARKER_LAYER,
@@ -1161,6 +1181,7 @@ const showMarkers = async () => {
 };
 
 function hideMarkers() {
+  markersSeq += 1;
   markersShown.value = false;
   const map = mapStore.map;
   if (!map) return;

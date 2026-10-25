@@ -226,11 +226,12 @@ import HintTip from '~/components/HintTip.vue'
 import KpiTile from '~/components/KpiTile.vue'
 import MiniHistogram from '~/components/MiniHistogram.vue'
 import StateView from '~/components/StateView.vue'
-import { formatApiError } from '~/utils/apiError'
+import { formatApiError, formatApiErrorWith } from '~/utils/apiError'
 import { computed, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { fastApiService, type RegimeAnalysisKind, type RegimeAnalysisResult } from '~/services/fastApiService'
 import { useFragmentStore } from '~/stores/fragmentStore'
+import { useNotificationStore } from '~/stores/notificationStore'
 import { regimePoints, type RegimePointsResult } from '~/utils/regimeMapPoints'
 
 const emit = defineEmits<{
@@ -405,18 +406,28 @@ const calculationItems = computed(() => [
   })),
 ])
 
+const notifications = useNotificationStore()
+/** Номера последних запросов: ответ по прежнему фрагменту или запросу, пришедший позже, отбрасывается */
+let calculationsSeq = 0
+let runSeq = 0
+
 const loadCalculations = async () => {
+  const seq = ++calculationsSeq
   calculations.value = []
   calculationId.value = null
-  if (!fragmentId.value) return
+  if (!fragmentId.value) {
+    calculationsLoading.value = false
+    return
+  }
   calculationsLoading.value = true
   try {
     const res = await fastApiService.listCalculations({ file_id: fragmentId.value, limit: 50 })
-    calculations.value = res.items.filter(c => c.has_results !== false)
-  } catch {
-    // список расчётов не обязателен: без него запросы идут по последнему расчёту
+    if (seq === calculationsSeq) calculations.value = res.items.filter(c => c.has_results !== false)
+  } catch (err: unknown) {
+    // список не обязателен (запросы идут по последнему расчёту), но выбор расчёта пропал — сказать об этом
+    if (seq === calculationsSeq) notifications.showWarning(formatApiErrorWith('Список расчётов фрагмента не загрузился — анализ по последнему расчёту', err))
   } finally {
-    calculationsLoading.value = false
+    if (seq === calculationsSeq) calculationsLoading.value = false
   }
 }
 watch(fragmentId, () => { void loadCalculations() })
@@ -434,25 +445,28 @@ const locate = (row: Record<string, any>) => {
 
 const run = async () => {
   if (!fragmentId.value || !queryKey.value) return
+  const seq = ++runSeq
   loading.value = true
   error.value = ''
   result.value = null
   modeFilter.value = null
   try {
+    let next: RegimeAnalysisResult
     if (queryKey.value.startsWith('adm-')) {
-      result.value = await fastApiService.getAdmissibility(
+      next = await fastApiService.getAdmissibility(
         Number(queryKey.value.slice(4)), fragmentId.value, calculationId.value ?? undefined)
     } else {
       const q = REGIME[queryKey.value]
-      result.value = await fastApiService.getRegimeAnalysis(q.kind, fragmentId.value, {
+      next = await fastApiService.getRegimeAnalysis(q.kind, fragmentId.value, {
         includeUncalculated: q.uncalculated,
         calculationId: calculationId.value ?? undefined,
       })
     }
-  } catch (e: any) {
-    error.value = formatApiError(e)
+    if (seq === runSeq) result.value = next
+  } catch (e: unknown) {
+    if (seq === runSeq) error.value = formatApiError(e)
   } finally {
-    loading.value = false
+    if (seq === runSeq) loading.value = false
   }
 }
 
@@ -466,8 +480,9 @@ const openDialog = async () => {
   if (!admissibility.value.length) {
     try {
       admissibility.value = await fastApiService.getAdmissibilityCatalog()
-    } catch {
+    } catch (err: unknown) {
       // каталог — только для списка запросов; основные запросы работают и без него
+      notifications.showWarning(formatApiErrorWith('Каталог анализов режима не загрузился — в списке только основные запросы', err))
     }
   }
 }

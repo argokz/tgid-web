@@ -244,9 +244,11 @@ const fetchData = async () => {
 const toggleCalculation = async (id: number | null) => {
   // повторный щелчок по показанному — убрать с карты
   const target = id === mapStore.activeCalculationId ? null : id
-  switchingId.value = target ?? mapStore.activeCalculationId
+  const switching = target ?? mapStore.activeCalculationId
+  switchingId.value = switching
   try {
-    await mapStore.loadCalculation(target)
+    // false — пока грузилось, выбрали другой расчёт: об этом сообщит последний вызов
+    if (!(await mapStore.loadCalculation(target))) return
     if (target === null) {
       markCleared()
     } else {
@@ -256,7 +258,8 @@ const toggleCalculation = async (id: number | null) => {
   } catch (err: unknown) {
     notificationStore.showError(formatApiErrorWith(`Расчёт №${target} не загрузился на карту`, err))
   } finally {
-    switchingId.value = null
+    // индикатор снимает тот вызов, что его поставил (не вытесненный предыдущий)
+    if (switchingId.value === switching) switchingId.value = null
   }
 }
 

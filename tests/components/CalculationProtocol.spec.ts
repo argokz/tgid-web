@@ -78,6 +78,20 @@ describe('CalculationProtocol', () => {
     w.unmount();
   });
 
+  it('медленный ответ прежнего протокола не затирает новый', async () => {
+    const { w } = mount();
+    let resolveOld!: (v: unknown) => void;
+    api.getCalcProtocol.mockImplementationOnce(() => new Promise((r) => { resolveOld = r; }));
+    api.getCalcProtocol.mockResolvedValueOnce(record(2, 7, 0));
+    const old = (w.vm as any).loadProtocols([1]);
+    await (w.vm as any).loadProtocols([2]);
+    resolveOld(record(1, 3, 0));
+    await old;
+    await flushPromises();
+    expect(w.findAll('.analysis-kpi')[0].text()).toContain('7');
+    w.unmount();
+  });
+
   it('панель встаёт между панелью слоёв и карточкой', async () => {
     const { w, ui } = mount();
     ui.setLeftInset(340);

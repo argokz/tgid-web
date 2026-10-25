@@ -478,16 +478,25 @@ export const useMapStore = defineStore('map', {
     },
 
     /** Сброс кастомных paint/layout для логического слоя: пересоздать слои из спецификации. */
-            async loadCalculation(calculationId: number | null) {
+            /**
+             * Показать результат расчёта на карте (null — убрать). Возвращает true, когда слой показывает именно
+             * этот расчёт; false — карты нет или, пока грузилось, выбрали другой расчёт (вызывающий не сообщает
+             * «показан»). Ошибка загрузки пробрасывается, слой прежнего расчёта при этом снимается.
+             */
+            async loadCalculation(calculationId: number | null): Promise<boolean> {
+      if (!this.map) return false;
       this.activeCalculationId = calculationId;
-      if (!this.map) return;
 
-      if (calculationId === null) {
-        if (this.map.getLayer('calculation-lines-layer')) {
+      const hideLayer = () => {
+        if (this.map?.getLayer('calculation-lines-layer')) {
           this.map.setLayoutProperty('calculation-lines-layer', 'visibility', 'none');
         }
         this.calculationResultsGeoJSON = null;
-        return;
+      };
+
+      if (calculationId === null) {
+        hideLayer();
+        return true;
       }
 
       try {
@@ -495,7 +504,7 @@ export const useMapStore = defineStore('map', {
         // стиль карты мог ещё грузиться (открытие карты, смена подложки) — слой добавляется после него
         await waitForStyleMutable(this.map);
         // пока грузилось, выбрали другой расчёт или убрали с карты — этот ответ уже не нужен
-        if (this.activeCalculationId !== calculationId) return;
+        if (this.activeCalculationId !== calculationId) return false;
         this.calculationResultsGeoJSON = data;
 
         if (!this.map.getSource('calculation-source')) {
@@ -535,9 +544,14 @@ export const useMapStore = defineStore('map', {
           this.map.setLayoutProperty('calculation-lines-layer', 'visibility', 'visible');
           this.updateCalculationColors();
         }
+        return true;
       } catch (e) {
-        // окно расчётов покажет ошибку: раньше сбой глотался, а окно сообщало «загружен на карту»
-        if (this.activeCalculationId === calculationId) this.activeCalculationId = null;
+        // окно расчётов покажет ошибку: раньше сбой глотался, а окно сообщало «загружен на карту».
+        // Слой прежнего расчёта снимается — иначе карта красила бы по нему без легенды и кнопки «Убрать»
+        // вытесненный вызов молчит: его ошибка относится к расчёту, который уже не нужен
+        if (this.activeCalculationId !== calculationId) return false;
+        this.activeCalculationId = null;
+        hideLayer();
         throw e;
       }
     },
@@ -567,7 +581,9 @@ export const useMapStore = defineStore('map', {
             });
             // Click handler is handled in MapViewer
           } catch (e) {
-            console.error('Failed to load defects GeoJSON', e);
+            // переключатель возвращается в «выкл.», ошибку покажет окно диагностики неисправностей
+            this.isDefectsLayerVisible = false;
+            throw e;
           }
         } else {
           this.map.setLayoutProperty('defects-layer', 'visibility', 'visible');
@@ -598,7 +614,9 @@ export const useMapStore = defineStore('map', {
               }
             });
           } catch (e) {
-            console.error('Failed to load corrosion GeoJSON', e);
+            // переключатель возвращается в «выкл.», ошибку покажет окно диагностики неисправностей
+            this.isCorrosionLayerVisible = false;
+            throw e;
           }
         } else {
           this.map.setLayoutProperty('corrosion-layer', 'visibility', 'visible');
