@@ -750,12 +750,16 @@ const openDetails = async (id: number) => {
   catch (loadError: any) { if (request !== detailsRequest) return; detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку технических условий' }
   finally { if (request === detailsRequest) detailsLoading.value = false }
 }
+let openDialogSeq = 0
 const openDialog = async (nextScope: TechnicalConditionJournalScope = {}) => {
+  const seq = ++openDialogSeq
   Object.assign(scope, { buildingId: undefined, pipeId: undefined, conditionId: undefined }, nextScope)
   page.value = 1; visible.value = true
   // список сам показывает свою ошибку; сбой справочников не должен прятать список
   const [lookupsResult] = await Promise.allSettled([loadLookups(), loadConditions()])
   if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — фильтры и выбор значений могут быть неполными'))
+  // журнал открыли снова, пока грузились списки — запись открывает последний вызов
+  if (seq !== openDialogSeq) return
   if (nextScope.conditionId) await openDetails(nextScope.conditionId)
 }
 const clearScope = () => { scope.buildingId = undefined; scope.pipeId = undefined; page.value = 1; void loadConditions() }

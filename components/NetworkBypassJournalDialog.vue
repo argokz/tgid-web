@@ -997,7 +997,9 @@ const openTubeDetails = async (tubeId: number) => {
   }
 }
 
+let openDialogSeq = 0
 const openDialog = async (nextScope: NetworkBypassJournalScope = {}) => {
+  const seq = ++openDialogSeq
   Object.assign(scope, { bypassId: undefined, standardTubeId: undefined, lineId: undefined }, nextScope)
   inventoryPage.value = 1
   tubePage.value = 1
@@ -1010,6 +1012,8 @@ const openDialog = async (nextScope: NetworkBypassJournalScope = {}) => {
   // раздел сам показывает свою ошибку; сбой справочника не должен прятать список
   const [lookupsResult] = await Promise.allSettled([loadLookups(), loadSection])
   if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — плитки и фильтры могут быть неполными'))
+  // журнал открыли снова, пока грузились списки — запись открывает последний вызов
+  if (seq !== openDialogSeq) return
   if (nextScope.standardTubeId) await openTubeDetails(nextScope.standardTubeId)
   else if (nextScope.bypassId) await openItemDetails(nextScope.bypassId)
 }
@@ -1047,6 +1051,7 @@ const saveChanges = async () => {
 }
 
 const locate = (item: Record<string, unknown>) => {
+  if (!hasCoordinates(item)) return
   emit('locate-bypass', {
     longitude: Number(item.longitude), latitude: Number(item.latitude), id: Number(item.id),
     lineId: item.line_id == null ? null : Number(item.line_id), label: String(item.display_name || `Байпас №${item.id}`)

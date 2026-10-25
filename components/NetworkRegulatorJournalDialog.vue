@@ -1073,7 +1073,9 @@ const openCatalogDetails = async (type: NetworkRegulatorType, catalogId: number)
   }
 }
 
+let openDialogSeq = 0
 const openDialog = async (nextScope: NetworkRegulatorJournalScope = {}) => {
+  const seq = ++openDialogSeq
   Object.assign(scope, { regulatorType: undefined, regulatorId: undefined, catalogType: undefined, catalogId: undefined, lineId: undefined }, nextScope)
   regulatorType.value = nextScope.regulatorType
   catalogType.value = nextScope.catalogType
@@ -1088,6 +1090,8 @@ const openDialog = async (nextScope: NetworkRegulatorJournalScope = {}) => {
   // раздел сам показывает свою ошибку; сбой справочника не должен прятать список
   const [lookupsResult] = await Promise.allSettled([loadLookups(), loadSection])
   if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — плитки и фильтры могут быть неполными'))
+  // журнал открыли снова, пока грузились списки — запись открывает последний вызов
+  if (seq !== openDialogSeq) return
   if (nextScope.catalogType && nextScope.catalogId) await openCatalogDetails(nextScope.catalogType, nextScope.catalogId)
   else if (nextScope.regulatorType && nextScope.regulatorId) await openItemDetails(nextScope.regulatorType, nextScope.regulatorId)
 }
@@ -1132,6 +1136,7 @@ const saveChanges = async () => {
 }
 
 const locate = (item: Record<string, unknown>) => {
+  if (!hasCoordinates(item)) return
   emit('locate-regulator', {
     longitude: Number(item.longitude), latitude: Number(item.latitude), id: Number(item.id),
     lineId: item.line_id == null ? null : Number(item.line_id), label: String(item.display_name || `Регулятор №${item.id}`)

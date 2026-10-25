@@ -786,12 +786,16 @@ const openDetails = async (id: number) => {
   finally { if (request === detailsRequest) detailsLoading.value = false }
 }
 const notifications = useNotificationStore()
+let openDialogSeq = 0
 const openDialog = async (nextScope: PressureTestJournalScope = {}) => {
+  const seq = ++openDialogSeq
   Object.assign(scope, { lineId: undefined, nodeId: undefined, testId: undefined }, nextScope)
   page.value = 1; visible.value = true
   // список и схема сами показывают свои ошибки; сбой справочников не должен прятать список
   const [lookupsResult] = await Promise.allSettled([loadLookups(), loadTests(), recordForm.loadSchema()])
   if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — фильтры и выбор значений могут быть неполными'))
+  // журнал открыли снова, пока грузились списки — запись открывает последний вызов
+  if (seq !== openDialogSeq) return
   if (nextScope.testId) await openDetails(nextScope.testId)
 }
 const clearScope = () => { scope.lineId = undefined; scope.nodeId = undefined; page.value = 1; void loadTests() }

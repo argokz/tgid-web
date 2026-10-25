@@ -815,6 +815,7 @@ const bindSelectedBuilding = () => {
 }
 
 const locate = (row: Record<string, unknown>, kind: AlsekoKind) => {
+  if (!hasCoordinates(row)) return
   emit('locate-alseko', {
     longitude: Number(row.longitude), latitude: Number(row.latitude), id: Number(row.id), kind,
     label: `${kind === 'load' ? 'АЛСЕКО' : 'Здание АЛСЕКО'} ${row.id}`
@@ -823,7 +824,9 @@ const locate = (row: Record<string, unknown>, kind: AlsekoKind) => {
   visible.value = false
 }
 
+let openDialogSeq = 0
 const openDialog = async (nextScope: AlsekoJournalScope = {}) => {
+  const seq = ++openDialogSeq
   Object.assign(scope, { loadId: undefined, buildingId: undefined }, nextScope)
   page.value = 1
   visible.value = true
@@ -834,6 +837,8 @@ const openDialog = async (nextScope: AlsekoJournalScope = {}) => {
   // список сам показывает свою ошибку; сбой справочника не должен прятать список
   const [lookupsResult] = await Promise.allSettled([loadLookups(), modeChanged ? Promise.resolve() : loadItemsPage()])
   if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — плитки и фильтры могут быть неполными'))
+  // журнал открыли снова, пока грузились списки — запись открывает последний вызов
+  if (seq !== openDialogSeq) return
   if (nextScope.buildingId) await openBuilding(nextScope.buildingId)
   else if (nextScope.loadId) await openLoad(nextScope.loadId)
 }

@@ -806,13 +806,17 @@ const openDetails = async (id: number) => {
   }
 }
 const notifications = useNotificationStore()
+let openDialogSeq = 0
 const openDialog = async (nextScope: ShurfJournalScope = {}) => {
+  const seq = ++openDialogSeq
   Object.assign(scope, { lineId: undefined, nodeId: undefined, shurfId: undefined }, nextScope)
   page.value = 1
   visible.value = true
   // список и схема сами показывают свои ошибки; сбой справочников не должен прятать список
   const [lookupsResult] = await Promise.allSettled([loadLookups(), loadShurfs(), recordForm.loadSchema()])
   if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — фильтры и выбор значений могут быть неполными'))
+  // журнал открыли снова, пока грузились списки — запись открывает последний вызов
+  if (seq !== openDialogSeq) return
   if (nextScope.shurfId) await openDetails(nextScope.shurfId)
 }
 const clearScope = () => {

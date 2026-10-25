@@ -1668,8 +1668,9 @@ const reloadCardView = async (wasEquipment: boolean) => {
       if (card.tg_pair) next.tg_pair = card.tg_pair
       show(next)
     }
-  } catch {
-    // просмотр обновится при следующем выборе объекта
+  } catch (e) {
+    // сохранено; просмотр обновится при следующем выборе объекта
+    useNotificationStore().showWarning(formatApiError(e, 'Сохранено, но карточку не удалось обновить — выберите объект заново'))
   }
 }
 
@@ -1913,9 +1914,7 @@ const show = (props: Record<string, any>, options: { anchor?: [number, number] |
   let objectNames: Record<string, string> | null = null
 
 
-  console.log('[AttributePanel] show() called, props keys:', Object.keys(props))
 
-  console.log('[AttributePanel] tg_tabs present:', !!props.tg_tabs, '| type:', typeof props.tg_tabs)
 
 
   if (props.tg_tabs) {
@@ -1924,7 +1923,6 @@ const show = (props: Record<string, any>, options: { anchor?: [number, number] |
 
       objectTabs = typeof props.tg_tabs === 'string' ? JSON.parse(props.tg_tabs) : props.tg_tabs
 
-      console.log('[AttributePanel] objectTabs parsed:', objectTabs?.length, 'tabs')
 
     } catch (e) {
 
@@ -1957,7 +1955,6 @@ const show = (props: Record<string, any>, options: { anchor?: [number, number] |
   cardPair.value = parseDesktopCardPair(tg_pair)
 
 
-  console.log('[AttributePanel] cleanProps keys count:', Object.keys(cleanProps).length)
 
 
   objectTabsData.value = objectTabs
@@ -1982,7 +1979,6 @@ const show = (props: Record<string, any>, options: { anchor?: [number, number] |
 
     updateTabsStructure(objectTabs, objectNames || {})
 
-    console.log('[AttributePanel] tabsData after build:', tabsData.value.length, 'tabs', tabsData.value.map(t => t.tabName))
 
   } else {
 
@@ -1994,8 +1990,8 @@ const show = (props: Record<string, any>, options: { anchor?: [number, number] |
 
   }
   // Клик по карте при закрытой карточке — сначала сводка у точки; открытая карточка обновляется сразу.
-  // На телефоне — сразу карточка (нижний лист — отдельный шаг)
-  if (options.anchor && !visible.value && !isMobile.value) {
+  // На телефоне и без готовой карты — сразу карточка
+  if (options.anchor && !visible.value && !isMobile.value && summaryMap.value) {
     summaryAnchor.value = options.anchor
     return
   }

@@ -995,7 +995,9 @@ const openCatalogDetails = async (standardId: number) => {
   }
 }
 
+let openDialogSeq = 0
 const openDialog = async (nextScope: NetworkArmatureJournalScope = {}) => {
+  const seq = ++openDialogSeq
   Object.assign(scope, { equipmentType: undefined, armatureId: undefined, standardId: undefined, lineId: undefined }, nextScope)
   equipmentType.value = nextScope.equipmentType
   inventoryPage.value = 1
@@ -1009,6 +1011,8 @@ const openDialog = async (nextScope: NetworkArmatureJournalScope = {}) => {
   // раздел сам показывает свою ошибку; сбой справочника не должен прятать список
   const [lookupsResult] = await Promise.allSettled([loadLookups(), loadSection])
   if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — плитки и фильтры могут быть неполными'))
+  // журнал открыли снова, пока грузились списки — запись открывает последний вызов
+  if (seq !== openDialogSeq) return
   if (nextScope.standardId) await openCatalogDetails(nextScope.standardId)
   else if (nextScope.armatureId && nextScope.equipmentType) await openItemDetails(nextScope.equipmentType, nextScope.armatureId)
 }
@@ -1046,6 +1050,7 @@ const saveChanges = async () => {
 }
 
 const locate = (item: Record<string, unknown>) => {
+  if (!hasCoordinates(item)) return
   emit('locate-armature', {
     longitude: Number(item.longitude), latitude: Number(item.latitude), id: Number(item.id),
     lineId: item.line_id == null ? null : Number(item.line_id), label: String(item.display_name || `Арматура №${item.id}`)

@@ -1152,20 +1152,10 @@ export const useMapStore = defineStore('map', {
           } catch (e) {
             console.warn('Failed to load local tabs structure', e);
           }
-        } else {
-          console.log('[selectFeature] tg_tabs source: WFS response ✓');
         }
       } catch (e) {
         console.error('Failed to load translations or tab structure', e);
       }
-
-      console.log('[selectFeature] Before _attributePanelShow:', {
-        hasTgTabs: !!properties.tg_tabs,
-        hasTgNames: !!properties.tg_names,
-        tgTabsPreview: properties.tg_tabs ? String(properties.tg_tabs).substring(0, 80) : null,
-        propertyCount: Object.keys(properties).length,
-        attributePanelReady: !!this._attributePanelShow,
-      });
 
       // Show Attribute Panel
       const safeProperties = this.toPlainObject(properties);

@@ -810,13 +810,17 @@ const openDetails = async (diaphragmId: number) => {
   }
 }
 
+let openDialogSeq = 0
 const openDialog = async (nextScope: NetworkDiaphragmJournalScope = {}) => {
+  const seq = ++openDialogSeq
   Object.assign(scope, { lineId: undefined, diaphragmId: undefined }, nextScope)
   page.value = 1
   visible.value = true
   // список сам показывает свою ошибку; сбой справочника не должен прятать список
   const [lookupsResult] = await Promise.allSettled([loadLookups(), loadItems()])
   if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — плитки и фильтры могут быть неполными'))
+  // журнал открыли снова, пока грузились списки — запись открывает последний вызов
+  if (seq !== openDialogSeq) return
   if (nextScope.diaphragmId) await openDetails(nextScope.diaphragmId)
 }
 
@@ -856,6 +860,7 @@ const saveChanges = async () => {
 }
 
 const locate = (item: Record<string, unknown>) => {
+  if (!hasCoordinates(item)) return
   emit('locate-diaphragm', {
     longitude: Number(item.longitude), latitude: Number(item.latitude), id: Number(item.id),
     lineId: item.line_id == null ? null : Number(item.line_id),

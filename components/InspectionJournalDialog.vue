@@ -790,13 +790,17 @@ const openDetails = async (id: number) => {
   }
 }
 const notifications = useNotificationStore()
+let openDialogSeq = 0
 const openDialog = async (nextScope: InspectionJournalScope = {}) => {
+  const seq = ++openDialogSeq
   Object.assign(scope, { lineId: undefined, nodeId: undefined, inspectionId: undefined }, nextScope)
   page.value = 1
   visible.value = true
   // список и схема сами показывают свои ошибки; сбой справочников не должен прятать список
   const [lookupsResult] = await Promise.allSettled([loadLookups(), loadInspections(), recordForm.loadSchema()])
   if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — фильтры и выбор значений могут быть неполными'))
+  // журнал открыли снова, пока грузились списки — запись открывает последний вызов
+  if (seq !== openDialogSeq) return
   if (nextScope.inspectionId) await openDetails(nextScope.inspectionId)
 }
 const clearScope = () => {
