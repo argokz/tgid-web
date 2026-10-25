@@ -1,24 +1,35 @@
 <template>
+  <!-- На телефоне — нижний лист: карта над ним остаётся рабочей; закрытие свайпом решает владелец -->
+  <BottomSheet
+    v-if="mobile"
+    v-model:snap="sheetSnap"
+    :model-value="modelValue"
+    drag-selector="[data-card-drag]"
+    aria-label="Карточка объекта"
+    @dismiss="emit('dismiss')"
+  >
+    <slot />
+  </BottomSheet>
   <!-- Окно свойств без затемнения карты: панель справа или плавающее окно (useObjectCardLayout) -->
   <div
-    v-if="modelValue"
+    v-else-if="modelValue"
     ref="root"
     class="oc-shell"
-    :class="[`oc-shell--${mobile ? 'mobile' : layout.mode}`, { 'oc-shell--dragging': dragging }]"
+    :class="[`oc-shell--${layout.mode}`, { 'oc-shell--dragging': dragging }]"
     :style="shellStyle"
     role="dialog"
     aria-modal="false"
     @pointerdown="onPointerDown"
   >
     <div
-      v-if="!mobile && layout.mode === 'panel'"
+      v-if="layout.mode === 'panel'"
       class="oc-resize oc-resize--left"
       title="Ширина панели"
       @pointerdown.stop.prevent="startResize($event, 'panel')"
     />
     <slot />
     <div
-      v-if="!mobile && layout.mode === 'float'"
+      v-if="layout.mode === 'float'"
       class="oc-resize oc-resize--corner"
       title="Размер окна"
       @pointerdown.stop.prevent="startResize($event, 'float')"
@@ -30,15 +41,24 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
 import { clampFloat, clampPanelWidth, useObjectCardLayout, type ObjectCardLayout } from '~/composables/useObjectCardLayout';
 import { useUiStore } from '~/stores/uiStore';
+import BottomSheet from '~/components/BottomSheet.vue';
+import type { SheetSnap } from '~/utils/sheetSnap';
 
 const props = defineProps<{ modelValue: boolean; mobile?: boolean }>();
-defineEmits<{ 'update:modelValue': [value: boolean] }>();
+const emit = defineEmits<{
+  'update:modelValue': [value: boolean];
+  /** Лист смахнут вниз на телефоне — закрыть просит владелец (подтверждение правок) */
+  dismiss: [];
+}>();
 
 const layout = useObjectCardLayout();
 const ui = useUiStore();
 const root = ref<HTMLElement | null>(null);
 const dragging = ref(false);
 const viewport = ref({ w: 1280, h: 800 });
+/** Положение нижнего листа; каждое открытие — с половины экрана */
+const sheetSnap = ref<SheetSnap>('half');
+watch(() => props.modelValue, (open) => { if (open) sheetSnap.value = 'half'; });
 
 const updateViewport = () => {
   viewport.value = { w: window.innerWidth, h: window.innerHeight };
@@ -171,10 +191,6 @@ const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
 .oc-shell--float {
   border-radius: 12px;
   overflow: hidden;
-}
-.oc-shell--mobile {
-  inset: 0;
-  z-index: var(--z-overlay);
 }
 .oc-shell--dragging {
   user-select: none;

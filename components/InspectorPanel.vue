@@ -3,6 +3,7 @@
     :model-value="modelValue"
     :mobile="mobile"
     @update:model-value="emit('update:modelValue', $event)"
+    @dismiss="close"
   >
     <div
       class="inspector"
@@ -261,6 +262,17 @@ const close = () => {
   flex: 0 1 auto;
   min-width: 0;
 }
+/* телефон: действия — одной прокручиваемой строкой под названием, а не столбиком рядом с ним */
+.inspector--mobile .inspector__header { flex-wrap: wrap; row-gap: var(--space-2); }
+.inspector--mobile .inspector__heading { flex-basis: 100%; }
+.inspector--mobile .inspector__actions {
+  flex: 1 0 100%;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.inspector--mobile .inspector__actions > * { flex-shrink: 0; }
 .inspector__search { flex-shrink: 0; background: rgb(var(--v-theme-surface)); }
 .inspector__tabs { flex-shrink: 0; }
 .inspector__tab { font-size: 0.8rem; min-width: 0; padding: 0 12px; }

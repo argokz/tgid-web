@@ -53,7 +53,7 @@
 | `GlassSurface`, `FloatingToolbar` | стеклянная поверхность по токенам; группа кнопок-инструментов с `HintTip`, активный — акцентом | тулбар, поповеры, панели над картой | `EditorToolbar`, `DrawPanel`, `MapControls` | есть: тесты; `FloatingToolbar` — инструменты редактора топологии, `GlassSurface` — панель измерений; тулбар редактора на токенах стекла |
 | `InspectorPanel` | панель справа / окно, вкладки, секции, поиск по полям | карточка объекта, формы записей | `ObjectCardShell` + `useObjectCardLayout` | есть: `components/InspectorPanel.vue`, тест, применён в `AttributePanel` (шапка, действия в слоте `#actions`, поиск и вкладки со счётчиками только в режиме просмотра) |
 | `MapPopover` | поповер у точки карты, следует за ней при pan | клик по объекту | `popupStore` + popup MapLibre | есть: `components/MapPopover.vue`, тест; сводка объекта в `AttributePanel` (клик при закрытой карточке). `popupStore` и `mapStore.showPopup` (мёртвый код) удалены |
-| `BottomSheet` | 3 положения, свайп | инспектор и графики на телефоне | `useSwipe` | — |
+| `BottomSheet` | 3 положения, свайп | инспектор и графики на телефоне | `useSwipe` | есть: `components/BottomSheet.vue` + `utils/sheetSnap.ts`, тесты; карточка объекта на телефоне (`ObjectCardShell`). Перетаскивание — pointer events (`useSwipe` только горизонтальный тач) |
 
 ### StateView
 
