@@ -2,6 +2,7 @@
   <div
     v-show="show"
     class="protocol-container"
+    :style="containerStyle"
   >
     <div
       class="protocol-resize-handle"
@@ -59,45 +60,77 @@
           </v-tabs>
         </div>
         <div class="protocol-actions">
-          <v-btn
-            icon
-            density="compact"
-            class="mr-2"
-            variant="text"
-            aria-label="Очистить"
-            @click="clear"
+          <HintTip
+            :text="'Очистить протокол'"
+            location="top"
           >
-            <v-icon>mdiDelete</v-icon>
-          </v-btn>
-          <v-btn
-            icon
-            density="compact"
-            class="mr-2"
-            variant="text"
-            :aria-label="isFullscreen ? 'Выйти из полноэкранного режима' : 'Во весь экран'"
-            @click="toggleFullscreen"
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                density="compact"
+                class="mr-2"
+                variant="text"
+                aria-label="Очистить протокол"
+                @click="clear"
+              >
+                <v-icon>mdiDelete</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
+          <HintTip
+            :text="fullscreenLabel"
+            location="top"
           >
-            <v-icon>{{ isFullscreen ? 'mdiFullscreenExit' : 'mdiFullscreen' }}</v-icon>
-          </v-btn>
-          <v-btn
-            icon
-            density="compact"
-            class="mr-2"
-            variant="text"
-            :aria-label="protocolHeight <= 45 ? 'Развернуть протокол' : 'Свернуть протокол'"
-            @click="minimize"
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                density="compact"
+                class="mr-2"
+                variant="text"
+                :aria-label="fullscreenLabel"
+                @click="toggleFullscreen"
+              >
+                <v-icon>{{ isFullscreen ? 'mdiFullscreenExit' : 'mdiFullscreen' }}</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
+          <HintTip
+            :text="minimizeLabel"
+            location="top"
           >
-            <v-icon>{{ protocolHeight <= 45 ? 'mdiChevronUp' : 'mdiChevronDown' }}</v-icon>
-          </v-btn>
-          <v-btn
-            icon
-            density="compact"
-            variant="text"
-            aria-label="Закрыть"
-            @click="close"
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                density="compact"
+                class="mr-2"
+                variant="text"
+                :aria-label="minimizeLabel"
+                @click="minimize"
+              >
+                <v-icon>{{ protocolHeight <= 45 ? 'mdiChevronUp' : 'mdiChevronDown' }}</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
+          <HintTip
+            :text="'Закрыть протокол'"
+            location="top"
           >
-            <v-icon>mdiClose</v-icon>
-          </v-btn>
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                density="compact"
+                variant="text"
+                aria-label="Закрыть протокол"
+                @click="close"
+              >
+                <v-icon>mdiClose</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
         </div>
       </div>
 
@@ -145,26 +178,31 @@
                     class="analysis-title"
                     :title="recordsTitle"
                   >{{ recordsLabel }}</span>
-                  <v-chip
-                    size="small"
-                    :variant="severity === 'error' ? 'flat' : 'tonal'"
-                    color="error"
-                    class="mr-1"
-                    :disabled="!summary?.errors"
-                    @click="toggleSeverity('error')"
-                  >
-                    Ошибки {{ summary?.errors ?? 0 }}
-                  </v-chip>
-                  <v-chip
-                    size="small"
-                    :variant="severity === 'warning' ? 'flat' : 'tonal'"
-                    color="warning"
-                    class="mr-2"
-                    :disabled="!summary?.warnings"
-                    @click="toggleSeverity('warning')"
-                  >
-                    Предупреждения {{ summary?.warnings ?? 0 }}
-                  </v-chip>
+                  <!-- Итог расчёта: плитки — фильтр по важности; после пересчёта — изменение к прошлому -->
+                  <KpiTile
+                    label="Ошибки"
+                    :value="summary?.errors ?? 0"
+                    :status="summary?.errors ? 'serious' : 'good'"
+                    :delta="deltas?.errors ?? null"
+                    delta-label="к прошлому"
+                    :up-is-good="false"
+                    selectable
+                    :active="severity === 'error'"
+                    class="analysis-kpi mr-1"
+                    @select="toggleSeverity('error')"
+                  />
+                  <KpiTile
+                    label="Предупреждения"
+                    :value="summary?.warnings ?? 0"
+                    :status="summary?.warnings ? 'warning' : 'good'"
+                    :delta="deltas?.warnings ?? null"
+                    delta-label="к прошлому"
+                    :up-is-good="false"
+                    selectable
+                    :active="severity === 'warning'"
+                    class="analysis-kpi mr-2"
+                    @select="toggleSeverity('warning')"
+                  />
                   <v-chip
                     v-for="c in chips"
                     :key="c.code"
@@ -179,41 +217,52 @@
                   <v-spacer />
                   <span
                     v-if="comparison"
-                    class="analysis-compare mr-2"
-                    :class="comparisonClass"
+                    class="d-sr-only"
                   >{{ comparison }}</span>
-                  <v-text-field
+                  <SearchField
                     v-model="query"
                     density="compact"
-                    variant="outlined"
-                    hide-details
-                    clearable
-                    placeholder="Поиск"
-                    prepend-inner-icon="mdiMagnify"
+                    placeholder="Поиск по сообщениям"
+                    aria-label="Поиск по сообщениям протокола"
+                    :result-count="query ? filtered.length : null"
                     class="analysis-search mr-1"
                   />
-                  <v-btn
-                    icon
-                    density="compact"
-                    variant="text"
-                    title="Предыдущая проблема"
-                    aria-label="Предыдущая проблема"
-                    :disabled="!filtered.length"
-                    @click="step(-1)"
+                  <HintTip
+                    :text="'Предыдущая проблема'"
+                    location="top"
                   >
-                    <v-icon>mdiChevronUp</v-icon>
-                  </v-btn>
-                  <v-btn
-                    icon
-                    density="compact"
-                    variant="text"
-                    title="Следующая проблема"
-                    aria-label="Следующая проблема"
-                    :disabled="!filtered.length"
-                    @click="step(1)"
+                    <template #default="{ props: tip }">
+                      <v-btn
+                        v-bind="tip"
+                        icon
+                        density="compact"
+                        variant="text"
+                        aria-label="Предыдущая проблема"
+                        :disabled="!filtered.length"
+                        @click="step(-1)"
+                      >
+                        <v-icon>mdiChevronUp</v-icon>
+                      </v-btn>
+                    </template>
+                  </HintTip>
+                  <HintTip
+                    :text="'Следующая проблема'"
+                    location="top"
                   >
-                    <v-icon>mdiChevronDown</v-icon>
-                  </v-btn>
+                    <template #default="{ props: tip }">
+                      <v-btn
+                        v-bind="tip"
+                        icon
+                        density="compact"
+                        variant="text"
+                        aria-label="Следующая проблема"
+                        :disabled="!filtered.length"
+                        @click="step(1)"
+                      >
+                        <v-icon>mdiChevronDown</v-icon>
+                      </v-btn>
+                    </template>
+                  </HintTip>
                   <v-btn
                     size="small"
                     variant="text"
@@ -229,16 +278,24 @@
                     </v-icon>
                     {{ markersShown ? 'Скрыть на карте' : 'Все на карте' }}
                   </v-btn>
-                  <v-btn
-                    size="small"
-                    variant="text"
-                    title="Сохранённые протоколы"
-                    @click="openHistory"
+                  <HintTip
+                    :text="'Сохранённые протоколы'"
+                    location="top"
                   >
-                    <v-icon size="small">
-                      mdiHistory
-                    </v-icon>
-                  </v-btn>
+                    <template #default="{ props: tip }">
+                      <v-btn
+                        v-bind="tip"
+                        size="small"
+                        variant="text"
+                        aria-label="Сохранённые протоколы"
+                        @click="openHistory"
+                      >
+                        <v-icon size="small">
+                          mdiHistory
+                        </v-icon>
+                      </v-btn>
+                    </template>
+                  </HintTip>
                   <v-btn
                     v-if="canRecalculate"
                     size="small"
@@ -422,72 +479,75 @@
     <!-- Сохранённые протоколы -->
     <v-dialog
       v-model="historyOpen"
-      max-width="760"
+      max-width="860"
       scrollable
     >
-      <v-card>
-        <v-card-title class="d-flex align-center">
-          Протоколы расчётов
-          <v-spacer />
-          <v-btn
-            icon="mdi-close"
-            variant="text"
-            size="small"
-            aria-label="Закрыть"
-            @click="historyOpen = false"
-          />
+      <v-card rounded="lg">
+        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
+          <v-avatar
+            color="primary"
+            variant="tonal"
+            size="40"
+          >
+            <v-icon>mdi-history</v-icon>
+          </v-avatar>
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
+            <div class="text-subtitle-1 font-weight-bold">
+              Протоколы расчётов
+            </div>
+            <div class="text-caption text-medium-emphasis text-truncate">
+              Последние 100 сохранённых; щелчок по строке — открыть протокол
+            </div>
+          </div>
+          <HintTip
+            text="Закрыть"
+            hotkey="Esc"
+            location="bottom"
+          >
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon="mdi-close"
+                variant="text"
+                aria-label="Закрыть"
+                @click="historyOpen = false"
+              />
+            </template>
+          </HintTip>
         </v-card-title>
-        <v-card-text>
-          <div
-            v-if="historyLoading"
-            class="analysis-empty"
+        <v-divider />
+        <v-card-text class="pa-4">
+          <StateView
+            variant="table"
+            :rows="8"
+            :loading="historyLoading"
+            :error="historyError"
+            :empty="!historyLoading && !historyError && !historyItems.length"
+            empty-title="Сохранённых протоколов нет"
+            empty-text="Протокол сохраняется после каждого расчёта"
+            empty-icon="mdi-history"
+            error-title="Список протоколов не загружен"
+            :retrying="historyLoading"
+            @retry="openHistory"
           >
-            <v-progress-circular
-              indeterminate
-              size="20"
-              class="mr-2"
-            />
-            Загрузка…
-          </div>
-          <div
-            v-else-if="!historyItems.length"
-            class="analysis-empty"
-          >
-            Сохранённых протоколов нет
-          </div>
-          <v-table
-            v-else
-            density="compact"
-            hover
-          >
-            <thead>
-              <tr>
-                <th>Дата</th>
-                <th>Фрагмент</th>
-                <th>Режим</th>
-                <th>Автор</th>
-                <th>Ошибки</th>
-                <th>Предупр.</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="h in historyItems"
-                :key="h.id"
-                class="history-row"
-                @click="openFromHistory(h)"
-              >
-                <td>{{ formatDate(h.created_at) }}</td>
-                <td>{{ h.fragment_name || h.fileid || '—' }}</td>
-                <td>{{ h.mode === 'emergency' ? 'аварийный' : 'плановый' }}</td>
-                <td>{{ h.author || '—' }}</td>
-                <td :class="{ 'text-error': h.errors }">
-                  {{ h.errors }}
-                </td>
-                <td>{{ h.warnings }}</td>
-              </tr>
-            </tbody>
-          </v-table>
+            <DataTable
+              :columns="historyColumns"
+              :items="historyRows"
+              selectable
+              :height="420"
+              @select="(row) => openFromHistory(row as unknown as CalcProtocolRecord)"
+            >
+              <template #[`item.created_at`]="{ item }">
+                {{ formatDate(item.created_at as string | null) }}
+              </template>
+              <template #[`item.errors`]="{ item }">
+                <span :class="{ 'text-error font-weight-medium': item.errors }">{{ item.errors }}</span>
+              </template>
+            </DataTable>
+          </StateView>
         </v-card-text>
       </v-card>
     </v-dialog>
@@ -502,6 +562,11 @@ import { useNotificationStore } from '~/stores/notificationStore';
 import { useUiStore } from '~/stores/uiStore';
 import { useAuthStore } from '~/stores/authStore';
 import AiAnswerPanel from '~/components/ai/AiAnswerPanel.vue';
+import DataTable, { type DataTableColumn } from '~/components/DataTable.vue';
+import HintTip from '~/components/HintTip.vue';
+import KpiTile from '~/components/KpiTile.vue';
+import SearchField from '~/components/SearchField.vue';
+import StateView from '~/components/StateView.vue';
 import { aiService, type AiObjectRef, type ExplainProtocolResult, type RootCause } from '~/services/aiService';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { formatApiErrorWith } from '~/utils/apiError';
@@ -551,6 +616,11 @@ const activeTab = ref('analysis');
 const isMinimized = ref(false);
 const isFullscreen = ref(false);
 const systemTime = ref('');
+
+/** Протокол встаёт между панелью слоёв и карточкой объекта — не закрывает их кнопки */
+const containerStyle = computed(() => ({ left: `${uiStore.leftInset}px`, right: `${uiStore.rightInset}px` }));
+const fullscreenLabel = computed(() => (isFullscreen.value ? 'Выйти из полноэкранного режима' : 'Во весь экран'));
+const minimizeLabel = computed(() => (protocolHeight.value <= 45 ? 'Развернуть протокол' : 'Свернуть протокол'));
 
 onMounted(() => {
   systemTime.value = new Date().toLocaleTimeString('ru-RU');
@@ -656,13 +726,12 @@ const comparison = computed(() => {
   if (!prev || !s || prev.files !== filesKey(records.value)) return null;
   return compareSummaries(prev, s);
 });
-const comparisonClass = computed(() => {
+/** Изменение к прошлому протоколу тех же фрагментов — для плиток (null — сравнивать не с чем) */
+const deltas = computed(() => {
   const prev = previousTotals.value;
   const s = summary.value;
-  if (!prev || !s) return '';
-  if (s.errors < prev.errors || (s.errors === prev.errors && s.warnings < prev.warnings)) return 'text-success';
-  if (s.errors > prev.errors) return 'text-error';
-  return '';
+  if (!comparison.value || !prev || !s) return null;
+  return { errors: s.errors - prev.errors, warnings: s.warnings - prev.warnings };
 });
 
 const fragmentName = (id: number | null | undefined) => {
@@ -861,11 +930,39 @@ const locateAll = async (): Promise<ProtocolLocateResult | null> => {
       Object.assign(result.pairs, part.pairs);
     }
   } catch (err) {
-    console.warn('[CalculationProtocol] locate', err);
+    // без этого переход молча сообщал бы «нет координат» у существующих объектов
+    notify.showError(formatApiErrorWith('Не удалось найти объекты протокола на карте', err));
     return null;
   }
   located.value = result;
   return result;
+};
+
+/**
+ * Отступ от краёв, px: карта лежит под панелью слоёв, карточкой и протоколом — объект показывается в видимой части.
+ * Каждый отступ не больше доли размера карты, иначе fitBounds не найдёт масштаб и не сработает.
+ */
+const VIEW_MARGIN_PX = 80;
+const MAX_BOTTOM_SHARE = 0.6;
+const MAX_SIDE_SHARE = 0.4;
+const visiblePadding = (map: { getContainer: () => HTMLElement }) => {
+  const { clientWidth, clientHeight } = map.getContainer();
+  const width = clientWidth || window.innerWidth;
+  const height = clientHeight || window.innerHeight;
+  return {
+    top: VIEW_MARGIN_PX,
+    bottom: Math.min(protocolHeight.value + VIEW_MARGIN_PX / 2, height * MAX_BOTTOM_SHARE),
+    left: Math.min(uiStore.leftInset + VIEW_MARGIN_PX, width * MAX_SIDE_SHARE),
+    right: Math.min(uiStore.rightInset + VIEW_MARGIN_PX, width * MAX_SIDE_SHARE),
+  };
+};
+/**
+ * Сдвиг центра при переходе: объект — посередине видимой над протоколом части (offset карта не запоминает).
+ * Переход — easeTo: flyTo при «уменьшении движения» в системе прыгает через jumpTo и offset теряет.
+ */
+const visibleOffset = (map: { getContainer: () => HTMLElement }): [number, number] => {
+  const padding = visiblePadding(map);
+  return [(padding.left - padding.right) / 2, (padding.top - padding.bottom) / 2];
 };
 
 const flyTo = (target: ProtocolTarget) => {
@@ -873,9 +970,9 @@ const flyTo = (target: ProtocolTarget) => {
   const view = geometryView(target.geometry);
   if (!map || !view) return;
   if (view.bounds) {
-    map.fitBounds(view.bounds, { padding: 80, maxZoom: 18, duration: 800 });
+    map.fitBounds(view.bounds, { padding: visiblePadding(map), maxZoom: 18, duration: 800 });
   } else {
-    map.flyTo({ center: view.center, zoom: Math.max(map.getZoom(), 17), duration: 800 });
+    map.easeTo({ center: view.center, zoom: Math.max(map.getZoom(), 17), duration: 800, offset: visibleOffset(map) });
   }
 };
 
@@ -897,6 +994,7 @@ const fixInfo = (e: ProtocolEntry) => {
 /** Перелёт к объекту, подсветка и карточка (устройство на участке — только подсветка) */
 const goTo = async (o: ProtocolObject, e?: ProtocolEntry) => {
   const loc = await locateAll();
+  if (!loc) return null; // ошибку поиска уже показали
   const target = protocolTarget(o, loc);
   if (!target) {
     notify.showWarning(`Нет координат объекта «${o.label || objectKey(o)}» (удалён или без геометрии)`);
@@ -1055,8 +1153,8 @@ const showMarkers = async () => {
   }
   if (!markersShown.value && features.length) {
     markersShown.value = true;
-    if (features.length === 1) map.flyTo({ center: features[0].geometry.coordinates, zoom: 16, duration: 800 });
-    else map.fitBounds([[minX, minY], [maxX, maxY]], { padding: 80, maxZoom: 17, duration: 800 });
+    if (features.length === 1) map.easeTo({ center: features[0].geometry.coordinates, zoom: 16, duration: 800, offset: visibleOffset(map) });
+    else map.fitBounds([[minX, minY], [maxX, maxY]], { padding: visiblePadding(map), maxZoom: 17, duration: 800 });
   }
   markersShown.value = true;
   if (!features.length) notify.showInfo('У отфильтрованных сообщений нет объектов с координатами');
@@ -1088,15 +1186,32 @@ onBeforeUnmount(hideMarkers);
 const historyOpen = ref(false);
 const historyLoading = ref(false);
 const historyItems = ref<CalcProtocolRecord[]>([]);
+const historyError = ref('');
+
+const historyColumns: DataTableColumn[] = [
+  { key: 'created_at', title: 'Дата', width: 170 },
+  { key: 'fragment', title: 'Фрагмент' },
+  { key: 'mode_name', title: 'Режим', width: 110 },
+  { key: 'author', title: 'Автор', width: 150 },
+  { key: 'errors', title: 'Ошибки', type: 'number', width: 90 },
+  { key: 'warnings', title: 'Предупр.', type: 'number', width: 100 },
+];
+const historyRows = computed(() => historyItems.value.map((h) => ({
+  ...h,
+  fragment: h.fragment_name || h.fileid || '—',
+  mode_name: h.mode === 'emergency' ? 'аварийный' : 'плановый',
+  author: h.author || '—',
+})));
 
 const openHistory = async () => {
   historyOpen.value = true;
   historyLoading.value = true;
+  historyError.value = '';
   try {
     historyItems.value = (await fastApiService.listCalcProtocols(null, 100)).items;
   } catch (err) {
     historyItems.value = [];
-    notify.showError(formatApiErrorWith('Список протоколов не загружен', err));
+    historyError.value = formatApiErrorWith('Список протоколов не загружен', err);
   } finally {
     historyLoading.value = false;
   }
@@ -1120,8 +1235,6 @@ defineExpose({
 .protocol-container {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
   z-index: 1000;
   background-color: transparent;
   height: v-bind('protocolHeight + "px"');
@@ -1130,7 +1243,7 @@ defineExpose({
 
 .protocol-resize-handle {
   height: 4px;
-  background-color: #e0e0e0;
+  background-color: rgba(var(--v-theme-on-surface), 0.12);
   cursor: ns-resize;
   transition: background-color 0.2s;
   position: relative;
@@ -1138,14 +1251,14 @@ defineExpose({
 }
 
 .protocol-resize-handle:hover {
-  background-color: #bdbdbd;
+  background-color: rgba(var(--v-theme-on-surface), 0.28);
 }
 
 .protocol-card {
   margin: 0;
   border-radius: 0;
   box-shadow: none;
-  background-color: #f3f3f3;
+  background-color: rgb(var(--v-theme-surface-light));
   height: 100%;
   transition: all 0.2s ease;
 }
@@ -1155,8 +1268,8 @@ defineExpose({
   align-items: center;
   justify-content: space-between;
   padding: 0;
-  background-color: #f3f3f3;
-  border-bottom: 1px solid #e0e0e0;
+  background-color: rgb(var(--v-theme-surface-light));
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   height: 40px;
 }
 
@@ -1188,14 +1301,14 @@ defineExpose({
 }
 
 .protocol-window {
-  background-color: #ffffff;
-  color: #333;
+  background-color: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-on-surface));
   font-family: 'Consolas', monospace;
   padding: 12px;
   margin: 0;
   height: v-bind('isMinimized ? "0px" : (protocolHeight - 40) + "px"');
   overflow-y: auto;
-  border: 1px solid #e0e0e0;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   transition: height 0.2s ease;
 }
 
@@ -1213,8 +1326,8 @@ defineExpose({
   align-items: center;
   gap: 4px 0;
   padding: 6px 8px;
-  background: #fafafa;
-  border-bottom: 1px solid #e0e0e0;
+  background: rgb(var(--v-theme-surface));
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
 .analysis-title {
@@ -1232,40 +1345,40 @@ defineExpose({
   min-width: 160px;
 }
 
-.analysis-compare {
-  font-size: 0.8rem;
+.analysis-kpi {
+  min-width: 112px;
 }
 
 .analysis-empty {
   display: flex;
   align-items: center;
   padding: 16px;
-  color: #666;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
 .entry {
   display: flex;
   gap: 8px;
   padding: 6px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.06);
   border-left: 3px solid transparent;
   cursor: pointer;
 }
 
 .entry:hover {
-  background: #f7f9fc;
+  background: rgba(var(--v-theme-primary), 0.04);
 }
 
 .entry--error {
-  border-left-color: #d32f2f;
+  border-left-color: rgb(var(--v-theme-error));
 }
 
 .entry--warning {
-  border-left-color: #f9a825;
+  border-left-color: rgb(var(--v-theme-warning));
 }
 
 .entry--active {
-  background: #e3f2fd;
+  background: rgba(var(--v-theme-primary), 0.12);
 }
 
 .entry-icon {
@@ -1279,7 +1392,7 @@ defineExpose({
 
 .entry-meta {
   font-size: 0.72rem;
-  color: #777;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
 .entry-text {
@@ -1298,11 +1411,7 @@ defineExpose({
 
 .entry-more {
   font-size: 0.72rem;
-  color: #777;
-}
-
-.history-row {
-  cursor: pointer;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
 .protocol-line {
@@ -1313,25 +1422,25 @@ defineExpose({
 }
 
 .protocol-timestamp {
-  color: #666;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
   margin-right: 8px;
   font-size: 0.9em;
 }
 
 .protocol-message {
-  color: #333;
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .protocol-message.success {
-  color: #2e7d32;
+  color: rgb(var(--v-theme-success));
 }
 
 .protocol-message.error {
-  color: #c62828;
+  color: rgb(var(--v-theme-error));
 }
 
 .protocol-message.info {
-  color: #1565c0;
+  color: rgb(var(--v-theme-info));
 }
 
 /* HTML-протокол расчёта: переносы \\n и таблица с &nbsp; */
@@ -1343,35 +1452,12 @@ defineExpose({
 }
 
 .protocol-html :deep(a) {
-  color: #1565c0;
+  color: rgb(var(--v-theme-primary));
   text-decoration: underline;
   cursor: pointer;
 }
 
 .protocol-html :deep(a:hover) {
-  color: #0d47a1;
-}
-
-/* Стили для кнопок в светлой теме */
-.protocol-header :deep(.v-btn) {
-  color: #666;
-}
-
-.protocol-header :deep(.v-btn:hover) {
-  color: #333;
-  background-color: rgba(0, 0, 0, 0.04);
-}
-
-/* Стили для вкладок в светлой теме */
-:deep(.v-tab) {
-  color: #666;
-}
-
-:deep(.v-tab--selected) {
-  color: #1976d2;
-}
-
-:deep(.v-tab:hover) {
-  color: #333;
+  text-decoration-thickness: 2px;
 }
 </style>
