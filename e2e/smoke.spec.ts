@@ -70,10 +70,12 @@ test.describe('ITwin Map smoke', () => {
     const response = page.waitForResponse((r) => r.url().includes('piezometer/route'));
     await panel.getByRole('button', { name: 'Построить график' }).click();
     expect((await response).status()).toBe(200);
-    const modal = page.locator('.v-overlay--active').filter({ has: page.getByText('Пьезометрический график', { exact: true }) }).first();
-    await expect(modal).toBeVisible();
-    await modal.getByRole('tab', { name: 'Таблица узлов' }).click();
-    await expect(modal.locator('.piezo-table tbody tr').first()).toBeVisible();
+    // график — панель у нижнего края (ChartDock), карта над ней остаётся рабочей
+    const dock = page.getByRole('region', { name: 'Пьезометрический график' });
+    await expect(dock).toBeVisible();
+    await expect(dock.locator('.chart-frame canvas').first()).toBeVisible();
+    await dock.getByRole('button', { name: 'Таблица узлов' }).click();
+    await expect(dock.locator('.piezo-table tbody tr').first()).toBeVisible();
   });
 
   test('открываются «Отчёты Excel» с каталогом', async ({ page }) => {
