@@ -1470,7 +1470,12 @@ const toolDialogs: ToolDialogEntry[] = [
   {
     key: 'faultDiagnostics',
     component: lazyDialog(() => import('./FaultDiagnosticsModal.vue')),
-    on: { openDefect, openCorrosion: (indicatorId: unknown) => openLazyDialog('corrosionIndicator', { indicatorId }) },
+    on: {
+      openDefect,
+      openCorrosion: (indicatorId: unknown) => openLazyDialog('corrosionIndicator', { indicatorId }),
+      // «Журнал» у пометки «последние N из M» — полный список с фильтрами
+      openJournal: (kind: unknown) => openLazyDialog(kind === 'defect' ? 'defect' : 'corrosionIndicator', {}),
+    },
   },
   { key: 'calculationDiagnostics', component: lazyDialog(() => import('./CalculationDiagnosticsModal.vue')) },
   // Администрирование: пользователи и роли (только admin), история правок audit_log
