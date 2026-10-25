@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { h } from 'vue';
 import { mount } from '@vue/test-utils';
 import { createVuetify } from 'vuetify';
 import HintTip from '~/components/HintTip.vue';
@@ -23,5 +24,57 @@ describe('HintTip', () => {
   it('без хоткея и пояснения — только название', () => {
     const w = mountTip({ text: 'Закрыть' });
     expect((w.vm as any).ariaText).toBe('Закрыть');
+  });
+
+  describe('палец: долгое нажатие', () => {
+    afterEach(() => vi.useRealTimers());
+
+    const touch = (type: string, x = 10, y = 10) => {
+      const e = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y });
+      Object.assign(e, { pointerType: 'touch' });
+      return e;
+    };
+
+    const mountWithClick = () => {
+      const onClick = vi.fn();
+      const w = mount(HintTip, {
+        props: { text: 'Построить пьезометр' },
+        slots: { default: (p: { props: Record<string, unknown> }) => h('button', { ...p.props, onClick }, 'П') },
+        global: { plugins: [createVuetify()] },
+        attachTo: document.body,
+      });
+      return { w, onClick, btn: w.find('button').element };
+    };
+
+    it('полсекунды — подсказка открыта, отпускание не нажимает кнопку; обычное касание — нажимает', async () => {
+      vi.useFakeTimers();
+      const { w, onClick, btn } = mountWithClick();
+      btn.dispatchEvent(touch('pointerdown'));
+      vi.advanceTimersByTime(500);
+      await w.vm.$nextTick();
+      expect((w.vm as any).$.setupState.open).toBe(true);
+      btn.dispatchEvent(touch('pointerup'));
+      btn.click();
+      expect(onClick).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(2500);
+      expect((w.vm as any).$.setupState.open).toBe(false);
+
+      btn.dispatchEvent(touch('pointerdown'));
+      vi.advanceTimersByTime(100);
+      btn.dispatchEvent(touch('pointerup'));
+      btn.click();
+      expect(onClick).toHaveBeenCalledTimes(1);
+      w.unmount();
+    });
+
+    it('палец сдвинулся — это прокрутка, подсказки нет', () => {
+      vi.useFakeTimers();
+      const { w, btn } = mountWithClick();
+      btn.dispatchEvent(touch('pointerdown', 10, 10));
+      btn.dispatchEvent(touch('pointermove', 10, 40));
+      vi.advanceTimersByTime(600);
+      expect((w.vm as any).$.setupState.open).toBe(false);
+      w.unmount();
+    });
   });
 });

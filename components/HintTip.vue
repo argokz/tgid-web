@@ -1,5 +1,6 @@
 <template>
   <v-tooltip
+    v-model="open"
     :location="location"
     :disabled="disabled || !text"
     :open-delay="openDelay"
@@ -8,7 +9,7 @@
     content-class="hint-tip"
   >
     <template #activator="{ props: activatorProps }">
-      <slot :props="activatorProps" />
+      <slot :props="withLongPress(activatorProps)" />
     </template>
     <div class="hint-tip__title">
       <span>{{ text }}</span>
@@ -25,12 +26,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, mergeProps, onBeforeUnmount, ref } from 'vue';
 
 /**
  * HintTip — обёртка над v-tooltip с единым содержимым для всех иконочных кнопок (docs/ui-primitives.md):
  * название действия в повелительном наклонении («Построить пьезометр»), хоткей, одна строка пояснения.
- * aria-label у самой кнопки остаётся — подсказка её не заменяет. Тач-эквивалент (долгое нажатие) — этап 7.
+ * aria-label у самой кнопки остаётся — подсказка её не заменяет. Палец: наведения нет — подсказка по долгому
+ * нажатию (полсекунды), держится 2,5 с; отпускание после долгого нажатия не нажимает кнопку.
  */
 const props = withDefaults(defineProps<{
   /** Название действия */
@@ -52,6 +54,63 @@ const props = withDefaults(defineProps<{
 
 /** Пауза перед скрытием: успеть перевести курсор с кнопки на подсказку (WCAG 1.4.13 hoverable) */
 const HOVER_BRIDGE_MS = 80;
+
+const open = ref(false);
+
+/** Долгое нажатие пальцем: через сколько показать подсказку, сколько держать, какой сдвиг — уже прокрутка */
+const LONG_PRESS_MS = 500;
+const TOUCH_HINT_MS = 2500;
+const LONG_PRESS_SLOP_PX = 10;
+
+let pressTimer: ReturnType<typeof setTimeout> | null = null;
+let hideTimer: ReturnType<typeof setTimeout> | null = null;
+let pressStart: { x: number; y: number } | null = null;
+/** Долгое нажатие сработало — следующий click (на отпускании) — не нажатие кнопки */
+let swallowClick = false;
+
+const cancelPress = () => {
+  if (pressTimer) clearTimeout(pressTimer);
+  pressTimer = null;
+  pressStart = null;
+};
+
+const touchHandlers = {
+  onPointerdown: (e: PointerEvent) => {
+    if (e.pointerType !== 'touch' || props.disabled || !props.text) return;
+    cancelPress();
+    swallowClick = false;
+    pressStart = { x: e.clientX, y: e.clientY };
+    pressTimer = setTimeout(() => {
+      pressTimer = null;
+      swallowClick = true;
+      open.value = true;
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => { open.value = false; }, TOUCH_HINT_MS);
+    }, LONG_PRESS_MS);
+  },
+  onPointermove: (e: PointerEvent) => {
+    if (pressStart && Math.hypot(e.clientX - pressStart.x, e.clientY - pressStart.y) > LONG_PRESS_SLOP_PX) cancelPress();
+  },
+  onPointerup: cancelPress,
+  onPointercancel: cancelPress,
+  // долгое нажатие на телефоне открывает контекстное меню браузера — здесь вместо него подсказка
+  onContextmenu: (e: Event) => {
+    if (swallowClick || pressTimer) e.preventDefault();
+  },
+  onClickCapture: (e: Event) => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  },
+};
+
+const withLongPress = (activatorProps: Record<string, unknown>) => mergeProps(activatorProps, touchHandlers);
+
+onBeforeUnmount(() => {
+  cancelPress();
+  if (hideTimer) clearTimeout(hideTimer);
+});
 
 /** Полный текст подсказки одной строкой (читалки экрана, тесты) */
 const ariaText = computed(() => [props.text, props.hotkey && `(${props.hotkey})`, props.hint].filter(Boolean).join(' '));

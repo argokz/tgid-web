@@ -4,9 +4,16 @@
     class="protocol-container"
     :style="containerStyle"
   >
+    <!-- Высота протокола: мышь, палец, перо — pointer events; с клавиатуры — стрелки (Shift — крупный шаг) -->
     <div
       class="protocol-resize-handle"
-      @mousedown="startResize"
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Высота протокола"
+      :aria-valuenow="Math.round(protocolHeight)"
+      tabindex="0"
+      @pointerdown="startResize"
+      @keydown="onResizeKey"
     />
     <v-card
       class="protocol-card"
@@ -637,26 +644,46 @@ watch(() => props.show, (newValue) => {
   }
 });
 
-const startResize = (e: MouseEvent) => {
+/** Пределы высоты протокола: свёрнут — 40 px, сверху — не выше шапки */
+const PROTOCOL_MIN_HEIGHT_PX = 40;
+const PROTOCOL_TOP_GAP_PX = 64;
+const RESIZE_KEY_STEP_PX = 24;
+const RESIZE_KEY_STEP_LARGE_PX = 120;
+
+const setProtocolHeight = (height: number) => {
+  protocolHeight.value = Math.max(PROTOCOL_MIN_HEIGHT_PX, Math.min(window.innerHeight - PROTOCOL_TOP_GAP_PX, height));
+  if (protocolHeight.value > PROTOCOL_MIN_HEIGHT_PX) {
+    isMinimized.value = false;
+  }
+};
+
+let stopResize: (() => void) | null = null;
+const startResize = (e: PointerEvent) => {
+  if (e.button !== 0 || stopResize) return;
   e.preventDefault();
   const startY = e.clientY;
   const startHeight = protocolHeight.value;
 
-  const handleMouseMove = (e: MouseEvent) => {
-    const deltaY = startY - e.clientY;
-    protocolHeight.value = Math.max(40, Math.min(window.innerHeight - 64, startHeight + deltaY));
-    if (protocolHeight.value > 40) {
-      isMinimized.value = false;
-    }
+  const handleMove = (ev: PointerEvent) => setProtocolHeight(startHeight + startY - ev.clientY);
+  stopResize = () => {
+    window.removeEventListener('pointermove', handleMove);
+    window.removeEventListener('pointerup', stop);
+    window.removeEventListener('pointercancel', stop);
+    stopResize = null;
   };
+  const stop = () => stopResize?.();
 
-  const handleMouseUp = () => {
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-  };
+  window.addEventListener('pointermove', handleMove);
+  window.addEventListener('pointerup', stop);
+  window.addEventListener('pointercancel', stop);
+};
+onBeforeUnmount(() => stopResize?.());
 
-  document.addEventListener('mousemove', handleMouseMove);
-  document.addEventListener('mouseup', handleMouseUp);
+const onResizeKey = (e: KeyboardEvent) => {
+  const dir = e.key === 'ArrowUp' ? 1 : e.key === 'ArrowDown' ? -1 : 0;
+  if (!dir) return;
+  e.preventDefault();
+  setProtocolHeight(protocolHeight.value + dir * (e.shiftKey ? RESIZE_KEY_STEP_LARGE_PX : RESIZE_KEY_STEP_PX));
 };
 
 const addLog = (log: { timestamp: string; message: string; type: string; html: boolean }) => {
@@ -1269,6 +1296,23 @@ defineExpose({
   transition: background-color 0.2s;
   position: relative;
   z-index: 1001;
+  /* палец: тянуть, а не прокручивать страницу */
+  touch-action: none;
+}
+
+/* зона захвата пальцем — 44 px при видимой полосе 4 px; только вверх, над картой: вниз она перекрыла бы кнопки
+   шапки протокола */
+@media (pointer: coarse) {
+  .protocol-resize-handle::before {
+    content: "";
+    position: absolute;
+    inset: -40px 0 0;
+  }
+}
+
+.protocol-resize-handle:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: -2px;
 }
 
 .protocol-resize-handle:hover {
