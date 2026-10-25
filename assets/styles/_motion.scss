@@ -1,0 +1,100 @@
+// Движение интерфейса (этап 7, docs/ui-modernization-prompt.md, раздел 12).
+// Только opacity и отдельные свойства translate / scale: они складываются с transform, которым панели
+// центрируются (EditorToolbar) и едут при перетаскивании (useFloatingDrag), и не трогают раскладку.
+// Вход — пружина без перелёта (--ease-spring) за --duration-slow, выход быстрее (--duration-exit).
+// При «уменьшении движения» длительности в _tokens.scss нулевые — смена мгновенная.
+
+:root {
+  --duration-exit: 160ms;   // уход панели, окна, поповера — быстрее входа
+  --motion-shift: 16px;     // откуда выезжает панель
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-exit: 0ms;
+  }
+}
+
+// Vue <Transition name="motion-panel-right | -left | -up">: панель выезжает от своего края
+.motion-panel-right-enter-active,
+.motion-panel-left-enter-active,
+.motion-panel-up-enter-active,
+.motion-pop-enter-active {
+  transition:
+    translate var(--duration-slow) var(--ease-spring),
+    scale var(--duration-slow) var(--ease-spring),
+    opacity var(--duration-base) var(--ease-out);
+}
+
+.motion-panel-right-leave-active,
+.motion-panel-left-leave-active,
+.motion-panel-up-leave-active,
+.motion-pop-leave-active {
+  transition:
+    translate var(--duration-exit) var(--ease-in),
+    scale var(--duration-exit) var(--ease-in),
+    opacity var(--duration-exit) var(--ease-in);
+}
+
+.motion-panel-right-enter-from,
+.motion-panel-right-leave-to {
+  translate: var(--motion-shift) 0;
+  opacity: 0;
+}
+
+.motion-panel-left-enter-from,
+.motion-panel-left-leave-to {
+  translate: calc(-1 * var(--motion-shift)) 0;
+  opacity: 0;
+}
+
+.motion-panel-up-enter-from,
+.motion-panel-up-leave-to {
+  translate: 0 var(--motion-shift);
+  opacity: 0;
+}
+
+// Окно и тулбар: растут из своей точки (transform-origin задаёт компонент)
+.motion-pop-enter-from,
+.motion-pop-leave-to {
+  scale: 0.96;
+  opacity: 0;
+}
+
+// Микро-отклик на нажатие: кнопка чуть «проседает» за --duration-fast.
+// Двойной класс — стили Vuetify подключаются позже и с одним классом перебивают transition-property
+.v-btn.v-btn {
+  transition-property: box-shadow, transform, opacity, background, scale;
+}
+
+.v-btn.v-btn:active:not(.v-btn--disabled, .v-btn--loading) {
+  scale: 0.96;
+  transition-duration: var(--duration-fast);
+}
+
+// Строка таблицы после сохранения (DataTable, flashKey): подсветка акцентом держится и гаснет к концу
+// подсветки журнала (useJournalEdit, FLASH_MS = 2,5 с) — раньше она пропадала рывком
+@keyframes motion-row-flash {
+  0%,
+  35% {
+    background-color: var(--accent-soft);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 3px 0 0 transparent;
+  }
+}
+
+.motion-row-flash > td {
+  animation: motion-row-flash 2.5s var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  // без затухания: подсветка ровная, снимается вместе с flashKey
+  .motion-row-flash > td {
+    animation: none;
+    background-color: var(--accent-soft);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+}

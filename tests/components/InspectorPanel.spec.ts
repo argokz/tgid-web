@@ -60,4 +60,23 @@ describe('InspectorPanel', () => {
     await tabs[1].trigger('click');
     expect(w.emitted('update:tab')?.at(-1)).toEqual([1]);
   });
+
+  it('окно браузера сузили — окно карточки показано в его пределах, сохранённое размещение не ужимается', async () => {
+    const layout = useObjectCardLayout();
+    layout.mode = 'float';
+    Object.assign(layout.float, { x: 600, y: 100, w: 560, h: 640 });
+    Object.assign(window, { innerWidth: 500, innerHeight: 400 });
+    const w = mountPanel();
+    window.dispatchEvent(new Event('resize'));
+    await w.vm.$nextTick();
+    const style = (w.find('.oc-shell').element as HTMLElement).style;
+    expect([style.left, style.top, style.width, style.height]).toEqual(['8px', '8px', '484px', '384px']);
+    expect(layout.float).toEqual({ x: 600, y: 100, w: 560, h: 640 });
+    Object.assign(window, { innerWidth: 1280, innerHeight: 800 });
+    window.dispatchEvent(new Event('resize'));
+    await w.vm.$nextTick();
+    expect(style.left).toBe('600px');
+    w.unmount();
+    layout.mode = 'panel';
+  });
 });

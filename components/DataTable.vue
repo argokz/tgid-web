@@ -40,6 +40,7 @@ import { VDataTable, VDataTableVirtual } from 'vuetify/components/VDataTable';
  * Виртуализация включается от `virtualFrom` строк (200): высота строки предсказуема (одна строка текста,
  * длинное — обрезается с полным текстом в title), иначе ломается расчёт прокрутки Vuetify.
  * Выбор строки — событие `select(item)` мышью и с клавиатуры (Enter / пробел), подсветка `selectedKey`;
+ * только что сохранённая строка — `flashKey` (подсветка гаснет, _motion.scss);
  * слоты `item.<key>` проходят насквозь. Сортировка работает сама; родитель может задать `sortBy` и слушать
  * `update:sortBy` (например, для серверной сортировки).
  */
@@ -72,6 +73,8 @@ const props = withDefaults(defineProps<{
   height?: number | string;
   selectable?: boolean;
   selectedKey?: string | number | null;
+  /** Строка, которую только что сохранили: подсвечивается и гаснет (снимает родитель, обычно через 2,5 с) */
+  flashKey?: string | number | null;
   sortBy?: readonly SortItem[];
   noDataText?: string;
   loadingText?: string;
@@ -84,6 +87,7 @@ const props = withDefaults(defineProps<{
   height: 480,
   selectable: false,
   selectedKey: null,
+  flashKey: null,
   sortBy: () => [],
   noDataText: 'Записей нет',
   loadingText: 'Загрузка…',
@@ -125,11 +129,14 @@ const tableHeaders = computed(() => props.columns.map((c) => ({
 
 const rowProps = ({ item }: { item: Record<string, unknown> }) => {
   const selected = props.selectedKey != null && item[props.itemKey] === props.selectedKey;
+  const flash = props.flashKey != null && item[props.itemKey] === props.flashKey;
+  const rowClass = [selected && 'data-table__row--selected', flash && 'motion-row-flash'].filter(Boolean);
+  const cls = rowClass.length ? rowClass : undefined;
   if (!props.selectable) {
-    return { class: selected ? 'data-table__row--selected' : undefined };
+    return { class: cls };
   }
   return {
-    class: selected ? 'data-table__row--selected' : undefined,
+    class: cls,
     'aria-selected': selected ? 'true' : 'false',
     tabindex: 0,
     onClick: () => emit('select', item),

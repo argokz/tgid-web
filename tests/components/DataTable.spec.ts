@@ -56,4 +56,14 @@ describe('DataTable', () => {
     const empty = mountWithVuetify(DataTable, { props: { columns, items: [], noDataText: 'Диафрагм нет' } });
     expect(empty.text()).toContain('Диафрагм нет');
   });
+
+  it('только что сохранённая строка (flashKey) подсвечивается отдельно от выбранной', async () => {
+    const w = mountWithVuetify(DataTable, { props: { columns, items: rows(3), selectedKey: 1, flashKey: 3 } });
+    const trs = w.findAll('tbody tr');
+    expect(trs[2].classes()).toContain('motion-row-flash');
+    expect(trs[2].classes()).not.toContain('data-table__row--selected');
+    expect(trs[0].classes()).not.toContain('motion-row-flash');
+    await w.setProps({ flashKey: null });
+    expect(w.findAll('tbody tr')[2].classes()).not.toContain('motion-row-flash');
+  });
 });

@@ -10,31 +10,37 @@
   >
     <slot />
   </BottomSheet>
-  <!-- Окно свойств без затемнения карты: панель справа или плавающее окно (useObjectCardLayout) -->
-  <div
-    v-else-if="modelValue"
-    ref="root"
-    class="oc-shell"
-    :class="[`oc-shell--${layout.mode}`, { 'oc-shell--dragging': resizing || moving }]"
-    :style="shellStyle"
-    role="dialog"
-    aria-modal="false"
-    @pointerdown="onDragDown"
+  <!-- Окно свойств без затемнения карты: панель справа или плавающее окно (useObjectCardLayout);
+       панель выезжает справа, окно вырастает (_motion.scss) -->
+  <Transition
+    v-else
+    :name="layout.mode === 'panel' ? 'motion-panel-right' : 'motion-pop'"
   >
     <div
-      v-if="layout.mode === 'panel'"
-      class="oc-resize oc-resize--left"
-      title="Ширина панели"
-      @pointerdown.stop.prevent="startResize($event, 'panel')"
-    />
-    <slot />
-    <div
-      v-if="layout.mode === 'float'"
-      class="oc-resize oc-resize--corner"
-      title="Размер окна"
-      @pointerdown.stop.prevent="startResize($event, 'float')"
-    />
-  </div>
+      v-if="modelValue"
+      ref="root"
+      class="oc-shell"
+      :class="[`oc-shell--${layout.mode}`, { 'oc-shell--dragging': resizing || moving }]"
+      :style="shellStyle"
+      role="dialog"
+      aria-modal="false"
+      @pointerdown="onDragDown"
+    >
+      <div
+        v-if="layout.mode === 'panel'"
+        class="oc-resize oc-resize--left"
+        title="Ширина панели"
+        @pointerdown.stop.prevent="startResize($event, 'panel')"
+      />
+      <slot />
+      <div
+        v-if="layout.mode === 'float'"
+        class="oc-resize oc-resize--corner"
+        title="Размер окна"
+        @pointerdown.stop.prevent="startResize($event, 'float')"
+      />
+    </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
@@ -74,9 +80,10 @@ watch(() => props.mobile, (mobile) => {
   if (!props.modelValue) sheet.value = Boolean(mobile);
 });
 
+// Окно браузера уменьшили — карточка показывается в его пределах (shellStyle), а сохранённое размещение не
+// переписывается: раньше временное сужение окна навсегда ужимало окно карточки до 320×240 в углу
 const updateViewport = () => {
   viewport.value = { w: window.innerWidth, h: window.innerHeight };
-  if (layout.mode === 'float') Object.assign(layout.float, clampFloat(layout.float, viewport.value.w, viewport.value.h));
 };
 
 onMounted(() => {
@@ -155,12 +162,11 @@ const stopPointer = () => {
   window.removeEventListener('pointercancel', stopPointer);
   move = null;
   if (geometryFrame) cancelAnimationFrame(geometryFrame);
-  geometryFrame = 0;
+  // Последний кадр — сразу в DOM: inline-стиль совпадает с итогом, а Vue при следующем рендере пишет те же
+  // значения. Стирать стиль нельзя: при итоге, равном прежнему, рендера нет — окно теряло размеры и место
   const g = pendingGeometry;
+  applyPendingToDom();
   pendingGeometry = null;
-  // Inline-style больше не нужен: итог идёт через shellStyle (иначе при равном итоге Vue не перепатчит
-  // стиль, и останется промежуточное положение из последнего кадра)
-  if (root.value) root.value.style.cssText = '';
   if (g) {
     const { panelWidth, ...float } = g;
     if (panelWidth != null) layout.panelWidth = panelWidth;
@@ -177,14 +183,16 @@ const listenPointer = (handler: (e: PointerEvent) => void) => {
 };
 
 const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
-  const start = { x: e.clientX, y: e.clientY, w: layout.panelWidth, fw: layout.float.w, fh: layout.float.h };
+  // от показанных размеров (в пределах окна), а не от сохранённых — иначе первый шаг дёргал бы рамку
+  const shown = clampFloat(layout.float, viewport.value.w, viewport.value.h);
+  const start = { x: e.clientX, y: e.clientY, w: clampPanelWidth(layout.panelWidth, viewport.value.w), fw: shown.w, fh: shown.h };
   resizing.value = true;
   listenPointer((ev: PointerEvent) => {
     if (what === 'panel') {
       scheduleGeometry({ panelWidth: clampPanelWidth(start.w + start.x - ev.clientX, viewport.value.w) });
     } else {
       const f = clampFloat(
-        { ...layout.float, w: start.fw + ev.clientX - start.x, h: start.fh + ev.clientY - start.y },
+        { ...shown, w: start.fw + ev.clientX - start.x, h: start.fh + ev.clientY - start.y },
         viewport.value.w, viewport.value.h,
       );
       scheduleGeometry({ x: f.x, y: f.y, w: f.w, h: f.h });

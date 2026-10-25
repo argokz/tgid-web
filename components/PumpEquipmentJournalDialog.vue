@@ -199,7 +199,7 @@
                 :items="(installed as Record<string, unknown>[])"
                 item-key="id"
                 selectable
-                :selected-key="flashId"
+                :flash-key="flashId"
                 density="compact"
                 class="pump-table"
                 @select="openInstalledDetails(Number($event.id))"

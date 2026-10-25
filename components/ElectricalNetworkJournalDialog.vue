@@ -197,7 +197,7 @@
                 :items="rows"
                 item-key="row_key"
                 selectable
-                :selected-key="flashKey"
+                :flash-key="flashKey"
                 density="compact"
                 class="electrical-table"
                 @select="openDetails($event.object_type as ElectricalObjectType, Number($event.id))"

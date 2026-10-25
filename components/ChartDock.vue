@@ -52,85 +52,87 @@
       </div>
     </BottomSheet>
 
-    <section
-      v-else-if="modelValue"
-      ref="dockRef"
-      class="chart-dock chart-dock--desktop"
-      :class="{ 'chart-dock--collapsed': collapsed }"
-      :style="dockStyle"
-      role="region"
-      :aria-label="title"
-    >
-      <header class="chart-dock__header">
-        <v-icon
-          v-if="icon"
-          color="primary"
-          size="20"
-        >
-          {{ icon }}
-        </v-icon>
-        <div class="chart-dock__heading">
-          <div class="chart-dock__title text-truncate">
-            {{ title }}
+    <Transition name="motion-panel-up">
+      <section
+        v-if="modelValue && !isMobile"
+        ref="dockRef"
+        class="chart-dock chart-dock--desktop"
+        :class="{ 'chart-dock--collapsed': collapsed }"
+        :style="dockStyle"
+        role="region"
+        :aria-label="title"
+      >
+        <header class="chart-dock__header">
+          <v-icon
+            v-if="icon"
+            color="primary"
+            size="20"
+          >
+            {{ icon }}
+          </v-icon>
+          <div class="chart-dock__heading">
+            <div class="chart-dock__title text-truncate">
+              {{ title }}
+            </div>
+            <div
+              v-if="subtitle"
+              class="chart-dock__subtitle text-truncate"
+            >
+              {{ subtitle }}
+            </div>
           </div>
           <div
-            v-if="subtitle"
-            class="chart-dock__subtitle text-truncate"
+            v-if="$slots.actions && !collapsed"
+            class="chart-dock__actions"
           >
-            {{ subtitle }}
+            <slot name="actions" />
           </div>
-        </div>
+          <HintTip
+            :text="collapsed ? 'Развернуть панель' : 'Свернуть панель'"
+            hint="Карта под панелью остаётся рабочей"
+            location="top"
+          >
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                size="small"
+                variant="text"
+                :aria-expanded="!collapsed"
+                :aria-label="collapsed ? 'Развернуть панель' : 'Свернуть панель'"
+                @click="collapsed = !collapsed"
+              >
+                <v-icon>{{ collapsed ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
+          <HintTip
+            text="Закрыть"
+            hotkey="Esc"
+            location="top"
+          >
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                size="small"
+                variant="text"
+                aria-label="Закрыть"
+                @click="close"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
+        </header>
         <div
-          v-if="$slots.actions && !collapsed"
-          class="chart-dock__actions"
+          v-show="!collapsed"
+          class="chart-dock__body"
         >
-          <slot name="actions" />
+          <slot />
         </div>
-        <HintTip
-          :text="collapsed ? 'Развернуть панель' : 'Свернуть панель'"
-          hint="Карта под панелью остаётся рабочей"
-          location="top"
-        >
-          <template #default="{ props: tip }">
-            <v-btn
-              v-bind="tip"
-              icon
-              size="small"
-              variant="text"
-              :aria-expanded="!collapsed"
-              :aria-label="collapsed ? 'Развернуть панель' : 'Свернуть панель'"
-              @click="collapsed = !collapsed"
-            >
-              <v-icon>{{ collapsed ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-            </v-btn>
-          </template>
-        </HintTip>
-        <HintTip
-          text="Закрыть"
-          hotkey="Esc"
-          location="top"
-        >
-          <template #default="{ props: tip }">
-            <v-btn
-              v-bind="tip"
-              icon
-              size="small"
-              variant="text"
-              aria-label="Закрыть"
-              @click="close"
-            >
-              <v-icon>mdi-close</v-icon>
-            </v-btn>
-          </template>
-        </HintTip>
-      </header>
-      <div
-        v-show="!collapsed"
-        class="chart-dock__body"
-      >
-        <slot />
-      </div>
-    </section>
+      </section>
+    </Transition>
   </Teleport>
 </template>
 

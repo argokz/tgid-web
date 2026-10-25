@@ -219,7 +219,7 @@
                 :items="(inventory as Record<string, unknown>[])"
                 item-key="id"
                 selectable
-                :selected-key="flashId"
+                :flash-key="flashId"
                 density="compact"
                 class="bypass-table"
                 @select="openItemDetails(Number($event.id))"

@@ -232,7 +232,7 @@
                 :items="inventoryRows"
                 item-key="row_key"
                 selectable
-                :selected-key="flashKey"
+                :flash-key="flashKey"
                 density="compact"
                 class="armature-table"
                 @select="openItemDetails($event.equipment_type as NetworkArmatureType, Number($event.id))"

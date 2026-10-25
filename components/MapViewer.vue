@@ -119,11 +119,13 @@
         />
 
         <!-- Панель рисования и измерений на карте -->
-        <LazyDrawPanel
-          v-if="uiStore.drawPanelOpen"
-          v-model="uiStore.drawPanelOpen"
-          :map="mapStore.map"
-        />
+        <Transition name="motion-panel-left">
+          <LazyDrawPanel
+            v-if="uiStore.drawPanelOpen"
+            v-model="uiStore.drawPanelOpen"
+            :map="mapStore.map"
+          />
+        </Transition>
 
         <!-- Right Map Controls -->
         <MapControls
@@ -346,10 +348,12 @@
         />
 
         <!-- Панель инструментов редактора сети: инструменты, параметры активного, отмена/повтор -->
-        <EditorToolbar
-          v-if="isEditTopologyMode"
-          :editor="topologyEditor"
-        />
+        <Transition name="motion-pop">
+          <EditorToolbar
+            v-if="isEditTopologyMode"
+            :editor="topologyEditor"
+          />
+        </Transition>
         <EditorStatusBar
           v-if="isEditTopologyMode && !chainPreviewOpen"
           :tool="activeTool"
@@ -358,28 +362,30 @@
         <!-- Координаты курсора внизу карты: WGS84 / местная / десктоп, копирование -->
         <CursorCoords />
         <!-- Легенда раскраски результатов расчёта: та же шкала, что у слоя (utils/calculationScale) -->
-        <MapLegend
-          v-if="mapStore.activeCalculationId !== null"
-          :title="calculationLegend.title"
-          :subtitle="`Расчёт №${mapStore.activeCalculationId}`"
-          :stops="calculationLegend.stops"
-          :units="calculationLegend.units"
-        >
-          <template #actions>
-            <HintTip text="Убрать расчёт с карты">
-              <template #default="{ props: tip }">
-                <v-btn
-                  v-bind="tip"
-                  icon="mdi-close"
-                  size="x-small"
-                  variant="text"
-                  aria-label="Убрать расчёт с карты"
-                  @click="clearCalculationFromMap"
-                />
-              </template>
-            </HintTip>
-          </template>
-        </MapLegend>
+        <Transition name="motion-panel-up">
+          <MapLegend
+            v-if="mapStore.activeCalculationId !== null"
+            :title="calculationLegend.title"
+            :subtitle="`Расчёт №${mapStore.activeCalculationId}`"
+            :stops="calculationLegend.stops"
+            :units="calculationLegend.units"
+          >
+            <template #actions>
+              <HintTip text="Убрать расчёт с карты">
+                <template #default="{ props: tip }">
+                  <v-btn
+                    v-bind="tip"
+                    icon="mdi-close"
+                    size="x-small"
+                    variant="text"
+                    aria-label="Убрать расчёт с карты"
+                    @click="clearCalculationFromMap"
+                  />
+                </template>
+              </HintTip>
+            </template>
+          </MapLegend>
+        </Transition>
         <LazyHotkeysHelp
           v-if="hotkeysHelpOpen"
           v-model="hotkeysHelpOpen"

@@ -513,6 +513,7 @@ const statusChips = computed(() => {
   top: 72px;
   left: 50%;
   transform: translateX(-50%);
+  transform-origin: 50% 0;
   /* стекло уровня 1 — из токенов (fallback и .map-moving в _tokens.scss) */
   background: var(--glass-1-bg);
   -webkit-backdrop-filter: var(--glass-1-filter);

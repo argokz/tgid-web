@@ -291,7 +291,7 @@
               :items="(items as Record<string, unknown>[])"
               item-key="id"
               selectable
-              :selected-key="flashId"
+              :flash-key="flashId"
               density="compact"
               class="tu-table"
               @select="openDetails(Number($event.id))"

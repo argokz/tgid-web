@@ -182,8 +182,11 @@ defineExpose({ update })
   color: rgb(var(--v-theme-on-surface));
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-3);
-  animation: map-popover-in var(--duration-base) var(--ease-out);
+  /* растёт из точки карты: начало масштаба — кончик стрелки (сверху или снизу от поповера) */
+  transform-origin: var(--map-popover-tip, 50%) calc(100% + 6px);
+  animation: map-popover-in var(--duration-base) var(--ease-spring);
 }
+.map-popover--bottom { transform-origin: var(--map-popover-tip, 50%) -6px; }
 .map-popover:focus { outline: none; }
 .map-popover--hidden { visibility: hidden; }
 .map-popover__header {
@@ -215,7 +218,7 @@ defineExpose({ update })
 .map-popover--top .map-popover__tip { bottom: -6px; box-shadow: 2px 2px 3px rgba(15, 23, 42, 0.08); }
 .map-popover--bottom .map-popover__tip { top: -6px; }
 @keyframes map-popover-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; scale: 0.9; }
+  to { opacity: 1; scale: 1; }
 }
 </style>

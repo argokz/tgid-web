@@ -278,11 +278,15 @@ onBeforeUnmount(() => ui.setLeftInset(0))
   opacity: 1 !important;
 }
 
-/* Анимация появления/скрытия панели (после гидрации) */
-.slide-enter-active,
+/* Анимация появления/скрытия панели (после гидрации): токены _motion.scss — вход пружиной, выход быстрее */
+.slide-enter-active {
+  transition: transform var(--duration-slow) var(--ease-spring),
+              opacity   var(--duration-base) var(--ease-out);
+}
+
 .slide-leave-active {
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity   0.2s  cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--duration-exit) var(--ease-in),
+              opacity   var(--duration-exit) var(--ease-in);
 }
 
 .slide-enter-from,
@@ -292,8 +296,8 @@ onBeforeUnmount(() => ui.setLeftInset(0))
 }
 
 /* Анимация кнопки */
-.fade-enter-active,
-.fade-leave-active { transition: opacity 0.2s; }
+.fade-enter-active { transition: opacity var(--duration-base) var(--ease-out); }
+.fade-leave-active { transition: opacity var(--duration-exit) var(--ease-in); }
 .fade-enter-from,
 .fade-leave-to     { opacity: 0; }
 </style>

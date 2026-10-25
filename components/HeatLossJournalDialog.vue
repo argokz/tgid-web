@@ -147,7 +147,7 @@
                   :items="(seasons as Record<string, unknown>[])"
                   item-key="id"
                   selectable
-                  :selected-key="flashId"
+                  :flash-key="flashId"
                   density="compact"
                   class="season-table"
                   @select="openSeason(Number($event.id))"

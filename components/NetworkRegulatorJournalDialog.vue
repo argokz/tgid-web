@@ -232,7 +232,7 @@
                 :items="inventoryRows"
                 item-key="row_key"
                 selectable
-                :selected-key="flashKey"
+                :flash-key="flashKey"
                 density="compact"
                 class="regulator-table"
                 @select="openItemDetails($event.regulator_type as NetworkRegulatorType, Number($event.id))"
