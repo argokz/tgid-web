@@ -71,8 +71,9 @@ describe('RegimeAnalysisDialog', () => {
     expect(api.getAdmissibility).toHaveBeenCalledWith(3, 74, undefined);
     expect(w.findAll('thead th').map((th) => th.text())).not.toContain('_hidden');
     expect(w.findAll('tbody tr')).toHaveLength(3);
-    const chip = w.findAll('.v-chip').find((c) => c.text().includes('авария'));
-    await chip!.trigger('click');
+    // режимы — плитки-фильтры (KpiTile) вместо чипов
+    const tile = w.findAll('.ra-tiles button').find((c) => c.text().includes('авария'));
+    await tile!.trigger('click');
     expect(w.findAll('tbody tr')).toHaveLength(1);
     w.unmount();
   });
