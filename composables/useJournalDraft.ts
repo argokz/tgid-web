@@ -1,5 +1,4 @@
 import { onBeforeUnmount } from 'vue';
-import type { JournalKey } from '~/services/journalWriteService';
 import { useAuthStore } from '~/stores/authStore';
 import { appStorage } from '~/utils/appStorage';
 import { clearDraft, draftKey, draftMatches, loadDraft, saveDraft, type JournalDraft } from '~/utils/journalDraft';
@@ -11,7 +10,7 @@ const SAVE_DELAY_MS = 400;
  * в `appStorage` с задержкой; при повторном открытии той же записи черновик предлагается, если запись на
  * сервере не изменилась (сверка снимка). Явное «Сохранить» и «Отменить» черновик удаляют. В базу — ничего.
  */
-export function useJournalDraft(journal: JournalKey) {
+export function useJournalDraft(journal: string) {
   const authStore = useAuthStore();
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: (() => void) | null = null;

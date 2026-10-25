@@ -26,47 +26,96 @@
               {{ scopeTitle }} · найдено {{ total }}
             </div>
           </div>
-          <v-btn
-            color="cyan-darken-1"
-            variant="tonal"
-            prepend-icon="mdi-map-marker-radius"
-            class="mr-2"
-            title="Подобрать точку подключения для заявки: узлы рядом, режим по расчёту, рекомендация ИИ"
-            @click="connectionVisible = true"
+          <HintTip
+            text="Подобрать точку подключения"
+            hint="Узлы рядом с заявкой, режим по расчёту, рекомендация ИИ"
+            location="bottom"
           >
-            Точка подключения
-          </v-btn>
-          <v-btn
-            color="cyan-darken-1"
-            variant="tonal"
-            prepend-icon="mdi-chart-box-outline"
-            class="mr-2"
-            :loading="loadingBalance"
-            @click="downloadBalance"
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                color="secondary"
+                variant="tonal"
+                prepend-icon="mdi-map-marker-radius"
+                class="mr-2"
+                @click="connectionVisible = true"
+              >
+                Точка подключения
+              </v-btn>
+            </template>
+          </HintTip>
+          <HintTip
+            text="Выгрузить свод ТУ"
+            hint="Excel по выбранному году выдачи"
+            location="bottom"
           >
-            Свод
-          </v-btn>
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                color="secondary"
+                variant="tonal"
+                prepend-icon="mdi-chart-box-outline"
+                class="mr-2"
+                :loading="loadingBalance"
+                @click="downloadBalance"
+              >
+                Свод
+              </v-btn>
+            </template>
+          </HintTip>
           <v-btn
             v-if="mutationsEnabled"
-            color="cyan-darken-3"
+            color="primary"
             variant="flat"
             prepend-icon="mdi-plus"
             class="mr-2"
-            @click="createTechnicalCondition"
             :loading="creating"
+            @click="createTechnicalCondition"
           >
             Создать
           </v-btn>
-          <v-btn
-            icon
-            variant="text"
-            aria-label="Закрыть журнал"
-            @click="visible = false"
+          <HintTip
+            text="Закрыть реестр"
+            hotkey="Esc"
+            location="bottom"
           >
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Закрыть журнал"
+                @click="visible = false"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
         </v-card-title>
         <v-divider />
+
+        <!-- Плитки из ответа списка: всего и по состояниям договора при тех же фильтрах; плитка — фильтр -->
+        <div
+          v-if="stateTiles.length"
+          class="tu-kpi px-3 px-md-4 pt-3"
+        >
+          <KpiTile
+            label="Найдено"
+            :value="total"
+            :compact="false"
+          />
+          <KpiTile
+            v-for="tile in stateTiles"
+            :key="tile.id"
+            :label="tile.name"
+            :value="tile.count"
+            :compact="false"
+            :status="tile.status"
+            selectable
+            :active="stateId === tile.id"
+            @select="toggleState(tile.id)"
+          />
+        </div>
 
         <div class="pa-3 pa-md-4 tu-filters">
           <v-row dense>
@@ -74,14 +123,13 @@
               cols="12"
               md="4"
             >
-              <v-text-field
-                v-model="search"
+              <SearchField
+                :model-value="search"
                 label="Номер, организация, объект, адрес или договор"
-                prepend-inner-icon="mdi-magnify"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
+                :debounce="350"
+                :loading="loading"
+                @update:model-value="search = $event"
+                @search="onSearch"
               />
             </v-col>
             <v-col
@@ -89,16 +137,12 @@
               sm="6"
               md="2"
             >
-              <v-select
+              <AppSelect
                 v-model="stateId"
                 :items="lookups.states"
                 item-title="name"
                 item-value="id"
                 label="Состояние"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
               />
             </v-col>
             <v-col
@@ -106,16 +150,12 @@
               sm="6"
               md="2"
             >
-              <v-select
+              <AppSelect
                 v-model="issueYear"
                 :items="lookups.years"
                 item-title="value"
                 item-value="value"
                 label="Год выдачи"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
               />
             </v-col>
             <v-col
@@ -123,16 +163,12 @@
               sm="6"
               md="4"
             >
-              <v-select
+              <AppSelect
                 v-model="heatSource"
                 :items="lookups.heat_sources"
                 item-title="name"
                 item-value="name"
                 label="Источник"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
               />
             </v-col>
             <v-col
@@ -140,16 +176,12 @@
               sm="6"
               md="4"
             >
-              <v-select
+              <AppSelect
                 v-model="district"
                 :items="lookups.districts"
                 item-title="name"
                 item-value="name"
                 label="Район эксплуатации"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
               />
             </v-col>
             <v-col
@@ -157,16 +189,12 @@
               sm="6"
               md="2"
             >
-              <v-select
+              <AppSelect
                 v-model="linked"
                 :items="linkOptions"
                 item-title="title"
                 item-value="value"
                 label="Привязка"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
               />
             </v-col>
             <v-col
@@ -202,7 +230,7 @@
             <v-chip
               v-if="scope.buildingId"
               size="small"
-              color="cyan-darken-3"
+              color="primary"
               closable
               @click:close="clearScope"
             >
@@ -211,7 +239,7 @@
             <v-chip
               v-if="scope.pipeId"
               size="small"
-              color="cyan-darken-3"
+              color="primary"
               closable
               @click:close="clearScope"
             >
@@ -221,89 +249,127 @@
             <v-btn
               variant="text"
               prepend-icon="mdi-filter-remove-outline"
+              :disabled="!filtersActive"
               @click="resetFilters"
-            >Сбросить</v-btn>
+            >
+              Сбросить
+            </v-btn>
             <v-btn
-              color="cyan-darken-3"
+              color="primary"
               prepend-icon="mdi-refresh"
               :loading="loading"
               @click="loadConditions"
-            >Обновить</v-btn>
+            >
+              Обновить
+            </v-btn>
           </div>
         </div>
         <v-divider />
 
         <v-card-text class="pa-0 tu-table-wrap">
-          <v-progress-linear
-            v-if="loading"
-            indeterminate
-            color="cyan-darken-3"
-          />
-          <v-alert
-            v-if="error"
-            type="error"
-            variant="tonal"
-            class="ma-4"
-          >{{ error }}</v-alert>
-          <div
-            v-else-if="!loading && !items.length"
-            class="tu-empty"
+          <StateView
+            variant="table"
+            :rows="10"
+            :loading="loading && !items.length"
+            :error="error"
+            :empty="!loading && !items.length"
+            empty-title="Технические условия не найдены"
+            :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В реестре пока нет записей'"
+            empty-icon="mdi-file-search-outline"
+            :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
+            :retrying="loading"
+            @retry="loadConditions"
+            @action="resetFilters"
           >
-            <v-icon
-              size="56"
-              color="grey-lighten-1"
-            >mdi-file-search-outline</v-icon>
-            <div class="text-subtitle-1 mt-3">Технические условия не найдены</div>
-            <div class="text-body-2 text-medium-emphasis mt-1">Измените фильтры и повторите поиск.</div>
-          </div>
-          <table
-            v-else
-            class="tu-table"
-          >
-            <thead>
-              <tr>
-                <th>№ ТУ / дата</th><th>Состояние</th><th>Объект и адрес</th><th>Организация</th>
-                <th>Источник / район</th><th>Нагрузка</th><th>Привязка</th><th />
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="item in items"
-                :key="item.id"
-                class="tu-row"
-                @click="openDetails(item.id)"
-              >
-                <td><strong>{{ item.number || `ТУ ${item.id}` }}</strong><div class="cell-note">{{ formatDate(item.issued_on) }}</div></td>
-                <td><v-chip
-                  size="small"
-                  :color="stateColor(item.state_id)"
+            <v-progress-linear
+              v-if="loading"
+              indeterminate
+              color="primary"
+            />
+            <DataTable
+              :columns="tableColumns"
+              :items="(items as Record<string, unknown>[])"
+              item-key="id"
+              selectable
+              :selected-key="flashId"
+              density="compact"
+              class="tu-table"
+              @select="openDetails(Number($event.id))"
+            >
+              <template #[`item.number`]="{ item }">
+                <strong>{{ item.number || `ТУ ${item.id}` }}</strong>
+                <div class="cell-note">
+                  {{ formatDate(item.issued_on) }}
+                </div>
+              </template>
+              <template #[`item.state_name`]="{ item }">
+                <v-chip
+                  size="x-small"
+                  :color="stateColor(Number(item.state_id))"
                   variant="tonal"
-                >{{ item.state_name || 'Не задано' }}</v-chip></td>
-                <td class="wide-cell"><strong>{{ item.object_name || 'Объект не указан' }}</strong><div class="cell-note">{{ item.address || item.building_address || 'Адрес не указан' }}</div></td>
-                <td class="wide-cell">{{ item.organization_name || '—' }}</td>
-                <td>{{ item.heat_source_name || '—' }}<div class="cell-note">{{ item.district_name || 'Район не указан' }}</div></td>
-                <td>{{ heatLoad(item.total_heat_load) }}<div
+                >
+                  {{ item.state_name || 'Не задано' }}
+                </v-chip>
+              </template>
+              <template #[`item.object_name`]="{ item }">
+                <span
+                  class="wide-cell"
+                  :title="String(item.object_name || '')"
+                ><strong>{{ item.object_name || 'Объект не указан' }}</strong></span>
+                <div
+                  class="cell-note wide-cell"
+                  :title="String(item.address || item.building_address || '')"
+                >
+                  {{ item.address || item.building_address || 'Адрес не указан' }}
+                </div>
+              </template>
+              <template #[`item.organization_name`]="{ item }">
+                <span
+                  class="wide-cell"
+                  :title="String(item.organization_name || '')"
+                >{{ item.organization_name || '—' }}</span>
+              </template>
+              <template #[`item.heat_source_name`]="{ item }">
+                {{ item.heat_source_name || '—' }}
+                <div class="cell-note">
+                  {{ item.district_name || 'Район не указан' }}
+                </div>
+              </template>
+              <template #[`item.total_heat_load`]="{ item }">
+                <span class="num">{{ heatLoad(item.total_heat_load) }}</span>
+                <div
                   v-if="item.load_increase != null"
-                  class="cell-note"
-                >прирост {{ heatLoad(item.load_increase) }}</div></td>
-                <td>
-                  <v-icon
-                    :color="item.building_link_valid ? 'success' : 'warning'"
-                    size="18"
-                  >
-                    {{ item.building_link_valid ? 'mdi-link-variant' : 'mdi-link-variant-off' }}
-                  </v-icon>
-                  <span class="ml-1">{{ item.building_id || 'нет' }}</span>
-                </td>
-                <td><v-btn
-                  icon="mdi-chevron-right"
-                  size="small"
-                  variant="text"
-                  aria-label="Открыть карточку"
-                /></td>
-              </tr>
-            </tbody>
-          </table>
+                  class="cell-note num"
+                >
+                  прирост {{ heatLoad(item.load_increase) }}
+                </div>
+              </template>
+              <template #[`item.building_id`]="{ item }">
+                <v-icon
+                  :color="item.building_link_valid ? 'success' : 'warning'"
+                  size="18"
+                  :aria-label="item.building_link_valid ? 'Привязка к зданию есть' : 'Ссылка на здание не найдена'"
+                >
+                  {{ item.building_link_valid ? 'mdi-link-variant' : 'mdi-link-variant-off' }}
+                </v-icon>
+                <span class="ml-1 num">{{ item.building_id || 'нет' }}</span>
+              </template>
+              <template #[`item.actions`]="{ item }">
+                <HintTip text="Открыть карточку">
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon="mdi-chevron-right"
+                      size="x-small"
+                      variant="text"
+                      aria-label="Открыть карточку"
+                      @click.stop="openDetails(Number(item.id))"
+                    />
+                  </template>
+                </HintTip>
+              </template>
+            </DataTable>
+          </StateView>
         </v-card-text>
         <v-divider />
         <v-card-actions class="px-4 py-2">
@@ -331,195 +397,141 @@
           <v-avatar
             color="cyan-darken-3"
             size="40"
-          ><v-icon color="white">mdi-file-certificate-outline</v-icon></v-avatar>
+          >
+            <v-icon color="white">mdi-file-certificate-outline</v-icon>
+          </v-avatar>
           <div
             class="flex-grow-1"
             style="min-width: 0"
           >
-            <div class="text-subtitle-1 font-weight-bold text-truncate">{{ isNew ? 'Новые ТУ' : selectedTitle }}</div>
+            <div class="text-subtitle-1 font-weight-bold d-flex align-center ga-2">
+              <span class="text-truncate">{{ isNew ? 'Новые ТУ' : selectedTitle }}</span>
+              <v-chip
+                v-if="isEditing && isDirty"
+                size="x-small"
+                color="accent"
+                variant="tonal"
+              >
+                Не сохранено
+              </v-chip>
+            </div>
             <div
-              class="text-caption text-medium-emphasis"
               v-if="!isNew"
-            >{{ selected?.state_name || 'Состояние не указано' }}</div>
+              class="text-caption text-medium-emphasis"
+            >
+              {{ selected?.state_name || 'Состояние не указано' }}
+            </div>
           </div>
           <v-btn
             icon
             variant="text"
             aria-label="Закрыть"
             @click="detailsVisible = false"
-          ><v-icon>mdi-close</v-icon></v-btn>
+          >
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-4">
-          <div
-            v-if="detailsLoading"
-            class="d-flex justify-center pa-10"
-          ><v-progress-circular
-            indeterminate
-            color="cyan-darken-3"
-          /></div>
-          <v-alert
-            v-else-if="detailsError"
-            type="error"
-            variant="tonal"
-          >{{ detailsError }}</v-alert>
-          <template v-else-if="selected || isEditing">
-            <v-alert
-              v-if="selected?.building_id && !selected?.building_link_valid"
-              type="warning"
-              variant="tonal"
-              class="mb-4"
-            >
-              В исходной базе ссылка на здание {{ selected?.building_id }} не найдена. Карточка ТУ доступна, позиционирование на карте — нет.
-            </v-alert>
-            <v-expansion-panels
-              multiple
-              variant="accordion"
-              :model-value="[0, 1]"
-            >
-              <v-expansion-panel
-                v-for="(group, index) in detailGroups"
-                :key="group.title"
-                :value="index"
+          <StateView
+            variant="form"
+            :rows="8"
+            :loading="detailsLoading"
+            :error="detailsError"
+            :empty="!detailsLoading && !detailsError && !selected && !isEditing"
+            empty-title="Карточка не выбрана"
+            :retry="false"
+          >
+            <template v-if="selected || isEditing">
+              <v-alert
+                v-if="selected?.building_id && !selected?.building_link_valid"
+                type="warning"
+                variant="tonal"
+                class="mb-4"
               >
-                <v-expansion-panel-title>{{ group.title }}</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-row dense>
-                    <v-col
-                      v-for="field in group.fields"
-                      :key="field.label"
-                      cols="12"
-                      sm="6"
-                    >
-                      <div class="detail-label mb-1">{{ field.label }}</div>
-                      <template v-if="isEditing && field.key">
-                        <v-select
-                          v-if="field.type === 'select'"
-                          v-model="editFields[field.key]"
-                          :items="field.items"
-                          item-title="name"
-                          item-value="id"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                          clearable
-                        />
-                        <v-text-field
-                          v-else-if="field.type === 'date'"
-                          v-model="editFields[field.key]"
-                          type="date"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                          clearable
-                        />
-                        <v-text-field
-                          v-else-if="field.type === 'time'"
-                          v-model="editFields[field.key]"
-                          type="time"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                          clearable
-                        />
-                        <v-textarea
-                          v-else-if="field.type === 'textarea'"
-                          v-model="editFields[field.key]"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                          rows="3"
-                          auto-grow
-                          clearable
-                        />
-                        <v-text-field
-                          v-else-if="field.type === 'number'"
-                          v-model.number="editFields[field.key]"
-                          type="number"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                          clearable
-                        />
-                        <v-text-field
-                          v-else
-                          v-model="editFields[field.key]"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                          clearable
-                        />
-                      </template>
-                      <div
-                        v-else
-                        class="detail-value"
-                      >{{ field.value }}</div>
-                    </v-col>
-                  </v-row>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
+                В исходной базе ссылка на здание {{ selected?.building_id }} не найдена. Карточка ТУ доступна, позиционирование на карте — нет.
+              </v-alert>
+              <JournalDetailFields
+                :groups="detailGroups"
+                :model="editFields"
+                :editable="editable"
+                :is-field-dirty="isFieldDirty"
+                @update:model="editFields = $event"
+              >
+                <template v-if="!isEditing">
+                  <v-expansion-panel
+                    v-if="extensions.length"
+                    :value="detailGroups.length"
+                  >
+                    <v-expansion-panel-title>Изменения и продления ({{ extensions.length }})</v-expansion-panel-title>
+                    <v-expansion-panel-text>
+                      <v-card
+                        v-for="extension in extensions"
+                        :key="Number(extension.index)"
+                        variant="outlined"
+                        class="mb-3 pa-3"
+                      >
+                        <div class="font-weight-bold">
+                          Продление {{ extension.index }} · {{ formatDate(extension.changed_on) }}
+                        </div>
+                        <div
+                          v-if="extension.description"
+                          class="text-body-2 mt-2"
+                        >
+                          {{ extension.description }}
+                        </div>
+                        <div class="text-caption text-medium-emphasis mt-2 num">
+                          Нагрузка: {{ heatLoad(extension.total_heat_load) }} · прирост: {{ heatLoad(extension.load_increase) }}
+                        </div>
+                        <div
+                          v-if="extension.additional_measures"
+                          class="text-body-2 mt-2"
+                        >
+                          {{ extension.additional_measures }}
+                        </div>
+                      </v-card>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
 
-              <template v-if="!isEditing">
-                <v-expansion-panel
-                  v-if="extensions.length"
-                  :value="detailGroups.length"
-                >
-                  <v-expansion-panel-title>Изменения и продления ({{ extensions.length }})</v-expansion-panel-title>
-                  <v-expansion-panel-text>
-                    <v-card
-                      v-for="extension in extensions"
-                      :key="Number(extension.index)"
-                      variant="outlined"
-                      class="mb-3 pa-3"
-                    >
-                      <div class="font-weight-bold">Продление {{ extension.index }} · {{ formatDate(extension.changed_on) }}</div>
-                      <div
-                        v-if="extension.description"
-                        class="text-body-2 mt-2"
-                      >{{ extension.description }}</div>
-                      <div class="text-caption text-medium-emphasis mt-2">Нагрузка: {{ heatLoad(extension.total_heat_load) }} · прирост: {{ heatLoad(extension.load_increase) }}</div>
-                      <div
-                        v-if="extension.additional_measures"
-                        class="text-body-2 mt-2"
-                      >{{ extension.additional_measures }}</div>
-                    </v-card>
-                  </v-expansion-panel-text>
-                </v-expansion-panel>
+                  <v-expansion-panel
+                    v-if="connections.length"
+                    :value="detailGroups.length + 1"
+                  >
+                    <v-expansion-panel-title>Узлы присоединения ({{ connections.length }})</v-expansion-panel-title>
+                    <v-expansion-panel-text>
+                      <v-list density="compact">
+                        <v-list-item
+                          v-for="connection in connections"
+                          :key="Number(connection.index)"
+                          prepend-icon="mdi-source-branch"
+                          :title="String(connection.node || connection.code || `Присоединение ${connection.index}`)"
+                          :subtitle="[connection.code && `код ${connection.code}`, connection.load_percent != null && `${connection.load_percent}% нагрузки`].filter(Boolean).join(' · ')"
+                        />
+                      </v-list>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
 
-                <v-expansion-panel
-                  v-if="connections.length"
-                  :value="detailGroups.length + 1"
-                >
-                  <v-expansion-panel-title>Узлы присоединения ({{ connections.length }})</v-expansion-panel-title>
-                  <v-expansion-panel-text><v-list density="compact">
-                    <v-list-item
-                      v-for="connection in connections"
-                      :key="Number(connection.index)"
-                      prepend-icon="mdi-source-branch"
-                      :title="String(connection.node || connection.code || `Присоединение ${connection.index}`)"
-                      :subtitle="[connection.code && `код ${connection.code}`, connection.load_percent != null && `${connection.load_percent}% нагрузки`].filter(Boolean).join(' · ')"
-                    />
-                  </v-list></v-expansion-panel-text>
-                </v-expansion-panel>
-
-                <v-expansion-panel
-                  v-if="documents.length"
-                  :value="detailGroups.length + 2"
-                >
-                  <v-expansion-panel-title>Документы ({{ documents.length }})</v-expansion-panel-title>
-                  <v-expansion-panel-text><v-list density="compact">
-                    <v-list-item
-                      v-for="(document, index) in documents"
-                      :key="`${document.kind}-${document.index || index}`"
-                      prepend-icon="mdi-file-document-outline"
-                      :title="documentTitle(document)"
-                      :subtitle="fileName(document.path)"
-                    />
-                  </v-list></v-expansion-panel-text>
-                </v-expansion-panel>
-              </template>
-            </v-expansion-panels>
-          </template>
+                  <v-expansion-panel
+                    v-if="documents.length"
+                    :value="detailGroups.length + 2"
+                  >
+                    <v-expansion-panel-title>Документы ({{ documents.length }})</v-expansion-panel-title>
+                    <v-expansion-panel-text>
+                      <v-list density="compact">
+                        <v-list-item
+                          v-for="(document, index) in documents"
+                          :key="`${document.kind}-${document.index || index}`"
+                          prepend-icon="mdi-file-document-outline"
+                          :title="documentTitle(document)"
+                          :subtitle="fileName(document.path)"
+                        />
+                      </v-list>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+                </template>
+              </JournalDetailFields>
+            </template>
+          </StateView>
         </v-card-text>
         <v-divider />
         <v-card-actions class="px-4 py-3">
@@ -527,17 +539,19 @@
             v-if="!isEditing && selected && hasCoordinates(selected)"
             prepend-icon="mdi-crosshairs-gps"
             variant="tonal"
-            color="cyan-darken-3"
+            color="primary"
             @click="locateSelected"
           >
             На карте
           </v-btn>
           <v-btn
-            v-if="mutationsEnabled && (!isEditing)"
+            v-if="mutationsEnabled && !isEditing && selected"
             variant="text"
             prepend-icon="mdi-pencil"
             @click="startEdit"
-          >Редактировать</v-btn>
+          >
+            Редактировать
+          </v-btn>
           <v-btn
             v-if="mutationsEnabled && !isEditing && selected && !isNew"
             color="error"
@@ -545,27 +559,36 @@
             prepend-icon="mdi-delete"
             :loading="deleting"
             @click="deleteTechnicalCondition(selected.id)"
-          >Удалить</v-btn>
+          >
+            Удалить
+          </v-btn>
           <v-spacer />
           <template v-if="isEditing">
             <v-btn
               v-if="mutationsEnabled"
               variant="text"
               @click="cancelEdit"
-            >Отмена</v-btn>
+            >
+              Отмена
+            </v-btn>
             <v-btn
               v-if="mutationsEnabled"
-              color="cyan-darken-3"
+              color="primary"
               variant="flat"
               :loading="saving"
+              :disabled="!isNew && !isDirty"
               @click="saveChanges"
-            >Сохранить</v-btn>
+            >
+              Сохранить
+            </v-btn>
           </template>
           <v-btn
             v-else
             variant="text"
             @click="detailsVisible = false"
-          >Закрыть</v-btn>
+          >
+            Закрыть
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -574,11 +597,19 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
+import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
+import HintTip from '~/components/HintTip.vue'
+import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
+import KpiTile, { type KpiStatus } from '~/components/KpiTile.vue'
+import SearchField from '~/components/SearchField.vue'
+import StateView from '~/components/StateView.vue'
 import { hasLonLat } from '~/utils/journalFields'
 import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError, formatApiErrorWith } from '~/utils/apiError'
 import { confirmAction } from '~/composables/useConfirm'
 import { computed, reactive, ref, watch } from 'vue'
+import { useJournalEdit } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
 import TuConnectionDialog from '~/components/ai/TuConnectionDialog.vue'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
@@ -591,6 +622,12 @@ import {
   type TechnicalConditionSummary
 } from '~/services/fastApiService'
 
+/**
+ * Реестр технических условий — тип (б) «рабочее место» (docs/ui-modernization-progress.md, этап 5): `DataTable`
+ * с серверной пагинацией (тысячи записей), плитки состояний договора из `state_counts`, `SearchField` / `AppSelect`,
+ * `StateView`, свод в Excel и подбор точки подключения сохранены; карточка на `JournalDetailFields` +
+ * `useJournalEdit`. Запись — через API ТУ по ключам карточки (сервер переводит их в колонки таблицы).
+ */
 export interface TechnicalConditionJournalScope { buildingId?: number; pipeId?: number; conditionId?: number }
 const emit = defineEmits<{
   'locate-technical-condition': [coordinates: { longitude: number; latitude: number; id: number; label: string }]
@@ -610,22 +647,50 @@ const linked = ref<boolean | undefined>()
 const scope = reactive<TechnicalConditionJournalScope>({})
 const lookups = reactive<TechnicalConditionLookups>({ states: [], heat_sources: [], districts: [], years: [] })
 const linkOptions = [{ title: 'Привязанные', value: true }, { title: 'Без привязки', value: false }]
+/** Счётчики по состояниям из ответа списка; null — API их не отдаёт (плитки скрыты) */
+const stateCounts = ref<{ state_id: number | null; count: number }[] | null>(null)
 const detailsVisible = ref(false), detailsLoading = ref(false), detailsError = ref('')
 // Другой журнал начал выбор участков на карте — закрыть это окно (QA F48)
 useCloseOnMapPick(() => visible.value || detailsVisible.value, () => { detailsVisible.value = false; visible.value = false })
 const selected = ref<TechnicalConditionDetails | null>(null)
-let searchTimer: ReturnType<typeof setTimeout> | undefined
-
-const isEditing = ref(false)
-const isNew = ref(false)
-const saving = ref(false)
 const creating = ref(false)
 const deleting = ref(false)
 const loadingBalance = ref(false)
-const editFields = ref<Record<string, any>>({})
 
 const scopeTitle = computed(() => scope.buildingId ? `ТУ здания ${scope.buildingId}` : scope.pipeId ? `ТУ трубопровода ${scope.pipeId}` : 'весь реестр')
 const selectedTitle = computed(() => selected.value?.number ? `ТУ № ${selected.value.number}` : `Технические условия ${selected.value?.id || ''}`)
+const filtersActive = computed(() => Boolean(
+  search.value.trim() || stateId.value || issueYear.value || heatSource.value || district.value
+  || linked.value !== undefined || dateFrom.value || dateTo.value,
+))
+
+const tableColumns: DataTableColumn[] = [
+  { key: 'number', title: '№ ТУ / дата', width: 150, sortable: false },
+  { key: 'state_name', title: 'Состояние', width: 130, sortable: false },
+  { key: 'object_name', title: 'Объект и адрес', sortable: false },
+  { key: 'organization_name', title: 'Организация', width: 220, sortable: false },
+  { key: 'heat_source_name', title: 'Источник / район', width: 190, sortable: false },
+  { key: 'total_heat_load', title: 'Нагрузка', type: 'number', width: 150, sortable: false },
+  { key: 'building_id', title: 'Привязка', width: 110, sortable: false },
+  { key: 'actions', title: '', type: 'actions', width: 56, sortable: false },
+]
+
+/** Состояние договора → тон плитки: действующие — в порядке, аннулированные — внимание, завершённые — нейтрально */
+const STATE_STATUS: Record<number, KpiStatus> = { 1: 'good', 2: 'warning', 3: 'warning', 4: 'none' }
+const stateTiles = computed(() => {
+  if (!stateCounts.value) return []
+  const counts = new Map(stateCounts.value.map((c) => [c.state_id, c.count]))
+  return (lookups.states as { id: number; name: string }[]).map((state) => ({
+    id: state.id,
+    name: state.name,
+    count: counts.get(state.id) ?? 0,
+    status: STATE_STATUS[state.id] ?? 'none',
+  }))
+})
+const toggleState = (id: number) => {
+  stateId.value = stateId.value === id ? undefined : id
+}
+
 const formatDate = (value: unknown) => {
   if (!value) return '—'
   const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/)
@@ -637,7 +702,7 @@ const stateColor = (state: number | null) => state === 1 ? 'success' : state ===
 const hasCoordinates = (item: { longitude?: unknown; latitude?: unknown }) => hasLonLat(item)
 const fileName = (path: unknown) => String(path || 'Путь не указан').split(/[\\/]/).pop() || 'Файл'
 const documentTitle = (document: Record<string, unknown>) => document.kind === 'contract' ? 'Договор' : document.kind === 'admission_act' ? 'Акт допуска' : `Технические условия${document.index ? ` · файл ${document.index}` : ''}`
-const buildFields = (entries: Array<[string, unknown, string?, string?, any[]?]>) => {
+const buildFields = (entries: Array<[string, unknown, string?, string?, any[]?]>): JournalDetailField[] => {
   return entries
     .filter(([, value]) => isEditing.value || (value !== null && value !== undefined && value !== ''))
     .map(([label, value, key, type, items]) => ({
@@ -656,9 +721,16 @@ const loadConditions = async () => {
       building_id: scope.buildingId, pipe_id: scope.pipeId, search: search.value.trim() || undefined
     })
     items.value = response.items; total.value = response.total; pages.value = response.pages
+    stateCounts.value = Array.isArray(response.state_counts) ? response.state_counts : null
   } catch (loadError: any) {
     error.value = loadError?.data?.detail || loadError?.message || 'Не удалось загрузить реестр технических условий'
   } finally { loading.value = false }
+}
+/** Текст после паузы ввода (SearchField) */
+const onSearch = () => {
+  if (!visible.value) return
+  page.value = 1
+  void loadConditions()
 }
 const openDetails = async (id: number) => {
   // карточка существующей записи всегда открывается на просмотр (после неудачного создания
@@ -687,9 +759,32 @@ const locateSelected = () => {
   detailsVisible.value = false; visible.value = false
 }
 
-/** Справочник названий (источник, район) для v-select с item-value="id" */
+/** Ключи API, которые правит форма (сервер переводит их в колонки tehnicheskie_usloviya) */
+const EDITABLE_KEYS = [
+  'number', 'issued_on', 'state_id', 'annulled_on', 'organization_name', 'object_name', 'address', 'heat_source_name',
+  'district_name', 'connection_chamber', 'validity_period',
+  'total_heat_load', 'heating_load', 'ventilation_load', 'hot_water_max_load', 'hot_water_average_load', 'load_increase',
+  'heating_load_increase', 'ventilation_load_increase', 'hot_water_max_load_increase', 'hot_water_average_load_increase',
+  'network_approval_number', 'network_approval_date', 'heating_approval_number', 'heating_approval_date',
+  'project_approval_number', 'project_approval_date', 'additional_measures', 'measures_completion', 'construction_stage',
+  'admission_act_number', 'admission_act_date', 'admitted_total_heat_load', 'admitted_heating_load',
+  'admitted_ventilation_load', 'admitted_hot_water_max_load', 'admitted_hot_water_average_load', 'contract_number', 'contract_date',
+  'building_id', 'pipe_id',
+] as const
+const EDITABLE_COLUMNS = identityColumns([...EDITABLE_KEYS])
+const editSource = {
+  schema: computed(() => ({ fields: EDITABLE_COLUMNS as Record<string, unknown> })),
+  isWritable: (key?: string | null) => Boolean(key && key in EDITABLE_COLUMNS),
+  loadSchema: async () => null,
+}
+const {
+  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable,
+  beginCreate, beginEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
+} = useJournalEdit('technical-conditions', editSource, selected)
+
+/** Справочник названий (источник, район) для AppSelect с item-value="id" */
 const nameItems = (items: Array<{ name: string }>) => items.map(entry => ({ id: entry.name, name: entry.name }))
-const detailGroups = computed(() => {
+const detailGroups = computed((): JournalDetailGroup[] => {
   const item = isEditing.value ? editFields.value : selected.value
   if (!item && !isNew.value) return []
   return [
@@ -727,40 +822,35 @@ const extensions = computed(() => selected.value?.relations?.extensions || [])
 const documents = computed(() => selected.value?.relations?.documents || [])
 const connections = computed(() => selected.value?.relations?.connections || [])
 
-const startEdit = () => {
-  if (!selected.value) return
-  isEditing.value = true
-  isNew.value = false
-  editFields.value = { ...selected.value }
-}
+const startEdit = () => beginEdit()
 
-const cancelEdit = () => {
-  isEditing.value = false
+const cancelEdit = async () => {
+  if (!(await cancel())) return
   if (isNew.value) detailsVisible.value = false
 }
+
+// Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
+watch(detailsVisible, (open) => {
+  if (!open) closeKeepingDraft()
+})
 
 const createTechnicalCondition = async () => {
   creating.value = true
   await loadLookups()
   creating.value = false
   selected.value = null
-  isEditing.value = true
-  isNew.value = true
-  editFields.value = {}
+  detailsError.value = ''
   detailsVisible.value = true
+  await beginCreate({})
 }
 
 const notifications = useNotificationStore()
-/** Ключи API, которые правит форма (сервер переводит их в колонки tehnicheskie_usloviya) */
-const editableColumns = () => identityColumns(
-  detailGroups.value.flatMap(group => group.fields.map(field => field.key).filter((key): key is string => !!key))
-)
 
 const saveChanges = async () => {
   saving.value = true
   try {
     if (isNew.value) {
-      const fields = filledColumns(editFields.value, editableColumns())
+      const fields = filledColumns(editFields.value, EDITABLE_COLUMNS)
       if (!Object.keys(fields).length) {
         notifications.showError('Заполните хотя бы одно поле ТУ')
         return
@@ -768,19 +858,21 @@ const saveChanges = async () => {
       const result = await fastApiService.createTechnicalCondition(fields)
       if (result?.id) {
         notifications.showSuccess(`ТУ ${result.id} созданы`)
+        markSaved(Number(result.id))
         await loadConditions()
         await openDetails(result.id)
       }
     } else if (selected.value) {
       const id = selected.value.id
-      const changes = changedColumns(selected.value, editFields.value, editableColumns())
+      const changes = changedColumns(selected.value, editFields.value, EDITABLE_COLUMNS)
       if (!Object.keys(changes).length) {
         notifications.showInfo('Изменений нет')
-        isEditing.value = false
+        markSaved(null)
         return
       }
       await fastApiService.updateTechnicalCondition(id, changes)
       notifications.showSuccess('Изменения ТУ сохранены')
+      markSaved(id)
       await loadConditions()
       await openDetails(id)
     }
@@ -810,11 +902,11 @@ const downloadBalance = async () => {
     link.remove()
     URL.revokeObjectURL(url)
     const note = balance.notes ? ` (${balance.notes})` : ''
-    useNotificationStore().showSuccess(
+    notifications.showSuccess(
       `Свод ТУ ${balance.year || ''}: ${balance.totals?.tu_count ?? 0} записей${note}`
     )
   } catch (e: any) {
-    useNotificationStore().showError(formatApiError(e, 'Не удалось выгрузить свод ТУ'))
+    notifications.showError(formatApiError(e, 'Не удалось выгрузить свод ТУ'))
   } finally {
     loadingBalance.value = false
   }
@@ -825,6 +917,7 @@ const deleteTechnicalCondition = async (id: number) => {
   try {
     deleting.value = true
     await fastApiService.deleteTechnicalCondition(id)
+    forgetDraft(id)
     notifications.showSuccess(`ТУ ${id} удалены`)
     detailsVisible.value = false
     await loadConditions()
@@ -837,22 +930,16 @@ const deleteTechnicalCondition = async (id: number) => {
 
 watch(page, () => { if (visible.value) void loadConditions() })
 watch([stateId, issueYear, heatSource, district, linked, dateFrom, dateTo], () => { if (visible.value) { page.value = 1; void loadConditions() } })
-watch(search, () => { if (!visible.value) return; if (searchTimer) clearTimeout(searchTimer); searchTimer = setTimeout(() => { page.value = 1; void loadConditions() }, 350) })
 defineExpose({ openDialog })
 </script>
 
 <style scoped>
 .tu-journal { height: min(90vh, 920px); display: flex; flex-direction: column; }
-.tu-filters { flex-shrink: 0; background: #fafafa; }
+.tu-kpi { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.tu-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
 .tu-table-wrap { min-height: 280px; overflow: auto; flex: 1; }
-.tu-table { width: 100%; min-width: 1320px; border-collapse: collapse; font-size: .84rem; }
-.tu-table th { position: sticky; top: 0; z-index: 1; background: #eceff1; color: #546e7a; text-align: left; padding: 10px 12px; }
-.tu-table td { padding: 10px 12px; border-bottom: 1px solid #eceff1; vertical-align: top; }
-.tu-row { cursor: pointer; }.tu-row:hover { background: #e0f7fa; }
-.wide-cell { max-width: 260px; }.cell-note { color: #78909c; font-size: .75rem; margin-top: 3px; }
-.tu-empty { min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; }
-.detail-label { color: #78909c; font-size: .72rem; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
-.detail-value { color: #263238; font-size: .9rem; margin-top: 3px; overflow-wrap: anywhere; }
+.tu-table { min-width: 1320px; }
+.wide-cell { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.cell-note { color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity)); font-size: .75rem; margin-top: 2px; }
 @media (max-width: 600px) { .tu-journal { height: 100dvh; } }
 </style>
-

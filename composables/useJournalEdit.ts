@@ -1,11 +1,19 @@
 import { computed, ref, watch, type Ref } from 'vue';
 import { confirmAction } from '~/composables/useConfirm';
 import { useJournalDraft } from '~/composables/useJournalDraft';
-import type { useJournalRecordForm } from '~/composables/useJournalRecordForm';
-import type { JournalKey } from '~/services/journalWriteService';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { hasChanges, recordSnapshot } from '~/utils/journalDraft';
 import { withDateInputs } from '~/utils/journalFields';
+
+/**
+ * Откуда известно, какие поля записываемые: `useJournalRecordForm` (схема с сервера) или реестр
+ * (таблица колонок, например `CORROSION_COLUMN_BY_KEY`). `loadSchema` вызывается перед созданием.
+ */
+export interface JournalEditSource {
+  schema: Ref<{ fields: Record<string, unknown> } | null>;
+  isWritable: (key?: string | null) => boolean;
+  loadSchema: () => Promise<unknown>;
+}
 
 export interface JournalEditOptions {
   /** Ключи timestamp-полей, которые в форме показываются как `type="date"` */
@@ -23,8 +31,8 @@ const FLASH_MS = 2500;
  * у `useJournalRecordForm` и самого журнала — здесь только состояние формы.
  */
 export function useJournalEdit(
-  journal: JournalKey,
-  recordForm: ReturnType<typeof useJournalRecordForm>,
+  journal: string,
+  recordForm: JournalEditSource,
   selected: Ref<Record<string, any> | null>,
   options: JournalEditOptions = {},
 ) {
