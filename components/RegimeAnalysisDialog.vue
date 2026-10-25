@@ -6,23 +6,43 @@
     scrollable
   >
     <v-card rounded="lg">
-      <v-card-title class="d-flex align-center ga-2">
-        <v-icon>mdi-gauge</v-icon>
-        Анализ режима
-        <v-spacer />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+      <v-card-title class="d-flex align-center ga-3 px-4 py-3">
+        <v-avatar
+          color="primary"
+          variant="tonal"
+          size="40"
+        >
+          <v-icon>mdi-gauge</v-icon>
+        </v-avatar>
+        <div
+          class="flex-grow-1"
+          style="min-width: 0"
+        >
+          <div class="text-subtitle-1 font-weight-bold">
+            Анализ режима
+          </div>
+          <div class="text-caption text-medium-emphasis text-truncate">
+            Аналог desktop «Анализ» по результатам расчёта фрагмента; щелчок по строке — объект на карте
+          </div>
+        </div>
+        <HintTip
+          text="Закрыть"
+          hotkey="Esc"
+          location="bottom"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
+      <v-divider />
       <v-card-text>
-        <p class="text-body-2 text-medium-emphasis mb-3">
-          Аналог desktop «Анализ»: по результатам выбранного (по умолчанию последнего) расчёта фрагмента.
-          Щелчок по строке — объект на карте.
-        </p>
-
         <div class="d-flex flex-wrap ga-3 mb-3">
           <AppSelect
             v-model="fragmentId"
@@ -64,135 +84,136 @@
           </v-btn>
         </div>
 
-        <v-alert
-          v-if="error"
-          type="error"
-          variant="tonal"
-          density="compact"
-          class="mb-3"
+        <StateView
+          variant="table"
+          :rows="8"
+          :loading="loading"
+          :error="error"
+          :empty="!loading && !error && !result"
+          empty-title="Выберите фрагмент и запрос"
+          empty-text="«Выполнить» покажет объекты, найденные по результатам расчёта"
+          empty-icon="mdi-gauge"
+          error-title="Анализ не выполнен"
+          :retrying="loading"
+          @retry="run"
         >
-          {{ error }}
-        </v-alert>
+          <template v-if="result">
+            <div class="d-flex flex-wrap align-center ga-2 mb-3">
+              <span class="text-subtitle-1 font-weight-medium">{{ result.title }}</span>
+              <v-chip
+                v-if="result.calculation_id"
+                size="small"
+                variant="tonal"
+                color="primary"
+              >
+                Расчёт №{{ result.calculation_id }}<template v-if="result.tn != null">, Tн {{ result.tn }} °C</template>
+              </v-chip>
+              <v-spacer />
+              <v-btn
+                size="small"
+                variant="tonal"
+                color="primary"
+                prepend-icon="mdi-map-marker-multiple"
+                :disabled="!mapPointsCount"
+                @click="showAllOnMap"
+              >
+                Показать все на карте ({{ mapPointsCount }})
+              </v-btn>
+              <v-btn
+                size="small"
+                variant="text"
+                prepend-icon="mdi-map-marker-off"
+                @click="emit('clearMap')"
+              >
+                Скрыть с карты
+              </v-btn>
+            </div>
+            <p
+              v-if="result.note"
+              class="text-caption text-medium-emphasis mb-2"
+            >
+              {{ result.note }}
+            </p>
 
-        <template v-if="result">
-          <div class="d-flex flex-wrap align-center ga-2 mb-2">
-            <span class="text-subtitle-1">{{ result.title }}</span>
-            <v-chip
-              size="small"
+            <v-alert
+              v-if="result.query === 'hydrostatic_zones' && result.full_static_head_m != null"
+              type="info"
               variant="tonal"
-            >{{ result.count }}</v-chip>
-            <v-chip
-              v-if="result.calculation_id"
-              size="small"
-              variant="tonal"
-              color="primary"
-            >
-              Расчёт №{{ result.calculation_id }}<template v-if="result.tn != null">, Tн {{ result.tn }} °C</template>
-            </v-chip>
-            <v-spacer />
-            <v-btn
-              size="small"
-              variant="tonal"
-              color="primary"
-              prepend-icon="mdi-map-marker-multiple"
-              :disabled="!mapPointsCount"
-              @click="showAllOnMap"
-            >
-              Показать все на карте ({{ mapPointsCount }})
-            </v-btn>
-            <v-btn
-              size="small"
-              variant="text"
-              prepend-icon="mdi-map-marker-off"
-              @click="emit('clearMap')"
-            >
-              Скрыть с карты
-            </v-btn>
-          </div>
-          <p
-            v-if="result.note"
-            class="text-caption text-medium-emphasis mb-2"
-          >{{ result.note }}</p>
-
-          <v-alert
-            v-if="result.query === 'hydrostatic_zones' && result.full_static_head_m != null"
-            type="info"
-            variant="tonal"
-            density="compact"
-            class="mb-3"
-          >
-            Полный статический напор <strong>{{ formatNum(result.full_static_head_m) }} м</strong>,
-            пьезометрический статический напор <strong>{{ formatNum(result.piezometric_static_head_m) }} м</strong>.
-            Минимальная отметка верха трубы {{ formatNum(result.min_geo_mark_m) }} м
-            (узел {{ result.min_geo_node?.code }} {{ result.min_geo_node?.name }}).
-            Ниже — узлы нижней зоны.
-          </v-alert>
-
-          <div
-            v-if="summaryChips.length"
-            class="d-flex flex-wrap ga-1 mb-2"
-          >
-            <v-chip
-              v-for="chip in summaryChips"
-              :key="chip.mode"
-              size="small"
-              :color="modeFilter === chip.mode ? 'primary' : undefined"
-              :variant="modeFilter === chip.mode ? 'flat' : 'tonal'"
-              @click="modeFilter = modeFilter === chip.mode ? null : chip.mode"
-            >
-              {{ chip.mode }}: {{ chip.count }}
-            </v-chip>
-          </div>
-
-          <div class="ra-scroll">
-            <table class="ra-table">
-              <thead>
-                <tr>
-                  <th />
-                  <th
-                    v-for="col in columns"
-                    :key="col.key"
-                  >{{ col.title }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(row, idx) in pagedRows"
-                  :key="idx"
-                  :class="{ 'ra-row--clickable': hasCoords(row) }"
-                  @click="locate(row)"
-                >
-                  <td>
-                    <v-icon
-                      v-if="hasCoords(row)"
-                      size="16"
-                      color="primary"
-                    >mdi-crosshairs-gps</v-icon>
-                  </td>
-                  <td
-                    v-for="col in columns"
-                    :key="col.key"
-                  >{{ formatCell(row[col.key]) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div
-            v-if="filteredRows.length > pageSize"
-            class="d-flex justify-center mt-2"
-          >
-            <v-pagination
-              v-model="page"
-              :length="Math.ceil(filteredRows.length / pageSize)"
               density="compact"
-              total-visible="7"
-            />
-          </div>
-          <div
-            v-if="!filteredRows.length"
-            class="text-body-2 text-medium-emphasis mt-2"
-          >Записей нет.</div>
-        </template>
+              class="mb-3"
+            >
+              Полный статический напор <strong>{{ formatNum(result.full_static_head_m) }} м</strong>,
+              пьезометрический статический напор <strong>{{ formatNum(result.piezometric_static_head_m) }} м</strong>.
+              Минимальная отметка верха трубы {{ formatNum(result.min_geo_mark_m) }} м
+              (узел {{ result.min_geo_node?.code }} {{ result.min_geo_node?.name }}).
+              Ниже — узлы нижней зоны.
+            </v-alert>
+
+            <!-- Итог: число найденных и с координатой; режимы — плитки-фильтры; распределение ключевого показателя -->
+            <div class="ra-summary mb-3">
+              <div class="ra-tiles">
+                <KpiTile
+                  label="Найдено"
+                  :value="result.count"
+                  :compact="false"
+                  :status="foundStatus"
+                />
+                <KpiTile
+                  label="С координатой"
+                  :value="mapPointsCount"
+                  :compact="false"
+                />
+                <KpiTile
+                  v-for="tile in summaryChips"
+                  :key="tile.mode"
+                  :label="tile.mode"
+                  :value="tile.count"
+                  :compact="false"
+                  selectable
+                  :active="modeFilter === tile.mode"
+                  @select="modeFilter = modeFilter === tile.mode ? null : tile.mode"
+                />
+              </div>
+              <MiniHistogram
+                v-if="metric && filteredRows.length > 1"
+                class="ra-histogram"
+                :values="filteredRows.map((row) => row[metric!.key])"
+                :label="metric.label"
+                :units="metric.units"
+              />
+            </div>
+
+            <DataTable
+              :columns="tableColumns"
+              :items="tableRows"
+              item-key="_row"
+              selectable
+              density="compact"
+              :height="420"
+              no-data-text="Записей нет"
+              class="ra-table"
+              @select="locate"
+            >
+              <template
+                v-for="col in columns"
+                :key="col.key"
+                #[`item.${col.key}`]="{ item }"
+              >
+                {{ formatCell(item[col.key]) }}
+              </template>
+              <template #[`item._locate`]="{ item }">
+                <v-icon
+                  v-if="hasCoords(item)"
+                  size="16"
+                  color="primary"
+                  aria-label="Есть на карте"
+                >
+                  mdi-crosshairs-gps
+                </v-icon>
+              </template>
+            </DataTable>
+          </template>
+        </StateView>
       </v-card-text>
     </v-card>
   </v-dialog>
@@ -200,6 +221,11 @@
 
 <script setup lang="ts">
 import AppSelect from '~/components/AppSelect.vue'
+import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
+import HintTip from '~/components/HintTip.vue'
+import KpiTile from '~/components/KpiTile.vue'
+import MiniHistogram from '~/components/MiniHistogram.vue'
+import StateView from '~/components/StateView.vue'
 import { formatApiError } from '~/utils/apiError'
 import { computed, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
@@ -226,8 +252,6 @@ const calculations = ref<Array<{ id: number; calculated_at: string | null; tn: n
 const calculationsLoading = ref(false)
 const queryKey = ref<string>('negative-dp')
 const modeFilter = ref<string | null>(null)
-const page = ref(1)
-const pageSize = 100
 const admissibility = ref<{ id: number; title: string }[]>([])
 
 interface Column { key: string; title: string }
@@ -325,9 +349,34 @@ const filteredRows = computed(() => {
   return items.filter((i) => String(i[col]) === modeFilter.value)
 })
 
-const pagedRows = computed(() => filteredRows.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+/** Ключевой показатель запроса — его распределение мини-гистограммой (у запросов допустимости — нет) */
+const METRICS: Record<string, { key: string; label: string; units: string }> = {
+  'negative-dp': { key: 'dp', label: 'Перепад', units: 'м' },
+  airlock: { key: 'shortfall', label: 'Недостаток напора', units: 'м' },
+  'low-temperature': { key: 't_supply', label: 't подачи', units: '°C' },
+  'closed-sections': { key: 'length_m', label: 'Длина участков', units: 'м' },
+  'disconnected-sections': { key: 'length_m', label: 'Длина участков', units: 'м' },
+  'hydrostatic-zones': { key: 'geo_mark', label: 'Отметка верха трубы', units: 'м' },
+}
+/** Запросы-проблемы (найденное — нарушение режима): плитка «Найдено» с состоянием; у справочных — без */
+const PROBLEM_QUERIES = new Set(['negative-dp', 'airlock', 'low-temperature'])
+const foundStatus = computed(() => {
+  if (!result.value || !(PROBLEM_QUERIES.has(queryKey.value) || queryKey.value.startsWith('adm-'))) return 'none'
+  return result.value.count ? 'warning' : 'good'
+})
+const metric = computed(() => (result.value ? METRICS[queryKey.value] ?? null : null))
 
-watch([modeFilter, result], () => { page.value = 1 })
+/** Строки таблицы: ключ строки — порядковый номер (у результатов анализа нет общего id) */
+const tableRows = computed(() => filteredRows.value.map((row, index) => ({ ...row, _row: index })))
+/** Колонки: числовые — вправо (по первому непустому значению), первая — отметка «есть на карте» */
+const tableColumns = computed<DataTableColumn[]>(() => {
+  const rows = filteredRows.value
+  const isNumeric = (key: string) => typeof rows.find((row) => row[key] != null && row[key] !== '')?.[key] === 'number'
+  return [
+    { key: '_locate', title: '', width: 36, sortable: false },
+    ...columns.value.map((col) => ({ key: col.key, title: col.title, type: isNumeric(col.key) ? 'number' as const : 'text' as const })),
+  ]
+})
 
 const formatNum = (v: number | null | undefined) =>
   v == null || Number.isNaN(Number(v))
@@ -427,10 +476,7 @@ defineExpose({ openDialog })
 </script>
 
 <style scoped>
-.ra-scroll { overflow-x: auto; max-height: 60vh; }
-.ra-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
-.ra-table th, .ra-table td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #eceff1; white-space: nowrap; }
-.ra-table th { background: #eceff1; color: #546e7a; position: sticky; top: 0; z-index: 1; }
-.ra-row--clickable { cursor: pointer; }
-.ra-row--clickable:hover { background: rgba(33, 150, 243, .08); }
+.ra-summary { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); }
+.ra-tiles { display: flex; flex-wrap: wrap; gap: var(--space-2); flex: 1 1 360px; }
+.ra-histogram { flex: 0 1 300px; min-width: 220px; }
 </style>
