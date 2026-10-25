@@ -11,14 +11,21 @@
       >
         <v-toolbar-title>Направления пьезометра</v-toolbar-title>
         <v-spacer />
-        <v-btn
-          icon
-          size="small"
-          aria-label="Закрыть"
-          @click="$emit('update:modelValue', false)"
+        <HintTip
+          text="Закрыть"
         >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              size="small"
+              aria-label="Закрыть"
+              @click="$emit('update:modelValue', false)"
+            >
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
       </v-toolbar>
       <v-card-text>
         <p class="text-caption text-medium-emphasis mb-2">
@@ -107,15 +114,22 @@
             @click="load(d.id)"
           >
             <template #append>
-              <v-btn
+              <HintTip
                 v-if="canEditData"
-                icon="mdi-delete"
-                size="small"
-                variant="text"
-                color="error"
-                :aria-label="`Удалить ${d.name}`"
-                @click.stop="remove(d)"
-              />
+                :text="`Удалить ${d.name}`"
+              >
+                <template #default="{ props: tip }">
+                  <v-btn
+                    v-bind="tip"
+                    icon="mdi-delete"
+                    size="small"
+                    variant="text"
+                    color="error"
+                    :aria-label="`Удалить ${d.name}`"
+                    @click.stop="remove(d)"
+                  />
+                </template>
+              </HintTip>
             </template>
           </v-list-item>
         </v-list>
@@ -131,6 +145,7 @@ import { computed, ref, watch } from 'vue';
 import { fastApiService, type PiezometerDirection } from '~/services/fastApiService';
 import { useAuthStore } from '~/stores/authStore';
 import { useNotificationStore } from '~/stores/notificationStore';
+import HintTip from '~/components/HintTip.vue';
 
 const props = defineProps<{
   modelValue: boolean;

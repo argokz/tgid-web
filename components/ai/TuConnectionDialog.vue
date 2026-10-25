@@ -11,14 +11,21 @@
         </v-icon>
         <span class="text-subtitle-1 font-weight-bold">Точка подключения для ТУ</span>
         <v-spacer />
-        <v-btn
-          icon
-          variant="text"
-          aria-label="Закрыть"
-          @click="visible = false"
+        <HintTip
+          text="Закрыть"
         >
-          <v-icon>mdiClose</v-icon>
-        </v-btn>
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              variant="text"
+              aria-label="Закрыть"
+              @click="visible = false"
+            >
+              <v-icon>mdiClose</v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
       </v-card-title>
       <v-divider />
       <v-card-text class="pt-3">
@@ -319,6 +326,7 @@ import {
   type LoadEstimate,
   type TuRecommendation,
 } from '~/services/tuConnectionService';
+import HintTip from '~/components/HintTip.vue';
 
 /**
  * Подбор точки подключения для заявки на ТУ: точка объекта (адрес через Nominatim или центр карты),

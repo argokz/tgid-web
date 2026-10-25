@@ -11,14 +11,21 @@
       >
         <v-toolbar-title>Фрагменты: экспорт, импорт, слияние</v-toolbar-title>
         <v-spacer />
-        <v-btn
-          icon
-          size="small"
-          aria-label="Закрыть"
-          @click="$emit('update:modelValue', false)"
+        <HintTip
+          text="Закрыть"
         >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              size="small"
+              aria-label="Закрыть"
+              @click="$emit('update:modelValue', false)"
+            >
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
       </v-toolbar>
       <v-tabs
         v-model="tab"
@@ -254,6 +261,7 @@ import { computed, ref, watch } from 'vue';
 import { fastApiService, type FragmentTransferReport } from '~/services/fastApiService';
 import { useAuthStore } from '~/stores/authStore';
 import { useNotificationStore } from '~/stores/notificationStore';
+import HintTip from '~/components/HintTip.vue';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [boolean]; changed: [] }>();

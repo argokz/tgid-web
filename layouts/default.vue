@@ -8,17 +8,24 @@
       border="b"
       tag="header"
     >
-      <v-btn
+      <HintTip
         v-if="navCollapsed"
-        icon
-        variant="text"
-        class="ms-1"
-        aria-label="Открыть меню"
-        :aria-expanded="mainMenuOpen"
-        @click="mainMenuOpen = !mainMenuOpen"
+        text="Открыть главное меню"
       >
-        <v-icon>mdi-menu</v-icon>
-      </v-btn>
+        <template #default="{ props: tip }">
+          <v-btn
+            v-bind="tip"
+            icon
+            variant="text"
+            class="ms-1"
+            aria-label="Открыть меню"
+            :aria-expanded="mainMenuOpen"
+            @click="mainMenuOpen = !mainMenuOpen"
+          >
+            <v-icon>mdi-menu</v-icon>
+          </v-btn>
+        </template>
+      </HintTip>
 
       <!-- Брендинг -->
       <div
@@ -135,23 +142,27 @@
         transition="scale-transition"
       >
         <template #activator="{ props: menuProps }">
-          <v-btn
-            v-bind="menuProps"
-            icon
-            variant="text"
-            class="user-avatar-btn me-2"
-            aria-label="Меню пользователя"
-          >
-            <v-avatar
-              size="34"
-              color="primary"
-            >
-              <v-icon
-                color="white"
-                size="20"
-              >mdi-account</v-icon>
-            </v-avatar>
-          </v-btn>
+          <HintTip text="Открыть меню пользователя">
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="mergeProps(menuProps, tip)"
+                icon
+                variant="text"
+                class="user-avatar-btn me-2"
+                aria-label="Меню пользователя"
+              >
+                <v-avatar
+                  size="34"
+                  color="primary"
+                >
+                  <v-icon
+                    color="white"
+                    size="20"
+                  >mdi-account</v-icon>
+                </v-avatar>
+              </v-btn>
+            </template>
+          </HintTip>
         </template>
         <v-card
           min-width="240"
@@ -392,20 +403,27 @@
         >
           {{ notificationStore.action.label }}
         </v-btn>
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          size="small"
-          aria-label="Закрыть"
-          @click="notificationStore.hide()"
-        />
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              size="small"
+              aria-label="Закрыть"
+              @click="notificationStore.hide()"
+            />
+          </template>
+        </HintTip>
       </template>
     </v-snackbar>
   </v-app>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onBeforeUnmount, onMounted, watch } from 'vue';
+import { ref, reactive, computed, mergeProps, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useMobile } from '~/composables/useMobile';
 import { useEscapeClose, useGlobalEscape } from '~/composables/useEscape';

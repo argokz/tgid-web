@@ -20,16 +20,23 @@
           <div class="text-caption text-medium-emphasis">{{ tabSubtitle }}</div>
         </div>
       </div>
-      <v-btn
-        icon
-        variant="text"
-        color="secondary"
-        size="small"
-        aria-label="Закрыть панель"
-        @click="$emit('close')"
+      <HintTip
+        text="Закрыть панель"
       >
-        <v-icon>mdi-close</v-icon>
-      </v-btn>
+        <template #default="{ props: tip }">
+          <v-btn
+            v-bind="tip"
+            icon
+            variant="text"
+            color="secondary"
+            size="small"
+            aria-label="Закрыть панель"
+            @click="$emit('close')"
+          >
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </template>
+      </HintTip>
     </div>
 
     <!-- Табы -->
@@ -116,17 +123,24 @@
                 Слои контекста
               </span>
               <v-spacer />
-              <v-btn
-                icon
-                size="x-small"
-                variant="text"
-                :aria-label="contextSectionCollapsed ? 'Развернуть блок слоёв контекста' : 'Свернуть блок слоёв контекста'"
-                @click.stop="contextSectionCollapsed = !contextSectionCollapsed"
+              <HintTip
+                :text="contextSectionCollapsed ? 'Развернуть блок слоёв контекста' : 'Свернуть блок слоёв контекста'"
               >
-                <v-icon size="14">
-                  {{ contextSectionCollapsed ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
-                </v-icon>
-              </v-btn>
+                <template #default="{ props: tip }">
+                  <v-btn
+                    v-bind="tip"
+                    icon
+                    size="x-small"
+                    variant="text"
+                    :aria-label="contextSectionCollapsed ? 'Развернуть блок слоёв контекста' : 'Свернуть блок слоёв контекста'"
+                    @click.stop="contextSectionCollapsed = !contextSectionCollapsed"
+                  >
+                    <v-icon size="14">
+                      {{ contextSectionCollapsed ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
+                    </v-icon>
+                  </v-btn>
+                </template>
+              </HintTip>
             </div>
             <div
               v-show="!contextSectionCollapsed"
@@ -211,15 +225,22 @@
                 <v-card-title class="text-subtitle-2 py-2 px-3 d-flex align-center">
                   <span class="text-truncate">{{ planetStyleTarget.label }}</span>
                   <v-spacer />
-                  <v-btn
-                    icon
-                    size="x-small"
-                    variant="text"
-                    aria-label="Закрыть"
-                    @click="planetStyleTarget = null"
+                  <HintTip
+                    text="Закрыть"
                   >
-                    <v-icon size="18">mdi-close</v-icon>
-                  </v-btn>
+                    <template #default="{ props: tip }">
+                      <v-btn
+                        v-bind="tip"
+                        icon
+                        size="x-small"
+                        variant="text"
+                        aria-label="Закрыть"
+                        @click="planetStyleTarget = null"
+                      >
+                        <v-icon size="18">mdi-close</v-icon>
+                      </v-btn>
+                    </template>
+                  </HintTip>
                 </v-card-title>
                 <v-divider />
                 <v-card-text class="py-2 px-3">
@@ -316,17 +337,24 @@
                   Слои Planet V4
                 </span>
                 <v-spacer />
-                <v-btn
-                  icon
-                  size="x-small"
-                  variant="text"
-                  :aria-label="planetSectionCollapsed ? 'Развернуть блок слоёв Planet V4' : 'Свернуть блок слоёв Planet V4'"
-                  @click.stop="planetSectionCollapsed = !planetSectionCollapsed"
+                <HintTip
+                  :text="planetSectionCollapsed ? 'Развернуть блок слоёв Planet V4' : 'Свернуть блок слоёв Planet V4'"
                 >
-                  <v-icon size="14">
-                    {{ planetSectionCollapsed ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
-                  </v-icon>
-                </v-btn>
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon
+                      size="x-small"
+                      variant="text"
+                      :aria-label="planetSectionCollapsed ? 'Развернуть блок слоёв Planet V4' : 'Свернуть блок слоёв Planet V4'"
+                      @click.stop="planetSectionCollapsed = !planetSectionCollapsed"
+                    >
+                      <v-icon size="14">
+                        {{ planetSectionCollapsed ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
+                      </v-icon>
+                    </v-btn>
+                  </template>
+                </HintTip>
               </div>
               <div v-show="!planetSectionCollapsed">
                 <div
@@ -347,29 +375,43 @@
                       {{ pg.label }}
                     </span>
                     <v-spacer />
-                    <v-btn
-                      icon
-                      size="x-small"
-                      variant="text"
-                      class="mr-n1"
-                      :aria-label="`Включить или отключить все слои группы «${pg.label}»`"
-                      @click.stop="togglePlanetGroupAll(pg)"
+                    <HintTip
+                      :text="`Включить или отключить все слои группы «${pg.label}»`"
                     >
-                      <v-icon size="12">
-                        {{ isPlanetGroupAllVisible(pg) ? 'mdi-checkbox-marked' : isPlanetGroupPartial(pg) ? 'mdi-minus-box' : 'mdi-checkbox-blank-outline' }}
-                      </v-icon>
-                    </v-btn>
-                    <v-btn
-                      icon
-                      size="x-small"
-                      variant="text"
-                      :aria-label="isPlanetGroupCollapsed(pg.group) ? `Развернуть группу «${pg.label}»` : `Свернуть группу «${pg.label}»`"
-                      @click.stop="togglePlanetGroupCollapsed(pg.group)"
+                      <template #default="{ props: tip }">
+                        <v-btn
+                          v-bind="tip"
+                          icon
+                          size="x-small"
+                          variant="text"
+                          class="mr-n1"
+                          :aria-label="`Включить или отключить все слои группы «${pg.label}»`"
+                          @click.stop="togglePlanetGroupAll(pg)"
+                        >
+                          <v-icon size="12">
+                            {{ isPlanetGroupAllVisible(pg) ? 'mdi-checkbox-marked' : isPlanetGroupPartial(pg) ? 'mdi-minus-box' : 'mdi-checkbox-blank-outline' }}
+                          </v-icon>
+                        </v-btn>
+                      </template>
+                    </HintTip>
+                    <HintTip
+                      :text="isPlanetGroupCollapsed(pg.group) ? `Развернуть группу «${pg.label}»` : `Свернуть группу «${pg.label}»`"
                     >
-                      <v-icon size="14">
-                        {{ isPlanetGroupCollapsed(pg.group) ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
-                      </v-icon>
-                    </v-btn>
+                      <template #default="{ props: tip }">
+                        <v-btn
+                          v-bind="tip"
+                          icon
+                          size="x-small"
+                          variant="text"
+                          :aria-label="isPlanetGroupCollapsed(pg.group) ? `Развернуть группу «${pg.label}»` : `Свернуть группу «${pg.label}»`"
+                          @click.stop="togglePlanetGroupCollapsed(pg.group)"
+                        >
+                          <v-icon size="14">
+                            {{ isPlanetGroupCollapsed(pg.group) ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
+                          </v-icon>
+                        </v-btn>
+                      </template>
+                    </HintTip>
                   </div>
                   <v-list
                     v-show="!isPlanetGroupCollapsed(pg.group)"
@@ -398,16 +440,23 @@
                         {{ pl.label }}
                       </v-list-item-title>
                       <template #append>
-                        <v-btn
-                          icon
-                          size="x-small"
-                          variant="text"
-                          class="ms-n1"
-                          :aria-label="`Стиль слоя: ${pl.label}`"
-                          @click.stop="openPlanetStyleDialog(pl)"
+                        <HintTip
+                          :text="`Настроить стиль слоя «${pl.label}»`"
                         >
-                          <v-icon size="16">mdi-palette-outline</v-icon>
-                        </v-btn>
+                          <template #default="{ props: tip }">
+                            <v-btn
+                              v-bind="tip"
+                              icon
+                              size="x-small"
+                              variant="text"
+                              class="ms-n1"
+                              :aria-label="`Стиль слоя: ${pl.label}`"
+                              @click.stop="openPlanetStyleDialog(pl)"
+                            >
+                              <v-icon size="16">mdi-palette-outline</v-icon>
+                            </v-btn>
+                          </template>
+                        </HintTip>
                       </template>
                     </v-list-item>
                   </v-list>
@@ -446,17 +495,24 @@
                   {{ formatGroupName(group.name) }}
                 </span>
                 <v-spacer />
-                <v-btn
-                  icon
-                  size="x-small"
-                  variant="text"
-                  :aria-label="isGroupCollapsed(group.name) ? `Развернуть группу «${formatGroupName(group.name)}»` : `Свернуть группу «${formatGroupName(group.name)}»`"
-                  @click.stop="toggleGroupCollapsed(group.name)"
+                <HintTip
+                  :text="isGroupCollapsed(group.name) ? `Развернуть группу «${formatGroupName(group.name)}»` : `Свернуть группу «${formatGroupName(group.name)}»`"
                 >
-                  <v-icon size="14">
-                    {{ isGroupCollapsed(group.name) ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
-                  </v-icon>
-                </v-btn>
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon
+                      size="x-small"
+                      variant="text"
+                      :aria-label="isGroupCollapsed(group.name) ? `Развернуть группу «${formatGroupName(group.name)}»` : `Свернуть группу «${formatGroupName(group.name)}»`"
+                      @click.stop="toggleGroupCollapsed(group.name)"
+                    >
+                      <v-icon size="14">
+                        {{ isGroupCollapsed(group.name) ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
+                      </v-icon>
+                    </v-btn>
+                  </template>
+                </HintTip>
               </div>
 
               <v-list
@@ -554,26 +610,40 @@
                       class="d-flex flex-column"
                       style="gap: 2px;"
                     >
-                      <v-btn
-                        icon
-                        size="x-small"
-                        variant="text"
-                        :disabled="getLayerOrder(layer.layerId) === 1"
-                        :aria-label="`Переместить слой «${layer.label || layer.displayName || layer.sourceLayer}» вверх`"
-                        @click.stop="$emit('move-up', layer.layerId)"
+                      <HintTip
+                        :text="`Переместить слой «${layer.label || layer.displayName || layer.sourceLayer}» вверх`"
                       >
-                        <v-icon size="16">mdi-chevron-up</v-icon>
-                      </v-btn>
-                      <v-btn
-                        icon
-                        size="x-small"
-                        variant="text"
-                        :disabled="getLayerOrder(layer.layerId) === layerStore.geoServerLayers.length"
-                        :aria-label="`Переместить слой «${layer.label || layer.displayName || layer.sourceLayer}» вниз`"
-                        @click.stop="$emit('move-down', layer.layerId)"
+                        <template #default="{ props: tip }">
+                          <v-btn
+                            v-bind="tip"
+                            icon
+                            size="x-small"
+                            variant="text"
+                            :disabled="getLayerOrder(layer.layerId) === 1"
+                            :aria-label="`Переместить слой «${layer.label || layer.displayName || layer.sourceLayer}» вверх`"
+                            @click.stop="$emit('move-up', layer.layerId)"
+                          >
+                            <v-icon size="16">mdi-chevron-up</v-icon>
+                          </v-btn>
+                        </template>
+                      </HintTip>
+                      <HintTip
+                        :text="`Переместить слой «${layer.label || layer.displayName || layer.sourceLayer}» вниз`"
                       >
-                        <v-icon size="16">mdi-chevron-down</v-icon>
-                      </v-btn>
+                        <template #default="{ props: tip }">
+                          <v-btn
+                            v-bind="tip"
+                            icon
+                            size="x-small"
+                            variant="text"
+                            :disabled="getLayerOrder(layer.layerId) === layerStore.geoServerLayers.length"
+                            :aria-label="`Переместить слой «${layer.label || layer.displayName || layer.sourceLayer}» вниз`"
+                            @click.stop="$emit('move-down', layer.layerId)"
+                          >
+                            <v-icon size="16">mdi-chevron-down</v-icon>
+                          </v-btn>
+                        </template>
+                      </HintTip>
                     </div>
                   </template>
                 </v-list-item>
@@ -848,6 +918,7 @@ import {
   type PlanetLayerDef,
   type PlanetLayerStyleOverride,
 } from '~/utils/planetV4Layers'
+import HintTip from '~/components/HintTip.vue'
 
 const { mobile } = useDisplay()
 const planetStyleDialogWidth = computed(() =>

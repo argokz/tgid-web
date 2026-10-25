@@ -293,14 +293,21 @@
               {{ details ? `линия ${details.line_id ?? '—'} · ${details.state_name || 'состояние не указано'}` : '' }}
             </div>
           </div>
-          <v-btn
-            icon
-            variant="text"
-            aria-label="Закрыть паспорт"
-            @click="detailVisible = false"
+          <HintTip
+            text="Закрыть паспорт"
           >
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Закрыть паспорт"
+                @click="detailVisible = false"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
         </v-card-title>
         <v-divider />
 

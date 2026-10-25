@@ -416,14 +416,21 @@
               </v-btn>
             </template>
           </HintTip>
-          <v-btn
-            icon
-            variant="text"
-            aria-label="Закрыть"
-            @click="detailsVisible = false"
+          <HintTip
+            text="Закрыть"
           >
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Закрыть"
+                @click="detailsVisible = false"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
         </v-card-title>
         <v-divider />
 
@@ -475,13 +482,20 @@
                           v-if="hasCoordinates(line)"
                           #append
                         >
-                          <v-btn
-                            icon="mdi-crosshairs-gps"
-                            size="x-small"
-                            variant="text"
-                            aria-label="Показать на карте"
-                            @click.stop="locateRelation(line, `Линия ${line.line_id}`)"
-                          />
+                          <HintTip
+                            text="Показать на карте"
+                          >
+                            <template #default="{ props: tip }">
+                              <v-btn
+                                v-bind="tip"
+                                icon="mdi-crosshairs-gps"
+                                size="x-small"
+                                variant="text"
+                                aria-label="Показать на карте"
+                                @click.stop="locateRelation(line, `Линия ${line.line_id}`)"
+                              />
+                            </template>
+                          </HintTip>
                         </template>
                       </v-list-item>
                     </v-list>

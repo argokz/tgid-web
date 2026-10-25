@@ -25,14 +25,21 @@
         >
           Расчёты
         </v-btn>
-        <v-btn
-          icon
-          density="compact"
-          aria-label="Закрыть"
-          @click="close"
+        <HintTip
+          text="Закрыть"
         >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              density="compact"
+              aria-label="Закрыть"
+              @click="close"
+            >
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
       </v-card-title>
 
       <v-card-text class="pt-2 pb-0">
@@ -416,6 +423,7 @@ import { useLayerStore } from '~/stores/layerStore';
 import { fastApiService, type SetyCalcMode, type SetyRunRequest } from '~/services/fastApiService';
 import { tnRangeHint, tnValidationError, type TnRange } from '~/utils/calcTemperature';
 import { calcOutcome, taskStateLabel } from '~/utils/calcProtocol';
+import HintTip from '~/components/HintTip.vue';
 
 type RunKind = 'normal' | 'list' | 'emergency';
 

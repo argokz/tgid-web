@@ -10,22 +10,36 @@
         <v-icon>mdi-card-account-details-outline</v-icon>
         Личный кабинет
         <v-spacer />
-        <v-btn
+        <HintTip
           v-if="tab === 'users'"
-          icon="mdi-refresh"
-          variant="text"
-          density="compact"
-          :loading="usersPanel?.loading"
-          aria-label="Обновить список пользователей"
-          @click="usersPanel?.load()"
-        />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          density="compact"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+          text="Обновить список пользователей"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-refresh"
+              variant="text"
+              density="compact"
+              :loading="usersPanel?.loading"
+              aria-label="Обновить список пользователей"
+              @click="usersPanel?.load()"
+            />
+          </template>
+        </HintTip>
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              density="compact"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
 
       <v-tabs
@@ -201,6 +215,7 @@
 </template>
 
 <script setup lang="ts">
+import HintTip from '~/components/HintTip.vue'
 /** Личный кабинет: свой профиль и права, смена пароля, выход; администратору — пользователи */
 import { computed, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'

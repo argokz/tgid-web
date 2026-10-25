@@ -10,12 +10,19 @@
         <v-icon>mdi-file-excel</v-icon>
         Отчёты Excel
         <v-spacer />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
       <v-card-text>
         <p class="text-body-2 text-medium-emphasis mb-3">
@@ -218,6 +225,7 @@ import {
 import { useFragmentStore } from '~/stores/fragmentStore'
 import { useNotificationStore } from '~/stores/notificationStore'
 import { groupReports, reportNeedsFragment, saveBlob } from '~/utils/reportsCatalog'
+import HintTip from '~/components/HintTip.vue'
 
 const { isMobile } = useMobile()
 const fragmentStore = useFragmentStore()

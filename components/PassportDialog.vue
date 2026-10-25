@@ -8,12 +8,19 @@
       <v-card-title class="d-flex align-center bg-primary text-white">
         Отчеты и Паспорта участков
         <v-spacer />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          aria-label="Закрыть"
-          @click="dialog = false"
-        />
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              aria-label="Закрыть"
+              @click="dialog = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
       
       <v-card-text
@@ -124,14 +131,21 @@
                         size="20"
                         width="2"
                       />
-                      <v-btn
+                      <HintTip
                         v-else
-                        icon="mdi-file-excel-box"
-                        color="success"
-                        size="small"
-                        variant="text"
-                        aria-label="Скачать Excel"
-                      />
+                        text="Скачать Excel"
+                      >
+                        <template #default="{ props: tip }">
+                          <v-btn
+                            v-bind="tip"
+                            icon="mdi-file-excel-box"
+                            color="success"
+                            size="small"
+                            variant="text"
+                            aria-label="Скачать Excel"
+                          />
+                        </template>
+                      </HintTip>
                     </template>
                   </v-list-item>
                 </v-list-group>
@@ -155,6 +169,7 @@ import {
   type PassportHierarchyGroup,
   type PassportSite
 } from '~/services/fastApiService'
+import HintTip from '~/components/HintTip.vue'
 
 const dialog = ref(false)
 const loading = ref(false)

@@ -30,15 +30,22 @@
               {{ subtitle }}
             </div>
           </div>
-          <v-btn
-            icon
-            size="small"
-            variant="text"
-            aria-label="Закрыть"
-            @click="close"
+          <HintTip
+            text="Закрыть"
           >
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                size="small"
+                variant="text"
+                aria-label="Закрыть"
+                @click="close"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
         </header>
         <div
           v-if="$slots.actions"

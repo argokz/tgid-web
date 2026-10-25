@@ -27,14 +27,21 @@
         >
           Рассчитать
         </v-btn>
-        <v-btn
-          icon
-          variant="text"
-          aria-label="Закрыть"
-          @click="visible = false"
+        <HintTip
+          text="Закрыть"
         >
-          <v-icon>mdiClose</v-icon>
-        </v-btn>
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              variant="text"
+              aria-label="Закрыть"
+              @click="visible = false"
+            >
+              <v-icon>mdiClose</v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
       </v-card-title>
       <v-divider />
       <v-card-text class="pt-3">
@@ -342,6 +349,7 @@ import { useNotificationStore } from '~/stores/notificationStore';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { wearService, type WearOrder, type WearPlan, type WearSection, type WearSummary } from '~/services/wearService';
 import { fastApiService } from '~/services/fastApiService';
+import HintTip from '~/components/HintTip.vue';
 
 /**
  * Износ участков (формула gid6 tgid_iznos.sql) и приоритет ремонта: запуск расчёта (Celery),

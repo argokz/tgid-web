@@ -10,13 +10,20 @@
       <v-card-title class="chd-title">
         <span>{{ helper?.title || 'Выбор значения' }}</span>
         <v-spacer />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          size="small"
-          aria-label="Закрыть"
-          @click="emit('update:modelValue', false)"
-        />
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              size="small"
+              aria-label="Закрыть"
+              @click="emit('update:modelValue', false)"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
       <div
         v-if="helper?.type === 'pick' && helper.subtitle && helper.subtitle !== helper.title"
@@ -221,6 +228,7 @@
 import { computed, ref, watch } from 'vue';
 import { formatDesktopNumber } from '~/utils/desktopNumber';
 import { mestnResult, mixFactor, parseMestn, type CardHelper, type CardHelperMestn } from '~/utils/objectCard';
+import HintTip from '~/components/HintTip.vue';
 
 const props = defineProps<{
   modelValue: boolean

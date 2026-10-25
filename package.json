@@ -27,7 +27,8 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "perf:budget": "node ./scripts/perf-budget.mjs",
-    "check": "npm run lint && npm run typecheck && npm run test",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run check:hints",
+    "check:hints": "node scripts/check-icon-hints.mjs",
     "ci": "npm run check && npm run build"
   },
   "dependencies": {

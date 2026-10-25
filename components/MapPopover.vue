@@ -32,18 +32,25 @@
             {{ subtitle }}
           </div>
         </div>
-        <v-btn
-          icon
-          variant="text"
-          size="x-small"
-          color="secondary"
-          aria-label="Закрыть"
-          @click="emit('close')"
+        <HintTip
+          text="Закрыть"
         >
-          <v-icon size="18">
-            mdi-close
-          </v-icon>
-        </v-btn>
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              variant="text"
+              size="x-small"
+              color="secondary"
+              aria-label="Закрыть"
+              @click="emit('close')"
+            >
+              <v-icon size="18">
+                mdi-close
+              </v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
       </header>
       <div class="map-popover__body">
         <slot />
@@ -67,6 +74,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { CSSProperties } from 'vue'
 import { registerHotkeys } from '~/composables/useHotkeys'
 import { holdsEscape } from '~/utils/escapeKey'
+import HintTip from '~/components/HintTip.vue'
 
 /** То, что поповеру нужно от карты MapLibre: проекция точки, контейнер, события перемещения */
 export interface MapPopoverMap {

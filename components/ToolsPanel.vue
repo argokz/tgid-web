@@ -15,15 +15,22 @@
       >mdi-toolbox-outline</v-icon>
       <span class="text-subtitle-1 font-weight-bold">Инструменты</span>
       <v-spacer />
-      <v-btn
-        icon
-        size="small"
-        variant="text"
-        aria-label="Закрыть панель инструментов"
-        @click="open = false"
+      <HintTip
+        text="Закрыть панель инструментов"
       >
-        <v-icon size="20">mdi-close</v-icon>
-      </v-btn>
+        <template #default="{ props: tip }">
+          <v-btn
+            v-bind="tip"
+            icon
+            size="small"
+            variant="text"
+            aria-label="Закрыть панель инструментов"
+            @click="open = false"
+          >
+            <v-icon size="20">mdi-close</v-icon>
+          </v-btn>
+        </template>
+      </HintTip>
     </div>
 
     <v-divider />
@@ -115,6 +122,7 @@ import { useMobile } from '~/composables/useMobile';
 import { useAuthStore } from '~/stores/authStore';
 import { filterByRole } from '~/utils/permissions';
 import { TOOL_GROUPS, type ToolDescriptor } from '~/utils/toolCatalog';
+import HintTip from '~/components/HintTip.vue';
 
 const open = defineModel<boolean>({ default: false });
 const emit = defineEmits<{ 'open-tool': [event: ToolDescriptor['event']] }>();

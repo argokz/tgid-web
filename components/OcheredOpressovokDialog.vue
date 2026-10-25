@@ -16,12 +16,19 @@
               <span v-if="tableName"> · таблица {{ tableName }}</span>
             </div>
           </div>
-          <v-btn
-            icon
-            variant="text"
-            aria-label="Закрыть"
-            @click="visible = false"
-          ><v-icon>mdi-close</v-icon></v-btn>
+          <HintTip
+            text="Закрыть"
+          >
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Закрыть"
+                @click="visible = false"
+              ><v-icon>mdi-close</v-icon></v-btn>
+            </template>
+          </HintTip>
         </v-card-title>
         <v-divider />
         <v-alert
@@ -73,6 +80,7 @@ import { formatApiError } from '~/utils/apiError'
 import { useMobile } from '~/composables/useMobile'
 import { fastApiService } from '~/services/fastApiService'
 import type { DataTableColumn } from '~/components/DataTable.vue'
+import HintTip from '~/components/HintTip.vue'
 
 const { isMobile } = useMobile()
 const visible = ref(false)

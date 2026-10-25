@@ -218,14 +218,21 @@
             <span class="font-weight-medium">{{ lineId }}</span>
             <span class="text-caption text-medium-emphasis text-truncate">{{ lineCaption(lineId) }}</span>
             <v-spacer />
-            <v-btn
+            <HintTip
               v-if="canEdit"
-              icon="mdi-close"
-              size="x-small"
-              variant="text"
-              :aria-label="`Убрать участок ${lineId}`"
-              @click="removeLine(lineId)"
-            />
+              :text="`Убрать участок ${lineId}`"
+            >
+              <template #default="{ props: tip }">
+                <v-btn
+                  v-bind="tip"
+                  icon="mdi-close"
+                  size="x-small"
+                  variant="text"
+                  :aria-label="`Убрать участок ${lineId}`"
+                  @click="removeLine(lineId)"
+                />
+              </template>
+            </HintTip>
           </div>
         </div>
         <div
@@ -336,21 +343,35 @@
             >{{ doc.path }}</div>
           </div>
           <template v-if="canEdit">
-            <v-btn
-              icon="mdi-pencil"
-              size="x-small"
-              variant="text"
-              aria-label="Изменить документ"
-              @click="openDocForm(doc)"
-            />
-            <v-btn
-              icon="mdi-delete"
-              size="x-small"
-              variant="text"
-              color="error"
-              aria-label="Удалить документ"
-              @click="askDeleteDoc(doc)"
-            />
+            <HintTip
+              text="Изменить документ"
+            >
+              <template #default="{ props: tip }">
+                <v-btn
+                  v-bind="tip"
+                  icon="mdi-pencil"
+                  size="x-small"
+                  variant="text"
+                  aria-label="Изменить документ"
+                  @click="openDocForm(doc)"
+                />
+              </template>
+            </HintTip>
+            <HintTip
+              text="Удалить документ"
+            >
+              <template #default="{ props: tip }">
+                <v-btn
+                  v-bind="tip"
+                  icon="mdi-delete"
+                  size="x-small"
+                  variant="text"
+                  color="error"
+                  aria-label="Удалить документ"
+                  @click="askDeleteDoc(doc)"
+                />
+              </template>
+            </HintTip>
           </template>
         </div>
         <div
@@ -463,6 +484,7 @@ import {
   type JournalSchema,
 } from '~/services/journalWriteService';
 import { formatJournalError, parseLineIds } from '~/utils/journalWrite';
+import HintTip from '~/components/HintTip.vue';
 
 const props = defineProps<{
   journal: JournalKey

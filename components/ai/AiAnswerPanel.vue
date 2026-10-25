@@ -29,17 +29,24 @@
           mdiRefresh
         </v-icon>
       </v-btn>
-      <v-btn
-        size="x-small"
-        variant="text"
-        icon
-        aria-label="Скрыть объяснение"
-        @click="emit('close')"
+      <HintTip
+        text="Скрыть объяснение"
       >
-        <v-icon size="14">
-          mdiClose
-        </v-icon>
-      </v-btn>
+        <template #default="{ props: tip }">
+          <v-btn
+            v-bind="tip"
+            size="x-small"
+            variant="text"
+            icon
+            aria-label="Скрыть объяснение"
+            @click="emit('close')"
+          >
+            <v-icon size="14">
+              mdiClose
+            </v-icon>
+          </v-btn>
+        </template>
+      </HintTip>
     </div>
 
     <div
@@ -210,6 +217,7 @@
 import type { AiObjectRef } from '~/services/aiService';
 import type { ProtocolExplanation, ProtocolRegulator, RootCause } from '~/services/aiService';
 import { FIX_HINTS, FIX_LABELS, type ProtocolFix } from '~/utils/calcProtocol';
+import HintTip from '~/components/HintTip.vue';
 
 /**
  * Ответ помощника ИИ по протоколу расчёта: сводка, причины с объектами и кнопкой «что открыть»,

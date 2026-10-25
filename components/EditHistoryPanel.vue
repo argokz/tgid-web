@@ -14,14 +14,21 @@
         </v-icon>
         История правок
         <v-spacer />
-        <v-btn
-          icon="mdi-refresh"
-          variant="text"
-          size="small"
-          :loading="loading"
-          aria-label="Обновить"
-          @click="load"
-        />
+        <HintTip
+          text="Обновить"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-refresh"
+              variant="text"
+              size="small"
+              :loading="loading"
+              aria-label="Обновить"
+              @click="load"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
       <v-card-subtitle class="pb-2">
         Ваши последние правки сети и свойств. «Откатить до сюда» отменяет правки от последней до выбранной.
@@ -97,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import HintTip from '~/components/HintTip.vue'
 /** «История правок» пользователя (журнал отмены: сеть и карточки): показать на карте, откатить до места */
 import { computed, ref, watch } from 'vue'
 import { confirmAction } from '~/composables/useConfirm'

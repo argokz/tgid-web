@@ -16,13 +16,20 @@
         >mdi-calculator-variant</v-icon>
         <span class="text-h6 font-weight-bold">Калькулятор дросселирования (Шайбы и Элеваторы)</span>
         <v-spacer />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          size="small"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              size="small"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
 
       <v-card-text class="pa-4">
@@ -790,6 +797,7 @@ import {
   type OrificeScheme,
   type ThrottlingSheetParams,
 } from '~/services/fastApiService';
+import HintTip from '~/components/HintTip.vue';
 
 const visible = defineModel<boolean>({ default: false });
 const { isMobile } = useMobile();

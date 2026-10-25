@@ -59,21 +59,24 @@
       v-if="edit.helper || edit.fun_name === 'schemeNum'"
       #append-inner
     >
-      <v-btn
-        :icon="helperIcon"
-        size="x-small"
-        variant="text"
-        density="comfortable"
-        color="primary"
-        :disabled="readonly"
-        :aria-label="helperTitle"
-        @click.stop="emit('helper')"
-      />
-      <v-tooltip
-        activator="parent"
+      <HintTip
+        :text="helperTitle"
         location="top"
-        max-width="320"
-      >{{ helperTitle }}</v-tooltip>
+      >
+        <template #default="{ props: tip }">
+          <v-btn
+            v-bind="tip"
+            :icon="helperIcon"
+            size="x-small"
+            variant="text"
+            density="comfortable"
+            color="primary"
+            :disabled="readonly"
+            :aria-label="helperTitle"
+            @click.stop="emit('helper')"
+          />
+        </template>
+      </HintTip>
     </template>
     <template
       v-else-if="funHint"
@@ -97,6 +100,7 @@ import { computed, ref, watch } from 'vue';
 import { fastApiService } from '~/services/fastApiService';
 import { parseInput, type CardFieldEdit, type CardOption } from '~/utils/objectCard';
 import { cardOptionsCache } from '~/utils/objectCardOptions';
+import HintTip from '~/components/HintTip.vue';
 
 const props = defineProps<{
   modelValue: unknown

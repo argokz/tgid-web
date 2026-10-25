@@ -14,15 +14,22 @@
         </v-icon>
         Горячие клавиши
         <v-spacer />
-        <v-btn
-          icon
-          variant="text"
-          size="small"
-          aria-label="Закрыть"
-          @click="open = false"
+        <HintTip
+          text="Закрыть"
         >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              variant="text"
+              size="small"
+              aria-label="Закрыть"
+              @click="open = false"
+            >
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
       </v-card-title>
       <v-card-text>
         <div
@@ -66,6 +73,7 @@
 
 <script setup lang="ts">
 import { HOTKEY_DOCS } from '~/utils/hotkeys';
+import HintTip from '~/components/HintTip.vue';
 
 const open = defineModel<boolean>({ default: false });
 </script>

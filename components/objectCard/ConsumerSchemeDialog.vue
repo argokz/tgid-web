@@ -9,13 +9,20 @@
       <v-card-title class="csd-title">
         <span>Схема присоединения</span>
         <v-spacer />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          size="small"
-          aria-label="Закрыть"
-          @click="emit('update:modelValue', false)"
-        />
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              size="small"
+              aria-label="Закрыть"
+              @click="emit('update:modelValue', false)"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
       <v-divider />
       <v-card-text class="csd-body">
@@ -133,6 +140,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { rezAllowed, schemeNumber, schemeOptions, schemeSummary, type SchemeOptions } from '~/utils/consumerScheme';
+import HintTip from '~/components/HintTip.vue';
 
 const props = defineProps<{
   modelValue: boolean

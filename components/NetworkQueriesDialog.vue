@@ -10,12 +10,19 @@
         <v-icon>mdi-sigma</v-icon>
         Запросы по сети
         <v-spacer />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
       <v-card-text>
         <p class="text-body-2 text-medium-emphasis mb-3">
@@ -251,6 +258,7 @@ import { fastApiService } from '~/services/fastApiService'
 import { useFragmentStore } from '~/stores/fragmentStore'
 import { heatConsumptionRows } from '~/utils/heatConsumption'
 import { fragmentScopeItems } from '~/utils/fragmentScope'
+import HintTip from '~/components/HintTip.vue'
 
 const emit = defineEmits<{ (e: 'locate', point: { lat: number; lng: number }): void }>()
 const { isMobile } = useMobile()

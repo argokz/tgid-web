@@ -12,21 +12,35 @@
         </v-icon>
         Расчёты
         <v-spacer />
-        <v-btn
-          icon="mdi-refresh"
-          variant="text"
-          density="compact"
-          :loading="loading"
-          aria-label="Обновить"
-          @click="load"
-        />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          density="compact"
-          aria-label="Закрыть"
-          @click="isOpen = false"
-        />
+        <HintTip
+          text="Обновить"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-refresh"
+              variant="text"
+              density="compact"
+              :loading="loading"
+              aria-label="Обновить"
+              @click="load"
+            />
+          </template>
+        </HintTip>
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              density="compact"
+              aria-label="Закрыть"
+              @click="isOpen = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
 
       <v-card-text class="pt-0">
@@ -209,6 +223,7 @@ import {
 import { useAuthStore } from '~/stores/authStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { useNotificationStore } from '~/stores/notificationStore';
+import HintTip from '~/components/HintTip.vue';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [value: boolean]; 'deleted': [id: number]; 'open-protocol': [id: number] }>();

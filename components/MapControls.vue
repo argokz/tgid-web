@@ -9,28 +9,27 @@
       :class="{ 'expanded': searchExpanded }"
     >
 
-      <v-btn
-
+      <HintTip
         v-if="!searchExpanded"
-
-        icon
-
-        size="default"
-
-        elevation="4"
-
-        color="surface"
-
-        class="control-btn"
-
-        aria-label="Открыть поиск адреса на карте"
-
-        @click="expandSearch"
+        text="Открыть поиск адреса на карте"
       >
+        <template #default="{ props: tip }">
+          <v-btn
+            v-bind="tip"
+            icon
+            size="default"
+            elevation="4"
+            color="surface"
+            class="control-btn"
+            aria-label="Открыть поиск адреса на карте"
+            @click="expandSearch"
+          >
 
-        <v-icon color="primary">mdi-magnify</v-icon>
+            <v-icon color="primary">mdi-magnify</v-icon>
 
-      </v-btn>
+          </v-btn>
+        </template>
+      </HintTip>
 
 
       <v-card
@@ -75,22 +74,24 @@
 
             <template #append-inner>
 
-              <v-btn
-
-                icon
-
-                size="small"
-
-                variant="text"
-
-                aria-label="Закрыть поиск адреса"
-
-                @click="collapseSearch"
+              <HintTip
+                text="Закрыть поиск адреса"
               >
+                <template #default="{ props: tip }">
+                  <v-btn
+                    v-bind="tip"
+                    icon
+                    size="small"
+                    variant="text"
+                    aria-label="Закрыть поиск адреса"
+                    @click="collapseSearch"
+                  >
 
-                <v-icon size="small">mdi-close</v-icon>
+                    <v-icon size="small">mdi-close</v-icon>
 
-              </v-btn>
+                  </v-btn>
+                </template>
+              </HintTip>
 
             </template>
 
@@ -650,6 +651,7 @@
 
 
 <script setup lang="ts">
+import HintTip from '~/components/HintTip.vue'
 
 import { ref, computed, onMounted, nextTick } from 'vue'
 

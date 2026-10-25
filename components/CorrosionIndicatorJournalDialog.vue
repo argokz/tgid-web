@@ -370,14 +370,21 @@
               {{ selected?.phase_name || 'Этап не указан' }} · сезонов {{ selected?.history_count || 0 }}
             </div>
           </div>
-          <v-btn
-            icon
-            variant="text"
-            aria-label="Закрыть"
-            @click="detailsVisible = false"
+          <HintTip
+            text="Закрыть"
           >
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Закрыть"
+                @click="detailsVisible = false"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-4">

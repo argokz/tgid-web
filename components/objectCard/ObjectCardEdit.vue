@@ -99,14 +99,21 @@
               @click="applyTemplate(t)"
             >
               <template #append>
-                <v-btn
+                <HintTip
                   v-if="t.author === currentUser"
-                  icon="mdi-delete-outline"
-                  size="x-small"
-                  variant="text"
-                  aria-label="Удалить шаблон"
-                  @click.stop="removeTemplate(t)"
-                />
+                  text="Удалить шаблон"
+                >
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon="mdi-delete-outline"
+                      size="x-small"
+                      variant="text"
+                      aria-label="Удалить шаблон"
+                      @click.stop="removeTemplate(t)"
+                    />
+                  </template>
+                </HintTip>
               </template>
             </v-list-item>
             <v-divider />
@@ -390,6 +397,7 @@
 </template>
 
 <script setup lang="ts">
+import HintTip from '~/components/HintTip.vue'
 /** «19.10.2026 12:21» — дата создания объекта в карточке */
 const formatCreated = (iso: string) => new Date(iso).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })
 import { computed, ref, watch } from 'vue';

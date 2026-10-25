@@ -16,21 +16,35 @@
           — {{ filter.table }} #{{ filter.record_id }}
         </span>
         <v-spacer />
-        <v-btn
-          icon="mdi-refresh"
-          variant="text"
-          density="compact"
-          :loading="loading"
-          aria-label="Обновить"
-          @click="load"
-        />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          density="compact"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Обновить"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-refresh"
+              variant="text"
+              density="compact"
+              :loading="loading"
+              aria-label="Обновить"
+              @click="load"
+            />
+          </template>
+        </HintTip>
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              density="compact"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
 
       <v-card-text class="pt-0">
@@ -224,6 +238,7 @@ import {
   type AuditLogItem,
   type AuditLookups,
 } from '~/services/fastApiService'
+import HintTip from '~/components/HintTip.vue'
 
 const { isMobile: mobile } = useMobile()
 

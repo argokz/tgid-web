@@ -10,21 +10,35 @@
         <v-icon>mdi-book-open-page-variant-outline</v-icon>
         Справочники
         <v-spacer />
-        <v-btn
-          icon="mdi-refresh"
-          variant="text"
-          density="compact"
-          :loading="loading"
-          aria-label="Обновить"
-          @click="loadRows"
-        />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          density="compact"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Обновить"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-refresh"
+              variant="text"
+              density="compact"
+              :loading="loading"
+              aria-label="Обновить"
+              @click="loadRows"
+            />
+          </template>
+        </HintTip>
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              density="compact"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
 
       <v-card-text class="pt-0">
@@ -130,24 +144,38 @@
           >
             <template #[`item.__actions`]="{ item }">
               <div class="d-flex ga-1">
-                <v-btn
-                  icon="mdi-pencil"
-                  size="small"
-                  variant="text"
-                  density="compact"
-                  aria-label="Изменить"
-                  @click="openEditor(item)"
-                />
-                <v-btn
-                  icon="mdi-delete"
-                  size="small"
-                  variant="text"
-                  density="compact"
-                  color="error"
-                  aria-label="Удалить"
-                  :disabled="!canEditData"
-                  @click="removeRow(item)"
-                />
+                <HintTip
+                  text="Изменить"
+                >
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon="mdi-pencil"
+                      size="small"
+                      variant="text"
+                      density="compact"
+                      aria-label="Изменить"
+                      @click="openEditor(item)"
+                    />
+                  </template>
+                </HintTip>
+                <HintTip
+                  text="Удалить"
+                >
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon="mdi-delete"
+                      size="small"
+                      variant="text"
+                      density="compact"
+                      color="error"
+                      aria-label="Удалить"
+                      :disabled="!canEditData"
+                      @click="removeRow(item)"
+                    />
+                  </template>
+                </HintTip>
               </div>
             </template>
           </v-data-table-server>
@@ -249,6 +277,7 @@ import { useAuthStore } from '~/stores/authStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { apiErrorText, dictionaryPayload, formatCell } from '~/utils/groupSetters';
+import HintTip from '~/components/HintTip.vue';
 
 const { isMobile: mobile } = useMobile();
 const authStore = useAuthStore();

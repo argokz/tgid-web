@@ -19,21 +19,35 @@
         >
           В Excel (CSV)
         </v-btn>
-        <v-btn
-          icon="mdi-refresh"
-          variant="text"
-          density="compact"
-          :loading="loading"
-          aria-label="Обновить"
-          @click="load"
-        />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          density="compact"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Обновить"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-refresh"
+              variant="text"
+              density="compact"
+              :loading="loading"
+              aria-label="Обновить"
+              @click="load"
+            />
+          </template>
+        </HintTip>
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              density="compact"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
       <v-card-text class="pt-0">
         <div class="d-flex flex-wrap ga-2 mb-2">
@@ -153,6 +167,7 @@
 
 <script setup lang="ts">
 import AppSelect from '~/components/AppSelect.vue'
+import HintTip from '~/components/HintTip.vue'
 /** Журнал действий всех пользователей (activity_log, право «Просмотр журнала действий») */
 import { reactive, ref, watch } from 'vue'
 import { useDisplay } from 'vuetify'

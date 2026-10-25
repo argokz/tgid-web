@@ -10,15 +10,22 @@
       class="login-card"
       elevation="12"
     >
-      <v-btn
+      <HintTip
         v-if="!required"
-        icon="mdi-close"
-        variant="text"
-        size="small"
-        class="login-close"
-        aria-label="Закрыть"
-        @click="close"
-      />
+        text="Закрыть"
+      >
+        <template #default="{ props: tip }">
+          <v-btn
+            v-bind="tip"
+            icon="mdi-close"
+            variant="text"
+            size="small"
+            class="login-close"
+            aria-label="Закрыть"
+            @click="close"
+          />
+        </template>
+      </HintTip>
 
       <div class="login-head">
         <div class="login-logo">
@@ -123,6 +130,7 @@
 import AppSelect from '~/components/AppSelect.vue'
 import { fastApiService } from '~/services/fastApiService'
 import { formatApiError } from '~/utils/apiError'
+import HintTip from '~/components/HintTip.vue'
 
 const visible = defineModel<boolean>({ default: false })
 /** Сервер не отдаёт данные без входа: форму нельзя закрыть */

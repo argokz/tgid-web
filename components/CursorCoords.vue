@@ -42,18 +42,26 @@
 
     <v-menu location="top end">
       <template #activator="{ props: menuProps }">
-        <v-btn
-          v-bind="menuProps"
-          icon
-          variant="text"
-          size="x-small"
-          :disabled="!point"
-          aria-label="Скопировать координаты"
+        <HintTip
+          text="Скопировать координаты"
+          hint="Выбрать формат: широта и долгота, X и Y"
+          location="top"
         >
-          <v-icon size="16">
-            mdi-content-copy
-          </v-icon>
-        </v-btn>
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="mergeProps(menuProps, tip)"
+              icon
+              variant="text"
+              size="x-small"
+              :disabled="!point"
+              aria-label="Скопировать координаты"
+            >
+              <v-icon size="16">
+                mdi-content-copy
+              </v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
       </template>
       <v-list density="compact">
         <v-list-subheader>Скопировать</v-list-subheader>
@@ -70,9 +78,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, mergeProps, onBeforeUnmount, ref, watch } from 'vue';
 import type maplibregl from 'maplibre-gl';
 import { useMapStore } from '~/stores/mapStore';
+import HintTip from '~/components/HintTip.vue';
 import { registerHotkeys } from '~/composables/useHotkeys';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { fastApiService } from '~/services/fastApiService';

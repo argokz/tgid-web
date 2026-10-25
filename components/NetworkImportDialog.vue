@@ -10,13 +10,20 @@
         <v-icon>mdi-database-import</v-icon>
         Импорт сети: SHP, Excel, координаты
         <v-spacer />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          density="compact"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              density="compact"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
 
       <v-card-text class="pt-0">
@@ -374,6 +381,7 @@ import {
   type NetworkImportParams,
   type NetworkImportReport,
 } from '~/utils/networkImport';
+import HintTip from '~/components/HintTip.vue';
 
 const { isMobile: mobile } = useMobile();
 const authStore = useAuthStore();

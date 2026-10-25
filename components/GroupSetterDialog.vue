@@ -10,13 +10,20 @@
         <v-icon>mdi-select-group</v-icon>
         Групповые установщики
         <v-spacer />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          density="compact"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              density="compact"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
 
       <v-card-text class="pt-0">
@@ -200,13 +207,20 @@
                   label="Значение"
                 />
               </div>
-              <v-btn
-                icon="mdi-delete"
-                variant="text"
-                density="compact"
-                aria-label="Удалить условие"
-                @click="draft.conditions.splice(idx, 1)"
-              />
+              <HintTip
+                text="Удалить условие"
+              >
+                <template #default="{ props: tip }">
+                  <v-btn
+                    v-bind="tip"
+                    icon="mdi-delete"
+                    variant="text"
+                    density="compact"
+                    aria-label="Удалить условие"
+                    @click="draft.conditions.splice(idx, 1)"
+                  />
+                </template>
+              </HintTip>
             </div>
             <v-btn
               size="small"
@@ -382,6 +396,7 @@ import {
   pickKindForTarget,
   type SelectionDraft,
 } from '~/utils/groupSetters';
+import HintTip from '~/components/HintTip.vue';
 
 const { isMobile: mobile } = useMobile();
 const authStore = useAuthStore();

@@ -10,14 +10,21 @@
           <v-icon color="white">mdi-map-clock-outline</v-icon>
           <span class="text-h6 font-weight-bold">Гидравлический режим сети</span>
         </div>
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          size="small"
-          color="white"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              size="small"
+              color="white"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
 
       <v-card-text class="pa-4">
@@ -271,6 +278,7 @@ import { ref, computed } from 'vue';
 import { fastApiService, type CalculationSummaryItem, type CalculationGeoJsonResponse } from '~/services/fastApiService';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { useDialogMapOverlay } from '~/composables/useDialogMapOverlay';
+import HintTip from '~/components/HintTip.vue';
 
 const visible = ref(false);
 const calculations = ref<CalculationSummaryItem[]>([]);

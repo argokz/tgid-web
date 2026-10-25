@@ -21,13 +21,20 @@
           <v-btn value="rs">РС</v-btn>
         </v-btn-toggle>
         <v-spacer />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          density="compact"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              density="compact"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
 
       <v-card-text class="pt-0">
@@ -382,6 +389,7 @@ import { useNotificationStore } from '~/stores/notificationStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { apiErrorText } from '~/utils/groupSetters';
 import { cardPayload, describePipesChange, groupSitesByChief, inputType, siteTitle, toFormValue } from '~/utils/ptsSites';
+import HintTip from '~/components/HintTip.vue';
 
 const { isMobile: mobile } = useMobile();
 const authStore = useAuthStore();

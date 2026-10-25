@@ -15,14 +15,21 @@
           >mdi-map-search</v-icon>
           <span class="text-h6">Поиск узлов</span>
           <v-spacer />
-          <v-btn
-            icon
-            variant="text"
-            aria-label="Закрыть"
-            @click="dialog = false"
+          <HintTip
+            text="Закрыть"
           >
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Закрыть"
+                @click="dialog = false"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
         </v-card-title>
 
         <v-divider />
@@ -162,15 +169,22 @@
                   </div>
                 </v-list-item-subtitle>
                 <template #append>
-                  <v-btn
-                    icon
-                    variant="text"
-                    size="small"
-                    color="primary"
-                    aria-label="Подробнее"
+                  <HintTip
+                    text="Открыть подробности об узле"
                   >
-                    <v-icon>mdi-chevron-right</v-icon>
-                  </v-btn>
+                    <template #default="{ props: tip }">
+                      <v-btn
+                        v-bind="tip"
+                        icon
+                        variant="text"
+                        size="small"
+                        color="primary"
+                        aria-label="Подробнее"
+                      >
+                        <v-icon>mdi-chevron-right</v-icon>
+                      </v-btn>
+                    </template>
+                  </HintTip>
                 </template>
               </v-list-item>
             </template>
@@ -263,6 +277,7 @@ import { useUiStore } from '~/stores/uiStore'
 import { aiService } from '~/services/aiService'
 import { formatApiErrorWith } from '~/utils/apiError'
 import type { Map as MapLibreMap } from 'maplibre-gl'
+import HintTip from '~/components/HintTip.vue'
 
 interface Props {
   map?: MapLibreMap | null

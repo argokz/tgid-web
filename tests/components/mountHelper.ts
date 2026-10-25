@@ -1,3 +1,4 @@
+/* eslint-disable vue/one-component-per-file -- заглушки VDialog/VTooltip для тестов */
 import { mount, flushPromises, type ComponentMountingOptions } from '@vue/test-utils';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import { createVuetify } from 'vuetify';
@@ -16,6 +17,17 @@ const InlineDialog = defineComponent({
       props.modelValue
         ? h('div', { class: 'v-dialog-stub' }, slots.default?.({ isActive: { value: true }, close: () => emit('update:modelValue', false) }))
         : null;
+  },
+});
+
+/**
+ * v-tooltip: всплывающее содержимое не рендерим (оверлей), а активатор — на месте: в нём кнопка
+ * (HintTip передаёт её через #activator).
+ */
+const InlineTooltip = defineComponent({
+  name: 'VTooltip',
+  setup(_props, { slots }) {
+    return () => slots.activator?.({ props: {}, isActive: false }) ?? null;
   },
 });
 
@@ -38,7 +50,7 @@ export function mountWithVuetify<T extends Component>(
     global: {
       ...global,
       plugins: [vuetify, pinia, ...(global?.plugins ?? [])],
-      stubs: { VDialog: InlineDialog, VTooltip: true, ...(global?.stubs ?? {}) },
+      stubs: { VDialog: InlineDialog, VTooltip: InlineTooltip, ...(global?.stubs ?? {}) },
     },
   });
 }

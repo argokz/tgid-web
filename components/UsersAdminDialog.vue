@@ -10,21 +10,35 @@
         <v-icon>mdi-account-cog</v-icon>
         Пользователи и роли
         <v-spacer />
-        <v-btn
-          icon="mdi-refresh"
-          variant="text"
-          density="compact"
-          :loading="panel?.loading"
-          aria-label="Обновить"
-          @click="panel?.load()"
-        />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          density="compact"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Обновить"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-refresh"
+              variant="text"
+              density="compact"
+              :loading="panel?.loading"
+              aria-label="Обновить"
+              @click="panel?.load()"
+            />
+          </template>
+        </HintTip>
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              density="compact"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
 
       <v-card-text class="pt-0">
@@ -38,6 +52,7 @@
 import { ref } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import UsersAdminPanel from '~/components/UsersAdminPanel.vue'
+import HintTip from '~/components/HintTip.vue'
 
 const { isMobile: mobile } = useMobile()
 const visible = ref(false)

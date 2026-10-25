@@ -230,15 +230,22 @@
             >mdi-chart-line-variant</v-icon>
             <span class="text-subtitle-2 font-weight-bold">Маршрут пьезометра</span>
             <v-spacer />
-            <v-btn
-              icon
-              size="x-small"
-              variant="text"
-              aria-label="Закрыть трассировку"
-              @click="toggleTraceMode"
+            <HintTip
+              text="Закрыть трассировку"
             >
-              <v-icon size="18">mdi-close</v-icon>
-            </v-btn>
+              <template #default="{ props: tip }">
+                <v-btn
+                  v-bind="tip"
+                  icon
+                  size="x-small"
+                  variant="text"
+                  aria-label="Закрыть трассировку"
+                  @click="toggleTraceMode"
+                >
+                  <v-icon size="18">mdi-close</v-icon>
+                </v-btn>
+              </template>
+            </HintTip>
           </div>
           <v-divider />
           <div class="pa-3">
@@ -551,6 +558,7 @@ import { highlightKey } from '~/utils/selectionHighlight';
 import type { PickCandidate } from '~/utils/networkFeature';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
+import HintTip from '~/components/HintTip.vue';
 
 const props = defineProps<{
   initialLayers: LayerConfig[];

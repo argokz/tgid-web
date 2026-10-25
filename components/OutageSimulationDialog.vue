@@ -16,13 +16,20 @@
         >mdi-valve-closed</v-icon>
         <span class="text-h6 font-weight-bold">Анализ аварийного отключения (Локализация задвижек)</span>
         <v-spacer />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          size="small"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              size="small"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
 
       <v-card-text class="pa-4">
@@ -349,15 +356,22 @@
                     <td>{{ c.hot_water_load }}</td>
                     <td class="font-weight-bold text-error">{{ c.total_load }}</td>
                     <td>
-                      <v-btn
+                      <HintTip
                         v-if="c.longitude && c.latitude"
-                        size="x-small"
-                        variant="text"
-                        color="primary"
-                        icon="mdi-crosshairs-gps"
-                        aria-label="Показать на карте"
-                        @click="focusCoords(c.longitude, c.latitude)"
-                      />
+                        text="Показать на карте"
+                      >
+                        <template #default="{ props: tip }">
+                          <v-btn
+                            v-bind="tip"
+                            size="x-small"
+                            variant="text"
+                            color="primary"
+                            icon="mdi-crosshairs-gps"
+                            aria-label="Показать на карте"
+                            @click="focusCoords(c.longitude, c.latitude)"
+                          />
+                        </template>
+                      </HintTip>
                     </td>
                   </tr>
                   <tr v-if="!allConsumers.length">
@@ -456,6 +470,7 @@ import {
   fastApiService,
   type OutageSimulationResponse,
 } from '~/services/fastApiService';
+import HintTip from '~/components/HintTip.vue';
 
 const props = defineProps<{
   initialLineId?: number | null;

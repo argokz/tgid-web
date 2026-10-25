@@ -118,13 +118,20 @@
       <section class="mb-4">
         <h4 class="section-title">
           Расчёты
-          <v-btn
-            size="x-small"
-            variant="text"
-            icon="mdi-refresh"
-            aria-label="Обновить"
-            @click="loadRuns"
-          />
+          <HintTip
+            text="Обновить"
+          >
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                size="x-small"
+                variant="text"
+                icon="mdi-refresh"
+                aria-label="Обновить"
+                @click="loadRuns"
+              />
+            </template>
+          </HintTip>
         </h4>
         <table class="norm-table">
           <thead>
@@ -150,23 +157,37 @@
                 class="text-right"
                 @click.stop
               >
-                <v-btn
-                  size="x-small"
-                  variant="text"
-                  icon="mdi-microsoft-excel"
-                  aria-label="Excel"
-                  :loading="exporting === item.id"
-                  @click="downloadExcel(item.id)"
-                />
-                <v-btn
+                <HintTip
+                  text="Скачать в Excel"
+                >
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      size="x-small"
+                      variant="text"
+                      icon="mdi-microsoft-excel"
+                      aria-label="Excel"
+                      :loading="exporting === item.id"
+                      @click="downloadExcel(item.id)"
+                    />
+                  </template>
+                </HintTip>
+                <HintTip
                   v-if="authStore.canRunWritingCalc"
-                  size="x-small"
-                  variant="text"
-                  color="error"
-                  icon="mdi-delete-outline"
-                  aria-label="Удалить расчёт"
-                  @click="removeRun(item.id)"
-                />
+                  text="Удалить расчёт"
+                >
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      size="x-small"
+                      variant="text"
+                      color="error"
+                      icon="mdi-delete-outline"
+                      aria-label="Удалить расчёт"
+                      @click="removeRun(item.id)"
+                    />
+                  </template>
+                </HintTip>
               </td>
             </tr>
           </tbody>
@@ -286,14 +307,21 @@
                   <td>{{ fmt(s.loss_gcal_h, 4) }}</td>
                   <td>{{ fmt(s.loss_gcal_year, 2) }}</td>
                   <td>
-                    <v-btn
+                    <HintTip
                       v-if="s.longitude != null && s.latitude != null"
-                      size="x-small"
-                      variant="text"
-                      icon="mdi-crosshairs-gps"
-                      aria-label="На карте"
-                      @click="emit('locate', { longitude: Number(s.longitude), latitude: Number(s.latitude), id: s.lineid, nodeId: Number(s.nodeid1 || 0), label: `Участок ${s.lineid}: ${fmt(s.loss_gcal_year, 1)} Гкал/год` })"
-                    />
+                      text="Показать на карте"
+                    >
+                      <template #default="{ props: tip }">
+                        <v-btn
+                          v-bind="tip"
+                          size="x-small"
+                          variant="text"
+                          icon="mdi-crosshairs-gps"
+                          aria-label="На карте"
+                          @click="emit('locate', { longitude: Number(s.longitude), latitude: Number(s.latitude), id: s.lineid, nodeId: Number(s.nodeid1 || 0), label: `Участок ${s.lineid}: ${fmt(s.loss_gcal_year, 1)} Гкал/год` })"
+                        />
+                      </template>
+                    </HintTip>
                   </td>
                 </tr>
               </tbody>
@@ -358,6 +386,7 @@ import {
   type HeatLossNormScope,
   type HeatLossNormSection,
 } from '~/services/fastApiService'
+import HintTip from '~/components/HintTip.vue'
 
 const props = defineProps<{
   seasons: { id: number; d1?: string | null; d2?: string | null; city?: string | null; [key: string]: any }[]

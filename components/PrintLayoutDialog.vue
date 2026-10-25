@@ -10,13 +10,20 @@
         <v-icon>mdi-printer</v-icon>
         Печать и экспорт карты
         <v-spacer />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          density="compact"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Закрыть"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              density="compact"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
 
       <v-card-text class="pt-0">
@@ -244,6 +251,7 @@ import {
   type PrintOptions,
   type PrintResult,
 } from '~/utils/printRender';
+import HintTip from '~/components/HintTip.vue';
 
 const { isMobile: mobile } = useMobile();
 const mapStore = useMapStore();

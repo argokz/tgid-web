@@ -745,13 +745,18 @@
           v-if="editing && equipTarget"
           class="ap-equip-head"
         >
-          <v-btn
-            icon="mdi-arrow-left"
-            variant="text"
-            size="small"
-            aria-label="К списку оборудования"
-            @click="backToEquipment"
-          />
+          <HintTip text="Вернуться к списку оборудования">
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon="mdi-arrow-left"
+                variant="text"
+                size="small"
+                aria-label="К списку оборудования"
+                @click="backToEquipment"
+              />
+            </template>
+          </HintTip>
           <span class="ap-equip-title">{{ equipTarget.title }}</span>
           <v-btn
             v-if="canChangeEquipType"

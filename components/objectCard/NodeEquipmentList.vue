@@ -2,27 +2,41 @@
   <!-- Оборудование узла, как вход во внутреннюю схему десктопа: задвижки, регуляторы, насосы… -->
   <div class="nel">
     <div class="nel-head">
-      <v-btn
-        icon="mdi-arrow-left"
-        variant="text"
-        size="small"
-        aria-label="К карточке узла"
-        @click="emit('close')"
-      />
+      <HintTip
+        text="Вернуться к карточке узла"
+      >
+        <template #default="{ props: tip }">
+          <v-btn
+            v-bind="tip"
+            icon="mdi-arrow-left"
+            variant="text"
+            size="small"
+            aria-label="К карточке узла"
+            @click="emit('close')"
+          />
+        </template>
+      </HintTip>
       <span class="nel-title">Оборудование узла</span>
       <span
         v-if="data"
         class="text-medium-emphasis"
       >{{ data.items.length }}</span>
       <v-spacer />
-      <v-btn
-        icon="mdi-refresh"
-        variant="text"
-        size="small"
-        aria-label="Обновить"
-        :loading="loading"
-        @click="load"
-      />
+      <HintTip
+        text="Обновить"
+      >
+        <template #default="{ props: tip }">
+          <v-btn
+            v-bind="tip"
+            icon="mdi-refresh"
+            variant="text"
+            size="small"
+            aria-label="Обновить"
+            :loading="loading"
+            @click="load"
+          />
+        </template>
+      </HintTip>
     </div>
     <div class="nel-search">
       <v-text-field
@@ -157,6 +171,7 @@ import { formatApiError } from '~/utils/apiError';
 import {
   equipmentTitle, groupEquipment, type EquipmentKind, type NodeEquipment, type NodeEquipmentItem,
 } from '~/utils/objectCard';
+import HintTip from '~/components/HintTip.vue';
 
 const props = defineProps<{
   nodeId: number

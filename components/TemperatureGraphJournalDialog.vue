@@ -311,14 +311,21 @@
               {{ details ? `${details.graph_type_name || 'тип не задан'} · узел ${details.node_id}` : '' }}
             </div>
           </div>
-          <v-btn
-            icon
-            variant="text"
-            aria-label="Закрыть карточку"
-            @click="detailVisible = false"
+          <HintTip
+            text="Закрыть карточку"
           >
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Закрыть карточку"
+                @click="detailVisible = false"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
         </v-card-title>
         <v-divider />
 

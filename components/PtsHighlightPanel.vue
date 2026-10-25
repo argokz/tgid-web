@@ -112,15 +112,22 @@
               <v-icon size="18">mdi-account-tie</v-icon>
             </template>
             <template #append>
-              <v-btn
-                icon
-                size="x-small"
-                variant="text"
-                :aria-label="isOpen(node.key) ? 'Свернуть участки' : 'Показать участки'"
-                @click.stop="toggle(node.key)"
+              <HintTip
+                :text="isOpen(node.key) ? 'Свернуть участки' : 'Показать участки'"
               >
-                <v-icon>{{ isOpen(node.key) ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-              </v-btn>
+                <template #default="{ props: tip }">
+                  <v-btn
+                    v-bind="tip"
+                    icon
+                    size="x-small"
+                    variant="text"
+                    :aria-label="isOpen(node.key) ? 'Свернуть участки' : 'Показать участки'"
+                    @click.stop="toggle(node.key)"
+                  >
+                    <v-icon>{{ isOpen(node.key) ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                  </v-btn>
+                </template>
+              </HintTip>
             </template>
           </v-list-item>
           <template v-if="isOpen(node.key)">
@@ -164,6 +171,7 @@ import { ptsService, type PtsHighlightExtent, type PtsSiteItem } from '~/service
 import { chiefTree, hiddenHighlightFragments, type ChiefNode, type PtsHighlightKind } from '~/utils/ptsHighlight';
 import { siteTitle } from '~/utils/ptsSites';
 import { apiErrorText } from '~/utils/groupSetters';
+import HintTip from '~/components/HintTip.vue';
 
 const layerStore = useLayerStore();
 const fragmentStore = useFragmentStore();

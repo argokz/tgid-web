@@ -196,14 +196,23 @@
                 >
                   <td>{{ idx ? '' : typeTitle(r.object_type) }}</td><td>{{ idx ? '' : r.id }}</td><td>{{ idx ? '' : (r.name || '—') }}</td>
                   <td>{{ fieldTitle(c.field) }}</td><td>{{ cell(c.old) }}</td><td>{{ cell(c.new) }}</td><td>{{ cell(c.distance) }}</td>
-                  <td><v-btn
-                    v-if="!idx && hasCoords(r)"
-                    icon="mdi-crosshairs-gps"
-                    size="x-small"
-                    variant="text"
-                    aria-label="Показать на карте"
-                    @click="locate(r)"
-                  /></td>
+                  <td>
+                    <HintTip
+                      v-if="!idx && hasCoords(r)"
+                      text="Показать на карте"
+                    >
+                      <template #default="{ props: tip }">
+                        <v-btn
+                          v-bind="tip"
+                          icon="mdi-crosshairs-gps"
+                          size="x-small"
+                          variant="text"
+                          aria-label="Показать на карте"
+                          @click="locate(r)"
+                        />
+                      </template>
+                    </HintTip>
+                  </td>
                 </tr>
               </template>
             </tbody>
@@ -232,6 +241,7 @@
 
 <script setup lang="ts">
 import AppSelect from '~/components/AppSelect.vue'
+import HintTip from '~/components/HintTip.vue'
 import { formatApiError } from '~/utils/apiError'
 import { pluralRu } from '~/utils/pluralRu'
 import { confirmAction } from '~/composables/useConfirm'
