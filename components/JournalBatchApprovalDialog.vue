@@ -9,12 +9,21 @@
         <v-icon color="teal-darken-2">mdi-stamper</v-icon>
         <span class="text-subtitle-1 font-weight-bold">Утверждение плана: {{ title }}</span>
         <v-spacer />
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
+        <HintTip
+          text="Закрыть"
+          hotkey="Esc"
+          location="bottom"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon="mdi-close"
+              variant="text"
+              aria-label="Закрыть"
+              @click="visible = false"
+            />
+          </template>
+        </HintTip>
       </v-card-title>
       <v-divider />
       <v-card-text>
@@ -58,13 +67,6 @@
             >Показать</v-btn>
           </v-col>
         </v-row>
-        <v-alert
-          v-if="error"
-          type="error"
-          variant="tonal"
-          density="compact"
-          class="my-2"
-        >{{ error }}</v-alert>
         <div class="d-flex align-center mt-3 mb-1">
           <span class="text-subtitle-2">Неутверждённые планы: {{ candidates.length }}</span>
           <v-spacer />
@@ -78,19 +80,29 @@
           </v-btn>
         </div>
         <div class="candidate-list">
-          <v-checkbox
-            v-for="item in candidates"
-            :key="item.id"
-            v-model="selectedIds"
-            :value="item.id"
-            density="compact"
-            hide-details
-            :label="`№ ${item.id} · ${item.name || 'без названия'} · начало ${formatDate(item.planned_start)}`"
-          />
-          <div
-            v-if="!candidates.length && !loading"
-            class="text-caption text-medium-emphasis pa-2"
-          >Нет планов для утверждения.</div>
+          <StateView
+            variant="list"
+            :rows="4"
+            :loading="loading && !candidates.length"
+            :error="error"
+            :empty="!loading && !candidates.length"
+            empty-title="Нет планов для утверждения"
+            empty-text="За выбранный период все планы утверждены или их нет — измените даты"
+            empty-icon="mdi-stamper"
+            error-title="Не удалось загрузить планы"
+            :retrying="loading"
+            @retry="loadCandidates"
+          >
+            <v-checkbox
+              v-for="item in candidates"
+              :key="item.id"
+              v-model="selectedIds"
+              :value="item.id"
+              density="compact"
+              hide-details
+              :label="`№ ${item.id} · ${item.name || 'без названия'} · начало ${formatDate(item.planned_start)}`"
+            />
+          </StateView>
         </div>
         <v-divider class="my-3" />
         <v-row dense>
@@ -113,29 +125,21 @@
             cols="12"
             sm="4"
           >
-            <v-select
+            <AppSelect
               v-if="signer.ref === 'dolzhnosti'"
               v-model="signers[key]"
               :items="schema?.positions || []"
               item-title="name"
               item-value="id"
               :label="signer.label"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
             />
-            <v-select
+            <AppSelect
               v-else-if="signer.ref === 'subdivisions'"
               v-model="signers[key]"
               :items="schema?.subdivisions || []"
               item-title="name"
               item-value="id"
               :label="signer.label"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
             />
             <v-text-field
               v-else
@@ -195,6 +199,9 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
+import HintTip from '~/components/HintTip.vue';
+import StateView from '~/components/StateView.vue';
 import { localToday } from '~/utils/journalFields';
 import { pluralRu } from '~/utils/pluralRu';
 import { confirmAction } from '~/composables/useConfirm';
@@ -283,7 +290,8 @@ const open = async () => {
   try {
     schema.value = await journalWriteService.getSchema(props.journal);
   } catch (e: any) {
-    error.value = formatJournalError(e, null, 'Описание журнала недоступно');
+    // список планов ниже покажет свою ошибку сам; без описания нет подписантов
+    notifications.showWarning(formatJournalError(e, null, 'Описание журнала недоступно — подписанты не загрузились'));
   }
   await loadCandidates();
 };
