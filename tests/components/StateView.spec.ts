@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import StateView from '~/components/StateView.vue';
+import StateIllustration from '~/components/StateIllustration.vue';
 import { mountWithVuetify, findButton } from './mountHelper';
 
 const mountState = (props: Record<string, unknown>, slot = '<table class="data">данные</table>') =>
@@ -48,5 +49,21 @@ describe('StateView: четыре состояния', () => {
     expect(w.findAll('button').some((b) => b.text().includes('Повторить'))).toBe(false);
     const noListener = mountState({ error: 'ошибка' });
     expect(noListener.findAll('button').some((b) => b.text().includes('Повторить'))).toBe(false);
+  });
+});
+
+describe('StateView: иллюстрации', () => {
+  it('ошибка связи — «нет связи», нет прав — «нет доступа», прочее — «ошибка»', () => {
+    expect(mountWithRetry({ error: 'Сервер API недоступен. Проверьте подключение к сети.' }).find('.state-illustration--offline').exists()).toBe(true);
+    expect(mountWithRetry({ error: 'Недостаточно прав для этой операции.' }).find('.state-illustration--no-access').exists()).toBe(true);
+    expect(mountWithRetry({ error: 'Запись не найдена.' }).find('.state-illustration--error').exists()).toBe(true);
+  });
+
+  it('пусто — предметная иконка экрана в центральном узле; иконка поиска — «не найдено»', () => {
+    const pumps = mountState({ empty: true, emptyIcon: 'mdi-pump' });
+    expect(pumps.find('.state-illustration--empty').exists()).toBe(true);
+    expect(pumps.findComponent(StateIllustration).props('icon')).toBe('mdi-pump');
+    expect(mountState({ empty: true, emptyIcon: 'mdi-magnify' }).find('.state-illustration--not-found').exists()).toBe(true);
+    expect(mountState({ empty: true, emptyIllustration: 'done' }).find('.state-illustration--done').exists()).toBe(true);
   });
 });

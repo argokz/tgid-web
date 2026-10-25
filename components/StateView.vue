@@ -23,10 +23,7 @@
     >
       <template #media>
         <slot name="illustration-error">
-          <v-icon
-            size="48"
-            color="error"
-          >mdi-alert-circle-outline</v-icon>
+          <StateIllustration :kind="errorIllustrationKind" />
         </slot>
       </template>
       <template
@@ -53,10 +50,10 @@
     >
       <template #media>
         <slot name="illustration-empty">
-          <v-icon
-            size="48"
-            class="state-view__icon"
-          >{{ emptyIcon }}</v-icon>
+          <StateIllustration
+            :kind="emptyIllustrationKind"
+            :icon="emptyIllustrationKind === 'empty' ? emptyIcon : ''"
+          />
         </slot>
       </template>
       <template
@@ -77,6 +74,8 @@
 
 <script setup lang="ts">
 import { computed, getCurrentInstance } from 'vue';
+import StateIllustration from '~/components/StateIllustration.vue';
+import { illustrationForEmpty, illustrationForError, type StateIllustrationKind } from '~/utils/stateIllustration';
 
 /**
  * StateView — загрузка (скелетон той же формы, что и данные), пусто (что это, почему пусто, что сделать),
@@ -98,6 +97,10 @@ const props = withDefaults(defineProps<{
   emptyTitle?: string;
   emptyText?: string;
   emptyIcon?: string;
+  /** Иллюстрация пустого состояния; по умолчанию — по иконке (поиск — «не найдено», галочка — «готово») */
+  emptyIllustration?: StateIllustrationKind;
+  /** Иллюстрация ошибки; по умолчанию — по тексту (нет прав, нет связи, прочее) */
+  errorIllustration?: StateIllustrationKind;
   /** Подпись кнопки в пустом состоянии; событие action */
   actionLabel?: string;
   errorTitle?: string;
@@ -115,6 +118,8 @@ const props = withDefaults(defineProps<{
   emptyTitle: 'Записей нет',
   emptyText: '',
   emptyIcon: 'mdi-tray-remove',
+  emptyIllustration: undefined,
+  errorIllustration: undefined,
   actionLabel: '',
   errorTitle: 'Не удалось загрузить данные',
   retry: true,
@@ -132,6 +137,9 @@ const state = computed<StateViewState>(() => {
   if (props.empty) return 'empty';
   return 'ready';
 });
+
+const emptyIllustrationKind = computed(() => props.emptyIllustration ?? illustrationForEmpty(props.emptyIcon));
+const errorIllustrationKind = computed(() => props.errorIllustration ?? illustrationForError(props.error));
 
 /** Скелетон повторяет форму данных, а не спиннер по центру (принцип «состояния у всего») */
 const skeletonType = computed(() => {
@@ -181,10 +189,6 @@ defineExpose({ state });
 
 .state-view__empty :deep(.v-empty-state__text) {
   font-size: var(--text-sm);
-}
-
-.state-view__icon {
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
 /* Меньше движения — без мерцания скелетона */
