@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampPanelPos, parsePanelPos } from '~/utils/floatingPanel';
+import { clampPanelPos, parsePanelPos, snapPanelPos } from '~/utils/floatingPanel';
 
 describe('floatingPanel', () => {
   const panel = { w: 600, h: 48 };
@@ -23,5 +23,12 @@ describe('floatingPanel', () => {
     expect(parsePanelPos(null)).toBeNull();
     expect(parsePanelPos('oops')).toBeNull();
     expect(parsePanelPos('{"x":"a","y":1}')).toBeNull();
+  });
+
+  it('магнит: у края — к краю с отступом, у середины по горизонтали — по центру, иначе как есть', () => {
+    expect(snapPanelPos({ x: 20, y: 300 }, panel, area)).toEqual({ x: 8, y: 300 });
+    expect(snapPanelPos({ x: 580, y: 740 }, panel, area)).toEqual({ x: 592, y: 744 });
+    expect(snapPanelPos({ x: 310, y: 400 }, panel, area)).toEqual({ x: 300, y: 400 });
+    expect(snapPanelPos({ x: 200, y: 200 }, panel, area)).toEqual({ x: 200, y: 200 });
   });
 });

@@ -11,8 +11,11 @@
         class="editor-toolbar__handle"
         :class="{ 'editor-toolbar__handle--pinned': pinned }"
         role="button"
-        aria-label="Переместить панель"
+        :tabindex="pinned ? -1 : 0"
+        aria-label="Переместить панель (стрелки — сдвиг, Enter — на место)"
         @pointerdown="onHandleDown"
+        @keydown="onHandleKeydown"
+        @keydown.enter.prevent="resetPos"
         @dblclick="resetPos"
       >
         <v-icon size="18">
@@ -24,7 +27,7 @@
         >
           {{ pinned
             ? 'Панель закреплена — открепите её кнопкой с булавкой, чтобы переместить'
-            : 'Перетащите, чтобы переместить панель; двойной щелчок — вернуть на место' }}
+            : 'Перетащите или сдвиньте стрелками; двойной щелчок или Enter — вернуть на место' }}
         </v-tooltip>
       </div>
       <!-- Инструменты: один активный (V, L, N, E, M, B) -->
@@ -375,7 +378,7 @@
 <script setup lang="ts">
 import AppSelect from '~/components/AppSelect.vue';
 import FloatingToolbar from '~/components/FloatingToolbar.vue';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { useTopologyEditor } from '~/composables/useTopologyEditor';
 import { EDITOR_TOOLS, toolAllowed, type EditorTool } from '~/utils/editorTools';
 import { useAuthStore } from '~/stores/authStore';
@@ -386,106 +389,45 @@ import { topologyOperationLabel } from '~/utils/topologyLabels';
 import { fragmentChoices, fragmentLabel } from '~/utils/editFragment';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { appStorage } from '~/utils/appStorage';
-import { clampPanelPos, parsePanelPos, type PanelPos } from '~/utils/floatingPanel';
+import { useFloatingDrag, usePersistedPanelPos } from '~/composables/useFloatingDrag';
 
 const props = defineProps<{ editor: ReturnType<typeof useTopologyEditor> }>();
 
-// === Положение панели: перетаскивание за ручку, закрепление, запоминание между сеансами ===
-const POS_KEY = 'editorToolbarPos';
+// === Положение панели: перетаскивание за ручку (useFloatingDrag), закрепление, запоминание между сеансами ===
 const PINNED_KEY = 'editorToolbarPinned';
-const readStorage = (key: string): string | null => {
+const readPinned = (): boolean => {
   try {
-    return appStorage.getItem(key);
+    return appStorage.getItem(PINNED_KEY) === '1';
   } catch {
-    return null;
-  }
-};
-const writeStorage = (key: string, value: string | null) => {
-  try {
-    if (value == null) appStorage.removeItem(key);
-    else appStorage.setItem(key, value);
-  } catch {
-    // удобство: без хранилища положение живёт до перезагрузки
+    return false;
   }
 };
 
 const rootEl = ref<HTMLElement | null>(null);
 /** null — на месте по умолчанию (сверху по центру карты) */
-const pos = ref<PanelPos | null>(parsePanelPos(readStorage(POS_KEY)));
-const pinned = ref(readStorage(PINNED_KEY) === '1');
-const dragging = ref(false);
+const { pos, save: savePos, reset: resetStoredPos } = usePersistedPanelPos('editorToolbarPos');
+const pinned = ref(readPinned());
 const posStyle = computed(() => (pos.value ? { left: `${pos.value.x}px`, top: `${pos.value.y}px` } : undefined));
-
-/** Положение в пределах карты (родителя панели) */
-const clampToArea = (p: PanelPos): PanelPos => {
-  const el = rootEl.value;
-  const area = el?.offsetParent as HTMLElement | null;
-  if (!el || !area) return p;
-  return clampPanelPos(p, { w: el.offsetWidth, h: el.offsetHeight }, { w: area.clientWidth, h: area.clientHeight });
-};
-
-let stopDrag: (() => void) | null = null;
-const onHandleDown = (e: PointerEvent) => {
-  if (pinned.value || e.button !== 0) return;
-  const el = rootEl.value;
-  const area = el?.offsetParent as HTMLElement | null;
-  if (!el || !area) return;
-  e.preventDefault();
-  const start = el.getBoundingClientRect();
-  const dx = e.clientX - start.left;
-  const dy = e.clientY - start.top;
-  dragging.value = true;
-  const move = (ev: PointerEvent) => {
-    const a = area.getBoundingClientRect();
-    pos.value = clampToArea({ x: ev.clientX - a.left - dx, y: ev.clientY - a.top - dy });
-  };
-  const up = () => stopDrag?.();
-  stopDrag = () => {
-    window.removeEventListener('pointermove', move);
-    window.removeEventListener('pointerup', up);
-    window.removeEventListener('pointercancel', up);
-    dragging.value = false;
-    stopDrag = null;
-    if (pos.value) writeStorage(POS_KEY, JSON.stringify(pos.value));
-  };
-  window.addEventListener('pointermove', move);
-  window.addEventListener('pointerup', up);
-  window.addEventListener('pointercancel', up);
-};
+const { dragging, onPointerDown: onHandleDown, onKeydown: onHandleKeydown, reclamp } = useFloatingDrag({
+  target: rootEl,
+  pos,
+  enabled: () => !pinned.value,
+  onCommit: savePos,
+});
 
 const resetPos = () => {
-  if (pinned.value) return;
-  pos.value = null;
-  writeStorage(POS_KEY, null);
+  if (!pinned.value) resetStoredPos();
 };
 
 const togglePinned = () => {
   pinned.value = !pinned.value;
-  writeStorage(PINNED_KEY, pinned.value ? '1' : null);
+  try {
+    if (pinned.value) appStorage.setItem(PINNED_KEY, '1');
+    else appStorage.removeItem(PINNED_KEY);
+  } catch {
+    // удобство: без хранилища закрепление живёт до перезагрузки
+  }
 };
-
-// сменили инструмент (другой набор параметров — другой размер панели) или окно уменьшилось —
-// не уходить за край карты. Без ResizeObserver: панель перестраивается внутри наблюдателей
-// Vuetify, и наблюдатель на ней даёт «ResizeObserver loop» (событие error без объекта ошибки)
-let reclampFrame = 0;
-const reclamp = () => {
-  if (reclampFrame) return;
-  reclampFrame = requestAnimationFrame(() => {
-    reclampFrame = 0;
-    if (!pos.value || dragging.value) return;
-    const next = clampToArea(pos.value);
-    if (next.x !== pos.value.x || next.y !== pos.value.y) pos.value = next;
-  });
-};
-onMounted(() => {
-  window.addEventListener('resize', reclamp);
-  reclamp();
-});
-onBeforeUnmount(() => {
-  stopDrag?.();
-  if (reclampFrame) cancelAnimationFrame(reclampFrame);
-  window.removeEventListener('resize', reclamp);
-});
 
 // поля редактора — ссылки: в шаблоне разворачиваются как верхнеуровневые
 const {

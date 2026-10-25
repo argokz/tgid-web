@@ -1,13 +1,43 @@
 <template>
   <GlassSurface
     v-if="open"
+    ref="panelRef"
     level="solid"
     rounded="lg"
     class="draw-panel"
+    :class="{ 'draw-panel--dragging': dragging }"
+    :style="posStyle"
     role="region"
     aria-label="Панель измерений"
+    @pointerdown="onDragDown"
   >
-    <div class="draw-panel__header px-3 py-2">
+    <div
+      class="draw-panel__header px-3 py-2"
+      data-panel-drag
+    >
+      <!-- Ручка: перетащить панель (шапка целиком тоже тащит), стрелки — сдвиг, двойной щелчок — на место -->
+      <HintTip
+        text="Переместить панель"
+        hint="Перетащите или сдвиньте стрелками; двойной щелчок или Enter — вернуть на место"
+        location="bottom"
+      >
+        <template #default="{ props: tip }">
+          <div
+            v-bind="tip"
+            class="draw-panel__handle"
+            role="button"
+            tabindex="0"
+            aria-label="Переместить панель (стрелки — сдвиг, Enter — на место)"
+            @keydown="onDragKeydown"
+            @keydown.enter.prevent="resetPos"
+            @dblclick="resetPos"
+          >
+            <v-icon size="18">
+              mdi-drag
+            </v-icon>
+          </div>
+        </template>
+      </HintTip>
       <v-icon
         size="18"
         color="primary"
@@ -241,7 +271,8 @@ import HintTip from '~/components/HintTip.vue';
 import GlassSurface from '~/components/GlassSurface.vue';
 import FloatingToolbar, { type FloatingToolbarItem } from '~/components/FloatingToolbar.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
-import { computed, onBeforeUnmount, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { useFloatingDrag, usePersistedPanelPos } from '~/composables/useFloatingDrag';
 import { useEscapeClose } from '~/composables/useEscape';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import {
@@ -259,6 +290,23 @@ import { formatTurn } from '~/utils/cadGeometry';
 
 const props = defineProps<{ map: MapLibreMap | null }>();
 const open = defineModel<boolean>({ default: false });
+
+// Положение панели: перетаскивание за шапку (общая механика плавающих окон), запоминается между сеансами
+const panelRef = ref<InstanceType<typeof GlassSurface> | null>(null);
+const panelEl = computed(() => (panelRef.value?.$el as HTMLElement | undefined) ?? null);
+/** null — на месте по умолчанию (слева, у кнопки слоёв) */
+const { pos, save: savePos, reset: resetPos } = usePersistedPanelPos('drawPanelPos');
+const posStyle = computed(() => (pos.value ? { left: `${pos.value.x}px`, top: `${pos.value.y}px` } : undefined));
+const { dragging, onPointerDown: onDragDown, onKeydown: onDragKeydown, reclamp } = useFloatingDrag({
+  target: panelEl,
+  pos,
+  handle: '[data-panel-drag]',
+  onCommit: savePos,
+});
+// панель появляется по v-if: проверить сохранённое положение, когда она уже в DOM
+watch(panelEl, (el) => {
+  if (el) reclamp();
+});
 
 const draw = useMapDraw();
 const notificationStore = useNotificationStore();
@@ -372,6 +420,27 @@ onBeforeUnmount(() => draw.detach());
 .draw-panel__header {
   display: flex;
   align-items: center;
+  cursor: move;
+  touch-action: none;
+}
+
+.draw-panel--dragging {
+  user-select: none;
+  opacity: 0.92;
+}
+
+.draw-panel__handle {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  margin-inline-start: -6px;
+  margin-inline-end: 2px;
+  cursor: grab;
+  opacity: 0.6;
+}
+
+.draw-panel--dragging .draw-panel__handle {
+  cursor: grabbing;
 }
 
 .draw-panel__tools {

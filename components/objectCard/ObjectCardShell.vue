@@ -15,11 +15,11 @@
     v-else-if="modelValue"
     ref="root"
     class="oc-shell"
-    :class="[`oc-shell--${layout.mode}`, { 'oc-shell--dragging': dragging }]"
+    :class="[`oc-shell--${layout.mode}`, { 'oc-shell--dragging': resizing || moving }]"
     :style="shellStyle"
     role="dialog"
     aria-modal="false"
-    @pointerdown="onPointerDown"
+    @pointerdown="onDragDown"
   >
     <div
       v-if="layout.mode === 'panel'"
@@ -41,6 +41,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
 import { clampFloat, clampPanelWidth, useObjectCardLayout, type ObjectCardLayout } from '~/composables/useObjectCardLayout';
 import { useUiStore } from '~/stores/uiStore';
+import { useFloatingDrag } from '~/composables/useFloatingDrag';
+import type { PanelPos } from '~/utils/floatingPanel';
 import BottomSheet from '~/components/BottomSheet.vue';
 import type { SheetSnap } from '~/utils/sheetSnap';
 
@@ -54,7 +56,7 @@ const emit = defineEmits<{
 const layout = useObjectCardLayout();
 const ui = useUiStore();
 const root = ref<HTMLElement | null>(null);
-const dragging = ref(false);
+const resizing = ref(false);
 const viewport = ref({ w: 1280, h: 800 });
 /** Положение нижнего листа; каждое открытие — с половины экрана */
 const sheetSnap = ref<SheetSnap>('half');
@@ -104,10 +106,31 @@ const shellStyle = computed(() => {
   return { left: `${f.x}px`, top: `${f.y}px`, width: `${f.w}px`, height: `${f.h}px` };
 });
 
-// Перетаскивание плавающего окна — за элемент с data-card-drag (шапка карточки), не за кнопки.
-// Пока кнопка нажата, геометрия пишется прямо в style корня один раз на кадр (rAF), а в реактивный
-// layout — только на pointerup: иначе каждый pointermove перерисовывал всю карточку (замер S4a:
-// 185 мс на шаг, docs/performance-baseline.md).
+// Перетаскивание плавающего окна — общая механика (useFloatingDrag) за элемент с data-card-drag
+// (шапка карточки), не за кнопки; в layout итог пишется на отпускании. Возврат в окно при ресайзе —
+// updateViewport (clampFloat держит и размеры).
+const floatPos = computed<PanelPos | null>({
+  get: () => ({ x: layout.float.x, y: layout.float.y }),
+  set: (p) => {
+    if (p) Object.assign(layout.float, { x: p.x, y: p.y });
+  },
+});
+const { dragging: moving, onPointerDown: onDragDown } = useFloatingDrag({
+  target: root,
+  pos: floatPos,
+  area: 'viewport',
+  handle: '[data-card-drag]',
+  enabled: () => !sheet.value && layout.mode === 'float',
+  keepInView: false,
+  clamp: (p, _panel, box) => {
+    const f = clampFloat({ ...layout.float, x: p.x, y: p.y }, box.w, box.h);
+    return { x: f.x, y: f.y };
+  },
+});
+
+// Размер панели и окна: пока кнопка нажата, геометрия пишется прямо в style корня один раз на кадр
+// (rAF), а в реактивный layout — только на pointerup: иначе каждый pointermove перерисовывал всю
+// карточку (замер S4a: 185 мс на шаг, docs/performance-baseline.md).
 let move: ((e: PointerEvent) => void) | null = null;
 let pendingGeometry: Partial<ObjectCardLayout['float']> & { panelWidth?: number } | null = null;
 let geometryFrame = 0;
@@ -143,7 +166,7 @@ const stopPointer = () => {
     if (panelWidth != null) layout.panelWidth = panelWidth;
     if (Object.keys(float).length) Object.assign(layout.float, float);
   }
-  dragging.value = false;
+  resizing.value = false;
 };
 
 const listenPointer = (handler: (e: PointerEvent) => void) => {
@@ -153,24 +176,9 @@ const listenPointer = (handler: (e: PointerEvent) => void) => {
   window.addEventListener('pointercancel', stopPointer);
 };
 
-const onPointerDown = (e: PointerEvent) => {
-  if (sheet.value || layout.mode !== 'float' || e.button !== 0) return;
-  const target = e.target as HTMLElement | null;
-  if (!target?.closest('[data-card-drag]') || target.closest('button, a, input, textarea, .v-field')) return;
-  const start = { x: e.clientX, y: e.clientY, fx: layout.float.x, fy: layout.float.y };
-  dragging.value = true;
-  listenPointer((ev: PointerEvent) => {
-    const f = clampFloat(
-      { ...layout.float, x: start.fx + ev.clientX - start.x, y: start.fy + ev.clientY - start.y },
-      viewport.value.w, viewport.value.h,
-    );
-    scheduleGeometry({ x: f.x, y: f.y });
-  });
-};
-
 const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
   const start = { x: e.clientX, y: e.clientY, w: layout.panelWidth, fw: layout.float.w, fh: layout.float.h };
-  dragging.value = true;
+  resizing.value = true;
   listenPointer((ev: PointerEvent) => {
     if (what === 'panel') {
       scheduleGeometry({ panelWidth: clampPanelWidth(start.w + start.x - ev.clientX, viewport.value.w) });

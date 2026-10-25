@@ -33,3 +33,22 @@ export const parsePanelPos = (raw: string | null | undefined): PanelPos | null =
     return null;
   }
 };
+
+/** Расстояние, с которого панель притягивается к краю или к середине области, px */
+export const PANEL_SNAP_PX = 16;
+
+/**
+ * Магнит: близко к краю области — к краю (с отступом), близко к середине по горизонтали — по центру
+ * (место панели редактора по умолчанию). Положение уже должно быть в пределах области (clampPanelPos).
+ */
+export const snapPanelPos = (pos: PanelPos, panel: Size, area: Size, margin = PANEL_MARGIN_PX, snap = PANEL_SNAP_PX): PanelPos => {
+  const axis = (v: number, size: number, areaSize: number, center: boolean) => {
+    const far = areaSize - size - margin;
+    if (Math.abs(v - margin) <= snap) return margin;
+    if (far > margin && Math.abs(v - far) <= snap) return Math.round(far);
+    const mid = (areaSize - size) / 2;
+    if (center && mid > margin && Math.abs(v - mid) <= snap) return Math.round(mid);
+    return v;
+  };
+  return { x: axis(pos.x, panel.w, area.w, true), y: axis(pos.y, panel.h, area.h, false) };
+};
