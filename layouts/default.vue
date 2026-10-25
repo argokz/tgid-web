@@ -127,6 +127,7 @@
             variant="text"
             size="small"
             class="me-1"
+            data-first-run="palette"
             aria-label="Команды и поиск (Ctrl+K)"
             @click="paletteOpen = true"
           >
@@ -209,6 +210,11 @@
               prepend-icon="mdi-lock-reset"
               title="Сменить пароль"
               @click="showChangePassword = true"
+            />
+            <v-list-item
+              prepend-icon="mdi-help-circle-outline"
+              title="Подсказки по экрану"
+              @click="firstRunHints?.start()"
             />
             <v-list-item
               prepend-icon="mdi-cog-outline"
@@ -365,6 +371,12 @@
       v-model="hotkeysHelpOpen"
     />
 
+    <!-- Подсказка по зонам экрана: один раз после входа; снова — из меню пользователя -->
+    <FirstRunHints
+      v-if="isHydrated && (authStore.isAuthenticated || authStore.authDisabled)"
+      ref="firstRunHints"
+    />
+
     <!-- Модальное окно расчёта -->
     <LazyPlanningCalculationModal
       v-if="mountedOnce.calculation && authStore.canCalculate"
@@ -445,6 +457,7 @@ import type PlanningCalculationModal from '~/components/PlanningCalculationModal
 import type CalculationProtocol from '~/components/CalculationProtocol.vue';
 import ConfirmDialogHost from '~/components/ConfirmDialogHost.vue';
 import HintTip from '~/components/HintTip.vue';
+import FirstRunHints from '~/components/FirstRunHints.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { ROLE_LABELS, type Role } from '~/utils/permissions';
 import { deviceClass } from '~/utils/breakpoints';
@@ -484,6 +497,7 @@ const mountedOnce = reactive({ login: false, changePassword: false, account: fal
 const hotkeysHelpOpen = ref(false);
 watch(hotkeysHelpOpen, (v) => { if (v) mountedOnce.hotkeys = true; });
 const paletteOpen = ref(false);
+const firstRunHints = ref<InstanceType<typeof FirstRunHints> | null>(null);
 watch(paletteOpen, (v) => { if (v) mountedOnce.palette = true; });
 const paletteAvailable = computed(() => isHydrated.value && (authStore.isAuthenticated || authStore.authDisabled));
 watch(paletteAvailable, (ok) => { if (!ok) paletteOpen.value = false; });
