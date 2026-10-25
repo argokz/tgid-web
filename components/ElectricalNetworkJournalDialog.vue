@@ -464,15 +464,15 @@ defineExpose({ openDialog })
 
 <style scoped>
 .electrical-journal { height: min(92vh, 930px); display: flex; flex-direction: column; }
-.electrical-filters { flex-shrink: 0; background: #fff8e1; }
+.electrical-filters { flex-shrink: 0; background: rgba(var(--v-theme-warning), 0.06); }
 .electrical-table-wrap { min-height: 320px; overflow: auto; flex: 1; }
 .electrical-table { width: 100%; min-width: 1350px; border-collapse: collapse; font-size: .83rem; }
-.electrical-table th { position: sticky; top: 0; z-index: 1; background: #fff3e0; color: #e65100; text-align: left; padding: 10px 12px; }
-.electrical-table td { padding: 10px 12px; border-bottom: 1px solid #eceff1; vertical-align: top; }
-.electrical-table tbody tr { cursor: pointer; }.electrical-table tbody tr:hover { background: #fff8e1; }
+.electrical-table th { position: sticky; top: 0; z-index: 1; background: rgba(var(--v-theme-warning), 0.1); color: rgb(var(--v-theme-warning)); text-align: left; padding: 10px 12px; }
+.electrical-table td { padding: 10px 12px; border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); vertical-align: top; }
+.electrical-table tbody tr { cursor: pointer; }.electrical-table tbody tr:hover { background: rgba(var(--v-theme-warning), 0.06); }
 .electrical-empty { min-height: 360px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; }
-.detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: #e0e0e0; border: 1px solid #e0e0e0; }
-.detail-cell { background: white; padding: 10px 12px; overflow-wrap: anywhere; }.detail-label { color: #795548; font-size: .75rem; margin-bottom: 2px; }
-.relation-list { border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; }.relation-row { width: 100%; border: 0; border-bottom: 1px solid #eceff1; background: white; display: grid; grid-template-columns: 90px 1fr; gap: 12px; padding: 10px 12px; text-align: left; cursor: pointer; }.relation-row:hover { background: #fff8e1; }
+.detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: #e0e0e0; border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); }
+.detail-cell { background: rgb(var(--v-theme-surface)); padding: 10px 12px; overflow-wrap: anywhere; }.detail-label { color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity)); font-size: .75rem; margin-bottom: 2px; }
+.relation-list { border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); border-radius: 6px; overflow: hidden; }.relation-row { width: 100%; border: 0; border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); background: rgb(var(--v-theme-surface)); display: grid; grid-template-columns: 90px 1fr; gap: 12px; padding: 10px 12px; text-align: left; cursor: pointer; }.relation-row:hover { background: rgba(var(--v-theme-warning), 0.06); }
 @media (max-width: 600px) { .electrical-journal { height: 100dvh; } .detail-grid { grid-template-columns: 1fr; } }
 </style>

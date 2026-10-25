@@ -16,7 +16,7 @@
               icon
               size="large"
               elevation="3"
-              color="white"
+              color="surface"
               class="sidebar-toggle"
               aria-label="Открыть панель слоёв"
               @click="openPanel"
@@ -254,7 +254,7 @@ watch([desktopCollapsed, mobileOpen, activeTab], saveSidebarState, { deep: false
   height: 100%;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-right: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)) !important;
 }
 
 /* Первый показ панели: без анимации входа (см. sidebarMotionEnabled) */

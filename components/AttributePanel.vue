@@ -482,7 +482,7 @@
 
               size="small"
 
-              color="blue-grey-darken-3"
+              color="secondary"
 
               aria-label="Насосное оборудование и характеристики"
 
@@ -636,7 +636,7 @@
 
               size="small"
 
-              color="grey-darken-1"
+              color="secondary"
 
               :loading="copying"
 
@@ -660,7 +660,7 @@
               icon
               variant="text"
               size="small"
-              color="grey-darken-1"
+              color="secondary"
               aria-label="История правок объекта"
               @click="$emit('open-audit-history', historyTarget)"
             >
@@ -766,7 +766,7 @@
               icon
               variant="text"
               size="small"
-              color="grey-darken-1"
+              color="secondary"
               :aria-label="cardLayout.mode === 'panel' ? 'Открепить в отдельное окно' : 'Закрепить панелью справа'"
               @click="toggleCardMode"
             >
@@ -781,7 +781,7 @@
               icon
               variant="text"
               size="small"
-              color="grey-darken-1"
+              color="secondary"
               aria-label="Закрыть"
               @click="close"
             >
@@ -930,7 +930,7 @@
 
             v-model="activeTab"
 
-            bg-color="white"
+            bg-color="surface"
 
             color="primary"
 
@@ -2513,7 +2513,7 @@ defineExpose({ show, close, confirmLeaveEditing })
   height: 100%;
   max-height: 100%;
 
-  background: #fff;
+  background: rgb(var(--v-theme-surface));
 
 }
 
@@ -2538,7 +2538,7 @@ defineExpose({ show, close, confirmLeaveEditing })
 
   flex-shrink: 0;
 
-  background: #fff;
+  background: rgb(var(--v-theme-surface));
 
 }
 
@@ -2567,7 +2567,7 @@ defineExpose({ show, close, confirmLeaveEditing })
 
   flex-shrink: 0;
 
-  background: #fff;
+  background: rgb(var(--v-theme-surface));
 
 }
 
@@ -2624,7 +2624,7 @@ defineExpose({ show, close, confirmLeaveEditing })
 
   border: 1px solid rgba(0, 0, 0, 0.08) !important;
 
-  background: #fff !important;
+  background: rgb(var(--v-theme-surface)) !important;
 
   overflow: hidden;
 

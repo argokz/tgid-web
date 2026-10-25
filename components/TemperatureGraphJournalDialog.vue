@@ -429,6 +429,7 @@
                   class="chart-wrap"
                 >
                   <v-chart
+                  :theme="chartTheme"
                     class="chart"
                     :option="chartOptions"
                     autoresize
@@ -535,6 +536,7 @@ import { LineChart } from 'echarts/charts'
 import { CanvasRenderer } from 'echarts/renderers'
 import { DataZoomComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
+import { useChartTheme } from '~/composables/useChartTheme'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
 import {
@@ -548,6 +550,7 @@ import {
 } from '~/services/fastApiService'
 
 use([CanvasRenderer, LineChart, DataZoomComponent, GridComponent, LegendComponent, TooltipComponent])
+const { chartTheme } = useChartTheme()
 
 const DetailValue = defineComponent({
   props: { label: { type: String, required: true }, value: { type: [String, Number] as PropType<string | number | null>, default: null } },

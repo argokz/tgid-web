@@ -23,7 +23,7 @@
       <v-btn
         icon
         variant="text"
-        color="grey-darken-1"
+        color="secondary"
         size="small"
         aria-label="Закрыть панель"
         @click="$emit('close')"
@@ -35,7 +35,7 @@
     <!-- Табы -->
     <v-tabs
       v-model="activeTabLocal"
-      bg-color="white"
+      bg-color="surface"
       color="primary"
       density="compact"
       class="sidebar-tabs"
@@ -110,9 +110,9 @@
               <v-icon
                 size="13"
                 class="me-1"
-                color="grey-darken-2"
+                color="secondary"
               >mdi-earth</v-icon>
-              <span class="text-caption font-weight-bold text-grey-darken-2 text-uppercase">
+              <span class="text-caption font-weight-bold text-medium-emphasis text-uppercase">
                 Слои контекста
               </span>
               <v-spacer />
@@ -310,9 +310,9 @@
                 <v-icon
                   size="13"
                   class="me-1"
-                  color="grey-darken-2"
+                  color="secondary"
                 >mdi-earth</v-icon>
-                <span class="text-caption font-weight-bold text-grey-darken-2 text-uppercase">
+                <span class="text-caption font-weight-bold text-medium-emphasis text-uppercase">
                   Слои Planet V4
                 </span>
                 <v-spacer />
@@ -341,9 +341,9 @@
                     <v-icon
                       size="12"
                       class="me-1"
-                      color="grey-darken-1"
+                      color="secondary"
                     >{{ pg.icon }}</v-icon>
-                    <span class="text-caption font-weight-medium text-grey-darken-1">
+                    <span class="text-caption font-weight-medium text-medium-emphasis">
                       {{ pg.label }}
                     </span>
                     <v-spacer />
@@ -440,9 +440,9 @@
                 <v-icon
                   size="13"
                   class="me-1"
-                  color="grey-darken-2"
+                  color="secondary"
                 >mdi-folder-outline</v-icon>
-                <span class="text-caption font-weight-bold text-grey-darken-2 text-uppercase">
+                <span class="text-caption font-weight-bold text-medium-emphasis text-uppercase">
                   {{ formatGroupName(group.name) }}
                 </span>
                 <v-spacer />
@@ -531,7 +531,7 @@
                     @click.stop
                   >
                     <div class="d-flex align-center justify-space-between mb-1">
-                      <span class="text-caption text-grey-darken-1">Прозрачность</span>
+                      <span class="text-caption text-medium-emphasis">Прозрачность</span>
                       <span class="text-caption font-weight-medium">
                         {{ Math.round((layerOpacities[layer.layerId] ?? 1) * 100) }}%
                       </span>
@@ -1287,8 +1287,8 @@ const getLabelIconColor = (id: string) => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: #fff;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgb(var(--v-theme-surface));
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   flex-shrink: 0;
 }
 
@@ -1352,14 +1352,14 @@ const getLabelIconColor = (id: string) => {
 }
 
 .search-section {
-  background: #f8f9fa;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgb(var(--v-theme-surface-light));
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   flex-shrink: 0;
 }
 
 .sidebar-footer {
   flex-shrink: 0;
-  background: #fff;
+  background: rgb(var(--v-theme-surface));
 }
 
 .context-hover-switch {
@@ -1382,7 +1382,7 @@ const getLabelIconColor = (id: string) => {
   display: flex;
   align-items: center;
   background: rgba(0, 0, 0, 0.03);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
 .layer-item {

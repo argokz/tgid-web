@@ -575,6 +575,7 @@
             >
               <v-card-title class="text-subtitle-1">Характеристики H(Q), N(Q), КПД(Q)</v-card-title>
               <v-card-text class="chart-wrap"><VChart
+                :theme="chartTheme"
                 class="chart"
                 :option="chartOptions"
                 autoresize
@@ -631,6 +632,7 @@ import { LineChart, ScatterChart } from 'echarts/charts'
 import { CanvasRenderer } from 'echarts/renderers'
 import { DataZoomComponent, GridComponent, LegendComponent, MarkAreaComponent, TooltipComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
+import { useChartTheme } from '~/composables/useChartTheme'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
 import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
@@ -651,6 +653,7 @@ import {
 } from '~/services/fastApiService'
 
 use([CanvasRenderer, LineChart, ScatterChart, DataZoomComponent, GridComponent, LegendComponent, MarkAreaComponent, TooltipComponent])
+const { chartTheme } = useChartTheme()
 
 const DetailValue = defineComponent({
   props: { label: { type: String, required: true }, value: { type: [String, Number] as PropType<string | number | null | undefined>, default: null } },

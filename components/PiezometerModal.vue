@@ -171,6 +171,7 @@
             <v-window-item value="chart">
               <div style="height: 560px; width: 100%;">
                 <v-chart
+                  :theme="chartTheme"
                   class="chart"
                   :option="chartOptions"
                   autoresize
@@ -365,7 +366,8 @@ import {
   GridComponent,
   DataZoomComponent,
 } from 'echarts/components';
-import VChart from 'vue-echarts';
+import VChart from 'vue-echarts'
+import { useChartTheme } from '~/composables/useChartTheme';
 
 use([
   CanvasRenderer,
@@ -376,6 +378,7 @@ use([
   GridComponent,
   DataZoomComponent,
 ]);
+const { chartTheme } = useChartTheme()
 
 const props = defineProps<{
   modelValue: boolean;

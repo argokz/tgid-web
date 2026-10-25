@@ -711,16 +711,16 @@ defineExpose({ openDialog })
 .heat-loss-journal { height: min(92vh, 940px); display: flex; flex-direction: column; }
 .journal-window, .journal-pane { min-height: 0; flex: 1; }
 .journal-pane { height: 100%; display: flex; flex-direction: column; }
-.filters { display: grid; grid-template-columns: minmax(280px, 2fr) minmax(190px, 1fr) auto; gap: 12px; background: #fff3e0; align-items: center; }
+.filters { display: grid; grid-template-columns: minmax(280px, 2fr) minmax(190px, 1fr) auto; gap: 12px; background: rgba(var(--v-theme-warning), 0.1); align-items: center; }
 .source-filters { grid-template-columns: minmax(260px, 2fr) minmax(240px, 1.3fr) minmax(190px, 1fr) auto; }
 .table-wrap { min-height: 250px; overflow: auto; flex: 1; }
 .journal-table { width: 100%; min-width: 1180px; border-collapse: collapse; font-size: .84rem; }
-.journal-table th { position: sticky; top: 0; z-index: 1; padding: 10px 12px; text-align: left; color: #bf360c; background: #fff3e0; white-space: nowrap; }
+.journal-table th { position: sticky; top: 0; z-index: 1; padding: 10px 12px; text-align: left; color: rgb(var(--v-theme-warning)); background: rgba(var(--v-theme-warning), 0.1); white-space: nowrap; }
 .journal-table td { padding: 10px 12px; border-bottom: 1px solid #eceff1; vertical-align: middle; }
-.journal-table tbody tr { cursor: pointer; }.journal-table tbody tr:hover { background: #fff8e1; }
+.journal-table tbody tr { cursor: pointer; }.journal-table tbody tr:hover { background: rgba(var(--v-theme-warning), 0.06); }
 .empty { display: grid; place-items: center; min-height: 300px; color: #78909c; }
 .detail-grid { display: grid; grid-template-columns: repeat(3, minmax(170px, 1fr)); gap: 12px; }
-:deep(.detail-value) { padding: 12px; border: 1px solid #ffe0b2; border-radius: 8px; background: #fffaf5; }
+:deep(.detail-value) { padding: 12px; border: 1px solid rgba(var(--v-theme-warning), 0.3); border-radius: 8px; background: rgba(var(--v-theme-warning), 0.04); }
 :deep(.detail-label) { margin-bottom: 4px; color: #6d4c41; font-size: .75rem; }
 .status-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .detail-table-wrap { max-height: 430px; border: 1px solid #eceff1; border-radius: 8px; }

@@ -19,7 +19,7 @@
 
         elevation="4"
 
-        color="white"
+        color="surface"
 
         class="control-btn"
 
@@ -202,7 +202,7 @@
             icon
             size="default"
             elevation="4"
-            color="white"
+            color="surface"
             class="control-btn"
             aria-label="Поиск узлов"
             @click="$emit('open-node-search')"
@@ -377,7 +377,7 @@
 
             elevation="4"
 
-            color="white"
+            color="surface"
 
             class="control-btn"
 
@@ -386,7 +386,7 @@
             @click="goHome"
           >
 
-            <v-icon color="grey-darken-2">mdi-home</v-icon>
+            <v-icon color="secondary">mdi-home</v-icon>
 
           </v-btn>
 
@@ -451,7 +451,7 @@
 
             elevation="4"
 
-            color="white"
+            color="surface"
 
             class="control-btn"
 
@@ -502,7 +502,7 @@
 
             elevation="4"
 
-            color="white"
+            color="surface"
 
             class="control-btn"
 
@@ -511,7 +511,7 @@
             @click="zoomIn"
           >
 
-            <v-icon color="grey-darken-2">mdi-plus</v-icon>
+            <v-icon color="secondary">mdi-plus</v-icon>
 
           </v-btn>
 
@@ -539,7 +539,7 @@
 
             elevation="4"
 
-            color="white"
+            color="surface"
 
             class="control-btn"
 
@@ -548,7 +548,7 @@
             @click="zoomOut"
           >
 
-            <v-icon color="grey-darken-2">mdi-minus</v-icon>
+            <v-icon color="secondary">mdi-minus</v-icon>
 
           </v-btn>
 
@@ -583,7 +583,7 @@
 
                 elevation="4"
 
-                color="white"
+                color="surface"
 
                 class="control-btn"
 
@@ -1045,7 +1045,7 @@ defineExpose({ identifyMode })
 
   width: min(420px, calc(100vw - 24px));
 
-  background: rgba(255, 255, 255, 0.98);
+  background: rgba(var(--v-theme-surface), 0.96);
 
   backdrop-filter: blur(10px);
 

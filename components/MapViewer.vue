@@ -1611,7 +1611,7 @@ watch(
   width: auto;
   height: auto;
   min-height: 0;
-  background: #e3e9ef;
+  background: rgb(var(--v-theme-surface-variant));
   contain: layout paint;
 }
 
@@ -1657,7 +1657,7 @@ watch(
 }
 
 .map-skeleton {
-  background: #e8edf2;
+  background: rgb(var(--v-theme-surface-variant));
 }
 
 .map-skeleton-host {
