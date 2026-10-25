@@ -1,548 +1,1010 @@
 <template>
-  <v-dialog
-    v-model="visible"
-    :fullscreen="isMobile"
-    max-width="1500"
-    scrollable
-  >
-    <v-card
-      class="heat-loss-journal"
-      :rounded="isMobile ? 0 : 'lg'"
+  <Teleport to="body">
+    <v-dialog
+      v-model="visible"
+      :fullscreen="isMobile"
+      max-width="1500"
+      scrollable
     >
-      <v-toolbar
-        color="deep-orange-darken-3"
-        density="compact"
+      <v-card
+        class="heat-loss-journal"
+        :rounded="isMobile ? 0 : 'lg'"
       >
-        <v-icon class="ml-3 mr-2">
-          mdi-heat-wave
-        </v-icon>
-        <v-toolbar-title>Тепловые потери</v-toolbar-title>
-        <v-chip
-          class="mr-2"
-          size="small"
-          color="white"
-          variant="outlined"
-        >
-          {{ lookups.season_counts.total || 0 }} сезона
-        </v-chip>
-        <v-chip
-          class="mr-2"
-          size="small"
-          color="white"
-          variant="outlined"
-        >
-          {{ lookups.source_counts.ready || 0 }}/{{ lookups.source_counts.total || 0 }} источников готовы
-        </v-chip>
-        <v-btn
-          class="mr-1"
-          variant="text"
-          prepend-icon="mdi-microsoft-excel"
-          :loading="exportingSeasons"
-          @click="downloadSeasonsExcel"
-        >
-          Excel сезонов
-        </v-btn>
-        <v-btn
-          icon="mdi-close"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
-      </v-toolbar>
-
-      <v-alert
-        v-if="lookups.result_availability.calculation_count === 0"
-        type="info"
-        variant="tonal"
-        density="compact"
-        class="ma-3 mb-0"
-        icon="mdi-information-outline"
-      >
-        В БД пока нет сохранённых результатов расчёта UT_OUT. Журнал показывает реальные сезоны и готовность исходных данных desktop-калькулятора.
-      </v-alert>
-
-      <v-tabs
-        v-model="activeTab"
-        color="deep-orange-darken-3"
-        @update:model-value="loadActiveTab"
-      >
-        <v-tab value="seasons">
-          Отопительные сезоны
-        </v-tab>
-        <v-tab value="sources">
-          Источники и готовность
-        </v-tab>
-        <v-tab value="norm">
-          Нормативный расчёт
-        </v-tab>
-      </v-tabs>
-
-      <v-window
-        v-model="activeTab"
-        class="journal-window"
-      >
-        <v-window-item
-          value="seasons"
-          class="journal-pane"
-        >
-          <div class="filters pa-3">
-            <v-text-field
-              v-model="seasonFilters.search"
-              label="Поиск по городу, датам или ID"
-              prepend-inner-icon="mdi-magnify"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
-              @keyup.enter="reloadSeasons"
-            />
-            <v-select
-              v-model="seasonFilters.city"
-              :items="lookups.cities"
-              item-title="name"
-              item-value="name"
-              label="Город"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
-            />
-            <v-btn
-              color="deep-orange-darken-3"
-              :loading="loading"
-              @click="reloadSeasons"
-            >
-              Найти
-            </v-btn>
+        <v-card-title class="d-flex align-center flex-wrap ga-3 px-4 py-3">
+          <v-avatar
+            color="deep-orange-lighten-5"
+            size="40"
+          >
+            <v-icon color="deep-orange-darken-3">mdi-heat-wave</v-icon>
+          </v-avatar>
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
+            <div class="text-subtitle-1 font-weight-bold">Тепловые потери</div>
+            <div class="text-caption text-medium-emphasis text-truncate">
+              сезонов {{ lookups.season_counts.total || 0 }} · источников готовы {{ lookups.source_counts.ready || 0 }} из {{ lookups.source_counts.total || 0 }}
+            </div>
           </div>
-          <div class="table-wrap">
-            <table class="journal-table">
-              <thead><tr><th>ID</th><th>Период</th><th>Город</th><th>t отопл.</th><th>t вент.</th><th>Потери воды, %</th><th>Объёмы систем</th><th>Статус</th></tr></thead>
-              <tbody>
-                <tr
-                  v-for="item in seasons"
-                  :key="item.id"
-                  @click="openSeason(item.id)"
+          <SegmentedToggle
+            v-model="activeTab"
+            :items="tabItems"
+            wrap
+            aria-label="Раздел журнала тепловых потерь"
+            class="journal-tabs"
+          />
+          <HintTip
+            text="Excel сезонов"
+            hint="Ведомость отопительных сезонов"
+            location="bottom"
+          >
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Выгрузить сезоны в Excel"
+                :loading="exportingSeasons"
+                @click="downloadSeasonsExcel"
+              >
+                <v-icon>mdi-microsoft-excel</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
+          <HintTip
+            text="Закрыть журнал"
+            hotkey="Esc"
+            location="bottom"
+          >
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Закрыть журнал"
+                @click="visible = false"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
+        </v-card-title>
+
+        <v-divider />
+
+        <v-alert
+          v-if="lookupsLoaded && lookups.result_availability.calculation_count === 0"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mx-3 mx-md-4 mt-3 flex-shrink-0"
+        >
+          В БД пока нет сохранённых результатов расчёта UT_OUT. Журнал показывает реальные сезоны и готовность
+          исходных данных desktop-калькулятора.
+        </v-alert>
+
+        <v-window
+          v-model="activeTab"
+          class="journal-window"
+        >
+          <v-window-item
+            value="seasons"
+            class="journal-pane"
+          >
+            <div class="pa-3 pa-md-4 journal-filters">
+              <v-row dense>
+                <v-col
+                  cols="12"
+                  md="8"
                 >
-                  <td>{{ item.id }}</td>
-                  <td>{{ formatDate(item.d1) }} — {{ formatDate(item.d2) }}</td>
-                  <td>{{ item.city || '—' }}</td>
-                  <td>{{ formatNumber(item.t_ot) }} °C</td>
-                  <td>{{ formatNumber(item.t_vent) }} °C</td>
-                  <td>{{ formatNumber(item.a) }}</td>
-                  <td>ОТ {{ formatNumber(item.volwaterhs) }} / В {{ formatNumber(item.volwatervs) }} / ГВС {{ formatNumber(item.volwateropengvs) }}</td>
-                  <td>
+                  <SearchField
+                    :model-value="seasonSearch"
+                    label="Поиск по городу, датам или ID"
+                    :debounce="350"
+                    :loading="seasonsLoading"
+                    @update:model-value="seasonSearch = $event"
+                    @search="reloadSeasons"
+                  />
+                </v-col>
+                <v-col
+                  cols="12"
+                  md="4"
+                >
+                  <AppSelect
+                    v-model="seasonCity"
+                    :items="lookups.cities"
+                    item-title="name"
+                    item-value="name"
+                    label="Город"
+                  />
+                </v-col>
+              </v-row>
+            </div>
+            <v-divider />
+            <div class="table-wrap">
+              <StateView
+                variant="table"
+                :rows="8"
+                :loading="seasonsLoading && !seasons.length"
+                :error="seasonsError"
+                :empty="!seasonsLoading && !seasons.length"
+                empty-title="Сезоны не найдены"
+                :empty-text="seasonFiltersActive ? 'Измените фильтры: по выбранным условиям сезонов нет' : 'В базе нет отопительных сезонов'"
+                empty-icon="mdi-calendar-blank-outline"
+                :action-label="seasonFiltersActive ? 'Сбросить фильтры' : undefined"
+                error-title="Не удалось загрузить сезоны"
+                :retrying="seasonsLoading"
+                @retry="loadSeasons"
+                @action="resetSeasonFilters"
+              >
+                <v-progress-linear
+                  v-if="seasonsLoading"
+                  indeterminate
+                  color="primary"
+                />
+                <DataTable
+                  :columns="seasonColumns"
+                  :items="(seasons as Record<string, unknown>[])"
+                  item-key="id"
+                  selectable
+                  :selected-key="flashId"
+                  density="compact"
+                  class="season-table"
+                  @select="openSeason(Number($event.id))"
+                >
+                  <template #[`item.d1`]="{ item }">
+                    {{ formatDate(item.d1) }} — {{ formatDate(item.d2) }}
+                  </template>
+                  <template #[`item.city`]="{ item }">
+                    {{ item.city || '—' }}
+                  </template>
+                  <template #[`item.t_ot`]="{ item }">
+                    {{ formatNumber(item.t_ot, ' °C') }}
+                  </template>
+                  <template #[`item.t_vent`]="{ item }">
+                    {{ formatNumber(item.t_vent, ' °C') }}
+                  </template>
+                  <template #[`item.a`]="{ item }">
+                    {{ formatNumber(item.a) }}
+                  </template>
+                  <template #[`item.volwaterhs`]="{ item }">
+                    ОТ {{ formatNumber(item.volwaterhs) }} / В {{ formatNumber(item.volwatervs) }} / ГВС {{ formatNumber(item.volwateropengvs) }}
+                  </template>
+                  <template #[`item.is_current`]="{ item }">
                     <v-chip
                       size="x-small"
-                      :color="item.is_current ? 'green' : 'blue-grey'"
+                      variant="tonal"
+                      :color="item.is_current ? 'success' : 'grey'"
                     >
                       {{ item.is_current ? 'текущий' : 'архив' }}
                     </v-chip>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <div
-              v-if="!loading && !seasons.length"
-              class="empty"
-            >
-              Сезоны не найдены
+                  </template>
+                </DataTable>
+              </StateView>
             </div>
-          </div>
-          <v-pagination
-            v-if="seasonPages > 1"
-            v-model="seasonPage"
-            :length="seasonPages"
-            density="comfortable"
-            @update:model-value="loadSeasons"
-          />
-        </v-window-item>
+            <v-divider />
+            <div class="d-flex align-center px-4 py-2">
+              <span class="text-caption text-medium-emphasis">Страница {{ seasonPage }}{{ seasonPages ? ` из ${seasonPages}` : '' }}</span>
+              <v-spacer />
+              <v-pagination
+                v-if="seasonPages > 1"
+                v-model="seasonPage"
+                :length="seasonPages"
+                :total-visible="isMobile ? 3 : 7"
+                density="compact"
+              />
+            </div>
+          </v-window-item>
 
-        <v-window-item
-          value="sources"
-          class="journal-pane"
-        >
-          <div class="filters source-filters pa-3">
-            <v-text-field
-              v-model="sourceFilters.search"
-              label="Источник, узел, фрагмент или ID"
-              prepend-inner-icon="mdi-magnify"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
-              @keyup.enter="reloadSources"
-            />
-            <v-select
-              v-model="sourceFilters.fragment_id"
-              :items="lookups.fragments"
-              item-title="name"
-              item-value="id"
-              label="Фрагмент схемы"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
-            />
-            <v-select
-              v-model="sourceFilters.readiness"
-              :items="readinessOptions"
-              label="Готовность"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
-            />
-            <v-btn
-              color="deep-orange-darken-3"
-              :loading="loading"
-              @click="reloadSources"
-            >
-              Найти
-            </v-btn>
-          </div>
-          <div class="table-wrap">
-            <table class="journal-table source-table">
-              <thead><tr><th>ID</th><th>Источник</th><th>Фрагмент</th><th>Узел</th><th>Общие параметры</th><th>Месяцы</th><th>Заполнение / обвязка</th><th>Готовность</th></tr></thead>
-              <tbody>
-                <tr
-                  v-for="item in sources"
-                  :key="item.id"
-                  @click="openSource(item.id)"
+          <v-window-item
+            value="sources"
+            class="journal-pane"
+          >
+            <!-- Плитки готовности на всю базу; плитка — фильтр -->
+            <div class="journal-kpi px-3 px-md-4 pt-3">
+              <KpiTile
+                label="Готовы к расчёту"
+                :value="lookups.source_counts.ready || 0"
+                :compact="false"
+                status="good"
+                selectable
+                :active="sourceReadiness === 'ready'"
+                @select="toggleReadiness('ready')"
+              />
+              <KpiTile
+                label="Неполные данные"
+                :value="incompleteCount"
+                :compact="false"
+                :status="incompleteCount > 0 ? 'warning' : 'good'"
+                selectable
+                :active="sourceReadiness === 'incomplete'"
+                @select="toggleReadiness('incomplete')"
+              />
+              <KpiTile
+                label="Всего источников"
+                :value="lookups.source_counts.total || 0"
+                :compact="false"
+              />
+            </div>
+            <div class="pa-3 pa-md-4 journal-filters">
+              <v-row dense>
+                <v-col
+                  cols="12"
+                  md="6"
                 >
-                  <td>{{ item.id }}</td><td>{{ item.name }}</td><td>{{ item.fragment_name || '—' }}</td><td>{{ item.node_id }}</td>
-                  <td>
-                    <v-icon :color="item.has_source_parameters ? 'green' : 'grey-lighten-1'">
+                  <SearchField
+                    :model-value="sourceSearch"
+                    label="Источник, узел, фрагмент или ID"
+                    :debounce="350"
+                    :loading="sourcesLoading"
+                    @update:model-value="sourceSearch = $event"
+                    @search="reloadSources"
+                  />
+                </v-col>
+                <v-col
+                  cols="12"
+                  sm="6"
+                  md="3"
+                >
+                  <AppSelect
+                    v-model="sourceFragmentId"
+                    :items="lookups.fragments"
+                    item-title="name"
+                    item-value="id"
+                    label="Фрагмент схемы"
+                  />
+                </v-col>
+                <v-col
+                  cols="12"
+                  sm="6"
+                  md="3"
+                >
+                  <AppSelect
+                    v-model="sourceReadiness"
+                    :items="readinessOptions"
+                    item-title="title"
+                    item-value="value"
+                    label="Готовность"
+                  />
+                </v-col>
+              </v-row>
+            </div>
+            <v-divider />
+            <div class="table-wrap">
+              <StateView
+                variant="table"
+                :rows="10"
+                :loading="sourcesLoading && !sources.length"
+                :error="sourcesError"
+                :empty="!sourcesLoading && !sources.length"
+                empty-title="Источники не найдены"
+                :empty-text="sourceFiltersActive ? 'Измените фильтры: по выбранным условиям источников нет' : 'В базе нет источников тепла'"
+                empty-icon="mdi-factory"
+                :action-label="sourceFiltersActive ? 'Сбросить фильтры' : undefined"
+                error-title="Не удалось загрузить источники"
+                :retrying="sourcesLoading"
+                @retry="loadSources"
+                @action="resetSourceFilters"
+              >
+                <v-progress-linear
+                  v-if="sourcesLoading"
+                  indeterminate
+                  color="primary"
+                />
+                <DataTable
+                  :columns="sourceColumns"
+                  :items="(sources as Record<string, unknown>[])"
+                  item-key="id"
+                  selectable
+                  density="compact"
+                  class="source-table"
+                  @select="openSource(Number($event.id))"
+                >
+                  <template #[`item.fragment_name`]="{ item }">
+                    <div class="text-truncate">
+                      {{ item.fragment_name || '—' }}
+                    </div>
+                  </template>
+                  <template #[`item.has_source_parameters`]="{ item }">
+                    <v-icon
+                      size="20"
+                      :color="item.has_source_parameters ? 'success' : 'grey-lighten-1'"
+                      :aria-label="item.has_source_parameters ? 'есть' : 'нет'"
+                    >
                       {{ item.has_source_parameters ? 'mdi-check-circle' : 'mdi-minus-circle-outline' }}
                     </v-icon>
-                  </td>
-                  <td>
-                    <v-icon :color="item.has_month_parameters ? 'green' : 'grey-lighten-1'">
+                  </template>
+                  <template #[`item.has_month_parameters`]="{ item }">
+                    <v-icon
+                      size="20"
+                      :color="item.has_month_parameters ? 'success' : 'grey-lighten-1'"
+                      :aria-label="item.has_month_parameters ? 'есть' : 'нет'"
+                    >
                       {{ item.has_month_parameters ? 'mdi-check-circle' : 'mdi-minus-circle-outline' }}
                     </v-icon>
-                  </td>
-                  <td>
-                    <v-icon :color="item.has_filling_parameters || item.has_harness ? 'green' : 'grey-lighten-1'">
-                      {{ item.has_filling_parameters || item.has_harness ? 'mdi-check-circle' : 'mdi-minus-circle-outline' }}
+                  </template>
+                  <template #[`item.has_filling_parameters`]="{ item }">
+                    <v-icon
+                      size="20"
+                      :color="(item.has_filling_parameters || item.has_harness) ? 'success' : 'grey-lighten-1'"
+                      :aria-label="(item.has_filling_parameters || item.has_harness) ? 'есть' : 'нет'"
+                    >
+                      {{ (item.has_filling_parameters || item.has_harness) ? 'mdi-check-circle' : 'mdi-minus-circle-outline' }}
                     </v-icon>
-                  </td>
-                  <td>
+                  </template>
+                  <template #[`item.ready_to_calculate`]="{ item }">
                     <v-chip
                       size="x-small"
-                      :color="item.ready_to_calculate ? 'green' : 'orange'"
+                      variant="tonal"
+                      :color="item.ready_to_calculate ? 'success' : 'warning'"
                     >
                       {{ item.ready_to_calculate ? 'готов' : 'неполные данные' }}
                     </v-chip>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <div
-              v-if="!loading && !sources.length"
-              class="empty"
-            >
-              Источники не найдены
+                  </template>
+                  <template #[`item.actions`]="{ item }">
+                    <HintTip
+                      v-if="hasCoordinates(item)"
+                      text="Показать источник на карте"
+                      hint="Журнал закроется, маркер останется"
+                    >
+                      <template #default="{ props: tip }">
+                        <v-btn
+                          v-bind="tip"
+                          icon="mdi-crosshairs-gps"
+                          size="x-small"
+                          variant="text"
+                          color="primary"
+                          aria-label="Показать источник на карте"
+                          @click.stop="locateSource(item)"
+                        />
+                      </template>
+                    </HintTip>
+                    <HintTip text="Открыть карточку источника">
+                      <template #default="{ props: tip }">
+                        <v-btn
+                          v-bind="tip"
+                          icon="mdi-chevron-right"
+                          size="x-small"
+                          variant="text"
+                          aria-label="Открыть карточку источника"
+                          @click.stop="openSource(Number(item.id))"
+                        />
+                      </template>
+                    </HintTip>
+                  </template>
+                </DataTable>
+              </StateView>
+            </div>
+            <v-divider />
+            <div class="d-flex align-center px-4 py-2">
+              <span class="text-caption text-medium-emphasis">Страница {{ sourcePage }}{{ sourcePages ? ` из ${sourcePages}` : '' }}</span>
+              <v-spacer />
+              <v-pagination
+                v-if="sourcePages > 1"
+                v-model="sourcePage"
+                :length="sourcePages"
+                :total-visible="isMobile ? 3 : 7"
+                density="compact"
+              />
+            </div>
+          </v-window-item>
+
+          <v-window-item
+            value="norm"
+            class="journal-pane"
+          >
+            <HeatLossNormPanel
+              ref="normPanelRef"
+              :seasons="allSeasons"
+              :fragments="lookups.fragments"
+              @locate="locateSection"
+            />
+          </v-window-item>
+        </v-window>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog
+      v-model="detailsVisible"
+      :persistent="saving"
+      :fullscreen="isMobile"
+      max-width="1180"
+      scrollable
+    >
+      <v-card :rounded="isMobile ? 0 : 'lg'">
+        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
+          <v-icon color="deep-orange-darken-3">
+            {{ sourceDetails ? 'mdi-factory' : 'mdi-calendar-range' }}
+          </v-icon>
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
+            <div class="text-subtitle-1 font-weight-bold d-flex align-center ga-2">
+              <span class="text-truncate">{{ detailTitle }}</span>
+              <v-chip
+                v-if="isEditing && isDirty"
+                size="x-small"
+                color="accent"
+                variant="tonal"
+              >
+                Не сохранено
+              </v-chip>
+            </div>
+            <div class="text-caption text-medium-emphasis text-truncate">
+              {{ detailSubtitle }}
             </div>
           </div>
-          <v-pagination
-            v-if="sourcePages > 1"
-            v-model="sourcePage"
-            :length="sourcePages"
-            density="comfortable"
-            @update:model-value="loadSources"
-          />
-        </v-window-item>
-
-        <v-window-item
-          value="norm"
-          class="journal-pane"
-        >
-          <HeatLossNormPanel
-            ref="normPanelRef"
-            :seasons="allSeasons"
-            :fragments="lookups.fragments"
-            @locate="locateSection"
-          />
-        </v-window-item>
-      </v-window>
-    </v-card>
-  </v-dialog>
-
-  <v-dialog
-    v-model="detailsVisible"
-    :fullscreen="isMobile"
-    max-width="1180"
-    scrollable
-  >
-    <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar
-        color="deep-orange-darken-3"
-        density="compact"
-      >
-        <v-toolbar-title>{{ detailTitle }}</v-toolbar-title>
-        <v-btn
-          v-if="sourceDetails && hasCoordinates(sourceDetails)"
-          prepend-icon="mdi-crosshairs-gps"
-          variant="text"
-          @click="locateSource"
-        >
-          На карте
-        </v-btn>
-        <v-btn
-          icon="mdi-close"
-          aria-label="Закрыть карточку"
-          @click="detailsVisible = false"
-        />
-      </v-toolbar>
-      <v-card-text
-        v-if="detailLoading"
-        class="d-flex justify-center pa-10"
-      >
-        <v-progress-circular
-          indeterminate
-          color="deep-orange"
-        />
-      </v-card-text>
-
-      <v-card-text
-        v-else-if="seasonDetails"
-        class="pa-4"
-      >
-        <div class="d-flex justify-end mb-2">
           <v-btn
-            v-if="mutationsEnabled && (!isEditingSeason)"
-            color="primary"
+            icon
             variant="text"
-            prepend-icon="mdi-pencil"
-            @click="startEditSeason"
-          >Редактировать</v-btn>
-          <div
-            v-else
-            class="d-flex ga-2"
+            aria-label="Закрыть карточку"
+            @click="detailsVisible = false"
           >
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-card-title>
+        <v-divider />
+
+        <v-card-text class="pa-4">
+          <StateView
+            variant="form"
+            :rows="8"
+            :loading="detailLoading"
+            :error="detailError"
+            :empty="!detailLoading && !detailError && !seasonDetails && !sourceDetails"
+            empty-title="Карточка не выбрана"
+            :retry="false"
+          >
+            <template v-if="seasonDetails">
+              <JournalDetailFields
+                :groups="seasonGroups"
+                :model="editFields"
+                :editable="editable"
+                :is-field-dirty="isFieldDirty"
+                :open-panels="[0]"
+                @update:field="setEditField"
+              />
+              <v-alert
+                v-if="isEditing && saveError"
+                type="error"
+                variant="tonal"
+                density="compact"
+                class="mt-3"
+                data-testid="equipment-save-error"
+              >
+                {{ saveError }}
+              </v-alert>
+              <div class="text-subtitle-2 font-weight-bold mt-4 mb-2">
+                Климатические параметры по месяцам
+              </div>
+              <DataTable
+                :columns="climateColumns"
+                :items="(seasonDetails.climate || []) as Record<string, unknown>[]"
+                item-key="id"
+                density="compact"
+                class="detail-table"
+                no-data-text="Климатических параметров нет"
+              >
+                <template #[`item.month`]="{ item }">
+                  {{ item.month || item.m }}
+                </template>
+                <template #[`item.tn`]="{ item }">
+                  {{ formatNumber(item.tn, ' °C') }}
+                </template>
+                <template #[`item.tpod`]="{ item }">
+                  {{ formatNumber(item.tpod, ' °C') }}
+                </template>
+                <template #[`item.tgr`]="{ item }">
+                  {{ formatNumber(item.tgr, ' °C') }}
+                </template>
+              </DataTable>
+            </template>
+
+            <template v-else-if="sourceDetails">
+              <div class="status-row mb-4">
+                <v-chip
+                  variant="tonal"
+                  :color="sourceDetails.ready_to_calculate ? 'success' : 'warning'"
+                >
+                  {{ sourceDetails.ready_to_calculate ? 'Готов к расчёту' : 'Исходные данные неполные' }}
+                </v-chip>
+                <v-chip
+                  variant="outlined"
+                  :color="sourceDetails.has_source_parameters ? 'success' : 'grey'"
+                >
+                  Общие параметры
+                </v-chip>
+                <v-chip
+                  variant="outlined"
+                  :color="sourceDetails.has_month_parameters ? 'success' : 'grey'"
+                >
+                  Месячные параметры
+                </v-chip>
+                <v-chip
+                  variant="outlined"
+                  :color="sourceDetails.has_filling_parameters || sourceDetails.has_harness ? 'success' : 'grey'"
+                >
+                  Заполнение / обвязка
+                </v-chip>
+              </div>
+              <JournalDetailFields
+                :groups="sourceGroups"
+                :model="{}"
+                :editable="() => false"
+                :is-field-dirty="() => false"
+                :open-panels="[0]"
+              />
+              <div class="text-subtitle-2 font-weight-bold mt-4 mb-2">
+                Рабочие и температурные параметры
+              </div>
+              <DataTable
+                :columns="monthColumns"
+                :items="(sourceDetails.months || []) as Record<string, unknown>[]"
+                item-key="id"
+                density="compact"
+                class="detail-table months-table"
+                no-data-text="Месячных параметров нет"
+              >
+                <template #[`item.month`]="{ item }">
+                  {{ item.month || item.m }}
+                </template>
+                <template #[`item.sezon`]="{ item }">
+                  {{ seasonName(item.sezon) }}
+                </template>
+              </DataTable>
+            </template>
+          </StateView>
+        </v-card-text>
+
+        <v-divider />
+        <v-card-actions class="px-4 py-3 flex-wrap ga-2">
+          <v-spacer />
+          <template v-if="isEditing">
             <v-btn
-              v-if="mutationsEnabled"
-              color="error"
               variant="text"
-              @click="cancelEditSeason"
               :disabled="saving"
-            >Отмена</v-btn>
+              @click="cancelEdit"
+            >
+              Отмена
+            </v-btn>
             <v-btn
-              v-if="mutationsEnabled"
               color="primary"
               variant="flat"
-              @click="saveSeason"
               :loading="saving"
-            >Сохранить</v-btn>
-          </div>
-        </div>
-        <div
-          class="detail-grid mb-5"
-          v-if="!isEditingSeason"
-        >
-          <DetailValue
-            label="Период"
-            :value="`${formatDate(seasonDetails.d1)} — ${formatDate(seasonDetails.d2)}`"
-          />
-          <DetailValue
-            label="Город"
-            :value="seasonDetails.city"
-          />
-          <DetailValue
-            label="Расчётная t отопления"
-            :value="formatNumber(seasonDetails.t_ot, ' °C')"
-          />
-          <DetailValue
-            label="Расчётная t вентиляции"
-            :value="formatNumber(seasonDetails.t_vent, ' °C')"
-          />
-          <DetailValue
-            label="Норма потерь воды"
-            :value="formatNumber(seasonDetails.a)"
-          />
-          <DetailValue
-            label="Аккумуляторные баки"
-            :value="formatNumber(seasonDetails.tankbattery_q)"
-          />
-          <DetailValue
-            label="Объём отопления"
-            :value="formatNumber(seasonDetails.volwaterhs)"
-          />
-          <DetailValue
-            label="Объём вентиляции"
-            :value="formatNumber(seasonDetails.volwatervs)"
-          />
-          <DetailValue
-            label="Объём открытого ГВС"
-            :value="formatNumber(seasonDetails.volwateropengvs)"
-          />
-        </div>
-        <v-card
-          variant="outlined"
-          class="pa-3 mb-5"
-          v-else
-        >
-          <v-row dense>
-            <v-col
-              v-for="field in buildSeasonFields()"
-              :key="field.key"
-              cols="12"
-              sm="6"
-              md="4"
+              :disabled="!isDirty"
+              @click="saveSeason"
             >
-              <div class="detail-label mb-1">{{ field.label }}</div>
-              <v-text-field
-                v-model="editFields[field.key]"
-                :type="field.type === 'number' ? 'number' : 'text'"
-                density="compact"
-                hide-details
-                variant="outlined"
-                clearable
-              />
-            </v-col>
-          </v-row>
-        </v-card>
-        <h3 class="mb-2">
-          Климатические параметры по месяцам
-        </h3>
-        <div class="table-wrap detail-table-wrap">
-          <table class="journal-table compact-table">
-            <thead><tr><th>№</th><th>Месяц</th><th>Наружный воздух</th><th>Подвал</th><th>Грунт</th></tr></thead>
-            <tbody>
-              <tr
-                v-for="month in seasonDetails.climate"
-                :key="month.id"
-              >
-                <td>{{ month.r }}</td><td>{{ month.month || month.m }}</td><td>{{ formatNumber(month.tn, ' °C') }}</td><td>{{ formatNumber(month.tpod, ' °C') }}</td><td>{{ formatNumber(month.tgr, ' °C') }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </v-card-text>
-
-      <v-card-text
-        v-else-if="sourceDetails"
-        class="pa-4"
-      >
-        <div class="status-row mb-4">
-          <v-chip :color="sourceDetails.ready_to_calculate ? 'green' : 'orange'">
-            {{ sourceDetails.ready_to_calculate ? 'Готов к расчёту' : 'Исходные данные неполные' }}
-          </v-chip>
-          <v-btn
-            v-if="authStore.canRunWritingCalc && sourceDetails.fragment_id"
-            class="ml-2"
-            color="primary"
-            variant="tonal"
-            size="small"
-            prepend-icon="mdi-play"
-            :loading="runningHeatLoss"
-            title="Гидравлико-тепловой расчёт sety фрагмента с -tg (не модуль «Теплопотери»)"
-            @click="runHeatLossForSource"
-          >
-            Расчёт sety -tg
-          </v-btn>
-          <v-chip
-            variant="outlined"
-            :color="sourceDetails.has_source_parameters ? 'green' : 'grey'"
-          >
-            Общие параметры
-          </v-chip>
-          <v-chip
-            variant="outlined"
-            :color="sourceDetails.has_month_parameters ? 'green' : 'grey'"
-          >
-            Месячные параметры
-          </v-chip>
-          <v-chip
-            variant="outlined"
-            :color="sourceDetails.has_filling_parameters || sourceDetails.has_harness ? 'green' : 'grey'"
-          >
-            Заполнение / обвязка
-          </v-chip>
-        </div>
-        <div class="detail-grid mb-5">
-          <DetailValue
-            label="Источник"
-            :value="sourceDetails.name"
-          />
-          <DetailValue
-            label="Фрагмент"
-            :value="sourceDetails.fragment_name"
-          />
-          <DetailValue
-            label="Узел схемы"
-            :value="sourceDetails.node_id"
-          />
-          <DetailValue
-            label="Год расчёта"
-            :value="valueOf(sourceDetails.attributes, 'heatloscalcyear')"
-          />
-          <DetailValue
-            label="Ёмкость сети, %"
-            :value="valueOf(sourceDetails.source_parameters, 't_percent')"
-          />
-          <DetailValue
-            label="Весенняя опрессовка, %"
-            :value="valueOf(sourceDetails.source_parameters, 'spring_pressing')"
-          />
-          <DetailValue
-            label="Осенняя опрессовка, %"
-            :value="valueOf(sourceDetails.source_parameters, 'autumn_pressing')"
-          />
-        </div>
-        <h3 class="mb-2">
-          Рабочие и температурные параметры
-        </h3>
-        <div class="table-wrap detail-table-wrap">
-          <table class="journal-table compact-table months-table">
-            <thead><tr><th>№</th><th>Месяц</th><th>Сезон</th><th>Дней</th><th>tн</th><th>tпод</th><th>tгр</th><th>tхв</th><th>t1</th><th>t2</th></tr></thead>
-            <tbody>
-              <tr
-                v-for="month in sourceDetails.months"
-                :key="String(valueOf(month, 'id'))"
-              >
-                <td>{{ valueOf(month, 'r') }}</td><td>{{ valueOf(month, 'month') || valueOf(month, 'm') }}</td><td>{{ seasonName(valueOf(month, 'sezon')) }}</td><td>{{ valueOf(month, 'workcount') }}</td><td>{{ valueOf(month, 'tn') }}</td><td>{{ valueOf(month, 'tpod') }}</td><td>{{ valueOf(month, 'tgr') }}</td><td>{{ valueOf(month, 'tx') }}</td><td>{{ valueOf(month, 'tgp') }}</td><td>{{ valueOf(month, 'tgo') }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </v-card-text>
-    </v-card>
-  </v-dialog>
+              Сохранить
+            </v-btn>
+          </template>
+          <template v-else>
+            <HintTip
+              v-if="sourceDetails && authStore.canRunWritingCalc && sourceDetails.fragment_id"
+              text="Расчёт sety -tg"
+              hint="Гидравлико-тепловой расчёт фрагмента с -tg (не модуль «Теплопотери»); пишет результаты в базу"
+            >
+              <template #default="{ props: tip }">
+                <v-btn
+                  v-bind="tip"
+                  color="primary"
+                  variant="tonal"
+                  prepend-icon="mdi-play"
+                  :loading="runningHeatLoss"
+                  @click="runHeatLossForSource"
+                >
+                  Расчёт sety -tg
+                </v-btn>
+              </template>
+            </HintTip>
+            <v-btn
+              v-if="sourceDetails && hasCoordinates(sourceDetails)"
+              color="primary"
+              variant="tonal"
+              prepend-icon="mdi-crosshairs-gps"
+              @click="locateSource(sourceDetails)"
+            >
+              На карте
+            </v-btn>
+            <v-btn
+              v-if="mutationsEnabled && seasonDetails"
+              color="primary"
+              variant="tonal"
+              @click="startEdit"
+            >
+              Редактировать
+            </v-btn>
+            <v-btn
+              variant="text"
+              @click="detailsVisible = false"
+            >
+              Закрыть
+            </v-btn>
+          </template>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { formatApiError } from '~/utils/apiError'
+import AppSelect from '~/components/AppSelect.vue'
+import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
+import HeatLossNormPanel from '~/components/HeatLossNormPanel.vue'
+import HintTip from '~/components/HintTip.vue'
+import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
+import KpiTile from '~/components/KpiTile.vue'
+import SearchField from '~/components/SearchField.vue'
+import SegmentedToggle, { type SegmentedToggleItem } from '~/components/SegmentedToggle.vue'
+import StateView from '~/components/StateView.vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
+import { useJournalEdit, type JournalEditSource } from '~/composables/useJournalEdit'
+import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
 import { useAuthStore } from '~/stores/authStore'
+import { useNotificationStore } from '~/stores/notificationStore'
+import { formatApiError } from '~/utils/apiError'
+import { hasLonLat } from '~/utils/journalFields'
+import {
+  fastApiService,
+  type HeatLossLookups,
+  type HeatLossSeasonDetails,
+  type HeatLossSeasonSummary,
+  type HeatLossSourceDetails,
+  type HeatLossSourceSummary
+} from '~/services/fastApiService'
 
-const mutationsEnabled = useMutationsEnabled()
-/** Запуск теплопотерь пишет в БД: роль calculator+ и MUTATIONS_ENABLED на сервере */
-const authStore = useAuthStore()
-import { defineComponent, h, type PropType } from 'vue'
-import { useMobile } from '~/composables/useMobile'
-import { fastApiService, type HeatLossLookups, type HeatLossSeasonDetails, type HeatLossSeasonSummary, type HeatLossSourceDetails, type HeatLossSourceSummary } from '~/services/fastApiService'
+/**
+ * Тепловые потери — журнал (docs/ui-modernization-progress.md, этап 5): отопительные сезоны, источники и их
+ * готовность к расчёту (плитки — фильтр), нормативный расчёт (`HeatLossNormPanel`). Списки — `DataTable` с
+ * серверной пагинацией, `SearchField` / `AppSelect`, `StateView`. Сезон правится на общем `useJournalEdit`
+ * (черновик, «изменено», отмена с подтверждением); в `heatlosesmain` уходят только изменённые поля.
+ */
+type HeatLossTab = 'seasons' | 'sources' | 'norm'
+type Readiness = 'ready' | 'incomplete'
+type LocatePayload = { longitude: number; latitude: number; id: number; nodeId: number; label: string }
 
-const DetailValue = defineComponent({
-  props: {
-    label: { type: String, required: true },
-    value: { type: [String, Number] as PropType<string | number | null>, default: null },
-  },
-  setup(props) {
-    return () => h('div', { class: 'detail-value' }, [
-      h('div', { class: 'detail-label' }, props.label),
-      h('div', String(props.value ?? '—')),
-    ])
-  },
-})
-
-const emit = defineEmits<{ 'locate-heat-source': [payload: { longitude: number; latitude: number; id: number; nodeId: number; label: string }] }>()
+const emit = defineEmits<{ 'locate-heat-source': [payload: LocatePayload] }>()
 const { isMobile } = useMobile()
+const mutationsEnabled = useMutationsEnabled()
+/** Запуск расчёта пишет в БД: роль calculator+ и MUTATIONS_ENABLED на сервере */
+const authStore = useAuthStore()
+const notifications = useNotificationStore()
+const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
+
 const visible = ref(false)
+const activeTab = ref<HeatLossTab>('seasons')
+const tabItems: SegmentedToggleItem<HeatLossTab>[] = [
+  { value: 'seasons', label: 'Сезоны', icon: 'mdi-calendar-range', hint: 'Отопительные сезоны и климат' },
+  { value: 'sources', label: 'Источники', icon: 'mdi-factory', hint: 'Источники и готовность исходных данных' },
+  { value: 'norm', label: 'Нормативный расчёт', icon: 'mdi-calculator-variant-outline' }
+]
+const lookups = ref<HeatLossLookups>({ fragments: [], cities: [], source_counts: {}, season_counts: {}, result_availability: { calculation_count: 0, heat_loss_row_count: 0 } })
+const lookupsLoaded = ref(false)
+const pageSize = 50
+
+const seasons = ref<HeatLossSeasonSummary[]>([])
+const seasonsLoading = ref(false)
+const seasonsError = ref('')
+const seasonPage = ref(1)
+const seasonPages = ref(0)
+const seasonSearch = ref('')
+const seasonCity = ref<string | undefined>()
+
+const sources = ref<HeatLossSourceSummary[]>([])
+const sourcesLoading = ref(false)
+const sourcesError = ref('')
+const sourcePage = ref(1)
+const sourcePages = ref(0)
+const sourceSearch = ref('')
+const sourceFragmentId = ref<number | undefined>()
+const sourceReadiness = ref<Readiness | undefined>()
+const readinessOptions = [{ title: 'Готовы к расчёту', value: 'ready' }, { title: 'Неполные данные', value: 'incomplete' }]
+
+const normPanelRef = ref<{ init: () => Promise<void> } | null>(null)
+const allSeasons = ref<HeatLossSeasonSummary[]>([])
+
 const detailsVisible = ref(false)
-const loading = ref(false)
 const detailLoading = ref(false)
+const detailError = ref('')
+const seasonDetails = ref<HeatLossSeasonDetails | null>(null)
+const sourceDetails = ref<HeatLossSourceDetails | null>(null)
 const runningHeatLoss = ref(false)
 const exportingSeasons = ref(false)
+
+const seasonColumns: DataTableColumn[] = [
+  { key: 'id', title: 'ID', type: 'number', width: 70, sortable: false },
+  { key: 'd1', title: 'Период', width: 210, sortable: false },
+  { key: 'city', title: 'Город', width: 140, sortable: false },
+  { key: 't_ot', title: 't отопл.', type: 'number', width: 100, sortable: false },
+  { key: 't_vent', title: 't вент.', type: 'number', width: 100, sortable: false },
+  { key: 'a', title: 'Потери воды, %', type: 'number', width: 130, sortable: false },
+  { key: 'volwaterhs', title: 'Объёмы систем', sortable: false },
+  { key: 'is_current', title: 'Статус', width: 100, sortable: false }
+]
+const sourceColumns: DataTableColumn[] = [
+  { key: 'id', title: 'ID', type: 'number', width: 70, sortable: false },
+  { key: 'name', title: 'Источник', sortable: false },
+  { key: 'fragment_name', title: 'Фрагмент', width: 260, sortable: false },
+  { key: 'node_id', title: 'Узел', type: 'number', width: 90, sortable: false },
+  { key: 'has_source_parameters', title: 'Общие', width: 80, align: 'center', sortable: false },
+  { key: 'has_month_parameters', title: 'Месяцы', width: 80, align: 'center', sortable: false },
+  { key: 'has_filling_parameters', title: 'Заполнение / обвязка', width: 150, align: 'center', sortable: false },
+  { key: 'ready_to_calculate', title: 'Готовность', width: 140, sortable: false },
+  { key: 'actions', title: '', type: 'actions', width: 88, sortable: false }
+]
+const climateColumns: DataTableColumn[] = [
+  { key: 'r', title: '№', type: 'number', width: 60, sortable: false },
+  { key: 'month', title: 'Месяц', sortable: false },
+  { key: 'tn', title: 'Наружный воздух', type: 'number', sortable: false },
+  { key: 'tpod', title: 'Подвал', type: 'number', sortable: false },
+  { key: 'tgr', title: 'Грунт', type: 'number', sortable: false }
+]
+const monthColumns: DataTableColumn[] = [
+  { key: 'r', title: '№', type: 'number', width: 50, sortable: false },
+  { key: 'month', title: 'Месяц', sortable: false },
+  { key: 'sezon', title: 'Сезон', sortable: false },
+  { key: 'workcount', title: 'Дней', type: 'number', sortable: false },
+  { key: 'tn', title: 'tн', type: 'number', sortable: false },
+  { key: 'tpod', title: 'tпод', type: 'number', sortable: false },
+  { key: 'tgr', title: 'tгр', type: 'number', sortable: false },
+  { key: 'tx', title: 'tхв', type: 'number', sortable: false },
+  { key: 'tgp', title: 't1', type: 'number', sortable: false },
+  { key: 'tgo', title: 't2', type: 'number', sortable: false }
+]
+
+const seasonFiltersActive = computed(() => Boolean(seasonSearch.value.trim() || seasonCity.value))
+const sourceFiltersActive = computed(() => Boolean(sourceSearch.value.trim() || sourceFragmentId.value || sourceReadiness.value))
+const incompleteCount = computed(() => Math.max(0, Number(lookups.value.source_counts.total || 0) - Number(lookups.value.source_counts.ready || 0)))
+
+const formatDate = (value: unknown) => {
+  if (!value) return '—'
+  const date = new Date(String(value))
+  return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat('ru-RU').format(date)
+}
+const formatNumber = (value: unknown, suffix = '') => (value === null || value === undefined || value === '' || !Number.isFinite(Number(value))
+  ? '—'
+  : `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value))}${suffix}`)
+const valueOf = (record: Record<string, unknown> | null | undefined, key: string): string | number | null => {
+  const value = record?.[key]
+  return typeof value === 'string' || typeof value === 'number' ? value : null
+}
+const seasonName = (value: unknown) => (Number(value) === 1 ? 'отопительный' : Number(value) === 2 ? 'летний' : String(value ?? '—'))
+const hasCoordinates = (item: object) => hasLonLat(item as Record<string, unknown>)
+
+/** Правятся колонки heatlosesmain (как в прежней карточке); даты — `type="date"` */
+const SEASON_COLUMNS: Array<{ key: string; label: string; type: 'date' | 'text' | 'number'; units?: string }> = [
+  { key: 'd1', label: 'Начало сезона', type: 'date' },
+  { key: 'd2', label: 'Конец сезона', type: 'date' },
+  { key: 'city', label: 'Город', type: 'text' },
+  { key: 't_ot', label: 'Расчётная t отопления', type: 'number', units: '°C' },
+  { key: 't_vent', label: 'Расчётная t вентиляции', type: 'number', units: '°C' },
+  { key: 'a', label: 'Норма потерь воды', type: 'number' },
+  { key: 'tankbattery_q', label: 'Аккумуляторные баки', type: 'number' },
+  { key: 'volwaterhs', label: 'Объём отопления', type: 'number' },
+  { key: 'volwatervs', label: 'Объём вентиляции', type: 'number' },
+  { key: 'volwateropengvs', label: 'Объём открытого ГВС', type: 'number' }
+]
+const SEASON_KEYS = SEASON_COLUMNS.map(column => column.key)
+const editSource: JournalEditSource = {
+  schema: computed(() => ({ fields: Object.fromEntries(SEASON_KEYS.map(key => [key, true])) })),
+  isWritable: (key?: string | null) => Boolean(key && SEASON_KEYS.includes(key)),
+  // колонки известны заранее — загрузки нет, но useJournalEdit ждёт признак «есть»
+  loadSchema: async () => true
+}
+const {
+  isEditing, saving, editFields, flashId, isDirty, isFieldDirty, editable, setEditField,
+  beginEdit, resetEdit, cancel, closeKeepingDraft, markSaved
+} = useJournalEdit('heat-loss-seasons', editSource, seasonDetails, {
+  toForm: record => Object.fromEntries(SEASON_KEYS.map(key => [key, record[key] ?? null])),
+  dateKeys: ['d1', 'd2']
+})
+
+const seasonGroups = computed((): JournalDetailGroup[] => {
+  const item = seasonDetails.value
+  if (!item) return []
+  const fields: JournalDetailField[] = SEASON_COLUMNS.map(column => {
+    const raw = item[column.key]
+    const shown = column.type === 'date' ? formatDate(raw) : column.type === 'number' ? formatNumber(raw) : String(raw ?? '—')
+    return { label: column.label, value: shown, rawValue: raw, key: column.key, type: column.type, units: column.units }
+  })
+  return [{ title: 'Параметры сезона', fields }]
+})
+
+const sourceGroups = computed((): JournalDetailGroup[] => {
+  const item = sourceDetails.value
+  if (!item) return []
+  const entries: Array<[string, unknown]> = [
+    ['Источник', item.name], ['Фрагмент', item.fragment_name], ['Узел схемы', item.node_id],
+    ['Год расчёта', valueOf(item.attributes, 'heatloscalcyear')],
+    ['Ёмкость сети, %', valueOf(item.source_parameters, 't_percent')],
+    ['Весенняя опрессовка, %', valueOf(item.source_parameters, 'spring_pressing')],
+    ['Осенняя опрессовка, %', valueOf(item.source_parameters, 'autumn_pressing')]
+  ]
+  return [{ title: 'Паспорт источника', fields: entries.map(([label, value]) => ({ label, value: String(value ?? '—'), rawValue: value, type: 'text' })) }]
+})
+
+const detailTitle = computed(() => (seasonDetails.value
+  ? `Сезон №${seasonDetails.value.id}`
+  : sourceDetails.value ? `${sourceDetails.value.name} · источник №${sourceDetails.value.id}` : 'Карточка'))
+const detailSubtitle = computed(() => {
+  if (seasonDetails.value) return `${formatDate(seasonDetails.value.d1)} — ${formatDate(seasonDetails.value.d2)} · ${seasonDetails.value.city || 'город не указан'}`
+  if (sourceDetails.value) return `${sourceDetails.value.fragment_name || 'без фрагмента'} · узел ${sourceDetails.value.node_id}`
+  return ''
+})
+
+const loadLookups = async () => {
+  if (lookupsLoaded.value) return
+  lookups.value = await fastApiService.getHeatLossLookups()
+  lookupsLoaded.value = true
+}
+
+/** Номера последних запросов списков: ответ более раннего запроса не перекрывает поздний */
+let seasonRequest = 0
+const loadSeasons = async () => {
+  const request = ++seasonRequest
+  seasonsLoading.value = true
+  seasonsError.value = ''
+  try {
+    const response = await fastApiService.getHeatLossSeasons({
+      search: seasonSearch.value.trim() || undefined, city: seasonCity.value, page: seasonPage.value, page_size: pageSize
+    })
+    if (request !== seasonRequest) return
+    seasons.value = response.items
+    seasonPages.value = response.pages
+  } catch (cause) {
+    if (request !== seasonRequest) return
+    seasonsError.value = formatApiError(cause, 'Не удалось загрузить сезоны')
+  } finally {
+    if (request === seasonRequest) seasonsLoading.value = false
+  }
+}
+let sourceRequest = 0
+const loadSources = async () => {
+  const request = ++sourceRequest
+  sourcesLoading.value = true
+  sourcesError.value = ''
+  try {
+    const response = await fastApiService.getHeatLossSources({
+      search: sourceSearch.value.trim() || undefined, fragment_id: sourceFragmentId.value, readiness: sourceReadiness.value,
+      page: sourcePage.value, page_size: pageSize
+    })
+    if (request !== sourceRequest) return
+    sources.value = response.items
+    sourcePages.value = response.pages
+  } catch (cause) {
+    if (request !== sourceRequest) return
+    sourcesError.value = formatApiError(cause, 'Не удалось загрузить источники')
+  } finally {
+    if (request === sourceRequest) sourcesLoading.value = false
+  }
+}
+const loadNorm = async () => {
+  try {
+    if (!allSeasons.value.length) allSeasons.value = (await fastApiService.getHeatLossSeasons({ page: 1, page_size: 200 })).items
+  } catch (cause) {
+    notifications.showWarning(formatApiError(cause, 'Сезоны не загрузились — выбор сезона в нормативном расчёте пуст'))
+  }
+  await nextTick()
+  await normPanelRef.value?.init()
+}
+const loadTab = (tab: HeatLossTab) => (tab === 'seasons' ? loadSeasons() : tab === 'sources' ? loadSources() : loadNorm())
+
+const reloadSeasons = () => {
+  if (!visible.value) return
+  seasonPage.value = 1
+  void loadSeasons()
+}
+const reloadSources = () => {
+  if (!visible.value) return
+  sourcePage.value = 1
+  void loadSources()
+}
+const resetSeasonFilters = () => {
+  seasonSearch.value = ''
+  seasonCity.value = undefined
+  reloadSeasons()
+}
+const resetSourceFilters = () => {
+  sourceSearch.value = ''
+  sourceFragmentId.value = undefined
+  sourceReadiness.value = undefined
+  reloadSources()
+}
+const toggleReadiness = (value: Readiness) => {
+  sourceReadiness.value = sourceReadiness.value === value ? undefined : value
+}
+
+/** openDialog ставит раздел сам и грузит его один раз — наблюдатели в это время молчат */
+let applyingScope = false
+watch(activeTab, (tab) => { if (visible.value && !applyingScope) void loadTab(tab) })
+watch(seasonCity, () => { if (!applyingScope) reloadSeasons() })
+watch([sourceFragmentId, sourceReadiness], () => { if (!applyingScope) reloadSources() })
+watch(seasonPage, () => { if (visible.value && !applyingScope) void loadSeasons() })
+watch(sourcePage, () => { if (visible.value && !applyingScope) void loadSources() })
+
+/** Номер последнего запроса карточки: ответ более раннего запроса не перекрывает поздний */
+let detailRequest = 0
+const openCard = async <T>(load: () => Promise<T>, apply: (record: T) => void, failText: string) => {
+  // открытие другой карточки во время правки — черновик сезона остаётся, карточка на просмотр
+  closeKeepingDraft()
+  resetEdit()
+  clearSaveError()
+  const request = ++detailRequest
+  seasonDetails.value = null
+  sourceDetails.value = null
+  detailsVisible.value = true
+  detailLoading.value = true
+  detailError.value = ''
+  try {
+    const record = await load()
+    if (request !== detailRequest) return
+    apply(record)
+  } catch (cause) {
+    if (request !== detailRequest) return
+    detailError.value = formatApiError(cause, failText)
+  } finally {
+    if (request === detailRequest) detailLoading.value = false
+  }
+}
+const openSeason = (id: number) => openCard(() => fastApiService.getHeatLossSeason(id), (record) => { seasonDetails.value = record }, 'Не удалось открыть сезон')
+const openSource = (id: number) => openCard(() => fastApiService.getHeatLossSource(id), (record) => { sourceDetails.value = record }, 'Не удалось открыть источник')
+
+let openDialogSeq = 0
+const openDialog = async (scope: { sourceId?: number; seasonId?: number } = {}) => {
+  const seq = ++openDialogSeq
+  const tab: HeatLossTab = scope.sourceId ? 'sources' : 'seasons'
+  applyingScope = true
+  activeTab.value = tab
+  visible.value = true
+  await nextTick()
+  applyingScope = false
+  // раздел сам показывает свою ошибку; сбой справочника не должен прятать список
+  const [lookupsResult] = await Promise.allSettled([loadLookups(), loadTab(tab)])
+  if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — плитки и фильтры могут быть неполными'))
+  // журнал открыли снова, пока грузились списки — карточку открывает последний вызов
+  if (seq !== openDialogSeq) return
+  if (scope.sourceId) await openSource(scope.sourceId)
+  else if (scope.seasonId) await openSeason(scope.seasonId)
+}
+
+const startEdit = async () => {
+  clearSaveError()
+  await beginEdit()
+}
+const cancelEdit = async () => {
+  const { closed } = await cancel()
+  if (closed) clearSaveError()
+}
+// Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
+watch(detailsVisible, (open) => {
+  if (!open) closeKeepingDraft()
+})
+
+const saveSeason = async () => {
+  const id = seasonDetails.value?.id
+  if (!id) return
+  // только изменённые поля; пустая строка — NULL, как в десктопе
+  const changed = Object.fromEntries(Object.entries(editFields.value)
+    .filter(([key]) => isFieldDirty(key))
+    .map(([key, value]) => [key, value === '' ? null : value]))
+  if (!Object.keys(changed).length) return
+  saving.value = true
+  clearSaveError()
+  try {
+    await fastApiService.updateObjectAttributes('heatlosesmain', id, changed)
+    markSaved(id)
+    notifications.showSuccess('Сезон сохранён')
+    // сезоны нормативного расчёта перечитаются при следующем открытии раздела
+    allSeasons.value = []
+    await Promise.all([loadSeasons(), openSeason(id)])
+  } catch (cause) {
+    reportSaveError(cause, () => openSeason(id))
+  } finally {
+    saving.value = false
+  }
+}
 
 const downloadSeasonsExcel = async () => {
   exportingSeasons.value = true
@@ -556,84 +1018,18 @@ const downloadSeasonsExcel = async () => {
     link.click()
     link.remove()
     URL.revokeObjectURL(url)
-    useNotificationStore().showSuccess('Ведомость сезонов теплопотерь')
-  } catch (err: any) {
-    useNotificationStore().showError(formatApiError(err, 'Не удалось выгрузить Excel'))
+    notifications.showSuccess('Ведомость сезонов теплопотерь')
+  } catch (cause) {
+    notifications.showError(formatApiError(cause, 'Не удалось выгрузить Excel'))
   } finally {
     exportingSeasons.value = false
   }
 }
-const activeTab = ref<'seasons' | 'sources' | 'norm'>('seasons')
-const normPanelRef = ref<{ init: () => Promise<void> } | null>(null)
-const allSeasons = ref<HeatLossSeasonSummary[]>([])
-const lookups = ref<HeatLossLookups>({ fragments: [], cities: [], source_counts: {}, season_counts: {}, result_availability: { calculation_count: 0, heat_loss_row_count: 0 } })
-const seasons = ref<HeatLossSeasonSummary[]>([])
-const sources = ref<HeatLossSourceSummary[]>([])
-const seasonPage = ref(1)
-const sourcePage = ref(1)
-const seasonPages = ref(0)
-const sourcePages = ref(0)
-const seasonDetails = ref<HeatLossSeasonDetails | null>(null)
-const sourceDetails = ref<HeatLossSourceDetails | null>(null)
-const seasonFilters = reactive<{ search?: string; city?: string }>({})
-const sourceFilters = reactive<{ search?: string; fragment_id?: number; readiness?: 'ready' | 'incomplete' }>({})
-const readinessOptions = [{ title: 'Готовы к расчёту', value: 'ready' }, { title: 'Неполные данные', value: 'incomplete' }]
-const detailTitle = computed(() => seasonDetails.value ? `Сезон №${seasonDetails.value.id}` : sourceDetails.value ? `${sourceDetails.value.name} · источник №${sourceDetails.value.id}` : 'Карточка')
 
-const isEditingSeason = ref(false)
-const saving = ref(false)
-const editFields = ref<Record<string, any>>({})
-
-const buildSeasonFields = () => {
-  return [
-    { label: 'Дата начала (d1)', key: 'd1', type: 'text', value: seasonDetails.value?.d1 },
-    { label: 'Дата конца (d2)', key: 'd2', type: 'text', value: seasonDetails.value?.d2 },
-    { label: 'Город', key: 'city', type: 'text', value: seasonDetails.value?.city },
-    { label: 'Расчётная t отопления', key: 't_ot', type: 'number', value: seasonDetails.value?.t_ot },
-    { label: 'Расчётная t вентиляции', key: 't_vent', type: 'number', value: seasonDetails.value?.t_vent },
-    { label: 'Норма потерь воды', key: 'a', type: 'number', value: seasonDetails.value?.a },
-    { label: 'Аккумуляторные баки', key: 'tankbattery_q', type: 'number', value: seasonDetails.value?.tankbattery_q },
-    { label: 'Объём отопления', key: 'volwaterhs', type: 'number', value: seasonDetails.value?.volwaterhs },
-    { label: 'Объём вентиляции', key: 'volwatervs', type: 'number', value: seasonDetails.value?.volwatervs },
-    { label: 'Объём открытого ГВС', key: 'volwateropengvs', type: 'number', value: seasonDetails.value?.volwateropengvs }
-  ]
-}
-
-const startEditSeason = () => {
-  isEditingSeason.value = true
-  editFields.value = {}
-  for (const field of buildSeasonFields()) {
-    if (field.key) editFields.value[field.key] = field.value ?? null
-  }
-}
-
-const cancelEditSeason = () => {
-  isEditingSeason.value = false
-  editFields.value = {}
-}
-
-const saveSeason = async () => {
-  if (!seasonDetails.value) return
-  saving.value = true
-  try {
-    const processedFields: Record<string, any> = {}
-    for (const key in editFields.value) {
-      if (editFields.value[key] === '') processedFields[key] = null
-      else processedFields[key] = editFields.value[key]
-    }
-    
-    await fastApiService.updateObjectAttributes('heatlosesmain', seasonDetails.value.id, processedFields)
-    
-    await openSeason(seasonDetails.value.id)
-    isEditingSeason.value = false
-    await loadSeasons()
-  } catch {
-    // We could handle errors globally or locally
-  } finally {
-    saving.value = false
-  }
-}
-
+const POLL_MS = 2000
+const POLL_LIMIT = 180
+let unmounted = false
+onBeforeUnmount(() => { unmounted = true })
 const runHeatLossForSource = async () => {
   const src = sourceDetails.value
   if (!src?.fragment_id) return
@@ -642,89 +1038,72 @@ const runHeatLossForSource = async () => {
     const result = await fastApiService.runHeatLosses(Number(src.fragment_id))
     const taskId = result.task_id
     if (!taskId) {
-      useNotificationStore().showError('Сервер не вернул task_id')
+      notifications.showError('Сервер не вернул task_id')
       return
     }
-    useNotificationStore().showSuccess(`Теплопотери в очереди: ${taskId}`)
+    notifications.showSuccess(`Теплопотери в очереди: ${taskId}`)
     let lastStatus = ''
-    for (let i = 0; i < 180; i++) {
-      await new Promise((r) => setTimeout(r, 2000))
+    for (let i = 0; i < POLL_LIMIT && !unmounted; i++) {
+      await new Promise((resolve) => setTimeout(resolve, POLL_MS))
       const statusResponse = await fastApiService.getTaskStatus(taskId)
-      const st = String(statusResponse.status || '')
-      if (st && st !== lastStatus) {
-        lastStatus = st
-        if (st !== 'SUCCESS' && st !== 'FAILURE') {
-          useNotificationStore().showSuccess(`Теплопотери: ${st}`)
-        }
+      const status = String(statusResponse.status || '')
+      if (status && status !== lastStatus) {
+        lastStatus = status
+        if (status !== 'SUCCESS' && status !== 'FAILURE') notifications.showSuccess(`Теплопотери: ${status}`)
       }
-      if (st === 'SUCCESS') {
-        const msg = statusResponse.result?.message || 'Теплопотери завершены'
-        useNotificationStore().showSuccess(msg)
-        await openSource(src.id)
+      if (status === 'SUCCESS') {
+        notifications.showSuccess(statusResponse.result?.message || 'Теплопотери завершены')
+        if (sourceDetails.value?.id === src.id) await openSource(src.id)
         return
       }
-      if (st === 'FAILURE') {
-        useNotificationStore().showError(statusResponse.error || 'Ошибка расчёта теплопотерь')
+      if (status === 'FAILURE') {
+        notifications.showError(statusResponse.error || 'Ошибка расчёта теплопотерь')
         return
       }
     }
-    useNotificationStore().showError('Таймаут ожидания теплопотерь (6 мин)')
-  } catch (err: any) {
-    useNotificationStore().showError(formatApiError(err, 'Не удалось запустить теплопотери'))
+    if (!unmounted) notifications.showError('Таймаут ожидания теплопотерь (6 мин)')
+  } catch (cause) {
+    notifications.showError(formatApiError(cause, 'Не удалось запустить теплопотери'))
   } finally {
     runningHeatLoss.value = false
   }
 }
 
-function formatDate(value: string | null) { return value ? new Intl.DateTimeFormat('ru-RU').format(new Date(value)) : '—' }
-function formatNumber(value: number | null | undefined, suffix = '') { return value === null || value === undefined ? '—' : `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(value)}${suffix}` }
-function valueOf(record: Record<string, unknown> | null | undefined, key: string): string | number | null { const value = record?.[key]; return typeof value === 'string' || typeof value === 'number' ? value : null }
-function seasonName(value: string | number | null) { return Number(value) === 1 ? 'отопительный' : Number(value) === 2 ? 'летний' : value || '—' }
-function hasCoordinates(item: HeatLossSourceSummary) { return Number.isFinite(Number(item.longitude)) && Number.isFinite(Number(item.latitude)) }
-
-async function loadLookups() { if (!lookups.value.fragments.length && !lookups.value.season_counts.total) lookups.value = await fastApiService.getHeatLossLookups() }
-async function loadSeasons() { loading.value = true; try { const response = await fastApiService.getHeatLossSeasons({ ...seasonFilters, page: seasonPage.value, page_size: 50 }); seasons.value = response.items; seasonPages.value = response.pages } finally { loading.value = false } }
-async function loadSources() { loading.value = true; try { const response = await fastApiService.getHeatLossSources({ ...sourceFilters, page: sourcePage.value, page_size: 50 }); sources.value = response.items; sourcePages.value = response.pages } finally { loading.value = false } }
-async function reloadSeasons() { seasonPage.value = 1; await loadSeasons() }
-async function reloadSources() { sourcePage.value = 1; await loadSources() }
-async function loadActiveTab() {
-  if (activeTab.value === 'seasons') await loadSeasons()
-  else if (activeTab.value === 'sources') await loadSources()
-  else {
-    if (!allSeasons.value.length) allSeasons.value = (await fastApiService.getHeatLossSeasons({ page: 1, page_size: 200 })).items
-    await nextTick()
-    await normPanelRef.value?.init()
-  }
+const locateSource = (item: Record<string, unknown>) => {
+  if (!hasCoordinates(item)) return
+  emit('locate-heat-source', {
+    longitude: Number(item.longitude), latitude: Number(item.latitude), id: Number(item.id),
+    nodeId: Number(item.node_id), label: String(item.name ?? `Источник ${item.id}`)
+  })
+  detailsVisible.value = false
+  visible.value = false
 }
-function locateSection(payload: { longitude: number; latitude: number; id: number; nodeId: number; label: string }) {
+const locateSection = (payload: LocatePayload) => {
   emit('locate-heat-source', payload)
   visible.value = false
 }
-async function openSeason(id: number) { seasonDetails.value = null; sourceDetails.value = null; detailsVisible.value = true; detailLoading.value = true; isEditingSeason.value = false; try { seasonDetails.value = await fastApiService.getHeatLossSeason(id) } finally { detailLoading.value = false } }
-async function openSource(id: number) { seasonDetails.value = null; sourceDetails.value = null; detailsVisible.value = true; detailLoading.value = true; try { sourceDetails.value = await fastApiService.getHeatLossSource(id) } finally { detailLoading.value = false } }
-function locateSource() { const item = sourceDetails.value; if (!item || !hasCoordinates(item)) return; emit('locate-heat-source', { longitude: Number(item.longitude), latitude: Number(item.latitude), id: item.id, nodeId: item.node_id, label: item.name }); visible.value = false; detailsVisible.value = false }
-async function openDialog(scope: { sourceId?: number; seasonId?: number } = {}) { visible.value = true; await loadLookups(); if (scope.sourceId) { activeTab.value = 'sources'; await loadSources(); await openSource(scope.sourceId) } else { activeTab.value = 'seasons'; await loadSeasons(); if (scope.seasonId) await openSeason(scope.seasonId) } }
+
 defineExpose({ openDialog })
 </script>
 
 <style scoped>
 .heat-loss-journal { height: min(92vh, 940px); display: flex; flex-direction: column; }
-.journal-window, .journal-pane { min-height: 0; flex: 1; }
-.journal-pane { height: 100%; display: flex; flex-direction: column; }
-.filters { display: grid; grid-template-columns: minmax(280px, 2fr) minmax(190px, 1fr) auto; gap: 12px; background: rgba(var(--v-theme-warning), 0.1); align-items: center; }
-.source-filters { grid-template-columns: minmax(260px, 2fr) minmax(240px, 1.3fr) minmax(190px, 1fr) auto; }
+.journal-window { flex: 1; min-height: 0; }
+.journal-window :deep(.v-window__container) { height: 100%; }
+.journal-pane { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+.journal-kpi { display: flex; flex-wrap: wrap; flex-shrink: 0; gap: var(--space-2); }
+.journal-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
 .table-wrap { min-height: 250px; overflow: auto; flex: 1; }
-.journal-table { width: 100%; min-width: 1180px; border-collapse: collapse; font-size: .84rem; }
-.journal-table th { position: sticky; top: 0; z-index: 1; padding: 10px 12px; text-align: left; color: rgb(var(--v-theme-warning)); background: rgba(var(--v-theme-warning), 0.1); white-space: nowrap; }
-.journal-table td { padding: 10px 12px; border-bottom: 1px solid #eceff1; vertical-align: middle; }
-.journal-table tbody tr { cursor: pointer; }.journal-table tbody tr:hover { background: rgba(var(--v-theme-warning), 0.06); }
-.empty { display: grid; place-items: center; min-height: 300px; color: #78909c; }
-.detail-grid { display: grid; grid-template-columns: repeat(3, minmax(170px, 1fr)); gap: 12px; }
-:deep(.detail-value) { padding: 12px; border: 1px solid rgba(var(--v-theme-warning), 0.3); border-radius: 8px; background: rgba(var(--v-theme-warning), 0.04); }
-:deep(.detail-label) { margin-bottom: 4px; color: #6d4c41; font-size: .75rem; }
-.status-row { display: flex; flex-wrap: wrap; gap: 8px; }
-.detail-table-wrap { max-height: 430px; border: 1px solid #eceff1; border-radius: 8px; }
-.compact-table { min-width: 760px; }.months-table { min-width: 950px; }
-@media (max-width: 900px) { .filters, .source-filters { grid-template-columns: 1fr; }.detail-grid { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 600px) { .heat-loss-journal { height: 100dvh; }.detail-grid { grid-template-columns: 1fr; } }
+.season-table { min-width: 1000px; }
+.source-table { min-width: 1180px; }
+.status-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.detail-table { border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); border-radius: var(--radius-2, 8px); overflow: auto; }
+.months-table :deep(table) { min-width: 760px; }
+@media (max-width: 600px) {
+  .heat-loss-journal { height: 100dvh; }
+  /* телефон: Excel и «закрыть» — рядом с названием, разделы — строкой ниже */
+  .journal-tabs { order: 10; flex-basis: 100%; }
+  .journal-kpi { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .journal-kpi > * { flex-shrink: 0; }
+}
 </style>
