@@ -107,7 +107,9 @@ export function useRouteMapLink(
     showNode(null);
   };
 
-  watch(isActive, (active) => (active ? attach() : detach()), { immediate: true });
+  // и смена активности, и пересоздание карты при открытом графике (смена подложки/3D): attach снимет обработчики
+  // со старой карты и повесит на новую
+  watch(() => (isActive() ? getMap() : null), (map) => (map ? attach() : detach()), { immediate: true });
   if (getCurrentInstance()) onBeforeUnmount(detach);
 
   return { mapFocusId, focusFromChart, detach };

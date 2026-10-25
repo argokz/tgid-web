@@ -442,12 +442,14 @@
                 class="protocol-line"
               >
                 <span class="protocol-timestamp">{{ log.timestamp }}</span>
-                <!-- Вывод расчёта с бэкенда — HTML (цвета, ссылки на объекты — переход на карте) -->
+                <!-- Вывод расчёта с бэкенда — HTML (цвета, ссылки на объекты — переход на карте), очищен в addLog -->
+                <!-- eslint-disable vue/no-v-html -- message прошёл sanitizeProtocolHtml (utils/protocolHtml.ts) -->
                 <div
                   v-if="log.html"
                   class="protocol-message protocol-html"
                   v-html="log.message"
                 />
+                <!-- eslint-enable vue/no-v-html -->
                 <span
                   v-else
                   :class="['protocol-message', log.type]"
@@ -578,6 +580,7 @@ import StateView from '~/components/StateView.vue';
 import { aiService, type AiObjectRef, type ExplainProtocolResult, type RootCause } from '~/services/aiService';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { formatApiErrorWith } from '~/utils/apiError';
+import { sanitizeProtocolHtml } from '~/utils/protocolHtml';
 import {
   FIX_HINTS,
   FIX_LABELS,
@@ -659,7 +662,9 @@ const setProtocolHeight = (height: number) => {
 
 let stopResize: (() => void) | null = null;
 const startResize = (e: PointerEvent) => {
-  if (e.button !== 0 || stopResize) return;
+  if (e.button !== 0) return;
+  // прошлое перетаскивание не получило pointerup — снять его слушатели и начать новое
+  stopResize?.();
   e.preventDefault();
   const startY = e.clientY;
   const startHeight = protocolHeight.value;
@@ -689,6 +694,8 @@ const onResizeKey = (e: KeyboardEvent) => {
 const addLog = (log: { timestamp: string; message: string; type: string; html: boolean }) => {
   logs.value.push({
     ...log,
+    // HTML расчёта — только после очистки: в нём имена объектов из базы без экранирования
+    message: log.html ? sanitizeProtocolHtml(log.message) : log.message,
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   });
 };

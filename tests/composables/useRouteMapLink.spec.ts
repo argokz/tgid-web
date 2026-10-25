@@ -82,4 +82,22 @@ describe('useRouteMapLink', () => {
     expect(map.handlers.mousemove).toHaveLength(0);
     expect(show).toHaveBeenLastCalledWith(null);
   });
+
+  it('карта пересоздана при открытом графике — слушатели переезжают на новую', async () => {
+    const first = makeMap();
+    const current = ref<ReturnType<typeof makeMap> | null>(first);
+    const link = useRouteMapLink(() => current.value, () => nodes, () => true);
+    const second = makeMap();
+    current.value = second;
+    await nextTick();
+    expect(first.handlers.mousemove).toHaveLength(0);
+    expect(second.handlers.mousemove).toHaveLength(1);
+    second.fire('mousemove', { point: { x: 101, y: 99 } });
+    flushFrames();
+    expect(link.mapFocusId.value).toBe(10);
+    // карты нет (между удалением и созданием) — отключено, без ошибок
+    current.value = null;
+    await nextTick();
+    expect(second.handlers.mousemove).toHaveLength(0);
+  });
 });
