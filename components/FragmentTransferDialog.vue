@@ -48,12 +48,13 @@
 
         <v-window v-model="tab">
           <v-window-item value="export">
-            <v-autocomplete
+            <AppSelect
               v-model="exportId"
               :items="fragmentItems"
               label="Фрагмент"
-              density="compact"
               :loading="fragmentsLoading"
+              searchable
+              :clearable="false"
             />
             <v-btn
               color="primary"
@@ -119,15 +120,16 @@
             >
               Слияние — редактор топологии (admin и включённая запись топологии на сервере).
             </v-alert>
-            <v-autocomplete
+            <AppSelect
               v-model="mergeIds"
               :items="fragmentItems"
               label="Фрагменты (два и более, первый — основной)"
               multiple
               chips
               closable-chips
-              density="compact"
               :disabled="!canWrite"
+              searchable
+              :clearable="false"
               @update:model-value="report = null"
             />
             <v-text-field
@@ -246,6 +248,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { formatApiError, formatApiErrorWith } from '~/utils/apiError';
 import { computed, ref, watch } from 'vue';
 import { fastApiService, type FragmentTransferReport } from '~/services/fastApiService';

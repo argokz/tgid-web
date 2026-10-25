@@ -121,16 +121,15 @@
               </div>
 
               <div class="d-flex flex-column ga-3">
-                <v-autocomplete
+                <AppSelect
                   v-if="needsFragment"
                   v-model="fragmentId"
                   :items="fragmentItems"
                   item-title="title"
                   item-value="value"
                   label="Фрагмент"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
+                  searchable
+                  :clearable="false"
                 />
                 <AppSelect
                   v-if="selected.uses_calculation"

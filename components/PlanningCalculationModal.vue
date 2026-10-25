@@ -94,7 +94,7 @@
           <p class="text-subtitle-2 mb-1">
             {{ runKind === 'list' ? 'Фрагменты для расчёта (по очереди)' : 'Фрагмент для расчёта' }}
           </p>
-          <v-autocomplete
+          <AppSelect
             v-if="runKind === 'list'"
             v-model="selectedFragmentIds"
             :items="fragmentItems"
@@ -104,26 +104,26 @@
             multiple
             chips
             closable-chips
-            variant="outlined"
-            density="compact"
             placeholder="Выберите фрагменты"
             :error="fragmentError"
             :error-messages="fragmentError ? 'Выберите хотя бы два фрагмента' : undefined"
             class="mb-2"
+            searchable
+            :clearable="false"
           />
-          <v-autocomplete
+          <AppSelect
             v-else
             v-model="selectedFragmentId"
             :items="fragmentItems"
             item-title="name"
             item-value="id"
             :filter-keys="FRAGMENT_FILTER_KEYS"
-            variant="outlined"
-            density="compact"
             placeholder="Выберите фрагмент"
             :error="fragmentError"
             :error-messages="fragmentError ? 'Необходимо выбрать фрагмент для расчёта' : undefined"
             class="mb-2"
+            searchable
+            :clearable="false"
           />
 
           <!-- Плановый режим (Param1Dialog) -->

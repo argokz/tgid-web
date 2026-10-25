@@ -336,19 +336,19 @@
             density="compact"
             hide-details
           />
-          <v-autocomplete
+          <AppSelect
             v-model="editForm.fragments"
             :items="fragmentItems"
             item-title="title"
             item-value="value"
             label="Территория: фрагменты правки (пусто — вся сеть)"
-            variant="outlined"
-            density="compact"
             multiple
             chips
             closable-chips
             class="mt-3"
             :disabled="editForm.role === 'admin'"
+            searchable
+            :clearable="false"
           />
           <v-switch
             v-model="editForm.web_access"

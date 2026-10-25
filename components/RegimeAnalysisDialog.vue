@@ -24,16 +24,15 @@
         </p>
 
         <div class="d-flex flex-wrap ga-3 mb-3">
-          <v-autocomplete
+          <AppSelect
             v-model="fragmentId"
             :items="fragmentItems"
             item-title="title"
             item-value="value"
             label="Фрагмент"
-            density="compact"
-            variant="outlined"
-            hide-details
             style="min-width: 260px; max-width: 360px"
+            searchable
+            :clearable="false"
           />
           <AppSelect
             v-model="calculationId"

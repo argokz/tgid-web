@@ -37,15 +37,12 @@
       </v-card-title>
       <v-card-text class="pt-0">
         <div class="d-flex flex-wrap ga-2 mb-2">
-          <v-autocomplete
+          <AppSelect
             v-model="filter.username"
             :items="lookups.users"
             label="Пользователь"
-            density="compact"
-            variant="outlined"
-            hide-details
-            clearable
             style="min-width: 180px; flex: 1 1 180px;"
+            searchable
           />
           <AppSelect
             v-model="filter.action"

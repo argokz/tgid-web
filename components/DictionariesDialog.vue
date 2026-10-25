@@ -61,18 +61,15 @@
             style="flex: 2 1 260px;"
             :clearable="false"
           />
-          <v-autocomplete
+          <AppSelect
             v-if="info?.fragment_scoped"
             v-model="fragmentId"
             :items="fragmentItems"
             item-title="title"
             item-value="value"
             label="Фрагмент"
-            variant="outlined"
-            density="compact"
-            hide-details
-            clearable
             style="flex: 2 1 240px;"
+            searchable
           />
           <v-text-field
             v-model="search"

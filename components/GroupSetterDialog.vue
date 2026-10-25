@@ -43,17 +43,16 @@
 
         <!-- 1. Установщик -->
         <div class="text-subtitle-2 mb-1">1. Что установить</div>
-        <v-autocomplete
+        <AppSelect
           v-model="setterKey"
           :items="setterItems"
           item-title="title"
           item-value="value"
           label="Установщик"
-          variant="outlined"
-          density="compact"
           :loading="loadingList"
-          hide-details
           class="mb-2"
+          searchable
+          :clearable="false"
         >
           <template #item="{ props: itemProps, item }">
             <v-list-item
@@ -61,7 +60,7 @@
               :subtitle="item.raw.subtitle"
             />
           </template>
-        </v-autocomplete>
+        </AppSelect>
 
         <template v-if="setter">
           <div class="text-caption text-medium-emphasis mb-2">
@@ -122,7 +121,7 @@
             >Фильтр</v-btn>
           </v-btn-toggle>
 
-          <v-autocomplete
+          <AppSelect
             v-if="draft.mode !== 'map'"
             v-model="draft.fragmentIds"
             :items="fragmentItems"
@@ -132,10 +131,9 @@
             multiple
             chips
             closable-chips
-            variant="outlined"
-            density="compact"
-            hide-details
             class="mb-2"
+            searchable
+            :clearable="false"
           />
 
           <div

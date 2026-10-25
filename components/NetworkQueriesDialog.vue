@@ -22,7 +22,7 @@
           Аналог desktop «Запросы» (Zap1–Zap7_1). Участки отбираются по фрагменту начального узла,
           как в gid6 (n1.fileID). По умолчанию — выбранный или видимые фрагменты карты.
         </p>
-        <v-autocomplete
+        <AppSelect
           v-model="scopeIds"
           :items="fragmentItems"
           item-title="title"
@@ -32,12 +32,9 @@
           multiple
           chips
           closable-chips
-          clearable
-          density="compact"
-          variant="outlined"
           class="mb-2"
           data-testid="nq-fragment"
-          hide-details
+          searchable
         />
         <v-chip
           v-if="!scopeIds.length"
@@ -246,6 +243,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
 import { formatApiError } from '~/utils/apiError'
 import { computed, ref } from 'vue'
 import { useMobile } from '~/composables/useMobile'

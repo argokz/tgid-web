@@ -31,18 +31,15 @@
 
       <v-card-text class="pt-0">
         <div class="d-flex flex-wrap ga-2 mb-2">
-          <v-autocomplete
+          <AppSelect
             v-model="filter.file_id"
             :items="fragmentItems"
             item-title="name"
             item-value="id"
             :filter-keys="FRAGMENT_FILTER_KEYS"
             label="Фрагмент"
-            variant="outlined"
-            density="compact"
-            clearable
-            hide-details
             style="min-width: 220px; flex: 2 1 220px;"
+            searchable
           />
           <AppSelect
             v-model="filter.mode"

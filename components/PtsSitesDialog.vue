@@ -296,7 +296,7 @@
                   v-for="field in fields"
                   :key="field.name"
                 >
-                  <v-autocomplete
+                  <AppSelect
                     v-if="field.ref"
                     v-model="form[field.name]"
                     :items="lookups[field.name] || []"
@@ -304,10 +304,7 @@
                     item-value="value"
                     :label="field.label"
                     :readonly="!canEditData"
-                    density="compact"
-                    variant="outlined"
-                    hide-details
-                    clearable
+                    searchable
                     @focus="loadLookup(field)"
                   />
                   <v-checkbox
@@ -362,6 +359,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { confirmAction } from '~/composables/useConfirm';
 import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';

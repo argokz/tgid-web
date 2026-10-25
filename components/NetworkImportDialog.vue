@@ -125,13 +125,11 @@
               cols="12"
               md="4"
             >
-              <v-autocomplete
+              <AppSelect
                 v-model="fileid"
                 :items="fragmentItems"
                 :label="needsFragment ? 'Фрагмент (обязательно)' : 'Фрагмент (ограничить поиск узлов)'"
-                density="compact"
-                clearable
-                hide-details
+                searchable
               />
             </v-col>
             <v-col
