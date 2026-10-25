@@ -1,547 +1,628 @@
 <template>
-  <v-dialog
-    v-model="visible"
-    :fullscreen="isMobile"
-    max-width="1550"
-    scrollable
-  >
-    <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar
-        color="purple-darken-3"
-        density="compact"
+  <Teleport to="body">
+    <v-dialog
+      v-model="visible"
+      :fullscreen="isMobile"
+      max-width="1550"
+      scrollable
+    >
+      <v-card
+        class="tg-journal"
+        :rounded="isMobile ? 0 : 'lg'"
       >
-        <v-icon class="ml-3 mr-2">
-          mdi-chart-bell-curve-cumulative
-        </v-icon>
-        <v-toolbar-title>Температурные графики источников</v-toolbar-title>
-        <v-chip
-          class="mr-2"
-          size="small"
-          color="white"
-          variant="outlined"
+        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
+          <v-avatar
+            color="purple-lighten-5"
+            size="40"
+          >
+            <v-icon color="purple-darken-3">mdi-chart-bell-curve-cumulative</v-icon>
+          </v-avatar>
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
+            <div class="text-subtitle-1 font-weight-bold">Температурные графики источников</div>
+            <div class="text-caption text-medium-emphasis text-truncate">
+              найдено {{ total }} · готовы {{ lookups.counts.ready || 0 }} из {{ lookups.counts.total || 0 }}
+            </div>
+          </div>
+          <HintTip
+            text="Закрыть журнал"
+            hotkey="Esc"
+            location="bottom"
+          >
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Закрыть журнал"
+                @click="visible = false"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
+        </v-card-title>
+
+        <v-divider />
+
+        <v-alert
+          v-if="lookupsLoaded && lookups.fact_point_count === 0"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mx-3 mx-md-4 mt-3 flex-shrink-0"
         >
-          {{ lookups.counts.ready || 0 }}/{{ lookups.counts.total || 0 }} готовы
-        </v-chip>
-        <v-btn
-          icon="mdi-close"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
-      </v-toolbar>
+          Фактические температурные графики в БД отсутствуют. Показаны нормативные точки <code>deployedTempGraphs</code>
+          и исходные параметры источника.
+        </v-alert>
 
-      <v-alert
-        v-if="lookups.fact_point_count === 0"
-        type="info"
-        variant="tonal"
-        density="compact"
-        class="ma-3 mb-0"
-      >
-        Фактические температурные графики в БД отсутствуют. Показаны нормативные точки <code>deployedTempGraphs</code> и исходные параметры источника.
-      </v-alert>
+        <!-- Плитки состояния графиков на всю базу; плитка — фильтр -->
+        <div class="tg-kpi px-3 px-md-4 pt-3">
+          <KpiTile
+            v-for="metric in statusMetrics"
+            :key="metric.value"
+            :label="metric.label"
+            :value="lookups.counts[metric.value] || 0"
+            :compact="false"
+            :status="metric.status"
+            selectable
+            :active="graphStatus === metric.value"
+            @select="toggleStatus(metric.value)"
+          />
+        </div>
 
-      <div class="metric-row pa-3 pb-0">
-        <v-chip
-          v-for="metric in statusMetrics"
-          :key="metric.value"
-          :color="metric.color"
-          :variant="filters.graph_status === metric.value ? 'flat' : 'tonal'"
-          @click="setStatus(metric.value)"
-        >
-          {{ metric.label }}: {{ lookups.counts[metric.value] || 0 }}
-        </v-chip>
-      </div>
-
-      <div class="filters pa-3">
-        <v-text-field
-          v-model="filters.search"
-          label="Источник, узел, фрагмент или ID"
-          prepend-inner-icon="mdi-magnify"
-          density="compact"
-          variant="outlined"
-          clearable
-          hide-details
-          @keyup.enter="reload"
-        />
-        <v-select
-          v-model="filters.graph_status"
-          :items="statusOptions"
-          label="Состояние графика"
-          density="compact"
-          variant="outlined"
-          clearable
-          hide-details
-        />
-        <v-select
-          v-model="filters.summer_status"
-          :items="summerOptions"
-          label="Летний режим"
-          density="compact"
-          variant="outlined"
-          clearable
-          hide-details
-        />
-        <v-select
-          v-model="filters.graph_type_id"
-          :items="lookups.graph_types"
-          item-title="name"
-          item-value="id"
-          label="Тип графика"
-          density="compact"
-          variant="outlined"
-          clearable
-          hide-details
-        />
-        <v-select
-          v-model="filters.fragment_id"
-          :items="lookups.fragments"
-          item-title="name"
-          item-value="id"
-          label="Фрагмент"
-          density="compact"
-          variant="outlined"
-          clearable
-          hide-details
-        />
-        <v-btn
-          color="purple-darken-3"
-          :loading="loading"
-          @click="reload"
-        >
-          Найти
-        </v-btn>
-      </div>
-
-      <v-alert
-        v-if="error"
-        type="error"
-        variant="tonal"
-        density="compact"
-        class="mx-3 mb-3"
-      >
-        {{ error }}
-      </v-alert>
-
-      <div class="table-wrap">
-        <table class="journal-table">
-          <thead>
-            <tr>
-              <th>ID</th><th>Источник</th><th>Фрагмент</th><th>Тип</th><th>Диапазон tн</th><th>Точки</th><th>Расчётный режим</th><th>Летний режим</th><th>Статус</th><th />
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="item in sources"
-              :key="item.id"
-              @click="openDetails(item.id)"
+        <div class="pa-3 pa-md-4 tg-filters">
+          <v-row dense>
+            <v-col
+              cols="12"
+              md="4"
             >
-              <td>{{ item.id }}</td>
-              <td>
-                <strong>{{ item.name }}</strong><div class="muted">
+              <SearchField
+                :model-value="search"
+                label="Источник, узел, фрагмент или ID"
+                :debounce="350"
+                :loading="loading"
+                @update:model-value="search = $event"
+                @search="onSearch"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="graphStatus"
+                :items="statusOptions"
+                item-title="title"
+                item-value="value"
+                label="Состояние графика"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="summerStatus"
+                :items="summerOptions"
+                item-title="title"
+                item-value="value"
+                label="Летний режим"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="graphTypeId"
+                :items="lookups.graph_types"
+                item-title="name"
+                item-value="id"
+                label="Тип графика"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="fragmentId"
+                :items="lookups.fragments"
+                item-title="name"
+                item-value="id"
+                label="Фрагмент"
+              />
+            </v-col>
+          </v-row>
+          <div class="d-flex align-center flex-wrap ga-2 mt-3">
+            <v-spacer />
+            <v-btn
+              variant="text"
+              prepend-icon="mdi-filter-remove-outline"
+              :disabled="!filtersActive"
+              @click="resetFilters"
+            >
+              Сбросить
+            </v-btn>
+            <v-btn
+              color="primary"
+              prepend-icon="mdi-refresh"
+              :loading="loading"
+              @click="loadSources"
+            >
+              Обновить
+            </v-btn>
+          </div>
+        </div>
+
+        <v-divider />
+
+        <v-card-text class="pa-0 tg-table-wrap">
+          <StateView
+            variant="table"
+            :rows="10"
+            :loading="loading && !sources.length"
+            :error="error"
+            :empty="!loading && !sources.length"
+            empty-title="Источники не найдены"
+            :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям источников нет' : 'В базе нет источников тепла'"
+            empty-icon="mdi-chart-bell-curve-cumulative"
+            :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
+            error-title="Не удалось загрузить температурные графики"
+            :retrying="loading"
+            @retry="loadSources"
+            @action="resetFilters"
+          >
+            <v-progress-linear
+              v-if="loading"
+              indeterminate
+              color="primary"
+            />
+            <DataTable
+              :columns="tableColumns"
+              :items="(sources as Record<string, unknown>[])"
+              item-key="id"
+              selectable
+              :selected-key="flashId"
+              density="compact"
+              class="tg-table"
+              @select="openDetails(Number($event.id))"
+            >
+              <template #[`item.name`]="{ item }">
+                <div class="text-truncate font-weight-medium">
+                  {{ item.name }}
+                </div>
+                <div class="text-caption text-medium-emphasis">
                   узел {{ item.node_id }}
                 </div>
-              </td>
-              <td>{{ item.fragment_name || `№${item.fragment_id || '—'}` }}</td>
-              <td>{{ item.graph_type_name || '—' }}</td>
-              <td>{{ formatRange(item.min_outdoor_temperature, item.max_outdoor_temperature) }}</td>
-              <td>{{ item.point_count }}<span v-if="item.expected_point_count !== null"> / {{ item.expected_point_count }}</span></td>
-              <td>{{ formatNumber(item.design_flow_temperature) }} / {{ formatNumber(item.design_return_temperature) }} °C</td>
-              <td>{{ item.has_summer_temperatures ? `${formatNumber(item.summer_flow_temperature)} / ${formatNumber(item.summer_return_temperature)} °C` : 'не задан' }}</td>
-              <td>
+              </template>
+              <template #[`item.fragment_name`]="{ item }">
+                <div class="text-truncate">
+                  {{ item.fragment_name || `№${item.fragment_id || '—'}` }}
+                </div>
+              </template>
+              <template #[`item.graph_type_name`]="{ item }">
+                {{ item.graph_type_name || '—' }}
+              </template>
+              <template #[`item.min_outdoor_temperature`]="{ item }">
+                {{ formatRange(item.min_outdoor_temperature, item.max_outdoor_temperature) }}
+              </template>
+              <template #[`item.point_count`]="{ item }">
+                {{ item.point_count }}<span v-if="item.expected_point_count !== null"> / {{ item.expected_point_count }}</span>
+              </template>
+              <template #[`item.design_flow_temperature`]="{ item }">
+                {{ formatNumber(item.design_flow_temperature) }} / {{ formatNumber(item.design_return_temperature) }} °C
+              </template>
+              <template #[`item.has_summer_temperatures`]="{ item }">
+                {{ item.has_summer_temperatures ? `${formatNumber(item.summer_flow_temperature)} / ${formatNumber(item.summer_return_temperature)} °C` : 'не задан' }}
+              </template>
+              <template #[`item.graph_status`]="{ item }">
                 <v-chip
                   size="x-small"
-                  :color="statusColor(item.graph_status)"
+                  variant="tonal"
+                  :color="statusColor(item.graph_status as TemperatureGraphStatus)"
                 >
-                  {{ statusLabel(item.graph_status) }}
+                  {{ statusLabel(item.graph_status as TemperatureGraphStatus) }}
                 </v-chip>
-              </td>
-              <td>
-                <v-btn
+              </template>
+              <template #[`item.actions`]="{ item }">
+                <HintTip
                   v-if="hasCoordinates(item)"
-                  icon="mdi-map-marker"
-                  size="x-small"
-                  variant="text"
-                  aria-label="Показать источник на карте"
-                  @click.stop="locate(item)"
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div
-          v-if="!loading && !sources.length"
-          class="empty"
-        >
-          Источники не найдены
-        </div>
-        <v-progress-linear
-          v-if="loading"
-          indeterminate
-          color="purple-darken-3"
-        />
-      </div>
-
-      <v-pagination
-        v-if="pages > 1"
-        v-model="page"
-        :length="pages"
-        density="comfortable"
-        @update:model-value="loadSources"
-      />
-    </v-card>
-  </v-dialog>
-
-  <v-dialog
-    v-model="detailVisible"
-    :fullscreen="isMobile"
-    max-width="1450"
-    scrollable
-  >
-    <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar
-        color="purple-darken-3"
-        density="compact"
-      >
-        <v-btn
-          icon="mdi-arrow-left"
-          aria-label="Вернуться к журналу"
-          @click="detailVisible = false"
-        />
-        <v-toolbar-title>{{ details?.name || 'Температурный график' }}</v-toolbar-title>
-        <v-chip
-          v-if="details"
-          class="mr-2"
-          size="small"
-          color="white"
-          variant="outlined"
-        >
-          {{ details.graph_type_name || 'Тип не задан' }}
-        </v-chip>
-        <v-btn
-          icon="mdi-close"
-          aria-label="Закрыть карточку"
-          @click="detailVisible = false"
-        />
-      </v-toolbar>
-
-      <v-progress-linear
-        v-if="detailLoading"
-        indeterminate
-        color="purple-darken-3"
-      />
-
-      <template v-if="details && !detailLoading">
-        <div class="detail-alerts pa-3 pb-0">
-          <v-alert
-            v-if="details.graph_status === 'missing'"
-            type="warning"
-            variant="tonal"
-            density="compact"
-          >
-            Для источника нет развёрнутого температурного графика.
-          </v-alert>
-          <v-alert
-            v-if="details.duplicate_point_count > 0"
-            type="error"
-            variant="tonal"
-            density="compact"
-          >
-            Найдено {{ details.duplicate_point_count }} повторных строк температуры. На графике показана запись с максимальным ID для каждого tн.
-          </v-alert>
-          <v-alert
-            v-if="details.graph_status === 'incomplete'"
-            type="warning"
-            variant="tonal"
-            density="compact"
-          >
-            Количество или диапазон точек не соответствует исходным границам: {{ details.point_count }} вместо {{ details.expected_point_count ?? 'не определено' }}.
-          </v-alert>
-        </div>
-
-        <v-row class="ma-0 pa-3">
-          <v-col
-            cols="12"
-            md="4"
-          >
-            <v-card
-              variant="outlined"
-              class="mb-3"
-            >
-              <v-card-title class="text-subtitle-1">
-                Источник и режим
-              </v-card-title>
-              <v-card-text class="detail-grid">
-                <DetailValue
-                  label="ID источника"
-                  :value="details.id"
-                />
-                <DetailValue
-                  label="Узел"
-                  :value="details.node_id"
-                />
-                <DetailValue
-                  label="Фрагмент"
-                  :value="details.fragment_name"
-                />
-                <DetailValue
-                  label="Состояние"
-                  :value="details.state_name"
-                />
-                <DetailValue
-                  label="Тип источника"
-                  :value="details.source_type_name"
-                />
-                <DetailValue
-                  label="Точек"
-                  :value="`${details.point_count} / ${details.expected_point_count ?? '—'}`"
-                />
-                <DetailValue
-                  label="Диапазон tн"
-                  :value="formatRange(details.min_outdoor_temperature, details.max_outdoor_temperature)"
-                />
-                <DetailValue
-                  label="Летний режим"
-                  :value="details.has_summer_temperatures ? `${formatNumber(details.summer_flow_temperature)} / ${formatNumber(details.summer_return_temperature)} °C` : 'не задан'"
-                />
-              </v-card-text>
-              <v-card-actions>
-                <v-btn
-                  v-if="hasCoordinates(details)"
-                  prepend-icon="mdi-map-marker"
-                  color="purple-darken-3"
-                  @click="locate(details)"
+                  text="Показать источник на карте"
+                  hint="Журнал закроется, маркер останется"
                 >
-                  На карте
-                </v-btn>
-              </v-card-actions>
-            </v-card>
-
-            <v-card variant="outlined">
-              <v-card-title class="text-subtitle-1 d-flex justify-space-between align-center">
-                <span>Исходные параметры desktop</span>
-                <div>
-                  <v-select
-                    v-if="mutationsEnabled && details"
-                    v-model="graphMode"
-                    :items="graphModes"
-                    density="compact"
-                    variant="outlined"
-                    hide-details
-                    class="d-inline-flex mr-1 graph-mode-select"
-                    aria-label="Вид графика"
-                  />
-                  <v-btn
-                    v-if="mutationsEnabled && details"
-                    color="deep-orange"
-                    variant="text"
-                    prepend-icon="mdi-calculator"
-                    class="mr-1"
-                    :loading="recalculating"
-                    @click="recalculateGraph"
-                  >
-                    Рассчитать график
-                  </v-btn>
-                  <v-btn
-                    v-if="mutationsEnabled && details"
-                    color="indigo"
-                    variant="text"
-                    prepend-icon="mdi-thermometer-lines"
-                    class="mr-1"
-                    @click="stationaryDialog = true"
-                  >
-                    Стационарный
-                  </v-btn>
-                  <v-btn
-                    v-if="mutationsEnabled && (!isEditing)"
-                    color="primary"
-                    variant="text"
-                    prepend-icon="mdi-pencil"
-                    @click="startEdit"
-                  >Редактировать</v-btn>
-                  <div
-                    v-else
-                    class="d-flex ga-2"
-                  >
+                  <template #default="{ props: tip }">
                     <v-btn
-                      v-if="mutationsEnabled"
-                      color="error"
+                      v-bind="tip"
+                      icon="mdi-crosshairs-gps"
+                      size="x-small"
                       variant="text"
-                      @click="cancelEdit"
-                      :disabled="saving"
-                    >Отмена</v-btn>
-                    <v-btn
-                      v-if="mutationsEnabled"
                       color="primary"
-                      variant="flat"
-                      @click="saveInputs"
-                      :loading="saving"
-                    >Сохранить</v-btn>
-                  </div>
-                </div>
-              </v-card-title>
-              <v-card-text
-                v-if="!isEditing"
-                class="detail-grid input-grid"
-              >
-                <DetailValue
-                  v-for="field in inputFields"
-                  :key="field.key"
-                  :label="field.label"
-                  :value="formatInput(recordValue(details.inputs, field.key), field.unit)"
-                />
-              </v-card-text>
-              <v-card-text
-                v-else
-                class="input-grid"
-              >
-                <v-row dense>
-                  <v-col
-                    v-for="field in inputFields"
-                    :key="field.key"
-                    cols="12"
-                    sm="6"
-                  >
-                    <div class="detail-label mb-1">{{ field.label }}<span v-if="field.unit">, {{ field.unit }}</span></div>
-                    <v-text-field
-                      v-model="editFields[field.key]"
-                      type="number"
-                      density="compact"
-                      hide-details
-                      variant="outlined"
-                      clearable
+                      aria-label="Показать источник на карте"
+                      @click.stop="locate(item)"
                     />
-                  </v-col>
-                </v-row>
-              </v-card-text>
-            </v-card>
-          </v-col>
+                  </template>
+                </HintTip>
+                <HintTip text="Открыть график источника">
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon="mdi-chevron-right"
+                      size="x-small"
+                      variant="text"
+                      aria-label="Открыть график источника"
+                      @click.stop="openDetails(Number(item.id))"
+                    />
+                  </template>
+                </HintTip>
+              </template>
+            </DataTable>
+          </StateView>
+        </v-card-text>
 
-          <v-col
-            cols="12"
-            md="8"
+        <v-divider />
+        <v-card-actions class="px-4 py-2">
+          <span class="text-caption text-medium-emphasis">Страница {{ page }}{{ pages ? ` из ${pages}` : '' }}</span>
+          <v-spacer />
+          <v-pagination
+            v-if="pages > 1"
+            v-model="page"
+            :length="pages"
+            :total-visible="isMobile ? 3 : 7"
+            density="compact"
+          />
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog
+      v-model="detailVisible"
+      :persistent="saving"
+      :fullscreen="isMobile"
+      max-width="1450"
+      scrollable
+    >
+      <v-card :rounded="isMobile ? 0 : 'lg'">
+        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
+          <v-icon color="purple-darken-3">mdi-chart-bell-curve-cumulative</v-icon>
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
           >
-            <v-card variant="outlined">
-              <v-card-title class="text-subtitle-1">
-                Развёрнутый температурный график
-              </v-card-title>
-              <v-card-text>
-                <div
-                  v-if="details.points.length"
-                  class="chart-wrap"
-                >
-                  <v-chart
-                  :theme="chartTheme"
-                    class="chart"
-                    :option="chartOptions"
-                    autoresize
-                  />
-                </div>
-                <div
-                  v-else
-                  class="empty py-10"
-                >
-                  Нет точек для построения графика
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-
-        <div class="points-wrap mx-3 mb-3">
-          <table class="journal-table points-table">
-            <thead><tr><th>tн, °C</th><th>Qотн</th><th>Подающая t1</th><th>Обратная t2</th><th>Смешанная t3</th><th>Ветер tv</th><th>tбн</th><th>Дубли</th></tr></thead>
-            <tbody>
-              <tr
-                v-for="point in details.points"
-                :key="point.id"
+            <div class="text-subtitle-1 font-weight-bold d-flex align-center ga-2">
+              <span class="text-truncate">{{ details?.name || 'Температурный график' }}</span>
+              <v-chip
+                v-if="isEditing && isDirty"
+                size="x-small"
+                color="accent"
+                variant="tonal"
               >
-                <td>{{ formatNumber(point.tn) }}</td><td>{{ formatNumber(point.q_otn, 3) }}</td><td>{{ formatNumber(point.t1) }}</td><td>{{ formatNumber(point.t2) }}</td><td>{{ formatNumber(point.t3) }}</td><td>{{ formatNumber(point.tv) }}</td><td>{{ formatNumber(point.t_bn) }}</td><td>{{ point.duplicate_count && point.duplicate_count > 1 ? point.duplicate_count : '—' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </template>
-    </v-card>
-  </v-dialog>
+                Не сохранено
+              </v-chip>
+            </div>
+            <div class="text-caption text-medium-emphasis text-truncate">
+              {{ details ? `${details.graph_type_name || 'тип не задан'} · узел ${details.node_id}` : '' }}
+            </div>
+          </div>
+          <v-btn
+            icon
+            variant="text"
+            aria-label="Закрыть карточку"
+            @click="detailVisible = false"
+          >
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-card-title>
+        <v-divider />
 
-  <v-dialog
-    v-model="stationaryDialog"
-    max-width="420"
-  >
-    <v-card rounded="lg">
-      <v-card-title>Стационарный график</v-card-title>
-      <v-card-text>
-        <p class="text-body-2 text-medium-emphasis mb-3">
-          Задаёт постоянные t1/t2/t3/tv на всех точках источника (как desktop «Стационарный»).
-        </p>
-        <v-row dense>
-          <v-col cols="6"><v-text-field
-            v-model.number="stationary.t1"
-            label="t1 подача"
-            type="number"
-            density="compact"
-            variant="outlined"
-            hide-details
-          /></v-col>
-          <v-col cols="6"><v-text-field
-            v-model.number="stationary.t2"
-            label="t2 обратка"
-            type="number"
-            density="compact"
-            variant="outlined"
-            hide-details
-          /></v-col>
-          <v-col cols="6"><v-text-field
-            v-model.number="stationary.t3"
-            label="t3 смешение"
-            type="number"
-            density="compact"
-            variant="outlined"
-            hide-details
-            class="mt-2"
-          /></v-col>
-          <v-col cols="6"><v-text-field
-            v-model.number="stationary.tv"
-            label="tv ветер"
-            type="number"
-            density="compact"
-            variant="outlined"
-            hide-details
-            class="mt-2"
-          /></v-col>
-        </v-row>
-      </v-card-text>
-      <v-card-actions class="px-4 pb-4">
-        <v-spacer />
-        <v-btn
-          variant="text"
-          @click="stationaryDialog = false"
-        >Отмена</v-btn>
-        <v-btn
-          color="primary"
-          variant="flat"
-          :loading="applyingStationary"
-          @click="applyStationary"
-        >Применить</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+        <v-card-text class="pa-3 pa-md-4">
+          <StateView
+            variant="form"
+            :rows="8"
+            :loading="detailLoading"
+            :error="detailError"
+            :empty="!detailLoading && !detailError && !details"
+            empty-title="Источник не выбран"
+            :retry="false"
+          >
+            <template v-if="details">
+              <div class="tg-alerts mb-3">
+                <v-alert
+                  v-if="details.graph_status === 'missing'"
+                  type="warning"
+                  variant="tonal"
+                  density="compact"
+                >
+                  Для источника нет развёрнутого температурного графика.
+                </v-alert>
+                <v-alert
+                  v-if="details.duplicate_point_count > 0"
+                  type="error"
+                  variant="tonal"
+                  density="compact"
+                >
+                  Найдено {{ details.duplicate_point_count }} повторных строк температуры. На графике показана запись с
+                  максимальным ID для каждого tн.
+                </v-alert>
+                <v-alert
+                  v-if="details.graph_status === 'incomplete'"
+                  type="warning"
+                  variant="tonal"
+                  density="compact"
+                >
+                  Количество или диапазон точек не соответствует исходным границам: {{ details.point_count }} вместо
+                  {{ details.expected_point_count ?? 'не определено' }}.
+                </v-alert>
+              </div>
+
+              <v-row dense>
+                <v-col
+                  cols="12"
+                  md="5"
+                >
+                  <JournalDetailFields
+                    :groups="detailGroups"
+                    :model="editFields"
+                    :editable="editable"
+                    :is-field-dirty="isFieldDirty"
+                    :open-panels="[0, 1]"
+                    @update:field="setEditField"
+                  />
+                  <v-alert
+                    v-if="isEditing && saveError"
+                    type="error"
+                    variant="tonal"
+                    density="compact"
+                    class="mt-3"
+                    data-testid="equipment-save-error"
+                  >
+                    {{ saveError }}
+                  </v-alert>
+                  <!-- Пересчёт графика пишет точки в базу — те же права, что у правки -->
+                  <div
+                    v-if="mutationsEnabled && !isEditing"
+                    class="tg-graph-actions mt-3"
+                  >
+                    <AppSelect
+                      v-model="graphMode"
+                      :items="graphModes"
+                      item-title="title"
+                      item-value="value"
+                      label="Вид графика"
+                      :clearable="false"
+                      class="tg-graph-mode"
+                    />
+                    <v-btn
+                      color="primary"
+                      variant="tonal"
+                      prepend-icon="mdi-calculator"
+                      :loading="recalculating"
+                      @click="recalculateGraph"
+                    >
+                      Рассчитать график
+                    </v-btn>
+                    <HintTip
+                      text="Стационарный график"
+                      hint="Постоянные t1 / t2 / t3 / tv на всех точках источника, как «Стационарный» в десктопе"
+                    >
+                      <template #default="{ props: tip }">
+                        <v-btn
+                          v-bind="tip"
+                          variant="tonal"
+                          prepend-icon="mdi-thermometer-lines"
+                          @click="stationaryDialog = true"
+                        >
+                          Стационарный
+                        </v-btn>
+                      </template>
+                    </HintTip>
+                  </div>
+                </v-col>
+
+                <v-col
+                  cols="12"
+                  md="7"
+                >
+                  <div class="text-subtitle-2 font-weight-bold mb-2">
+                    Развёрнутый температурный график
+                  </div>
+                  <div
+                    v-if="details.points.length"
+                    class="chart-wrap"
+                  >
+                    <v-chart
+                      :theme="chartTheme"
+                      class="chart"
+                      :option="chartOptions"
+                      autoresize
+                    />
+                  </div>
+                  <StateView
+                    v-else
+                    empty
+                    empty-title="Нет точек для построения графика"
+                    empty-text="Рассчитайте график или задайте стационарный"
+                    empty-icon="mdi-chart-line"
+                  />
+                </v-col>
+              </v-row>
+
+              <div class="text-subtitle-2 font-weight-bold mt-4 mb-2">
+                Точки графика
+              </div>
+              <DataTable
+                :columns="pointColumns"
+                :items="(details.points as Record<string, unknown>[])"
+                item-key="id"
+                density="compact"
+                :height="360"
+                class="points-table"
+                no-data-text="Точек нет"
+              >
+                <template #[`item.tn`]="{ item }">
+                  {{ formatNumber(item.tn) }}
+                </template>
+                <template #[`item.q_otn`]="{ item }">
+                  {{ formatNumber(item.q_otn, 3) }}
+                </template>
+                <template #[`item.t1`]="{ item }">
+                  {{ formatNumber(item.t1) }}
+                </template>
+                <template #[`item.t2`]="{ item }">
+                  {{ formatNumber(item.t2) }}
+                </template>
+                <template #[`item.t3`]="{ item }">
+                  {{ formatNumber(item.t3) }}
+                </template>
+                <template #[`item.tv`]="{ item }">
+                  {{ formatNumber(item.tv) }}
+                </template>
+                <template #[`item.t_bn`]="{ item }">
+                  {{ formatNumber(item.t_bn) }}
+                </template>
+                <template #[`item.duplicate_count`]="{ item }">
+                  {{ Number(item.duplicate_count) > 1 ? item.duplicate_count : '—' }}
+                </template>
+              </DataTable>
+            </template>
+          </StateView>
+        </v-card-text>
+
+        <v-divider />
+        <v-card-actions class="px-4 py-3">
+          <v-spacer />
+          <template v-if="isEditing">
+            <v-btn
+              variant="text"
+              :disabled="saving"
+              @click="cancelEdit"
+            >
+              Отмена
+            </v-btn>
+            <v-btn
+              color="primary"
+              variant="flat"
+              :loading="saving"
+              :disabled="!isDirty"
+              @click="saveInputs"
+            >
+              Сохранить
+            </v-btn>
+          </template>
+          <template v-else>
+            <v-btn
+              v-if="details && hasCoordinates(details)"
+              color="primary"
+              variant="tonal"
+              prepend-icon="mdi-crosshairs-gps"
+              @click="locate(details)"
+            >
+              На карте
+            </v-btn>
+            <v-btn
+              v-if="mutationsEnabled && details"
+              color="primary"
+              variant="tonal"
+              @click="startEdit"
+            >
+              Редактировать
+            </v-btn>
+            <v-btn
+              variant="text"
+              @click="detailVisible = false"
+            >
+              Закрыть
+            </v-btn>
+          </template>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog
+      v-model="stationaryDialog"
+      :persistent="applyingStationary"
+      max-width="420"
+    >
+      <v-card rounded="lg">
+        <v-card-title class="px-4 pt-4">
+          Стационарный график
+        </v-card-title>
+        <v-card-text>
+          <p class="text-body-2 text-medium-emphasis mb-3">
+            Задаёт постоянные t1 / t2 / t3 / tv на всех точках источника (как «Стационарный» в десктопе).
+          </p>
+          <v-row dense>
+            <v-col
+              v-for="field in stationaryFields"
+              :key="field.key"
+              cols="6"
+            >
+              <v-text-field
+                v-model.number="stationary[field.key]"
+                :label="field.label"
+                type="number"
+                suffix="°C"
+                density="compact"
+                variant="outlined"
+                hide-details
+              />
+            </v-col>
+          </v-row>
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4">
+          <v-spacer />
+          <v-btn
+            variant="text"
+            :disabled="applyingStationary"
+            @click="stationaryDialog = false"
+          >
+            Отмена
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :loading="applyingStationary"
+            @click="applyStationary"
+          >
+            Применить
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { hasLonLat } from '~/utils/journalFields'
-import { formatApiError } from '~/utils/apiError'
-import { computed, defineComponent, h, ref, type PropType } from 'vue'
+import AppSelect from '~/components/AppSelect.vue'
+import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
+import HintTip from '~/components/HintTip.vue'
+import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
+import KpiTile from '~/components/KpiTile.vue'
+import SearchField from '~/components/SearchField.vue'
+import StateView from '~/components/StateView.vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { use } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
 import { CanvasRenderer } from 'echarts/renderers'
 import { DataZoomComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
 import { useChartTheme } from '~/composables/useChartTheme'
+import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
+import { useJournalEdit, type JournalEditSource } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useNotificationStore } from '~/stores/notificationStore'
+import { formatApiError } from '~/utils/apiError'
+import { hasLonLat } from '~/utils/journalFields'
 import {
   fastApiService,
-  type TemperatureGraphFilters,
   type TemperatureGraphLookups,
   type TemperatureGraphMode,
   type TemperatureGraphSourceDetails,
@@ -549,150 +630,163 @@ import {
   type TemperatureGraphStatus
 } from '~/services/fastApiService'
 
+/**
+ * Температурные графики источников — журнал (docs/ui-modernization-progress.md, этап 5): плитки состояния
+ * графиков (плитка — фильтр), `DataTable` с серверной пагинацией, `SearchField` / `AppSelect`, `StateView`.
+ * Карточка: исходные параметры desktop на `JournalDetailFields` + общий `useJournalEdit` (черновик, «изменено»,
+ * отмена с подтверждением); ключи формы — колонки `heatsources` (API отдаёт их под псевдонимами, `toForm`),
+ * в базу — только изменённые. Пересчёт и стационарный график, кривые t1 / t2 / t3 / tv и таблица точек.
+ */
+type LocatePayload = { longitude: number; latitude: number; id: number; nodeId: number; label: string }
+type StationaryKey = 't1' | 't2' | 't3' | 'tv'
+
 use([CanvasRenderer, LineChart, DataZoomComponent, GridComponent, LegendComponent, TooltipComponent])
 const { chartTheme } = useChartTheme()
 
-const DetailValue = defineComponent({
-  props: { label: { type: String, required: true }, value: { type: [String, Number] as PropType<string | number | null>, default: null } },
-  setup: props => () => h('div', { class: 'detail-value' }, [h('span', { class: 'detail-label' }, props.label), h('strong', String(props.value ?? '—'))])
-})
-
-const emit = defineEmits<{
-  'locate-source': [payload: { longitude: number; latitude: number; id: number; nodeId: number; label: string }]
-}>()
-
+const emit = defineEmits<{ 'locate-source': [payload: LocatePayload] }>()
 const { isMobile } = useMobile()
 const mutationsEnabled = useMutationsEnabled()
+const notifications = useNotificationStore()
+const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
+
 const visible = ref(false)
-const detailVisible = ref(false)
 const loading = ref(false)
-const detailLoading = ref(false)
 const error = ref('')
 const page = ref(1)
 const pages = ref(0)
+const total = ref(0)
+const pageSize = 50
 const sources = ref<TemperatureGraphSourceSummary[]>([])
-const details = ref<TemperatureGraphSourceDetails | null>(null)
 const lookups = ref<TemperatureGraphLookups>({ graph_types: [], source_types: [], fragments: [], counts: {}, fact_point_count: 0 })
-const filters = ref<TemperatureGraphFilters>({})
+const lookupsLoaded = ref(false)
+const search = ref('')
+const graphStatus = ref<TemperatureGraphStatus | undefined>()
+const summerStatus = ref<'ready' | 'missing' | undefined>()
+const graphTypeId = ref<number | undefined>()
+const fragmentId = ref<number | undefined>()
 
-const statusOptions = [
-  { title: 'Готов', value: 'ready' }, { title: 'Нет графика', value: 'missing' },
-  { title: 'Есть дубли', value: 'duplicates' }, { title: 'Неполный диапазон', value: 'incomplete' }
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const detailError = ref('')
+const details = ref<TemperatureGraphSourceDetails | null>(null)
+
+const statusMetrics: Array<{ value: TemperatureGraphStatus; label: string; status: 'good' | 'warning' | 'serious' | 'critical' }> = [
+  { value: 'ready', label: 'Готовы', status: 'good' },
+  { value: 'missing', label: 'Нет графика', status: 'serious' },
+  { value: 'duplicates', label: 'Дубли', status: 'critical' },
+  { value: 'incomplete', label: 'Неполный диапазон', status: 'warning' }
 ]
+const statusOptions = statusMetrics.map(metric => ({ title: metric.label, value: metric.value }))
 const summerOptions = [{ title: 'Задан', value: 'ready' }, { title: 'Не задан', value: 'missing' }]
-const statusMetrics: Array<{ value: TemperatureGraphStatus; label: string; color: string }> = [
-  { value: 'ready', label: 'Готовы', color: 'green' },
-  { value: 'missing', label: 'Нет графика', color: 'orange' },
-  { value: 'duplicates', label: 'Дубли', color: 'red' },
-  { value: 'incomplete', label: 'Диапазон', color: 'amber-darken-3' }
+const STATUS_LABEL: Record<TemperatureGraphStatus, string> = { ready: 'готов', missing: 'нет графика', duplicates: 'дубли', incomplete: 'диапазон' }
+const STATUS_COLOR: Record<TemperatureGraphStatus, string> = { ready: 'success', missing: 'warning', duplicates: 'error', incomplete: 'amber-darken-3' }
+const statusLabel = (status: TemperatureGraphStatus) => STATUS_LABEL[status] || String(status || '—')
+const statusColor = (status: TemperatureGraphStatus) => STATUS_COLOR[status] || 'grey'
+
+const tableColumns: DataTableColumn[] = [
+  { key: 'id', title: 'ID', type: 'number', width: 70, sortable: false },
+  { key: 'name', title: 'Источник', sortable: false },
+  { key: 'fragment_name', title: 'Фрагмент', width: 220, sortable: false },
+  { key: 'graph_type_name', title: 'Тип', width: 150, sortable: false },
+  { key: 'min_outdoor_temperature', title: 'Диапазон tн', width: 140, sortable: false },
+  { key: 'point_count', title: 'Точки', type: 'number', width: 90, sortable: false },
+  { key: 'design_flow_temperature', title: 'Расчётный режим', width: 140, sortable: false },
+  { key: 'has_summer_temperatures', title: 'Летний режим', width: 130, sortable: false },
+  { key: 'graph_status', title: 'Статус', width: 110, sortable: false },
+  { key: 'actions', title: '', type: 'actions', width: 88, sortable: false }
 ]
-const inputFields = [
-  { key: 'design_outdoor_temperature', label: 'Расчётная t наружного воздуха', unit: '°C' },
-  { key: 'heating_end_temperature', label: 't конца отопительного сезона', unit: '°C' },
-  { key: 'design_indoor_temperature', label: 'Расчётная t помещения', unit: '°C' },
-  { key: 'required_indoor_temperature', label: 'Требуемая t помещения', unit: '°C' },
-  { key: 'design_flow_temperature', label: 'Расчётная t подачи', unit: '°C' },
-  { key: 'design_return_temperature', label: 'Расчётная t обратки', unit: '°C' },
-  { key: 'design_mixed_temperature', label: 'Расчётная t смешения', unit: '°C' },
-  { key: 'heating_load', label: 'Нагрузка отопления', unit: 'Гкал/ч' },
-  { key: 'hot_water_load', label: 'Нагрузка ГВС', unit: 'Гкал/ч' },
-  { key: 'source_power', label: 'Мощность источника', unit: '' },
-  { key: 'lower_flow_cut', label: 'Нижняя срезка подачи', unit: '°C' },
-  { key: 'upper_flow_cut', label: 'Верхняя срезка подачи', unit: '°C' },
-  { key: 'lower_return_cut', label: 'Нижняя срезка обратки', unit: '°C' },
-  { key: 'mixing_correction', label: 'Поправка смешения', unit: '' },
-  { key: 'wind_speed', label: 'Скорость ветра', unit: 'м/с' }
+const pointColumns: DataTableColumn[] = [
+  { key: 'tn', title: 'tн, °C', type: 'number', sortable: false },
+  { key: 'q_otn', title: 'Qотн', type: 'number', sortable: false },
+  { key: 't1', title: 'Подающая t1', type: 'number', sortable: false },
+  { key: 't2', title: 'Обратная t2', type: 'number', sortable: false },
+  { key: 't3', title: 'Смешанная t3', type: 'number', sortable: false },
+  { key: 'tv', title: 'Ветер tv', type: 'number', sortable: false },
+  { key: 't_bn', title: 'tбн', type: 'number', sortable: false },
+  { key: 'duplicate_count', title: 'Дубли', type: 'number', sortable: false }
 ]
 
-const isEditing = ref(false)
-const saving = ref(false)
-const editFields = ref<Record<string, any>>({})
+const filtersActive = computed(() => Boolean(search.value.trim() || graphStatus.value || summerStatus.value || graphTypeId.value || fragmentId.value))
 
-const startEdit = () => {
-  isEditing.value = true
-  editFields.value = {}
-  for (const field of inputFields) {
-    editFields.value[field.key] = recordValue(details.value?.inputs || {}, field.key)
-  }
+const formatNumber = (value: unknown, digits = 1) => (value === null || value === undefined || value === '' || !Number.isFinite(Number(value))
+  ? '—'
+  : Number(value).toLocaleString('ru-RU', { maximumFractionDigits: digits }))
+const formatRange = (min: unknown, max: unknown) => (min === null || min === undefined || max === null || max === undefined
+  ? '—'
+  : `${formatNumber(min)} … ${formatNumber(max)} °C`)
+const hasCoordinates = (item: object) => hasLonLat(item as Record<string, unknown>)
+
+/**
+ * Исходные параметры: колонка `heatsources` → псевдоним в `inputs` API (database/temperature_graphs.py).
+ * Форма — по колонкам: прежняя форма слала псевдонимы, и сохранение не доходило до базы.
+ */
+const INPUT_COLUMNS: Array<{ column: string; alias: string; label: string; units: string }> = [
+  { column: 'tn_5', alias: 'design_outdoor_temperature', label: 'Расчётная t наружного воздуха', units: '°C' },
+  { column: 'tn_1', alias: 'heating_end_temperature', label: 't конца отопительного сезона', units: '°C' },
+  { column: 'tvn_r', alias: 'design_indoor_temperature', label: 'Расчётная t помещения', units: '°C' },
+  { column: 'tvb_tr', alias: 'required_indoor_temperature', label: 'Требуемая t помещения', units: '°C' },
+  { column: 't1_r', alias: 'design_flow_temperature', label: 'Расчётная t подачи', units: '°C' },
+  { column: 't2_r', alias: 'design_return_temperature', label: 'Расчётная t обратки', units: '°C' },
+  { column: 't3_r', alias: 'design_mixed_temperature', label: 'Расчётная t смешения', units: '°C' },
+  { column: 'q_r', alias: 'heating_load', label: 'Нагрузка отопления', units: 'Гкал/ч' },
+  { column: 'q_gv', alias: 'hot_water_load', label: 'Нагрузка ГВС', units: 'Гкал/ч' },
+  { column: 'hsourcepower', alias: 'source_power', label: 'Мощность источника', units: '' },
+  { column: 't1_2r', alias: 'lower_flow_cut', label: 'Нижняя срезка подачи', units: '°C' },
+  { column: 't1_4r', alias: 'upper_flow_cut', label: 'Верхняя срезка подачи', units: '°C' },
+  { column: 't2_2r', alias: 'lower_return_cut', label: 'Нижняя срезка обратки', units: '°C' },
+  { column: 'uf', alias: 'mixing_correction', label: 'Поправка смешения', units: '' },
+  { column: 'v', alias: 'wind_speed', label: 'Скорость ветра', units: 'м/с' }
+]
+const INPUT_KEYS = INPUT_COLUMNS.map(field => field.column)
+const editSource: JournalEditSource = {
+  schema: computed(() => ({ fields: Object.fromEntries(INPUT_KEYS.map(key => [key, true])) })),
+  isWritable: (key?: string | null) => Boolean(key && INPUT_KEYS.includes(key)),
+  // колонки известны заранее — загрузки нет, но useJournalEdit ждёт признак «есть»
+  loadSchema: async () => true
 }
+const {
+  isEditing, saving, editFields, flashId, isDirty, isFieldDirty, editable, setEditField,
+  beginEdit, resetEdit, cancel, closeKeepingDraft, markSaved
+} = useJournalEdit('temperature-graph-sources', editSource, details, {
+  toForm: record => Object.fromEntries(INPUT_COLUMNS.map(field => [field.column, record.inputs?.[field.alias] ?? null]))
+})
 
-const cancelEdit = () => {
-  isEditing.value = false
-  editFields.value = {}
-}
+const detailGroups = computed((): JournalDetailGroup[] => {
+  const item = details.value
+  if (!item) return []
+  const sourceFields: Array<[string, unknown]> = [
+    ['ID источника', item.id], ['Узел', item.node_id], ['Фрагмент', item.fragment_name], ['Состояние', item.state_name],
+    ['Тип источника', item.source_type_name], ['Точек', `${item.point_count} / ${item.expected_point_count ?? '—'}`],
+    ['Диапазон tн', formatRange(item.min_outdoor_temperature, item.max_outdoor_temperature)],
+    ['Летний режим', item.has_summer_temperatures ? `${formatNumber(item.summer_flow_temperature)} / ${formatNumber(item.summer_return_temperature)} °C` : 'не задан']
+  ]
+  const inputs = (item.inputs || {}) as Record<string, unknown>
+  const inputFields: JournalDetailField[] = INPUT_COLUMNS.map(field => ({
+    label: field.label,
+    value: formatNumber(inputs[field.alias], 3),
+    rawValue: inputs[field.alias],
+    key: field.column,
+    type: 'number',
+    units: field.units || undefined
+  }))
+  return [
+    { title: 'Источник и режим', fields: sourceFields.map(([label, value]) => ({ label, value: String(value ?? '—'), rawValue: value, type: 'text' })) },
+    { title: 'Исходные параметры desktop', fields: inputFields }
+  ]
+})
 
-const saveInputs = async () => {
-  if (!details.value) return
-  saving.value = true
-  try {
-    const processedFields: Record<string, any> = {}
-    for (const key in editFields.value) {
-      if (editFields.value[key] === '') processedFields[key] = null
-      else processedFields[key] = editFields.value[key]
-    }
-    
-    await fastApiService.updateObjectAttributes('heatsources', details.value.id, processedFields)
-    
-    await openDetails(details.value.id)
-    isEditing.value = false
-    await loadSources()
-  } catch {
-    // We could handle errors globally or locally
-  } finally {
-    saving.value = false
-  }
-}
-
-const recalculating = ref(false)
 /** Вид графика как у desktop CTempGraph: graphTypeID 1 — О, 3 — П, 2 — СВ, 4 — СН */
 const graphModes: { title: string; value: TemperatureGraphMode }[] = [
   { title: 'Отопительный (О)', value: 'otop' },
   { title: 'Повышенный (П)', value: 'pov' },
   { title: 'Скорр. повышенный (СВ)', value: 'skk_pov' },
-  { title: 'Скорр. пониженный (СН)', value: 'skk_pon' },
+  { title: 'Скорр. пониженный (СН)', value: 'skk_pon' }
 ]
 const graphMode = ref<TemperatureGraphMode>('otop')
 watch(() => details.value?.id, () => {
-  const type = Number((details.value as any)?.graph_type_id)
+  const type = Number(details.value?.graph_type_id)
   graphMode.value = type === 3 ? 'pov' : type === 2 ? 'skk_pov' : type === 4 ? 'skk_pon' : 'otop'
 })
-const recalculateGraph = async () => {
-  if (!details.value) return
-  recalculating.value = true
-  try {
-    const result = await fastApiService.recalculateTemperatureGraph(details.value.id, graphMode.value)
-    const title = graphModes.find(item => item.value === result.mode)?.title || result.mode
-    useNotificationStore().showSuccess(`Температурный график ${title}: ${result.points} точек`)
-    await openDetails(details.value.id)
-  } catch (err: any) {
-    useNotificationStore().showError(formatApiError(err, 'Не удалось пересчитать TG'))
-  } finally {
-    recalculating.value = false
-  }
-}
-
-const stationaryDialog = ref(false)
-const applyingStationary = ref(false)
-const stationary = ref({ t1: 95, t2: 70, t3: 70, tv: 0 })
-const applyStationary = async () => {
-  if (!details.value) return
-  applyingStationary.value = true
-  try {
-    const result = await fastApiService.applyStationaryTemperatureGraph(details.value.id, {
-      t1: Number(stationary.value.t1),
-      t2: Number(stationary.value.t2),
-      t3: Number(stationary.value.t3),
-      tv: Number(stationary.value.tv),
-    })
-    useNotificationStore().showSuccess(`Стационарный: обновлено ${result.updated_points} точек`)
-    stationaryDialog.value = false
-    await openDetails(details.value.id)
-  } catch (err: any) {
-    useNotificationStore().showError(formatApiError(err, 'Не удалось применить стационарный график'))
-  } finally {
-    applyingStationary.value = false
-  }
-}
 
 const chartOptions = computed(() => {
   const points = details.value?.points || []
@@ -701,7 +795,7 @@ const chartOptions = computed(() => {
     { name: 'Обратная t2', key: 't2', color: '#1e88e5' },
     { name: 'Смешанная t3', key: 't3', color: '#43a047' },
     { name: 'Ветер tv', key: 'tv', color: '#f9a825' }
-  ].filter(item => points.some(point => point[item.key as keyof typeof point] !== null))
+  ].filter(item => points.some(point => point[item.key] !== null))
   return {
     tooltip: { trigger: 'axis' },
     legend: { data: series.map(item => item.name) },
@@ -709,57 +803,225 @@ const chartOptions = computed(() => {
     xAxis: { type: 'category', inverse: true, name: 't наружного воздуха, °C', nameLocation: 'middle', nameGap: 32, data: points.map(point => point.tn) },
     yAxis: { type: 'value', name: 't воды, °C', min: (value: { min: number }) => Math.floor(Math.min(0, value.min) / 10) * 10 },
     dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 20 }],
-    series: series.map(item => ({ name: item.name, type: 'line', smooth: false, symbolSize: 5, itemStyle: { color: item.color }, lineStyle: { width: 2 }, data: points.map(point => point[item.key as keyof typeof point]) }))
+    series: series.map(item => ({
+      name: item.name, type: 'line', smooth: false, symbolSize: 5, itemStyle: { color: item.color }, lineStyle: { width: 2 },
+      data: points.map(point => point[item.key])
+    }))
   }
 })
 
 const loadLookups = async () => {
-  if (!lookups.value.graph_types.length) lookups.value = await fastApiService.getTemperatureGraphLookups()
+  if (lookupsLoaded.value) return
+  lookups.value = await fastApiService.getTemperatureGraphLookups()
+  lookupsLoaded.value = true
 }
+
+/** Номер последнего запроса списка: ответ более раннего запроса не перекрывает поздний */
+let listRequest = 0
 const loadSources = async () => {
+  const request = ++listRequest
   loading.value = true
   error.value = ''
   try {
-    const response = await fastApiService.getTemperatureGraphSources({ ...filters.value, page: page.value, page_size: 50 })
+    const response = await fastApiService.getTemperatureGraphSources({
+      search: search.value.trim() || undefined, graph_status: graphStatus.value, summer_status: summerStatus.value,
+      graph_type_id: graphTypeId.value, fragment_id: fragmentId.value, page: page.value, page_size: pageSize
+    })
+    if (request !== listRequest) return
     sources.value = response.items
+    total.value = response.total
     pages.value = response.pages
-  } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : 'Не удалось загрузить температурные графики'
+  } catch (cause) {
+    if (request !== listRequest) return
+    error.value = formatApiError(cause, 'Не удалось загрузить температурные графики')
   } finally {
-    loading.value = false
+    if (request === listRequest) loading.value = false
   }
 }
-const reload = () => { page.value = 1; void loadSources() }
-const setStatus = (status: TemperatureGraphStatus) => { filters.value.graph_status = filters.value.graph_status === status ? undefined : status; reload() }
+
+/** openDialog ставит фильтры области сам и грузит список один раз — наблюдатели в это время молчат */
+let applyingScope = false
+watch([graphStatus, summerStatus, graphTypeId, fragmentId], () => {
+  if (!visible.value || applyingScope) return
+  page.value = 1
+  void loadSources()
+})
+watch(page, () => { if (visible.value && !applyingScope) void loadSources() })
+
+const onSearch = () => {
+  if (!visible.value) return
+  page.value = 1
+  void loadSources()
+}
+const toggleStatus = (status: TemperatureGraphStatus) => {
+  graphStatus.value = graphStatus.value === status ? undefined : status
+}
+const resetFilters = () => {
+  search.value = ''
+  graphStatus.value = undefined
+  summerStatus.value = undefined
+  graphTypeId.value = undefined
+  fragmentId.value = undefined
+  page.value = 1
+  void loadSources()
+}
+
+/** Номер последнего запроса карточки: ответ более раннего запроса не перекрывает поздний */
+let detailRequest = 0
 const openDetails = async (sourceId: number) => {
+  // открытие другого источника во время правки — черновик текущего остаётся, карточка на просмотр
+  closeKeepingDraft()
+  resetEdit()
+  clearSaveError()
+  const request = ++detailRequest
   detailVisible.value = true
   detailLoading.value = true
+  detailError.value = ''
   details.value = null
-  isEditing.value = false
-  try { details.value = await fastApiService.getTemperatureGraphSource(sourceId) } catch (reason) { error.value = reason instanceof Error ? reason.message : 'Не удалось открыть источник'; detailVisible.value = false } finally { detailLoading.value = false }
+  try {
+    const record = await fastApiService.getTemperatureGraphSource(sourceId)
+    if (request !== detailRequest) return
+    details.value = record
+  } catch (cause) {
+    if (request !== detailRequest) return
+    detailError.value = formatApiError(cause, 'Не удалось открыть источник')
+  } finally {
+    if (request === detailRequest) detailLoading.value = false
+  }
 }
+
+let openDialogSeq = 0
 const openDialog = async (scope: { sourceId?: number; nodeId?: number; graphStatus?: TemperatureGraphStatus } = {}) => {
-  visible.value = true
-  await loadLookups()
-  filters.value = { graph_status: scope.graphStatus, search: scope.nodeId ? String(scope.nodeId) : undefined }
+  const seq = ++openDialogSeq
+  applyingScope = true
+  search.value = scope.nodeId ? String(scope.nodeId) : ''
+  graphStatus.value = scope.graphStatus
+  summerStatus.value = undefined
+  graphTypeId.value = undefined
+  fragmentId.value = undefined
   page.value = 1
-  await loadSources()
+  visible.value = true
+  await nextTick()
+  applyingScope = false
+  // список сам показывает свою ошибку; сбой справочника не должен прятать список
+  const [lookupsResult] = await Promise.allSettled([loadLookups(), loadSources()])
+  if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — плитки и фильтры могут быть неполными'))
+  // журнал открыли снова, пока грузились списки — карточку открывает последний вызов
+  if (seq !== openDialogSeq) return
   if (scope.sourceId) await openDetails(scope.sourceId)
 }
-const hasCoordinates = (item: TemperatureGraphSourceSummary) => hasLonLat(item)
-const locate = (item: TemperatureGraphSourceSummary) => emit('locate-source', { longitude: Number(item.longitude), latitude: Number(item.latitude), id: item.id, nodeId: item.node_id, label: item.name })
-const statusLabel = (status: TemperatureGraphStatus) => ({ ready: 'готов', missing: 'нет графика', duplicates: 'дубли', incomplete: 'диапазон' })[status]
-const statusColor = (status: TemperatureGraphStatus) => ({ ready: 'green', missing: 'orange', duplicates: 'red', incomplete: 'amber-darken-3' })[status]
-const formatNumber = (value: unknown, digits = 1) => value === null || value === undefined || value === '' || !Number.isFinite(Number(value)) ? '—' : Number(value).toLocaleString('ru-RU', { maximumFractionDigits: digits })
-const formatRange = (min: number | null, max: number | null) => min === null || max === null ? '—' : `${formatNumber(min)} … ${formatNumber(max)} °C`
-const recordValue = (record: Record<string, unknown>, key: string) => record[key]
-const formatInput = (value: unknown, unit: string) => `${formatNumber(value, 3)}${value === null || value === undefined || value === '' ? '' : unit ? ` ${unit}` : ''}`
+
+const startEdit = async () => {
+  clearSaveError()
+  await beginEdit()
+}
+const cancelEdit = async () => {
+  const { closed } = await cancel()
+  if (closed) clearSaveError()
+}
+// Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
+watch(detailVisible, (open) => {
+  if (!open) closeKeepingDraft()
+})
+
+const saveInputs = async () => {
+  const id = details.value?.id
+  if (!id) return
+  // только изменённые колонки; пустая строка — NULL, как в десктопе
+  const changed = Object.fromEntries(Object.entries(editFields.value)
+    .filter(([key]) => isFieldDirty(key))
+    .map(([key, value]) => [key, value === '' ? null : value]))
+  if (!Object.keys(changed).length) return
+  saving.value = true
+  clearSaveError()
+  try {
+    await fastApiService.updateObjectAttributes('heatsources', id, changed)
+    markSaved(id)
+    notifications.showSuccess('Параметры источника сохранены')
+    await Promise.all([loadSources(), openDetails(id)])
+  } catch (cause) {
+    reportSaveError(cause, () => openDetails(id))
+  } finally {
+    saving.value = false
+  }
+}
+
+const recalculating = ref(false)
+const recalculateGraph = async () => {
+  const id = details.value?.id
+  if (!id) return
+  recalculating.value = true
+  try {
+    const result = await fastApiService.recalculateTemperatureGraph(id, graphMode.value)
+    const title = graphModes.find(item => item.value === result.mode)?.title || result.mode
+    notifications.showSuccess(`Температурный график ${title}: ${result.points} точек`)
+    await Promise.all([loadSources(), openDetails(id)])
+  } catch (cause) {
+    notifications.showError(formatApiError(cause, 'Не удалось пересчитать температурный график'))
+  } finally {
+    recalculating.value = false
+  }
+}
+
+const stationaryDialog = ref(false)
+const applyingStationary = ref(false)
+const stationary = ref<Record<StationaryKey, number>>({ t1: 95, t2: 70, t3: 70, tv: 0 })
+const stationaryFields: Array<{ key: StationaryKey; label: string }> = [
+  { key: 't1', label: 't1 подача' }, { key: 't2', label: 't2 обратка' },
+  { key: 't3', label: 't3 смешение' }, { key: 'tv', label: 'tv ветер' }
+]
+const applyStationary = async () => {
+  const id = details.value?.id
+  if (!id) return
+  const values = Object.fromEntries(stationaryFields.map(field => [field.key, Number(stationary.value[field.key])])) as Record<StationaryKey, number>
+  if (Object.values(values).some(value => !Number.isFinite(value))) {
+    notifications.showWarning('Заполните все четыре температуры числами')
+    return
+  }
+  applyingStationary.value = true
+  try {
+    const result = await fastApiService.applyStationaryTemperatureGraph(id, values)
+    notifications.showSuccess(`Стационарный: обновлено ${result.updated_points} точек`)
+    stationaryDialog.value = false
+    await Promise.all([loadSources(), openDetails(id)])
+  } catch (cause) {
+    notifications.showError(formatApiError(cause, 'Не удалось применить стационарный график'))
+  } finally {
+    applyingStationary.value = false
+  }
+}
+
+const locate = (item: Record<string, unknown>) => {
+  if (!hasCoordinates(item)) return
+  emit('locate-source', {
+    longitude: Number(item.longitude), latitude: Number(item.latitude), id: Number(item.id),
+    nodeId: Number(item.node_id), label: String(item.name ?? `Источник ${item.id}`)
+  })
+  detailVisible.value = false
+  visible.value = false
+}
 
 defineExpose({ openDialog })
 </script>
 
 <style scoped>
-.metric-row,.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.filters>*{min-width:170px;flex:1}.filters .v-btn{flex:0 0 auto}.table-wrap,.points-wrap{overflow:auto}.table-wrap{min-height:300px}.journal-table{width:100%;border-collapse:collapse;font-size:13px}.journal-table th,.journal-table td{padding:9px 10px;border-bottom:1px solid #e0e0e0;text-align:left;white-space:nowrap}.journal-table th{position:sticky;top:0;background:#f4eef7;z-index:1}.journal-table tbody tr{cursor:pointer}.journal-table tbody tr:hover{background:#f7f2f9}.muted{font-size:11px;color:#757575}.empty{text-align:center;color:#757575;padding:32px}.detail-alerts{display:grid;gap:8px}.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.input-grid{max-height:440px;overflow:auto}.chart-wrap{height:540px}.graph-mode-select{width:230px;vertical-align:middle}.chart{height:100%;width:100%}.points-wrap{max-height:430px;border:1px solid #e0e0e0;border-radius:6px}.points-table tbody tr{cursor:default}
-:deep(.detail-value){display:flex;flex-direction:column;min-width:0}:deep(.detail-label){font-size:11px;color:#757575}:deep(.detail-value strong){overflow-wrap:anywhere}
-@media(max-width:960px){.filters{display:grid;grid-template-columns:1fr}.filters>*{width:100%}.detail-grid{grid-template-columns:1fr}.chart-wrap{height:430px}}
+.tg-journal { height: min(92vh, 940px); display: flex; flex-direction: column; }
+.tg-kpi { display: flex; flex-wrap: wrap; flex-shrink: 0; gap: var(--space-2); }
+.tg-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
+.tg-table-wrap { min-height: 280px; overflow: auto; flex: 1; }
+.tg-table { min-width: 1300px; }
+.tg-alerts { display: grid; gap: var(--space-2); }
+.tg-alerts:empty { display: none; }
+.tg-graph-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.tg-graph-mode { flex: 1 1 220px; }
+.chart-wrap { height: 520px; }
+.chart { height: 100%; width: 100%; }
+.points-table { border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); border-radius: var(--radius-2, 8px); }
+@media (max-width: 960px) { .chart-wrap { height: 420px; } }
+@media (max-width: 600px) {
+  .tg-journal { height: 100dvh; }
+  .tg-kpi { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .tg-kpi > * { flex-shrink: 0; }
+  .chart-wrap { height: 340px; }
+}
 </style>
