@@ -140,54 +140,67 @@
         />
 
         <!-- Диалоги инструментов монтируются лениво (таблица toolDialogs): чанк подгружается при первом открытии через openLazyDialog -->
+        <!-- Граница ошибок на каждый диалог: сбой чанка или рендера не роняет карту, «Повторить» монтирует заново -->
         <template
           v-for="dialog in toolDialogs"
           :key="dialog.key"
         >
-          <component
-            :is="dialog.component"
+          <LazyDialogBoundary
             v-if="mountedDialogs[dialog.key]"
-            :ref="dialogRef(dialog.key)"
-            v-on="dialog.on ?? {}"
-          />
+            :name="dialogLabel(dialog.key)"
+          >
+            <component
+              :is="dialog.component"
+              :ref="dialogRef(dialog.key)"
+              v-on="dialog.on ?? {}"
+            />
+          </LazyDialogBoundary>
         </template>
 
         <!-- Attribute properties panel dialog (лениво: монтируется при первом identify-клике) -->
-        <LazyAttributePanel
+        <LazyDialogBoundary
           v-if="mountedDialogs.attributePanel"
-          ref="attributePanelRef"
-          :is-edit-topology-mode="isEditTopologyMode"
-          @delete-feature="onDeleteFeature"
-          @refresh-layers="onCardRefreshLayers"
-          @open-defect-journal="openLazyDialog('defect', $event)"
-          @open-shurf-journal="openLazyDialog('shurf', $event)"
-          @open-inspection-journal="openLazyDialog('inspection', $event)"
-          @open-repair-journal="openLazyDialog('repair', $event)"
-          @open-pressure-test-journal="openLazyDialog('pressureTest', $event)"
-          @open-technical-condition-journal="openLazyDialog('technicalCondition', $event)"
-          @open-corrosion-indicator-journal="openLazyDialog('corrosionIndicator', $event)"
-          @open-alseko-journal="openLazyDialog('alseko', $event)"
-          @open-electrical-network-journal="openLazyDialog('electricalNetwork', $event)"
-          @open-heat-loss-journal="openLazyDialog('heatLoss', $event)"
-          @open-temperature-graph-journal="openLazyDialog('temperatureGraph', $event)"
-          @open-consumer-load-diagnostics="openLazyDialog('consumerLoad', $event)"
-          @open-pump-equipment="openLazyDialog('pumpEquipment', $event)"
-          @open-network-armatures="openLazyDialog('networkArmature', $event)"
-          @open-network-regulators="openLazyDialog('networkRegulator', $event)"
-          @open-network-bypasses="openLazyDialog('networkBypass', $event)"
-          @open-network-diaphragms="openLazyDialog('networkDiaphragm', $event)"
-          @open-outage-simulation="openLazyDialog('outageSimulation', $event)"
-          @open-wear-index="openLazyDialog('wearIndex', $event)"
-          @open-data-quality="openLazyDialog('dataQuality', $event)"
-          @open-audit-history="openLazyDialog('auditHistory', $event)"
-        />
+          name="Карточка объекта"
+        >
+          <LazyAttributePanel
+            ref="attributePanelRef"
+            :is-edit-topology-mode="isEditTopologyMode"
+            @delete-feature="onDeleteFeature"
+            @refresh-layers="onCardRefreshLayers"
+            @open-defect-journal="openLazyDialog('defect', $event)"
+            @open-shurf-journal="openLazyDialog('shurf', $event)"
+            @open-inspection-journal="openLazyDialog('inspection', $event)"
+            @open-repair-journal="openLazyDialog('repair', $event)"
+            @open-pressure-test-journal="openLazyDialog('pressureTest', $event)"
+            @open-technical-condition-journal="openLazyDialog('technicalCondition', $event)"
+            @open-corrosion-indicator-journal="openLazyDialog('corrosionIndicator', $event)"
+            @open-alseko-journal="openLazyDialog('alseko', $event)"
+            @open-electrical-network-journal="openLazyDialog('electricalNetwork', $event)"
+            @open-heat-loss-journal="openLazyDialog('heatLoss', $event)"
+            @open-temperature-graph-journal="openLazyDialog('temperatureGraph', $event)"
+            @open-consumer-load-diagnostics="openLazyDialog('consumerLoad', $event)"
+            @open-pump-equipment="openLazyDialog('pumpEquipment', $event)"
+            @open-network-armatures="openLazyDialog('networkArmature', $event)"
+            @open-network-regulators="openLazyDialog('networkRegulator', $event)"
+            @open-network-bypasses="openLazyDialog('networkBypass', $event)"
+            @open-network-diaphragms="openLazyDialog('networkDiaphragm', $event)"
+            @open-outage-simulation="openLazyDialog('outageSimulation', $event)"
+            @open-wear-index="openLazyDialog('wearIndex', $event)"
+            @open-data-quality="openLazyDialog('dataQuality', $event)"
+            @open-audit-history="openLazyDialog('auditHistory', $event)"
+          />
+        </LazyDialogBoundary>
 
         <!-- Node search dialog -->
-        <LazyNodeSearch
+        <LazyDialogBoundary
           v-if="mountedDialogs.nodeSearch"
-          :ref="dialogRef('nodeSearch')"
-          :map="mapStore.map"
-        />
+          name="Поиск узлов"
+        >
+          <LazyNodeSearch
+            :ref="dialogRef('nodeSearch')"
+            :map="mapStore.map"
+          />
+        </LazyDialogBoundary>
 
         <!-- Контур журнала: показ на карте и выбор участков (этап 9) -->
         <JournalContourPickBar />
@@ -476,7 +489,9 @@ import { useLayerStore } from '~/stores/layerStore';
 import { useCesiumStore } from '~/stores/cesiumStore';
 import { useUiStore } from '~/stores/uiStore';
 import { useAuthStore } from '~/stores/authStore';
-import { TOOL_EVENT_TO_DIALOG } from '~/utils/toolCatalog';
+import { ALL_TOOLS, TOOL_EVENT_TO_DIALOG } from '~/utils/toolCatalog';
+import LazyDialogBoundary from '~/components/LazyDialogBoundary.vue';
+import { isStaleChunkError } from '~/utils/staleChunk';
 import type { ToolDialogKey, ToolEvent } from '~/utils/toolCatalog';
 import type { LayerConfig } from '~/types';
 import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowReactive, watch } from 'vue';
@@ -1324,7 +1339,17 @@ interface ToolDialogEntry {
   component: Component;
   on?: Record<string, (...args: any[]) => void>;
 }
-const lazyDialog = (loader: () => Promise<any>) => markRaw(defineAsyncComponent(loader));
+const LAZY_CHUNK_RETRIES = 2;
+/** Чанк диалога: сетевой сбой — до двух повторов, устаревший чанк после выкатки — сразу ошибка (границе) */
+const lazyDialog = (loader: () => Promise<any>) => markRaw(defineAsyncComponent({
+  loader,
+  onError(error, retry, fail, attempts) {
+    if (!isStaleChunkError(error) && attempts <= LAZY_CHUNK_RETRIES) retry();
+    else fail();
+  },
+}));
+/** Название диалога для уведомления границы ошибок — из каталога инструментов */
+const dialogLabel = (key: ToolDialogKey) => ALL_TOOLS.find((tool) => tool.dialog === key)?.label || key;
 const openDefect = (defectId: unknown) => openLazyDialog('defect', { defectId });
 
 const toolDialogs: ToolDialogEntry[] = [
