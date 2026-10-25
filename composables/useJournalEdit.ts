@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch, type MaybeRefOrGetter, type Ref } from 'vue';
 import { confirmAction } from '~/composables/useConfirm';
 import { useJournalDraft } from '~/composables/useJournalDraft';
 import { useNotificationStore } from '~/stores/notificationStore';
@@ -46,7 +46,8 @@ const pick = (fields: Record<string, unknown>, keys: readonly string[]): Record<
  * подсветка сохранённой строки. Сетевые вызовы (сохранить / удалить) остаются у журнала.
  */
 export function useJournalEdit(
-  journal: string,
+  /** Имя журнала для ключа черновика; геттер — когда таблица зависит от типа записи (арматура) */
+  journal: MaybeRefOrGetter<string>,
   recordForm: JournalEditSource,
   selected: Ref<Record<string, any> | null>,
   options: JournalEditOptions = {},

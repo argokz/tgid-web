@@ -1,4 +1,4 @@
-import { onBeforeUnmount, onMounted } from 'vue';
+import { onBeforeUnmount, onMounted, toValue, type MaybeRefOrGetter } from 'vue';
 import { useAuthStore } from '~/stores/authStore';
 import { appStorage } from '~/utils/appStorage';
 import { clearDraft, journalDraftKey, draftMatches, isDraftExpired, loadDraft, saveDraft, type JournalDraft } from '~/utils/journalDraft';
@@ -16,11 +16,11 @@ interface Pending {
  * сервере не изменилась (сверка снимка). Явное «Сохранить» и «Отменить» черновик удаляют. В базу — ничего.
  * Отложенные записи — по ключу: очистка одного черновика не трогает другой.
  */
-export function useJournalDraft(journal: string) {
+export function useJournalDraft(journal: MaybeRefOrGetter<string>) {
   const authStore = useAuthStore();
   const pending = new Map<string, Pending>();
 
-  const keyFor = (recordId: number | 'new') => journalDraftKey(authStore.username, journal, recordId);
+  const keyFor = (recordId: number | 'new') => journalDraftKey(authStore.username, toValue(journal), recordId);
 
   /** Черновик записи, если он есть и подходит; `stale` — был, но запись изменилась или истёк срок (удалён) */
   const take = (recordId: number | 'new', snapshot: string): { draft: JournalDraft | null; stale: boolean } => {
