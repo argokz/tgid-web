@@ -42,22 +42,54 @@
             variant="flat"
             prepend-icon="mdi-plus"
             class="mr-2"
-            @click="createShurf"
             :loading="creating"
+            @click="createShurf"
           >
             Создать
           </v-btn>
-          <v-btn
-            icon
-            variant="text"
-            aria-label="Закрыть журнал"
-            @click="visible = false"
+          <HintTip
+            text="Закрыть журнал"
+            hotkey="Esc"
+            location="bottom"
           >
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Закрыть журнал"
+                @click="visible = false"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
         </v-card-title>
 
         <v-divider />
+
+        <!-- Плитки из ответа списка: всего и по состояниям при тех же фильтрах; плитка состояния — фильтр -->
+        <div
+          v-if="stateTiles.length"
+          class="shurf-kpi px-3 px-md-4 pt-3"
+        >
+          <KpiTile
+            label="Найдено"
+            :value="total"
+            :compact="false"
+          />
+          <KpiTile
+            v-for="tile in stateTiles"
+            :key="tile.id"
+            :label="tile.name"
+            :value="tile.count"
+            :compact="false"
+            :status="tile.status"
+            selectable
+            :active="stateId === tile.id"
+            @select="toggleState(tile.id)"
+          />
+        </div>
 
         <div class="pa-3 pa-md-4 shurf-filters">
           <v-row dense>
@@ -65,14 +97,13 @@
               cols="12"
               md="4"
             >
-              <v-text-field
-                v-model="search"
+              <SearchField
+                :model-value="search"
                 label="Поиск по ID, адресу, акту или результату"
-                prepend-inner-icon="mdi-magnify"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
+                :debounce="350"
+                :loading="loading"
+                @update:model-value="search = $event"
+                @search="onSearch"
               />
             </v-col>
             <v-col
@@ -80,16 +111,12 @@
               sm="4"
               md="2"
             >
-              <v-select
+              <AppSelect
                 v-model="purposeId"
                 :items="lookups.purposes"
                 item-title="name"
                 item-value="id"
                 label="Назначение"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
               />
             </v-col>
             <v-col
@@ -97,16 +124,12 @@
               sm="4"
               md="2"
             >
-              <v-select
+              <AppSelect
                 v-model="stateId"
                 :items="lookups.states"
                 item-title="name"
                 item-value="id"
                 label="Состояние"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
               />
             </v-col>
             <v-col
@@ -158,138 +181,140 @@
             >
               Узел {{ scope.nodeId }}
             </v-chip>
-            <v-select
+            <AppSelect
               v-model="approvalFilter"
               :items="approvalOptions"
               item-title="title"
               item-value="value"
               label="Утверждение"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
               class="approval-filter"
             />
             <v-spacer />
             <v-btn
               variant="text"
               prepend-icon="mdi-filter-remove-outline"
+              :disabled="!filtersActive"
               @click="resetFilters"
-            >Сбросить</v-btn>
+            >
+              Сбросить
+            </v-btn>
             <v-btn
               color="primary"
               prepend-icon="mdi-refresh"
               :loading="loading"
               @click="loadShurfs"
-            >Обновить</v-btn>
+            >
+              Обновить
+            </v-btn>
           </div>
         </div>
 
         <v-divider />
 
         <v-card-text class="pa-0 shurf-table-wrap">
-          <v-progress-linear
-            v-if="loading"
-            indeterminate
-            color="primary"
-          />
-          <v-alert
-            v-if="error"
-            type="error"
-            variant="tonal"
-            class="ma-4"
-          >{{ error }}</v-alert>
-
-          <div
-            v-else-if="!loading && items.length === 0"
-            class="shurf-empty"
+          <StateView
+            variant="table"
+            :rows="10"
+            :loading="loading && !items.length"
+            :error="error"
+            :empty="!loading && !items.length"
+            empty-title="Шурфовки не найдены"
+            :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В журнале пока нет записей — проверьте загрузку исторических данных TGID'"
+            empty-icon="mdi-shovel-off"
+            :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
+            :retrying="loading"
+            @retry="loadShurfs"
+            @action="resetFilters"
           >
-            <v-icon
-              size="56"
-              color="grey-lighten-1"
-            >mdi-shovel-off</v-icon>
-            <div class="text-subtitle-1 mt-3">Шурфовки не найдены</div>
-            <div class="text-body-2 text-medium-emphasis mt-1">
-              Измените фильтры или проверьте загрузку исторических данных TGID.
-            </div>
-          </div>
-
-          <v-table
-            v-else
-            fixed-header
-            hover
-            density="compact"
-            class="shurf-table"
-          >
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Срок</th>
-                <th>Назначение</th>
-                <th>Состояние</th>
-                <th>Адрес / участок</th>
-                <th>Результат</th>
-                <th>Утверждение</th>
-                <th class="text-right">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="item in items"
-                :key="item.id"
-                class="shurf-row"
-                @click="openDetails(item.id)"
-              >
-                <td class="font-weight-medium">{{ item.id }}</td>
-                <td>{{ dateRange(item.effective_start, item.effective_finish) }}</td>
-                <td>{{ item.purpose_name || '—' }}</td>
-                <td>
-                  <v-chip
-                    size="x-small"
-                    :color="stateColor(item.state_id)"
-                    variant="tonal"
-                  >
-                    {{ item.state_name || 'Не задано' }}
-                  </v-chip>
-                </td>
-                <td>
-                  <div>{{ item.address || nodeRange(item) || '—' }}</div>
-                  <div
-                    v-if="item.line_id"
-                    class="text-caption text-medium-emphasis"
-                  >Линия {{ item.line_id }}</div>
-                </td>
-                <td class="result-cell">{{ item.inspection_results || item.planned_measures || item.note || '—' }}</td>
-                <td>
-                  <v-chip
-                    size="x-small"
-                    :color="item.approval_id ? 'success' : 'grey'"
-                    variant="tonal"
-                  >
-                    {{ item.approval_name }}
-                  </v-chip>
-                </td>
-                <td class="text-right text-no-wrap">
-                  <v-btn
-                    v-if="hasCoordinates(item)"
-                    icon="mdi-crosshairs-gps"
-                    size="x-small"
-                    variant="text"
-                    color="primary"
-                    aria-label="Показать шурф на карте"
-                    @click.stop="locate(item)"
-                  />
-                  <v-btn
-                    icon="mdi-chevron-right"
-                    size="x-small"
-                    variant="text"
-                    aria-label="Подробнее"
-                    @click.stop="openDetails(item.id)"
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
+            <v-progress-linear
+              v-if="loading"
+              indeterminate
+              color="primary"
+            />
+            <DataTable
+              :columns="tableColumns"
+              :items="(items as Record<string, unknown>[])"
+              item-key="id"
+              selectable
+              :selected-key="flashId"
+              density="compact"
+              class="shurf-table"
+              @select="openDetails(Number($event.id))"
+            >
+              <template #[`item.term`]="{ item }">
+                {{ dateRange(item.effective_start, item.effective_finish) }}
+              </template>
+              <template #[`item.purpose_name`]="{ item }">
+                {{ item.purpose_name || '—' }}
+              </template>
+              <template #[`item.state_name`]="{ item }">
+                <v-chip
+                  size="x-small"
+                  :color="stateColor(Number(item.state_id))"
+                  variant="tonal"
+                >
+                  {{ item.state_name || 'Не задано' }}
+                </v-chip>
+              </template>
+              <template #[`item.address`]="{ item }">
+                <div class="text-truncate">
+                  {{ item.address || nodeRange(item as ShurfSummary) || '—' }}
+                </div>
+                <div
+                  v-if="item.line_id"
+                  class="text-caption text-medium-emphasis"
+                >
+                  Линия {{ item.line_id }}
+                </div>
+              </template>
+              <template #[`item.result`]="{ item }">
+                <span
+                  class="result-cell"
+                  :title="String(item.inspection_results || item.planned_measures || item.note || '')"
+                >{{ item.inspection_results || item.planned_measures || item.note || '—' }}</span>
+              </template>
+              <template #[`item.approval_name`]="{ item }">
+                <v-chip
+                  size="x-small"
+                  :color="item.approval_id ? 'success' : 'grey'"
+                  variant="tonal"
+                >
+                  {{ item.approval_name }}
+                </v-chip>
+              </template>
+              <template #[`item.actions`]="{ item }">
+                <HintTip
+                  v-if="hasCoordinates(item as ShurfSummary)"
+                  text="Показать на карте"
+                  hint="Журнал закроется, маркер останется"
+                >
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon="mdi-crosshairs-gps"
+                      size="x-small"
+                      variant="text"
+                      color="primary"
+                      aria-label="Показать шурф на карте"
+                      @click.stop="locate(item as ShurfSummary)"
+                    />
+                  </template>
+                </HintTip>
+                <HintTip text="Открыть карточку">
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon="mdi-chevron-right"
+                      size="x-small"
+                      variant="text"
+                      aria-label="Подробнее"
+                      @click.stop="openDetails(Number(item.id))"
+                    />
+                  </template>
+                </HintTip>
+              </template>
+            </DataTable>
+          </StateView>
         </v-card-text>
 
         <v-divider />
@@ -317,234 +342,195 @@
       <v-card :rounded="isMobile ? 0 : 'lg'">
         <v-card-title class="d-flex align-center ga-3 px-4 py-3">
           <v-icon color="brown-darken-2">mdi-shovel</v-icon>
-          <div class="flex-grow-1">
-            <div class="text-subtitle-1 font-weight-bold">Шурфовка {{ selected?.id || '' }}</div>
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
+            <div class="text-subtitle-1 font-weight-bold d-flex align-center ga-2">
+              <span>{{ isNew ? 'Новая шурфовка' : `Шурфовка ${selected?.id || ''}` }}</span>
+              <v-chip
+                v-if="isEditing && isDirty"
+                size="x-small"
+                color="accent"
+                variant="tonal"
+              >
+                Не сохранено
+              </v-chip>
+            </div>
             <div class="text-caption text-medium-emphasis">
               {{ selected?.purpose_name || 'Назначение не указано' }} · {{ selected?.state_name || 'Состояние не указано' }}
             </div>
           </div>
-          <v-btn
-            v-if="mutationsEnabled && selected"
-            icon
-            variant="text"
-            aria-label="Удалить"
-            color="error"
-            class="mr-1"
-            @click="deleteShurf(selected.id)"
-            :loading="deleting"
-            title="Удалить шурфовку"
+          <HintTip
+            v-if="mutationsEnabled && selected && !isEditing"
+            text="Удалить шурфовку"
+            hint="С подтверждением; действие попадёт в журнал"
+            location="bottom"
           >
-            <v-icon>mdi-delete</v-icon>
-          </v-btn>
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Удалить"
+                color="error"
+                class="mr-1"
+                :loading="deleting"
+                @click="deleteShurf(selected!.id)"
+              >
+                <v-icon>mdi-delete</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
           <v-btn
             icon
             variant="text"
             aria-label="Закрыть"
             @click="detailsVisible = false"
-          ><v-icon>mdi-close</v-icon></v-btn>
+          >
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
         </v-card-title>
         <v-divider />
 
         <v-card-text class="pa-4">
-          <div
-            v-if="detailsLoading"
-            class="d-flex justify-center pa-10"
-          ><v-progress-circular
-            indeterminate
-            color="primary"
-          /></div>
-          <v-alert
-            v-else-if="detailsError"
-            type="error"
-            variant="tonal"
-          >{{ detailsError }}</v-alert>
-          <template v-else-if="selected || isEditing">
-            <v-btn-toggle
-              v-if="isNew"
-              v-model="createMode"
-              mandatory
-              density="compact"
-              color="brown"
-              class="mb-3"
-            >
-              <v-btn value="plan">Плановый шурф</v-btn>
-              <v-btn value="unplanned">Внеплановый</v-btn>
-            </v-btn-toggle>
-            <v-expansion-panels
-              multiple
-              variant="accordion"
-              :model-value="[0, 1]"
-            >
-              <v-expansion-panel
-                v-for="(group, index) in detailGroups"
-                :key="group.title"
-                :value="index"
+          <StateView
+            variant="form"
+            :rows="8"
+            :loading="detailsLoading"
+            :error="detailsError"
+            :empty="!detailsLoading && !detailsError && !selected && !isEditing"
+            empty-title="Карточка не выбрана"
+            :retry="false"
+          >
+            <template v-if="selected || isEditing">
+              <!-- Плановый / внеплановый шурф — разные режимы создания сервера (gid6 OnRemontPovrShurfAdd / AddNeplan) -->
+              <SegmentedToggle
+                v-if="isNew"
+                v-model="createMode"
+                :items="createModeItems"
+                aria-label="Вид шурфа"
+                class="mb-3"
+              />
+              <JournalDetailFields
+                :groups="detailGroups"
+                :model="editFields"
+                :editable="editable"
+                :is-field-dirty="isFieldDirty"
+                :required-keys="createMode === 'plan' ? ['planned_start', 'planned_finish'] : []"
+                @update:model="editFields = $event"
               >
-                <v-expansion-panel-title>{{ group.title }}</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-row dense>
-                    <v-col
-                      v-for="field in group.fields"
-                      :key="field.label"
-                      cols="12"
-                      sm="6"
+                <v-expansion-panel
+                  v-if="inspectedElements.length && !isEditing"
+                  :value="detailGroups.length"
+                >
+                  <v-expansion-panel-title>Осмотренные элементы</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <div class="d-flex flex-wrap ga-1">
+                      <v-chip
+                        v-for="element in inspectedElements"
+                        :key="Number(element.id)"
+                        size="small"
+                        variant="tonal"
+                      >
+                        {{ element.name }}
+                      </v-chip>
+                    </div>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+
+                <v-expansion-panel
+                  v-if="relatedDefects.length && !isEditing"
+                  :value="detailGroups.length + 1"
+                >
+                  <v-expansion-panel-title>Нарушения, выявленные в шурфе</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-list
+                      density="compact"
+                      lines="two"
                     >
-                      <div class="detail-label mb-1">{{ field.label }}</div>
-                      <template v-if="isEditing && field.key && isWritable(field.key)">
-                        <v-select
-                          v-if="field.type === 'select'"
-                          v-model="editFields[field.key]"
-                          :items="field.items"
-                          item-title="name"
-                          item-value="id"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                          clearable
-                        />
-                        <v-text-field
-                          v-else-if="field.type === 'date'"
-                          v-model="editFields[field.key]"
-                          type="date"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                        />
-                        <v-textarea
-                          v-else-if="field.type === 'textarea'"
-                          v-model="editFields[field.key]"
-                          rows="2"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                        />
-                        <v-text-field
-                          v-else
-                          v-model="editFields[field.key]"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                        />
-                      </template>
-                      <div
-                        v-else
-                        class="detail-value"
-                      >{{ field.value }}</div>
-                    </v-col>
-                  </v-row>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
+                      <v-list-item
+                        v-for="defect in relatedDefects"
+                        :key="Number(defect.id)"
+                        prepend-icon="mdi-alert-circle-outline"
+                        :title="`Нарушение ${defect.id} · ${defect.state_name || 'без состояния'}`"
+                        :subtitle="String(defect.description || defect.source_name || 'Описание не заполнено')"
+                        @click="openRelatedDefect(Number(defect.id))"
+                      />
+                    </v-list>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
 
-              <v-expansion-panel
-                v-if="inspectedElements.length && !isEditing"
-                :value="detailGroups.length"
-              >
-                <v-expansion-panel-title>Осмотренные элементы</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <div class="d-flex flex-wrap ga-1">
-                    <v-chip
-                      v-for="element in inspectedElements"
-                      :key="Number(element.id)"
-                      size="small"
-                      variant="tonal"
+                <v-expansion-panel
+                  v-if="documents.length && !isEditing"
+                  :value="detailGroups.length + 2"
+                >
+                  <v-expansion-panel-title>Документы</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-list density="compact">
+                      <v-list-item
+                        v-for="document in documents"
+                        :key="Number(document.id)"
+                        prepend-icon="mdi-file-document-outline"
+                        :title="String(document.document_type_name || 'Документ')"
+                        :subtitle="`${formatDate(document.date_doc)} · ${fileName(document.path)}`"
+                      />
+                    </v-list>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+
+                <v-expansion-panel
+                  v-if="nearbyCommunications.length && !isEditing"
+                  :value="detailGroups.length + 3"
+                >
+                  <v-expansion-panel-title>Коммуникации вблизи шурфа</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <div class="d-flex flex-wrap ga-1">
+                      <v-chip
+                        v-for="communication in nearbyCommunications"
+                        :key="Number(communication.id)"
+                        size="small"
+                        variant="tonal"
+                      >
+                        {{ communication.name }}
+                      </v-chip>
+                    </div>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+
+                <v-expansion-panel
+                  v-if="riskFactors.length && !isEditing"
+                  :value="detailGroups.length + 4"
+                >
+                  <v-expansion-panel-title>Факторы риска трубопровода</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-list
+                      density="compact"
+                      lines="two"
                     >
-                      {{ element.name }}
-                    </v-chip>
-                  </div>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-
-              <v-expansion-panel
-                v-if="relatedDefects.length && !isEditing"
-                :value="detailGroups.length + 1"
-              >
-                <v-expansion-panel-title>Нарушения, выявленные в шурфе</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-list
-                    density="compact"
-                    lines="two"
-                  >
-                    <v-list-item
-                      v-for="defect in relatedDefects"
-                      :key="Number(defect.id)"
-                      prepend-icon="mdi-alert-circle-outline"
-                      :title="`Нарушение ${defect.id} · ${defect.state_name || 'без состояния'}`"
-                      :subtitle="String(defect.description || defect.source_name || 'Описание не заполнено')"
-                      @click="openRelatedDefect(Number(defect.id))"
-                    />
-                  </v-list>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-
-              <v-expansion-panel
-                v-if="documents.length && !isEditing"
-                :value="detailGroups.length + 2"
-              >
-                <v-expansion-panel-title>Документы</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-list density="compact">
-                    <v-list-item
-                      v-for="document in documents"
-                      :key="Number(document.id)"
-                      prepend-icon="mdi-file-document-outline"
-                      :title="String(document.document_type_name || 'Документ')"
-                      :subtitle="`${formatDate(document.date_doc)} · ${fileName(document.path)}`"
-                    />
-                  </v-list>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-
-              <v-expansion-panel
-                v-if="nearbyCommunications.length && !isEditing"
-                :value="detailGroups.length + 3"
-              >
-                <v-expansion-panel-title>Коммуникации вблизи шурфа</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <div class="d-flex flex-wrap ga-1">
-                    <v-chip
-                      v-for="communication in nearbyCommunications"
-                      :key="Number(communication.id)"
-                      size="small"
-                      variant="tonal"
-                    >
-                      {{ communication.name }}
-                    </v-chip>
-                  </div>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-
-              <v-expansion-panel
-                v-if="riskFactors.length && !isEditing"
-                :value="detailGroups.length + 4"
-              >
-                <v-expansion-panel-title>Факторы риска трубопровода</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-list
-                    density="compact"
-                    lines="two"
-                  >
-                    <v-list-item
-                      v-for="risk in riskFactors"
-                      :key="Number(risk.id)"
-                      prepend-icon="mdi-shield-alert-outline"
-                      :title="`Фактор риска ${risk.id}${risk.pipe_section_id ? ` · участок ${risk.pipe_section_id}` : ''}`"
-                      :subtitle="riskSummary(risk)"
-                    />
-                  </v-list>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-            </v-expansion-panels>
-            <JournalRecordPanels
-              v-if="selected && !isEditing"
-              class="mt-4"
-              journal="shurfs"
-              :record-id="selected.id"
-              :record-label="selected.address || `Шурф ${selected.id}`"
-              @changed="refreshSelected"
-              @hide="hideForMap"
-              @restore="restoreAfterMap"
-            />
-          </template>
+                      <v-list-item
+                        v-for="risk in riskFactors"
+                        :key="Number(risk.id)"
+                        prepend-icon="mdi-shield-alert-outline"
+                        :title="`Фактор риска ${risk.id}${risk.pipe_section_id ? ` · участок ${risk.pipe_section_id}` : ''}`"
+                        :subtitle="riskSummary(risk)"
+                      />
+                    </v-list>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+              </JournalDetailFields>
+              <JournalRecordPanels
+                v-if="selected && !isEditing"
+                class="mt-4"
+                journal="shurfs"
+                :record-id="selected.id"
+                :record-label="selected.address || `Шурф ${selected.id}`"
+                @changed="refreshSelected"
+                @hide="hideForMap"
+                @restore="restoreAfterMap"
+              />
+            </template>
+          </StateView>
         </v-card-text>
 
         <v-divider />
@@ -555,19 +541,24 @@
             variant="tonal"
             color="primary"
             @click="locate(selected)"
-          >На карте</v-btn>
+          >
+            На карте
+          </v-btn>
           <v-spacer />
           <template v-if="isEditing">
             <v-btn
               v-if="mutationsEnabled"
               variant="text"
               @click="cancelEdit"
-            >Отмена</v-btn>
+            >
+              Отмена
+            </v-btn>
             <v-btn
               v-if="mutationsEnabled"
               color="primary"
               variant="elevated"
               :loading="saving"
+              :disabled="!isNew && !isDirty"
               @click="saveChanges"
             >
               Сохранить
@@ -579,18 +570,24 @@
               color="primary"
               variant="tonal"
               @click="startEdit"
-            >Редактировать</v-btn>
+            >
+              Редактировать
+            </v-btn>
             <v-btn
               v-if="selected"
               variant="tonal"
               prepend-icon="mdi-file-word-outline"
               :loading="exportingWord"
               @click="exportWord"
-            >Word</v-btn>
+            >
+              Word
+            </v-btn>
             <v-btn
               variant="text"
               @click="detailsVisible = false"
-            >Закрыть</v-btn>
+            >
+              Закрыть
+            </v-btn>
           </template>
         </v-card-actions>
       </v-card>
@@ -604,10 +601,19 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
+import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
+import HintTip from '~/components/HintTip.vue'
+import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
+import KpiTile, { type KpiStatus } from '~/components/KpiTile.vue'
+import SearchField from '~/components/SearchField.vue'
+import SegmentedToggle, { type SegmentedToggleItem } from '~/components/SegmentedToggle.vue'
+import StateView from '~/components/StateView.vue'
 import { hasLonLat } from '~/utils/journalFields'
 import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
 import { computed, reactive, ref, watch } from 'vue'
+import { useJournalEdit } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
 import { useJournalRecordForm } from '~/composables/useJournalRecordForm'
@@ -618,6 +624,12 @@ import {
   type ShurfSummary
 } from '~/services/fastApiService'
 
+/**
+ * Журнал шурфовок — тип (б) «рабочее место» (docs/ui-modernization-progress.md, этап 5): таблица на `DataTable`
+ * с серверной пагинацией, плитки состояний из `state_counts`, фильтры `SearchField` / `AppSelect`, массовое
+ * утверждение плана (`JournalBatchApprovalDialog`) сохранено, карточка на общих `JournalDetailFields` +
+ * `useJournalEdit` (черновик, признак «изменено», отмена с подтверждением), связи и документы — панелями.
+ */
 export interface ShurfJournalScope {
   lineId?: number
   nodeId?: number
@@ -647,10 +659,11 @@ const dateTo = ref('')
 const scope = reactive<ShurfJournalScope>({})
 const lookups = reactive<ShurfLookups>({ purposes: [], states: [], materials: [] })
 const approvalOptions = [
-  { title: 'Утверждено', value: true },
-  { title: 'Не утверждено', value: false }
+  { title: 'Утверждённые', value: true },
+  { title: 'Не утверждённые', value: false },
 ]
-let searchTimer: ReturnType<typeof setTimeout> | undefined
+/** Счётчики по состояниям из ответа списка; null — API их не отдаёт (плитки скрыты) */
+const stateCounts = ref<{ state_id: number | null; count: number }[] | null>(null)
 
 const detailsVisible = ref(false)
 // Другой журнал начал выбор участков на карте — закрыть это окно (QA F48)
@@ -662,16 +675,44 @@ const creating = ref(false)
 const deleting = ref(false)
 const exportingWord = ref(false)
 
-const isEditing = ref(false)
-const isNew = ref(false)
-const saving = ref(false)
-const editFields = ref<Record<string, any>>({})
-
 const scopeTitle = computed(() => {
   if (scope.lineId) return `шурфовки трубопровода ${scope.lineId}`
-  if (scope.nodeId) return `шурфовки прилегающих трубопроводов узла ${scope.nodeId}`
+  if (scope.nodeId) return `шурфовки узла и прилегающих трубопроводов ${scope.nodeId}`
   return 'вся тепловая сеть'
 })
+
+const filtersActive = computed(() => Boolean(
+  search.value.trim() || purposeId.value || stateId.value || approvalFilter.value !== undefined || dateFrom.value || dateTo.value,
+))
+
+const tableColumns: DataTableColumn[] = [
+  { key: 'id', title: 'ID', type: 'number', width: 80, sortable: false },
+  { key: 'term', title: 'Срок', type: 'date', width: 170, sortable: false },
+  { key: 'purpose_name', title: 'Назначение', width: 130, sortable: false },
+  { key: 'state_name', title: 'Состояние', width: 120, sortable: false },
+  { key: 'address', title: 'Адрес / участок', sortable: false },
+  { key: 'result', title: 'Результат', sortable: false },
+  { key: 'approval_name', title: 'Утверждение', width: 140, sortable: false },
+  { key: 'actions', title: '', type: 'actions', width: 88, sortable: false },
+]
+
+/** Состояние шурфа → тон плитки: план — нейтрально, в процессе — внимание, выполнено — в порядке */
+const STATE_STATUS: Record<number, KpiStatus> = { 1: 'none', 2: 'warning', 3: 'good' }
+
+const stateTiles = computed(() => {
+  if (!stateCounts.value) return []
+  const counts = new Map(stateCounts.value.map((c) => [c.state_id, c.count]))
+  return (lookups.states as { id: number; name: string }[]).map((state) => ({
+    id: state.id,
+    name: state.name,
+    count: counts.get(state.id) ?? 0,
+    status: STATE_STATUS[state.id] ?? 'none',
+  }))
+})
+
+const toggleState = (id: number) => {
+  stateId.value = stateId.value === id ? undefined : id
+}
 
 const formatDate = (value: unknown) => {
   if (!value) return '—'
@@ -681,12 +722,11 @@ const formatDate = (value: unknown) => {
 const formatValue = (value: unknown) => {
   if (value === null || value === undefined || value === '') return '—'
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return formatDate(value)
-  if (typeof value === 'boolean') return value ? 'Да' : 'Нет'
   return String(value)
 }
 const dateRange = (start: unknown, finish: unknown) => {
   if (!start && !finish) return '—'
-  return [formatDate(start), formatDate(finish)].filter(value => value !== '—').join(' — ')
+  return `${formatDate(start)} — ${formatDate(finish)}`
 }
 const nodeRange = (item: ShurfSummary) => [item.line_start_node, item.line_end_node].filter(Boolean).join(' — ')
 const stateColor = (id: number | null) => id === 3 ? 'success' : id === 2 ? 'warning' : 'info'
@@ -723,11 +763,18 @@ const loadShurfs = async () => {
     items.value = response.items
     total.value = response.total
     pages.value = response.pages
+    stateCounts.value = Array.isArray(response.state_counts) ? response.state_counts : null
   } catch (loadError: any) {
     error.value = loadError?.data?.detail || loadError?.message || 'Не удалось загрузить журнал шурфовок'
   } finally {
     loading.value = false
   }
+}
+/** Текст после паузы ввода (SearchField) */
+const onSearch = () => {
+  if (!visible.value) return
+  page.value = 1
+  void loadShurfs()
 }
 const openDetails = async (id: number) => {
   detailsVisible.value = true
@@ -762,31 +809,35 @@ const clearScope = () => {
 
 const recordForm = useJournalRecordForm('shurfs')
 const batchApprovalRef = ref<{ open: () => Promise<void> } | null>(null)
-const isWritable = recordForm.isWritable
+const {
+  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable,
+  beginCreate, beginEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
+} = useJournalEdit('shurfs', recordForm, selected)
 const createMode = ref<'plan' | 'unplanned'>('plan')
+const createModeItems: SegmentedToggleItem<'plan' | 'unplanned'>[] = [
+  { value: 'plan', label: 'Плановый шурф', icon: 'mdi-calendar-check-outline', hint: 'С плановыми датами, попадает в план на утверждение' },
+  { value: 'unplanned', label: 'Внеплановый', icon: 'mdi-alert-outline', hint: 'По нарушению: сразу «в процессе»' },
+]
 
 const createShurf = async () => {
-  await recordForm.loadSchema()
-  isNew.value = true
-  isEditing.value = true
   createMode.value = 'plan'
-  editFields.value = { line_id: scope.lineId ?? null }
   selected.value = null
   detailsVisible.value = true
   detailsError.value = ''
+  await beginCreate({ line_id: scope.lineId ?? null })
 }
 
-const startEdit = () => {
-  if (!selected.value) return
-  isNew.value = false
-  isEditing.value = true
-  editFields.value = { ...selected.value }
-}
+const startEdit = () => beginEdit()
 
-const cancelEdit = () => {
-  isEditing.value = false
+const cancelEdit = async () => {
+  if (!(await cancel())) return
   if (isNew.value) detailsVisible.value = false
 }
+
+// Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
+watch(detailsVisible, (open) => {
+  if (!open) closeKeepingDraft()
+})
 
 const saveChanges = async () => {
   saving.value = true
@@ -796,8 +847,7 @@ const saveChanges = async () => {
       isNew: isNew.value, id: selected.value?.id, original: selected.value as Record<string, unknown> | null,
       edited: editFields.value, mode: createMode.value,
     })
-    isEditing.value = false
-    isNew.value = false
+    markSaved(id)
     await loadShurfs()
     if (id) await openDetails(id)
   } catch (e: any) {
@@ -811,6 +861,7 @@ const deleteShurf = async (id: number) => {
   deleting.value = true
   try {
     if (await recordForm.remove(id, selected.value?.address || `Шурф ${id}`)) {
+      forgetDraft(id)
       detailsVisible.value = false
       await loadShurfs()
     }
@@ -858,7 +909,7 @@ const openRelatedDefect = (id: number) => {
   visible.value = false
   emit('open-defect', id)
 }
-const buildFields = (entries: Array<[string, unknown, string?, string?, any?] | null>) => {
+const buildFields = (entries: Array<[string, unknown, string?, string?, any?] | null>): JournalDetailField[] => {
   return entries
     .filter(e => e != null)
     .map(e => e!)
@@ -873,24 +924,23 @@ const buildFields = (entries: Array<[string, unknown, string?, string?, any?] | 
     }))
 }
 
-const detailGroups = computed(() => {
+const detailGroups = computed((): JournalDetailGroup[] => {
   const item = isEditing.value ? editFields.value : selected.value
   if (!item && !isNew.value) return []
 
   return [
     { title: 'План и местоположение', fields: buildFields([
-      ['Название', item?.name, 'name', 'text'],
-      ['Назначение вскрытия', item?.purpose_name, 'purpose_id', 'select', lookups.purposes], 
+      ['Назначение вскрытия', item?.purpose_name, 'purpose_id', 'select', lookups.purposes],
       ['Состояние', item?.state_name, 'state_id', 'select', lookups.states],
       ['Материалы', item?.material_name, 'material_id', 'select', lookups.materials],
-      ['Плановое начало', item?.planned_start, 'planned_start', 'date'], 
+      ['Плановое начало', item?.planned_start, 'planned_start', 'date'],
       ['Плановое окончание', item?.planned_finish, 'planned_finish', 'date'],
-      ['Фактическое начало', item?.actual_start, 'actual_start', 'date'], 
+      ['Фактическое начало', item?.actual_start, 'actual_start', 'date'],
       ['Фактическое окончание', item?.actual_finish, 'actual_finish', 'date'],
       ['Адрес', item?.address], ['Номер дома', item?.house_number, 'house_number', 'text'],
-      ['Трубопровод', item?.line_id, 'line_id', 'number'], 
+      ['Трубопровод', item?.line_id, 'line_id', 'number'],
       ['Начальный узел', item?.line_start_node],
-      ['Конечный узел', item?.line_end_node], 
+      ['Конечный узел', item?.line_end_node],
       ['Ближайшая камера', item?.nearest_chamber_name],
       ['Расстояние до камеры, м', item?.distance_to_nearest_chamber, 'distance_to_nearest_chamber', 'number'],
       ['Длина осмотра, м', item?.inspection_length, 'inspection_length', 'number'],
@@ -938,11 +988,6 @@ watch([purposeId, stateId, approvalFilter, dateFrom, dateTo], () => {
   page.value = 1
   void loadShurfs()
 })
-watch(search, () => {
-  if (!visible.value) return
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => { page.value = 1; void loadShurfs() }, 350)
-})
 
 const exportWord = async () => {
   if (!selected.value) return
@@ -968,15 +1013,11 @@ defineExpose({ openDialog })
 
 <style scoped>
 .shurf-journal { height: min(88vh, 880px); display: flex; flex-direction: column; }
-.shurf-filters { flex-shrink: 0; background: #fafafa; }
+.shurf-kpi { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.shurf-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
 .approval-filter { min-width: 220px; max-width: 300px; }
 .shurf-table-wrap { min-height: 280px; overflow: auto; flex: 1; }
 .shurf-table { min-width: 1080px; }
-.shurf-row { cursor: pointer; }
-.result-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.shurf-empty { min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; }
-.detail-label { color: #78909c; font-size: .72rem; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
-.detail-value { color: #263238; font-size: .9rem; margin-top: 3px; overflow-wrap: anywhere; }
+.result-cell { display: inline-block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 @media (max-width: 600px) { .shurf-journal { height: 100dvh; } }
 </style>
-

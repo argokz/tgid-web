@@ -394,80 +394,14 @@
             :retry="false"
           >
             <template v-if="selected || isEditing">
-              <v-expansion-panels
-                multiple
-                variant="accordion"
-                :model-value="[0, 1]"
+              <JournalDetailFields
+                :groups="detailGroups"
+                :model="editFields"
+                :editable="editable"
+                :is-field-dirty="isFieldDirty"
+                :required-keys="['detected_at']"
+                @update:model="editFields = $event"
               >
-                <v-expansion-panel
-                  v-for="(group, groupIndex) in detailGroups"
-                  :key="group.title"
-                  :value="groupIndex"
-                >
-                  <v-expansion-panel-title>{{ group.title }}</v-expansion-panel-title>
-                  <v-expansion-panel-text>
-                    <FieldGrid :min-width="220">
-                      <FieldCell
-                        v-for="field in group.fields"
-                        :key="field.label"
-                        :label="field.label"
-                        :readonly="!editableField(field)"
-                        :dirty="editableField(field) && isFieldDirty(field.key)"
-                        :span="field.type === 'textarea'"
-                        :required="field.key === 'detected_at'"
-                      >
-                        <template #default="{ id }">
-                          <template v-if="editableField(field)">
-                            <AppSelect
-                              v-if="field.type === 'select'"
-                              :id="id"
-                              v-model="editFields[field.key!]"
-                              :items="field.items"
-                              item-title="name"
-                              item-value="id"
-                            />
-                            <v-text-field
-                              v-else-if="field.type === 'date'"
-                              :id="id"
-                              v-model="editFields[field.key!]"
-                              type="date"
-                              density="compact"
-                              hide-details
-                              variant="outlined"
-                            />
-                            <v-textarea
-                              v-else-if="field.type === 'textarea'"
-                              :id="id"
-                              v-model="editFields[field.key!]"
-                              rows="2"
-                              density="compact"
-                              hide-details
-                              variant="outlined"
-                            />
-                            <v-text-field
-                              v-else
-                              :id="id"
-                              v-model="editFields[field.key!]"
-                              :type="field.type === 'number' ? 'number' : 'text'"
-                              density="compact"
-                              hide-details
-                              variant="outlined"
-                            />
-                          </template>
-                          <div
-                            v-else
-                            :id="id"
-                            class="detail-value"
-                            :class="{ num: field.type === 'number' }"
-                          >
-                            {{ field.value }}
-                          </div>
-                        </template>
-                      </FieldCell>
-                    </FieldGrid>
-                  </v-expansion-panel-text>
-                </v-expansion-panel>
-
                 <v-expansion-panel
                   v-if="relationGroups.length && !isEditing"
                   :value="detailGroups.length"
@@ -495,7 +429,7 @@
                     </div>
                   </v-expansion-panel-text>
                 </v-expansion-panel>
-              </v-expansion-panels>
+              </JournalDetailFields>
               <JournalRecordPanels
                 v-if="selected && !isEditing"
                 class="mt-4"
@@ -582,23 +516,19 @@
 <script setup lang="ts">
 import AppSelect from '~/components/AppSelect.vue'
 import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
-import FieldCell from '~/components/FieldCell.vue'
-import FieldGrid from '~/components/FieldGrid.vue'
 import HintTip from '~/components/HintTip.vue'
+import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
 import KpiTile, { type KpiStatus } from '~/components/KpiTile.vue'
 import SearchField from '~/components/SearchField.vue'
 import StateView from '~/components/StateView.vue'
-import { hasLonLat, localToday, withDateInputs } from '~/utils/journalFields'
+import { hasLonLat, localToday } from '~/utils/journalFields'
 import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
 import { computed, reactive, ref, watch } from 'vue'
-import { confirmAction } from '~/composables/useConfirm'
-import { useJournalDraft } from '~/composables/useJournalDraft'
+import { useJournalEdit } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
 import { useJournalRecordForm } from '~/composables/useJournalRecordForm'
-import { useNotificationStore } from '~/stores/notificationStore'
-import { hasChanges, recordSnapshot } from '~/utils/journalDraft'
 import {
   fastApiService,
   type DefectDetails,
@@ -624,7 +554,6 @@ const emit = defineEmits<{
 
 const { isMobile } = useMobile()
 const mutationsEnabled = useMutationsEnabled()
-const notifications = useNotificationStore()
 
 const openForm11Report = () => {
   const url = fastApiService.getFormReportUrl('f11_defect', search.value)
@@ -649,10 +578,6 @@ const scope = reactive<DefectJournalScope>({})
 const lookups = reactive<DefectLookups>({ sources: [], states: [], categories: [] })
 /** Счётчики по состояниям из ответа списка; null — API их не отдаёт (плитки скрыты) */
 const stateCounts = ref<{ state_id: number | null; count: number }[] | null>(null)
-/** Строка, сохранённая только что, — подсвечивается в таблице */
-const flashId = ref<number | null>(null)
-let flashTimer: ReturnType<typeof setTimeout> | undefined
-const FLASH_MS = 2500
 
 const detailsVisible = ref(false)
 // Другой журнал начал выбор участков на карте — закрыть это окно (QA F48)
@@ -666,13 +591,6 @@ const notificationMessage = ref('')
 const notificationColor = ref<'success' | 'error'>('success')
 const creating = ref(false)
 const deleting = ref(false)
-
-const isEditing = ref(false)
-const isNew = ref(false)
-const saving = ref(false)
-const editFields = ref<Record<string, any>>({})
-/** Исходная запись на момент начала правки — для признака «изменено» и снимка черновика */
-const editOriginal = ref<Record<string, unknown> | null>(null)
 
 const scopeTitle = computed(() => {
   if (scope.lineId) return `нарушения трубопровода ${scope.lineId}`
@@ -810,84 +728,31 @@ const clearScope = () => {
 }
 
 const recordForm = useJournalRecordForm('defects')
-const isWritable = recordForm.isWritable
-const draft = useJournalDraft('defects')
-
-/** Записываемые поля по описанию журнала — только они сравниваются и попадают в черновик */
-const writableKeys = computed(() => Object.keys(recordForm.schema.value?.fields ?? {}))
-const draftId = computed<number | 'new'>(() => (isNew.value ? 'new' : (selected.value?.id ?? 'new')))
-const draftSnapshot = computed(() => recordSnapshot(isNew.value ? null : editOriginal.value, writableKeys.value))
-const isDirty = computed(() => isEditing.value && hasChanges(editFields.value, isNew.value ? null : editOriginal.value, writableKeys.value))
-const isFieldDirty = (key?: string) => Boolean(key) && isDirty.value
-  && hasChanges(editFields.value, isNew.value ? null : editOriginal.value, [key!])
-
-/** Черновик той же записи с того же снимка — предложить вернуть */
-const offerDraft = () => {
-  const saved = draft.take(draftId.value, draftSnapshot.value)
-  if (!saved) return
-  notifications.notify('info', 'Есть несохранённый черновик этой записи', {
-    label: 'Восстановить',
-    handler: () => { editFields.value = { ...editFields.value, ...saved.fields } },
-  })
-}
-
-watch(editFields, (fields) => {
-  if (isEditing.value && isDirty.value) draft.schedule(draftId.value, draftSnapshot.value, fields)
-}, { deep: true })
+// data_osmotra — timestamp ('2024-05-01T00:00:00'), поле type="date" его не показывает (QA F80)
+const {
+  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable,
+  beginCreate, beginEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
+} = useJournalEdit('defects', recordForm, selected, { dateKeys: ['detected_at', 'repair_started_on', 'repair_finished_on'] })
 
 const createDefect = async () => {
-  await recordForm.loadSchema()
-  isNew.value = true
-  isEditing.value = true
   // точка нарушения ставится на середину выбранного трубопровода (сервер), дата — сегодня
-  editFields.value = { detected_at: localToday(), line_id: scope.lineId ?? null }
-  editOriginal.value = null
   selected.value = null
   detailsVisible.value = true
   detailsError.value = ''
-  offerDraft()
+  await beginCreate({ detected_at: localToday(), line_id: scope.lineId ?? null })
 }
 
-const DEFECT_DATE_KEYS = ['detected_at', 'repair_started_on', 'repair_finished_on']
-
-const startEdit = () => {
-  if (!selected.value) return
-  isNew.value = false
-  isEditing.value = true
-  // data_osmotra — timestamp ('2024-05-01T00:00:00'), поле type="date" его не показывает (QA F80)
-  editFields.value = withDateInputs({ ...selected.value }, DEFECT_DATE_KEYS)
-  editOriginal.value = { ...editFields.value }
-  offerDraft()
-}
+const startEdit = () => beginEdit()
 
 const cancelEdit = async () => {
-  if (isDirty.value) {
-    const ok = await confirmAction({
-      title: 'Отменить правки?',
-      text: 'Несохранённые изменения будут отброшены. В базу ничего не записано.',
-      action: 'Отменить правки',
-      cancel: 'Продолжить правку',
-    })
-    if (!ok) return
-  }
-  draft.clear(draftId.value)
-  isEditing.value = false
+  if (!(await cancel())) return
   if (isNew.value) detailsVisible.value = false
 }
 
 // Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
 watch(detailsVisible, (open) => {
-  if (!open && isEditing.value) {
-    draft.flush()
-    isEditing.value = false
-  }
+  if (!open) closeKeepingDraft()
 })
-
-const flashRow = (id: number) => {
-  flashId.value = id
-  if (flashTimer) clearTimeout(flashTimer)
-  flashTimer = setTimeout(() => { flashId.value = null }, FLASH_MS)
-}
 
 const saveChanges = async () => {
   saving.value = true
@@ -897,14 +762,9 @@ const saveChanges = async () => {
       isNew: isNew.value, id: selected.value?.id, original: selected.value as Record<string, unknown> | null,
       edited: editFields.value,
     })
-    draft.clear(draftId.value)
-    isEditing.value = false
-    isNew.value = false
+    markSaved(id)
     await loadDefects()
-    if (id) {
-      flashRow(id)
-      await openDetails(id)
-    }
+    if (id) await openDetails(id)
   } catch (e: any) {
     recordForm.showError(formatApiError(e, 'Ошибка при сохранении'))
   } finally {
@@ -916,7 +776,7 @@ const deleteDefect = async (id: number) => {
   deleting.value = true
   try {
     if (await recordForm.remove(id, selected.value?.name || `Нарушение ${id}`)) {
-      draft.clear(id)
+      forgetDraft(id)
       detailsVisible.value = false
       await loadDefects()
     }
@@ -976,16 +836,7 @@ const downloadReport = async () => {
   }
 }
 
-interface DetailField {
-  label: string
-  value: string
-  rawValue: unknown
-  key?: string
-  type: string
-  items?: any
-}
-
-const buildFields = (entries: Array<[string, unknown, string?, string?, any?] | null>): DetailField[] => {
+const buildFields = (entries: Array<[string, unknown, string?, string?, any?] | null>): JournalDetailField[] => {
   return entries
     .filter(e => e != null)
     .map(e => e!)
@@ -1000,10 +851,7 @@ const buildFields = (entries: Array<[string, unknown, string?, string?, any?] | 
     }))
 }
 
-/** Поле правится: режим правки, ключ известен и объявлен сервером записываемым */
-const editableField = (field: DetailField) => isEditing.value && Boolean(field.key) && isWritable(field.key)
-
-const detailGroups = computed(() => {
+const detailGroups = computed((): JournalDetailGroup[] => {
   const item = isEditing.value ? editFields.value : selected.value
   if (!item && !isNew.value) return []
 
@@ -1160,12 +1008,6 @@ defineExpose({ openDialog })
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-}
-
-.detail-value {
-  color: rgb(var(--v-theme-on-surface));
-  font-size: 0.9rem;
-  overflow-wrap: anywhere;
 }
 
 @media (max-width: 600px) {

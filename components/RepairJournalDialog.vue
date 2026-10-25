@@ -51,35 +51,67 @@
             variant="flat"
             prepend-icon="mdi-plus"
             class="mr-2"
-            @click="createRepair"
             :loading="creating"
+            @click="createRepair"
           >
             Создать
           </v-btn>
-          <v-btn
-            icon
-            variant="text"
-            aria-label="Закрыть журнал"
-            @click="visible = false"
+          <HintTip
+            text="Закрыть журнал"
+            hotkey="Esc"
+            location="bottom"
           >
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Закрыть журнал"
+                @click="visible = false"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
         </v-card-title>
         <v-divider />
+
+        <!-- Плитки из ответа списка: всего и по состояниям при тех же фильтрах; плитка состояния — фильтр -->
+        <div
+          v-if="stateTiles.length"
+          class="repair-kpi px-3 px-md-4 pt-3"
+        >
+          <KpiTile
+            label="Найдено"
+            :value="total"
+            :compact="false"
+          />
+          <KpiTile
+            v-for="tile in stateTiles"
+            :key="tile.id"
+            :label="tile.name"
+            :value="tile.count"
+            :compact="false"
+            :status="tile.status"
+            selectable
+            :active="stateId === tile.id"
+            @select="toggleState(tile.id)"
+          />
+        </div>
+
         <div class="pa-3 pa-md-4 repair-filters">
           <v-row dense>
             <v-col
               cols="12"
               md="4"
             >
-              <v-text-field
-                v-model="search"
+              <SearchField
+                :model-value="search"
                 label="Поиск по ID, названию, работам или приказу"
-                prepend-inner-icon="mdi-magnify"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
+                :debounce="350"
+                :loading="loading"
+                @update:model-value="search = $event"
+                @search="onSearch"
               />
             </v-col>
             <v-col
@@ -87,16 +119,12 @@
               sm="6"
               md="2"
             >
-              <v-select
+              <AppSelect
                 v-model="stateId"
                 :items="lookups.states"
                 item-title="name"
                 item-value="id"
                 label="Состояние"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
               />
             </v-col>
             <v-col
@@ -104,16 +132,12 @@
               sm="6"
               md="2"
             >
-              <v-select
+              <AppSelect
                 v-model="repairTypeId"
                 :items="lookups.repair_types"
                 item-title="name"
                 item-value="id"
                 label="Вид ремонта"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
               />
             </v-col>
             <v-col
@@ -121,16 +145,12 @@
               sm="6"
               md="2"
             >
-              <v-select
+              <AppSelect
                 v-model="categoryId"
                 :items="lookups.categories"
                 item-title="name"
                 item-value="id"
                 label="Категория"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
               />
             </v-col>
             <v-col
@@ -138,16 +158,12 @@
               sm="6"
               md="2"
             >
-              <v-select
+              <AppSelect
                 v-model="approved"
                 :items="approvalOptions"
                 item-title="title"
                 item-value="value"
                 label="Утверждение"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
               />
             </v-col>
             <v-col
@@ -155,16 +171,12 @@
               sm="6"
               md="4"
             >
-              <v-select
+              <AppSelect
                 v-model="responsibleId"
                 :items="lookups.responsible_people"
                 item-title="name"
                 item-value="id"
                 label="Ответственный"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
               />
             </v-col>
             <v-col
@@ -201,7 +213,7 @@
             <v-chip
               v-if="scope.lineId"
               size="small"
-              color="deep-purple"
+              color="primary"
               closable
               @click:close="clearScope"
             >
@@ -210,7 +222,7 @@
             <v-chip
               v-if="scope.nodeId"
               size="small"
-              color="deep-purple"
+              color="primary"
               closable
               @click:close="clearScope"
             >
@@ -220,103 +232,122 @@
             <v-btn
               variant="text"
               prepend-icon="mdi-filter-remove-outline"
+              :disabled="!filtersActive"
               @click="resetFilters"
-            >Сбросить</v-btn>
+            >
+              Сбросить
+            </v-btn>
             <v-btn
-              color="deep-purple"
+              color="primary"
               prepend-icon="mdi-refresh"
               :loading="loading"
               @click="loadRepairs"
-            >Обновить</v-btn>
+            >
+              Обновить
+            </v-btn>
           </div>
         </div>
 
         <v-divider />
 
         <v-card-text class="pa-0 repair-table-wrap">
-          <v-progress-linear
-            v-if="loading"
-            indeterminate
-            color="deep-purple"
-          />
-          <v-alert
-            v-if="error"
-            type="error"
-            variant="tonal"
-            class="ma-4"
-          >{{ error }}</v-alert>
-
-          <div
-            v-else-if="!loading && items.length === 0"
-            class="repair-empty"
+          <StateView
+            variant="table"
+            :rows="10"
+            :loading="loading && !items.length"
+            :error="error"
+            :empty="!loading && !items.length"
+            empty-title="Ремонты не найдены"
+            :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В журнале пока нет записей — загрузите исторические данные ремонтов'"
+            empty-icon="mdi-hammer-wrench"
+            :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
+            :retrying="loading"
+            @retry="loadRepairs"
+            @action="resetFilters"
           >
-            <v-icon
-              size="56"
-              color="grey-lighten-1"
-            >mdi-hammer-wrench</v-icon>
-            <div class="text-subtitle-1 mt-3">Ремонты не найдены</div>
-            <div class="text-body-2 text-medium-emphasis mt-1">
-              Измените фильтры или загрузите в журнал исторические данные ремонтов.
-            </div>
-          </div>
-
-          <v-table
-            v-else
-            fixed-header
-            hover
-            density="compact"
-            class="repair-table"
-          >
-            <thead>
-              <tr>
-                <th>ID</th><th>Период</th><th>Ремонт</th><th>Вид / категория</th><th>Состояние</th>
-                <th>Ответственный</th><th>Линии</th><th>Бюджет, план / факт</th><th>Результат</th><th class="text-right">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="item in items"
-                :key="item.id"
-                class="repair-row"
-                @click="openDetails(item.id)"
-              >
-                <td class="font-weight-medium">{{ item.id }}</td>
-                <td class="text-no-wrap">{{ formatRange(item.effective_start, item.effective_finish) }}</td>
-                <td>
-                  <div>{{ item.name || `Ремонт ${item.id}` }}</div>
-                  <div class="text-caption text-medium-emphasis">{{ item.network_type_name || item.section_characteristics || '—' }}</div>
-                </td>
-                <td>{{ [item.repair_type_name, item.category_name].filter(Boolean).join(' · ') || '—' }}</td>
-                <td><v-chip
+            <v-progress-linear
+              v-if="loading"
+              indeterminate
+              color="primary"
+            />
+            <DataTable
+              :columns="tableColumns"
+              :items="(items as Record<string, unknown>[])"
+              item-key="id"
+              selectable
+              :selected-key="flashId"
+              density="compact"
+              class="repair-table"
+              @select="openDetails(Number($event.id))"
+            >
+              <template #[`item.period`]="{ item }">
+                <span class="text-no-wrap">{{ formatRange(item.effective_start, item.effective_finish) }}</span>
+              </template>
+              <template #[`item.name`]="{ item }">
+                <div class="text-truncate">
+                  {{ item.name || `Ремонт ${item.id}` }}
+                </div>
+                <div class="text-caption text-medium-emphasis text-truncate">
+                  {{ item.network_type_name || item.section_characteristics || '—' }}
+                </div>
+              </template>
+              <template #[`item.kind`]="{ item }">
+                {{ [item.repair_type_name, item.category_name].filter(Boolean).join(' · ') || '—' }}
+              </template>
+              <template #[`item.state_name`]="{ item }">
+                <v-chip
                   size="x-small"
-                  :color="stateColor(item.state_id)"
+                  :color="stateColor(Number(item.state_id))"
                   variant="tonal"
-                >{{ item.state_name || 'Не указано' }}</v-chip></td>
-                <td>{{ item.responsible_name || '—' }}</td>
-                <td>{{ item.line_count }}</td>
-                <td class="text-no-wrap">{{ formatMoney(item.planned_budget) }} / {{ formatMoney(item.actual_budget) }}</td>
-                <td class="result-cell">{{ item.results || item.work_description || item.note || '—' }}</td>
-                <td class="text-right text-no-wrap">
-                  <v-btn
-                    v-if="hasCoordinates(item)"
-                    icon="mdi-crosshairs-gps"
-                    size="x-small"
-                    variant="text"
-                    color="deep-purple"
-                    aria-label="Показать ремонт на карте"
-                    @click.stop="locate(item, item.name || `Ремонт ${item.id}`)"
-                  />
-                  <v-btn
-                    icon="mdi-chevron-right"
-                    size="x-small"
-                    variant="text"
-                    aria-label="Подробнее"
-                    @click.stop="openDetails(item.id)"
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
+                >
+                  {{ item.state_name || 'Не указано' }}
+                </v-chip>
+              </template>
+              <template #[`item.responsible_name`]="{ item }">
+                {{ item.responsible_name || '—' }}
+              </template>
+              <template #[`item.budget`]="{ item }">
+                <span class="text-no-wrap num">{{ formatMoney(item.planned_budget) }} / {{ formatMoney(item.actual_budget) }}</span>
+              </template>
+              <template #[`item.result`]="{ item }">
+                <span
+                  class="result-cell"
+                  :title="String(item.results || item.work_description || item.note || '')"
+                >{{ item.results || item.work_description || item.note || '—' }}</span>
+              </template>
+              <template #[`item.actions`]="{ item }">
+                <HintTip
+                  v-if="hasCoordinates(item)"
+                  text="Показать на карте"
+                  hint="Журнал закроется, маркер останется"
+                >
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon="mdi-crosshairs-gps"
+                      size="x-small"
+                      variant="text"
+                      color="primary"
+                      aria-label="Показать ремонт на карте"
+                      @click.stop="locate(item as RepairSummary, String(item.name || `Ремонт ${item.id}`))"
+                    />
+                  </template>
+                </HintTip>
+                <HintTip text="Открыть карточку">
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon="mdi-chevron-right"
+                      size="x-small"
+                      variant="text"
+                      aria-label="Подробнее"
+                      @click.stop="openDetails(Number(item.id))"
+                    />
+                  </template>
+                </HintTip>
+              </template>
+            </DataTable>
+          </StateView>
         </v-card-text>
 
         <v-divider />
@@ -348,249 +379,205 @@
             class="flex-grow-1"
             style="min-width: 0"
           >
-            <div class="text-subtitle-1 font-weight-bold text-truncate">{{ selected?.name || `Ремонт ${selected?.id || ''}` }}</div>
+            <div class="text-subtitle-1 font-weight-bold d-flex align-center ga-2">
+              <span class="text-truncate">{{ isNew ? 'Новый ремонт' : (selected?.name || `Ремонт ${selected?.id || ''}`) }}</span>
+              <v-chip
+                v-if="isEditing && isDirty"
+                size="x-small"
+                color="accent"
+                variant="tonal"
+              >
+                Не сохранено
+              </v-chip>
+            </div>
             <div class="text-caption text-medium-emphasis">
               {{ selected?.state_name || 'Состояние не указано' }} · линий {{ selected?.line_count || 0 }} · нарушений {{ selected?.defect_count || 0 }}
             </div>
           </div>
-          <v-btn
-            v-if="mutationsEnabled && selected"
-            icon
-            variant="text"
-            aria-label="Удалить"
-            color="error"
-            class="mr-1"
-            @click="deleteRepair(selected.id)"
-            :loading="deleting"
-            title="Удалить ремонт"
+          <HintTip
+            v-if="mutationsEnabled && selected && !isEditing"
+            text="Удалить ремонт"
+            hint="С подтверждением; действие попадёт в журнал"
+            location="bottom"
           >
-            <v-icon>mdi-delete</v-icon>
-          </v-btn>
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Удалить"
+                color="error"
+                class="mr-1"
+                :loading="deleting"
+                @click="deleteRepair(selected!.id)"
+              >
+                <v-icon>mdi-delete</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
           <v-btn
             icon
             variant="text"
             aria-label="Закрыть"
             @click="detailsVisible = false"
-          ><v-icon>mdi-close</v-icon></v-btn>
+          >
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
         </v-card-title>
         <v-divider />
 
         <v-card-text class="pa-4">
-          <div
-            v-if="detailsLoading"
-            class="d-flex justify-center pa-10"
-          ><v-progress-circular
-            indeterminate
-            color="deep-purple"
-          /></div>
-          <v-alert
-            v-else-if="detailsError"
-            type="error"
-            variant="tonal"
-          >{{ detailsError }}</v-alert>
-          <template v-else-if="selected || isEditing">
-            <v-btn-toggle
-              v-if="isNew"
-              v-model="createMode"
-              mandatory
-              density="compact"
-              color="deep-purple"
-              class="mb-3"
-            >
-              <v-btn value="plan">План (капитальный / инвестиционный)</v-btn>
-              <v-btn value="current">Текущий ремонт</v-btn>
-            </v-btn-toggle>
-            <v-expansion-panels
-              multiple
-              variant="accordion"
-              :model-value="[0, 1]"
-            >
-              <v-expansion-panel
-                v-for="(group, index) in detailGroups"
-                :key="group.title"
-                :value="index"
+          <StateView
+            variant="form"
+            :rows="8"
+            :loading="detailsLoading"
+            :error="detailsError"
+            :empty="!detailsLoading && !detailsError && !selected && !isEditing"
+            empty-title="Карточка не выбрана"
+            :retry="false"
+          >
+            <template v-if="selected || isEditing">
+              <!-- Плановый (капитальный / инвестиционный) и текущий ремонт — разные режимы создания сервера -->
+              <SegmentedToggle
+                v-if="isNew"
+                v-model="createMode"
+                :items="createModeItems"
+                aria-label="Вид ремонта"
+                class="mb-3"
+              />
+              <JournalDetailFields
+                :groups="detailGroups"
+                :model="editFields"
+                :editable="editable"
+                :is-field-dirty="isFieldDirty"
+                :required-keys="['name']"
+                @update:model="editFields = $event"
               >
-                <v-expansion-panel-title>{{ group.title }}</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-row dense>
-                    <v-col
-                      v-for="field in group.fields"
-                      :key="field.label"
-                      cols="12"
-                      sm="6"
-                      md="4"
-                      lg="3"
+                <v-expansion-panel
+                  v-if="repairLines.length && !isEditing"
+                  :value="detailGroups.length"
+                >
+                  <v-expansion-panel-title>Линии контура ({{ repairLines.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-list
+                      density="compact"
+                      lines="two"
                     >
-                      <div class="detail-label mb-1">{{ field.label }}</div>
-                      <template v-if="isEditing && field.key && isWritable(field.key)">
-                        <v-select
-                          v-if="field.type === 'select'"
-                          v-model="editFields[field.key]"
-                          :items="field.items"
-                          item-title="name"
-                          item-value="id"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                          clearable
-                        />
-                        <v-text-field
-                          v-else-if="field.type === 'date'"
-                          v-model="editFields[field.key]"
-                          type="date"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                        />
-                        <v-textarea
-                          v-else-if="field.type === 'textarea'"
-                          v-model="editFields[field.key]"
-                          rows="2"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                        />
-                        <v-text-field
-                          v-else
-                          v-model="editFields[field.key]"
-                          density="compact"
-                          hide-details
-                          variant="outlined"
-                        />
-                      </template>
-                      <div
-                        v-else
-                        class="detail-value"
-                      >{{ field.value }}</div>
-                    </v-col>
-                  </v-row>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-
-              <v-expansion-panel
-                v-if="repairLines.length && !isEditing"
-                :value="detailGroups.length"
-              >
-                <v-expansion-panel-title>Линии контура ({{ repairLines.length }})</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-list
-                    density="compact"
-                    lines="two"
-                  >
-                    <v-list-item
-                      v-for="line in repairLines"
-                      :key="Number(line.id)"
-                      prepend-icon="mdi-pipe"
-                      :title="`Линия ${line.line_id} · ${nodeRange(line)}`"
-                      :subtitle="lineSummary(line)"
-                    >
-                      <template
-                        v-if="hasCoordinates(line)"
-                        #append
+                      <v-list-item
+                        v-for="line in repairLines"
+                        :key="Number(line.id)"
+                        prepend-icon="mdi-pipe"
+                        :title="`Линия ${line.line_id} · ${nodeRange(line)}`"
+                        :subtitle="lineSummary(line)"
                       >
-                        <v-btn
-                          icon="mdi-crosshairs-gps"
-                          size="x-small"
-                          variant="text"
-                          aria-label="Показать на карте"
-                          @click.stop="locateRelation(line, `Линия ${line.line_id}`)"
-                        />
-                      </template>
-                    </v-list-item>
-                  </v-list>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
+                        <template
+                          v-if="hasCoordinates(line)"
+                          #append
+                        >
+                          <v-btn
+                            icon="mdi-crosshairs-gps"
+                            size="x-small"
+                            variant="text"
+                            aria-label="Показать на карте"
+                            @click.stop="locateRelation(line, `Линия ${line.line_id}`)"
+                          />
+                        </template>
+                      </v-list-item>
+                    </v-list>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
 
-              <v-expansion-panel
-                v-if="workSections.length && !isEditing"
-                :value="detailGroups.length + 1"
-              >
-                <v-expansion-panel-title>Участки работ ({{ workSections.length }})</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-list
-                    density="compact"
-                    lines="two"
-                  >
-                    <v-list-item
-                      v-for="section in workSections"
-                      :key="Number(section.id)"
-                      prepend-icon="mdi-ruler-square"
-                      :title="`Участок ${section.legacy_pipe_section_id || section.id}`"
-                      :subtitle="sectionSummary(section)"
-                    />
-                  </v-list>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
+                <v-expansion-panel
+                  v-if="workSections.length && !isEditing"
+                  :value="detailGroups.length + 1"
+                >
+                  <v-expansion-panel-title>Участки работ ({{ workSections.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-list
+                      density="compact"
+                      lines="two"
+                    >
+                      <v-list-item
+                        v-for="section in workSections"
+                        :key="Number(section.id)"
+                        prepend-icon="mdi-ruler-square"
+                        :title="`Участок ${section.legacy_pipe_section_id || section.id}`"
+                        :subtitle="sectionSummary(section)"
+                      />
+                    </v-list>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
 
-              <v-expansion-panel
-                v-if="workItems.length && !isEditing"
-                :value="detailGroups.length + 2"
-              >
-                <v-expansion-panel-title>Состав работ ({{ workItems.length }})</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-chip
-                    v-for="(item, index) in workItems"
-                    :key="`${item.category}-${item.name}-${index}`"
-                    class="ma-1"
-                    size="small"
-                    variant="tonal"
-                  >
-                    {{ item.category }} · {{ item.name }}
-                  </v-chip>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
+                <v-expansion-panel
+                  v-if="workItems.length && !isEditing"
+                  :value="detailGroups.length + 2"
+                >
+                  <v-expansion-panel-title>Состав работ ({{ workItems.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-chip
+                      v-for="(item, index) in workItems"
+                      :key="`${item.category}-${item.name}-${index}`"
+                      class="ma-1"
+                      size="small"
+                      variant="tonal"
+                    >
+                      {{ item.category }} · {{ item.name }}
+                    </v-chip>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
 
-              <v-expansion-panel
-                v-if="relatedDefects.length && !isEditing"
-                :value="detailGroups.length + 3"
-              >
-                <v-expansion-panel-title>Связанные нарушения ({{ relatedDefects.length }})</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-list
-                    density="compact"
-                    lines="two"
-                  >
-                    <v-list-item
-                      v-for="defect in relatedDefects"
-                      :key="Number(defect.id)"
-                      prepend-icon="mdi-alert-circle-outline"
-                      :title="`Нарушение ${defect.id} · ${defect.state_name || 'без состояния'}`"
-                      :subtitle="String(defect.description || defect.source_name || 'Описание не заполнено')"
-                      @click="openRelatedDefect(Number(defect.id))"
-                    />
-                  </v-list>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
+                <v-expansion-panel
+                  v-if="relatedDefects.length && !isEditing"
+                  :value="detailGroups.length + 3"
+                >
+                  <v-expansion-panel-title>Связанные нарушения ({{ relatedDefects.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-list
+                      density="compact"
+                      lines="two"
+                    >
+                      <v-list-item
+                        v-for="defect in relatedDefects"
+                        :key="Number(defect.id)"
+                        prepend-icon="mdi-alert-circle-outline"
+                        :title="`Нарушение ${defect.id} · ${defect.state_name || 'без состояния'}`"
+                        :subtitle="String(defect.description || defect.source_name || 'Описание не заполнено')"
+                        @click="openRelatedDefect(Number(defect.id))"
+                      />
+                    </v-list>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
 
-              <v-expansion-panel
-                v-if="documents.length && !isEditing"
-                :value="detailGroups.length + 4"
-              >
-                <v-expansion-panel-title>Документы ({{ documents.length }})</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-list density="compact">
-                    <v-list-item
-                      v-for="document in documents"
-                      :key="Number(document.id)"
-                      prepend-icon="mdi-file-document-outline"
-                      :title="String(document.document_type_name || 'Документ')"
-                      :subtitle="`${formatDate(document.date_doc)} · ${fileName(document.path)}`"
-                    />
-                  </v-list>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-            </v-expansion-panels>
-            <JournalRecordPanels
-              v-if="selected && !isEditing"
-              class="mt-4"
-              journal="repairs"
-              :record-id="selected.id"
-              :record-label="selected.name || `Ремонт ${selected.id}`"
-              @changed="refreshSelected"
-              @hide="hideForMap"
-              @restore="restoreAfterMap"
-            />
-          </template>
+                <v-expansion-panel
+                  v-if="documents.length && !isEditing"
+                  :value="detailGroups.length + 4"
+                >
+                  <v-expansion-panel-title>Документы ({{ documents.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-list density="compact">
+                      <v-list-item
+                        v-for="document in documents"
+                        :key="Number(document.id)"
+                        prepend-icon="mdi-file-document-outline"
+                        :title="String(document.document_type_name || 'Документ')"
+                        :subtitle="`${formatDate(document.date_doc)} · ${fileName(document.path)}`"
+                      />
+                    </v-list>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+              </JournalDetailFields>
+              <JournalRecordPanels
+                v-if="selected && !isEditing"
+                class="mt-4"
+                journal="repairs"
+                :record-id="selected.id"
+                :record-label="selected.name || `Ремонт ${selected.id}`"
+                @changed="refreshSelected"
+                @hide="hideForMap"
+                @restore="restoreAfterMap"
+              />
+            </template>
+          </StateView>
         </v-card-text>
 
         <v-divider />
@@ -599,23 +586,30 @@
             v-if="selected && hasCoordinates(selected) && !isEditing"
             prepend-icon="mdi-crosshairs-gps"
             variant="tonal"
-            color="deep-purple"
+            color="primary"
             @click="locate(selected, selected.name || `Ремонт ${selected.id}`)"
-          >На карте</v-btn>
+          >
+            На карте
+          </v-btn>
           <v-spacer />
           <template v-if="isEditing">
             <v-btn
               v-if="mutationsEnabled"
               variant="text"
               @click="cancelEdit"
-            >Отмена</v-btn>
+            >
+              Отмена
+            </v-btn>
             <v-btn
               v-if="mutationsEnabled"
               color="primary"
               variant="elevated"
               :loading="saving"
+              :disabled="!isNew && !isDirty"
               @click="saveChanges"
-            >Сохранить</v-btn>
+            >
+              Сохранить
+            </v-btn>
           </template>
           <template v-else>
             <v-btn
@@ -623,18 +617,24 @@
               color="primary"
               variant="tonal"
               @click="startEdit"
-            >Редактировать</v-btn>
+            >
+              Редактировать
+            </v-btn>
             <v-btn
               v-if="selected"
               variant="tonal"
               prepend-icon="mdi-file-word-outline"
               :loading="exportingWord"
               @click="exportWord"
-            >Word</v-btn>
+            >
+              Word
+            </v-btn>
             <v-btn
               variant="text"
               @click="detailsVisible = false"
-            >Закрыть</v-btn>
+            >
+              Закрыть
+            </v-btn>
           </template>
         </v-card-actions>
       </v-card>
@@ -648,15 +648,30 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
+import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
+import HintTip from '~/components/HintTip.vue'
+import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
+import KpiTile, { type KpiStatus } from '~/components/KpiTile.vue'
+import SearchField from '~/components/SearchField.vue'
+import SegmentedToggle, { type SegmentedToggleItem } from '~/components/SegmentedToggle.vue'
+import StateView from '~/components/StateView.vue'
 import { hasLonLat } from '~/utils/journalFields'
 import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
 import { computed, reactive, ref, watch } from 'vue'
+import { useJournalEdit } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
 import { useJournalRecordForm } from '~/composables/useJournalRecordForm'
 import { fastApiService, type RepairDetails, type RepairLookups, type RepairSummary } from '~/services/fastApiService'
 
+/**
+ * Журнал ремонтов — тип (б) «рабочее место» (docs/ui-modernization-progress.md, этап 5): `DataTable` с серверной
+ * пагинацией, плитки состояний из `state_counts`, фильтры `SearchField` / `AppSelect`, массовое утверждение плана
+ * (`JournalBatchApprovalDialog`), печать формы 10 и Word сохранены; карточка на общих `JournalDetailFields` +
+ * `useJournalEdit` (черновик, «изменено», отмена с подтверждением), линии контура с переходом на карту.
+ */
 export interface RepairJournalScope { lineId?: number; nodeId?: number; repairId?: number }
 const emit = defineEmits<{
   'locate-repair': [coordinates: { longitude: number; latitude: number; id: number; label: string }]
@@ -691,7 +706,8 @@ const lookups = reactive<RepairLookups>({
   states: [], repair_types: [], categories: [], subdivisions: [], document_types: [], responsible_people: []
 })
 const approvalOptions = [{ title: 'Утверждено', value: true }, { title: 'Не утверждено', value: false }]
-let searchTimer: ReturnType<typeof setTimeout> | undefined
+/** Счётчики по состояниям из ответа списка; null — API их не отдаёт (плитки скрыты) */
+const stateCounts = ref<{ state_id: number | null; count: number }[] | null>(null)
 const detailsVisible = ref(false)
 // Другой журнал начал выбор участков на карте — закрыть это окно (QA F48)
 useCloseOnMapPick(() => visible.value || detailsVisible.value, () => { detailsVisible.value = false; visible.value = false })
@@ -702,21 +718,50 @@ const creating = ref(false)
 const deleting = ref(false)
 const exportingWord = ref(false)
 
-const isEditing = ref(false)
-const isNew = ref(false)
-const saving = ref(false)
-const editFields = ref<Record<string, any>>({})
-
 const scopeTitle = computed(() => scope.lineId ? `ремонты трубопровода ${scope.lineId}`
   : scope.nodeId ? `ремонты прилегающих трубопроводов узла ${scope.nodeId}` : 'вся тепловая сеть')
+const filtersActive = computed(() => Boolean(
+  search.value.trim() || stateId.value || repairTypeId.value || categoryId.value || responsibleId.value
+  || approved.value !== undefined || dateFrom.value || dateTo.value,
+))
+
+const tableColumns: DataTableColumn[] = [
+  { key: 'id', title: 'ID', type: 'number', width: 76, sortable: false },
+  { key: 'period', title: 'Период', type: 'date', width: 170, sortable: false },
+  { key: 'name', title: 'Ремонт', sortable: false },
+  { key: 'kind', title: 'Вид / категория', width: 170, sortable: false },
+  { key: 'state_name', title: 'Состояние', width: 120, sortable: false },
+  { key: 'responsible_name', title: 'Ответственный', width: 150, sortable: false },
+  { key: 'line_count', title: 'Линии', type: 'number', width: 80, sortable: false },
+  { key: 'budget', title: 'Бюджет, план / факт', type: 'number', width: 180, sortable: false },
+  { key: 'result', title: 'Результат', sortable: false },
+  { key: 'actions', title: '', type: 'actions', width: 88, sortable: false },
+]
+
+/** Состояние ремонта → тон плитки: план — нейтрально, в работе — внимание, выполнен — в порядке */
+const STATE_STATUS: Record<number, KpiStatus> = { 1: 'none', 2: 'warning', 3: 'good' }
+const stateTiles = computed(() => {
+  if (!stateCounts.value) return []
+  const counts = new Map(stateCounts.value.map((c) => [c.state_id, c.count]))
+  return (lookups.states as { id: number; name: string }[]).map((state) => ({
+    id: state.id,
+    name: state.name,
+    count: counts.get(state.id) ?? 0,
+    status: STATE_STATUS[state.id] ?? 'none',
+  }))
+})
+const toggleState = (id: number) => {
+  stateId.value = stateId.value === id ? undefined : id
+}
+
 const formatDate = (value: unknown) => {
   if (!value) return '—'
   const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/)
   return match ? `${match[3]}.${match[2]}.${match[1]}` : String(value)
 }
 const formatRange = (start: unknown, finish: unknown) => [formatDate(start), formatDate(finish)].filter((v, i, a) => v !== '—' && a.indexOf(v) === i).join(' — ') || '—'
-const formatMoney = (value: unknown) => value === null || value === undefined || value === '' ? '—'
-  : new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value))
+const moneyFormat = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 })
+const formatMoney = (value: unknown) => value === null || value === undefined || value === '' ? '—' : moneyFormat.format(Number(value))
 const formatValue = (value: unknown) => {
   if (value === null || value === undefined || value === '') return '—'
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return formatDate(value)
@@ -742,9 +787,16 @@ const loadRepairs = async () => {
       approved: approved.value, date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined,
       line_id: scope.lineId, node_id: scope.nodeId, search: search.value.trim() || undefined })
     items.value = response.items; total.value = response.total; pages.value = response.pages
+    stateCounts.value = Array.isArray(response.state_counts) ? response.state_counts : null
   } catch (loadError: any) {
     error.value = loadError?.data?.detail || loadError?.message || 'Не удалось загрузить журнал ремонтов'
   } finally { loading.value = false }
+}
+/** Текст после паузы ввода (SearchField) */
+const onSearch = () => {
+  if (!visible.value) return
+  page.value = 1
+  void loadRepairs()
 }
 const openDetails = async (id: number) => {
   detailsVisible.value = true; detailsLoading.value = true; detailsError.value = ''; selected.value = null
@@ -764,32 +816,36 @@ const clearScope = () => { scope.lineId = undefined; scope.nodeId = undefined; p
 
 const recordForm = useJournalRecordForm('repairs')
 const batchApprovalRef = ref<{ open: () => Promise<void> } | null>(null)
-const isWritable = recordForm.isWritable
+const {
+  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable,
+  beginCreate, beginEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
+} = useJournalEdit('repairs', recordForm, selected)
 const createMode = ref<'plan' | 'current'>('plan')
+const createModeItems: SegmentedToggleItem<'plan' | 'current'>[] = [
+  { value: 'plan', label: 'План (капитальный / инвестиционный)', icon: 'mdi-calendar-check-outline', hint: 'С плановыми датами и бюджетом, попадает в план на утверждение' },
+  { value: 'current', label: 'Текущий ремонт', icon: 'mdi-wrench-outline', hint: 'Без плана: сразу в работу' },
+]
 const networkTypes = [{ id: 1, name: 'Магистральная сеть' }, { id: 2, name: 'Внутриквартальная сеть' }]
 
 const createRepair = async () => {
-  await recordForm.loadSchema()
-  isNew.value = true
-  isEditing.value = true
   createMode.value = 'plan'
-  editFields.value = { name: '' }
   selected.value = null
   detailsVisible.value = true
   detailsError.value = ''
+  await beginCreate({ name: '' })
 }
 
-const startEdit = () => {
-  if (!selected.value) return
-  isNew.value = false
-  isEditing.value = true
-  editFields.value = { ...selected.value }
-}
+const startEdit = () => beginEdit()
 
-const cancelEdit = () => {
-  isEditing.value = false
+const cancelEdit = async () => {
+  if (!(await cancel())) return
   if (isNew.value) detailsVisible.value = false
 }
+
+// Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
+watch(detailsVisible, (open) => {
+  if (!open) closeKeepingDraft()
+})
 
 const saveChanges = async () => {
   saving.value = true
@@ -799,8 +855,7 @@ const saveChanges = async () => {
       isNew: isNew.value, id: selected.value?.id, original: selected.value as Record<string, unknown> | null,
       edited: editFields.value, mode: createMode.value,
     })
-    isEditing.value = false
-    isNew.value = false
+    markSaved(id)
     await loadRepairs()
     if (id) await openDetails(id)
   } catch (e: any) {
@@ -814,6 +869,7 @@ const deleteRepair = async (id: number) => {
   deleting.value = true
   try {
     if (await recordForm.remove(id, selected.value?.name || `Ремонт ${id}`)) {
+      forgetDraft(id)
       detailsVisible.value = false
       await loadRepairs()
     }
@@ -858,7 +914,7 @@ const locateRelation = (relation: Record<string, unknown>, label: string) => {
   detailsVisible.value = false; visible.value = false
 }
 const openRelatedDefect = (id: number) => { detailsVisible.value = false; visible.value = false; emit('open-defect', id) }
-const buildFields = (entries: Array<[string, unknown, string?, string?, any?] | null>) => {
+const buildFields = (entries: Array<[string, unknown, string?, string?, any?] | null>): JournalDetailField[] => {
   return entries
     .filter(e => e != null)
     .map(e => e!)
@@ -872,7 +928,7 @@ const buildFields = (entries: Array<[string, unknown, string?, string?, any?] | 
       items
     }))
 }
-const detailGroups = computed(() => {
+const detailGroups = computed((): JournalDetailGroup[] => {
   const item = isEditing.value ? editFields.value : selected.value
   if (!item && !isNew.value) return []
 
@@ -911,11 +967,6 @@ watch(page, () => { if (visible.value) void loadRepairs() })
 watch([stateId, repairTypeId, categoryId, responsibleId, approved, dateFrom, dateTo], () => {
   if (!visible.value) return; page.value = 1; void loadRepairs()
 })
-watch(search, () => {
-  if (!visible.value) return
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => { page.value = 1; void loadRepairs() }, 350)
-})
 const exportWord = async () => {
   if (!selected.value) return
   exportingWord.value = true
@@ -940,16 +991,10 @@ defineExpose({ openDialog })
 
 <style scoped>
 .repair-journal { height: min(90vh, 900px); display: flex; flex-direction: column; }
-.repair-filters { flex-shrink: 0; background: #fafafa; }
+.repair-kpi { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.repair-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
 .repair-table-wrap { min-height: 280px; overflow: auto; flex: 1; }
 .repair-table { min-width: 1260px; }
-.repair-row { cursor: pointer; }
-.result-cell { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.repair-empty { min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; }
-.detail-label { color: #78909c; font-size: .72rem; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
-.detail-value { color: #263238; font-size: .9rem; margin-top: 3px; overflow-wrap: anywhere; }
+.result-cell { display: inline-block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 @media (max-width: 600px) { .repair-journal { height: 100dvh; } }
 </style>
-
-
-
