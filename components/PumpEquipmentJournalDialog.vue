@@ -695,6 +695,8 @@ import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
 import { useJournalEdit, type JournalEditSource } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useAuthStore } from '~/stores/authStore'
+import { canDo } from '~/utils/permissions'
 import { beginEquipmentEdit, saveEquipmentEdit } from '~/services/equipmentEditService'
 import { useNotificationStore } from '~/stores/notificationStore'
 import { formatApiError } from '~/utils/apiError'
@@ -734,7 +736,10 @@ const emit = defineEmits<{
 }>()
 const { isMobile } = useMobile()
 const { chartTheme } = useChartTheme()
-const mutationsEnabled = useMutationsEnabled('network')
+const canEditNetwork = useMutationsEnabled('network')
+const authStore = useAuthStore()
+// плюс право «оборудование: правка» из матрицы ролей — как у кнопки «Оборудование» в карточке объекта
+const mutationsEnabled = computed(() => canEditNetwork.value && canDo(authStore.permissions, 'equipment', 'edit'))
 const notifications = useNotificationStore()
 const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
 const visible = ref(false)
@@ -1191,6 +1196,7 @@ const saveChanges = async () => {
   try {
     await saveEquipmentEdit('pumps', id, editFields.value)
     markSaved(id)
+    notifications.showSuccess('Изменения сохранены')
     await Promise.all([loadInstalled(), openInstalledDetails(id)])
   } catch (cause) {
     // текст — в карточке; конфликт версий (409) ещё и уведомлением с перезагрузкой

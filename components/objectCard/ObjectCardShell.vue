@@ -1,7 +1,7 @@
 <template>
   <!-- На телефоне — нижний лист: карта над ним остаётся рабочей; закрытие свайпом решает владелец -->
   <BottomSheet
-    v-if="mobile"
+    v-if="sheet"
     v-model:snap="sheetSnap"
     :model-value="modelValue"
     drag-selector="[data-card-drag]"
@@ -58,7 +58,19 @@ const dragging = ref(false);
 const viewport = ref({ w: 1280, h: 800 });
 /** Положение нижнего листа; каждое открытие — с половины экрана */
 const sheetSnap = ref<SheetSnap>('half');
-watch(() => props.modelValue, (open) => { if (open) sheetSnap.value = 'half'; });
+/**
+ * Лист или панель — решается при открытии и держится, пока карточка открыта: смена ветки шаблона
+ * пересоздала бы содержимое (форму правки с несохранёнными значениями) при повороте или ресайзе окна.
+ */
+const sheet = ref(Boolean(props.mobile));
+watch(() => props.modelValue, (open) => {
+  if (!open) return;
+  sheetSnap.value = 'half';
+  sheet.value = Boolean(props.mobile);
+});
+watch(() => props.mobile, (mobile) => {
+  if (!props.modelValue) sheet.value = Boolean(mobile);
+});
 
 const updateViewport = () => {
   viewport.value = { w: window.innerWidth, h: window.innerHeight };
@@ -71,7 +83,7 @@ onMounted(() => {
 });
 // Ширина панели справа — в менеджер панелей: полосы над картой центрируются по видимой части карты
 watchEffect(() => {
-  ui.setRightInset(props.modelValue && !props.mobile && layout.mode === 'panel'
+  ui.setRightInset(props.modelValue && !sheet.value && layout.mode === 'panel'
     ? clampPanelWidth(layout.panelWidth, viewport.value.w)
     : 0);
 });
@@ -86,7 +98,7 @@ onBeforeUnmount(() => {
 });
 
 const shellStyle = computed(() => {
-  if (props.mobile) return {};
+  if (sheet.value) return {};
   if (layout.mode === 'panel') return { width: `${clampPanelWidth(layout.panelWidth, viewport.value.w)}px` };
   const f = clampFloat(layout.float, viewport.value.w, viewport.value.h);
   return { left: `${f.x}px`, top: `${f.y}px`, width: `${f.w}px`, height: `${f.h}px` };
@@ -142,7 +154,7 @@ const listenPointer = (handler: (e: PointerEvent) => void) => {
 };
 
 const onPointerDown = (e: PointerEvent) => {
-  if (props.mobile || layout.mode !== 'float' || e.button !== 0) return;
+  if (sheet.value || layout.mode !== 'float' || e.button !== 0) return;
   const target = e.target as HTMLElement | null;
   if (!target?.closest('[data-card-drag]') || target.closest('button, a, input, textarea, .v-field')) return;
   const start = { x: e.clientX, y: e.clientY, fx: layout.float.x, fy: layout.float.y };

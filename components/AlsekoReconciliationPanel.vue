@@ -372,12 +372,20 @@ async function loadSummary() {
   } catch (cause) { fail(cause, 'Не удалось выполнить сверку') } finally { loadingSummary.value = false }
 }
 async function selectKind(k: string) { kind.value = k; issuePage.value = 1; await loadIssues() }
+/** Номер последнего запроса несоответствий: ответ по прежнему виду или странице не перекрывает новый */
+let issuesRequest = 0
 async function loadIssues() {
   if (!kind.value) return
+  const request = ++issuesRequest
   loadingIssues.value = true
-  try { issues.value = await fastApiService.getAlsekoReconciliationIssues(kind.value, PAGE, (issuePage.value - 1) * PAGE) }
-  catch (cause) { fail(cause, 'Не удалось загрузить несоответствия') }
-  finally { loadingIssues.value = false }
+  try {
+    const result = await fastApiService.getAlsekoReconciliationIssues(kind.value, PAGE, (issuePage.value - 1) * PAGE)
+    if (request === issuesRequest) issues.value = result
+  } catch (cause) {
+    if (request === issuesRequest) fail(cause, 'Не удалось загрузить несоответствия')
+  } finally {
+    if (request === issuesRequest) loadingIssues.value = false
+  }
 }
 function openIssue(selectedRow: Record<string, unknown>) {
   const row = (selectedRow.__source as Record<string, unknown> | undefined) || selectedRow
@@ -404,42 +412,66 @@ async function searchAddresses() {
     if (!addressQuery.value && res.query) addressQuery.value = res.query
   } catch (cause) { fail(cause, 'Не удалось найти адреса') } finally { searching.value = false }
 }
+/**
+ * «Применить» записывает ровно то, что показал предпросмотр: запрос запоминается вместе с ним, а смена здания,
+ * выбранного адреса, узла или списка зданий предпросмотр сбрасывает (иначе записалось бы непросмотренное —
+ * вплоть до очистки адреса, когда новый поиск снял выбор).
+ */
+type AddressBindRequest = { buildingId: number; payload: { microdistrict?: string | null; street?: string | null; house: string | null } }
+type ConsumerBindRequest = { nodeId: number; buildingIds: number[] }
+let previewedAddress: AddressBindRequest | null = null
+let previewedConsumer: ConsumerBindRequest | null = null
+watch([buildingId, chosen], () => { addressPreview.value = null; previewedAddress = null })
+watch([consumerNodeId, consumerBuildings], () => { consumerPreview.value = null; previewedConsumer = null })
+
 async function previewAddress(clear: boolean) {
   if (!buildingId.value) return
+  const c = chosen.value
+  const requestBody: AddressBindRequest = {
+    buildingId: buildingId.value,
+    payload: clear || !c ? { house: null } : { microdistrict: c.microdistrict, street: c.street, house: c.house },
+  }
   binding.value = true
   try {
-    const c = chosen.value
-    addressPreview.value = await fastApiService.bindAlsekoBuildingAddress(buildingId.value, clear || !c
-      ? { house: null, dry_run: true }
-      : { microdistrict: c.microdistrict, street: c.street, house: c.house, dry_run: true })
+    addressPreview.value = await fastApiService.bindAlsekoBuildingAddress(requestBody.buildingId, { ...requestBody.payload, dry_run: true })
+    previewedAddress = requestBody
   } catch (cause) { fail(cause, 'Предпросмотр не удался') } finally { binding.value = false }
 }
 async function applyAddress() {
-  const p = addressPreview.value
-  if (!p || !buildingId.value) return
+  const requestBody = previewedAddress
+  if (!requestBody || !addressPreview.value?.dry_run) return
   binding.value = true
   try {
-    const c = chosen.value
-    addressPreview.value = await fastApiService.bindAlsekoBuildingAddress(buildingId.value, p.action === 'clear' || !c
-      ? { house: null, dry_run: false }
-      : { microdistrict: c.microdistrict, street: c.street, house: c.house, dry_run: false })
-    await loadSummary()
-  } catch (cause) { fail(cause, 'Привязка не записана') } finally { binding.value = false }
+    addressPreview.value = await fastApiService.bindAlsekoBuildingAddress(requestBody.buildingId, { ...requestBody.payload, dry_run: false })
+    previewedAddress = null
+  } catch (cause) {
+    fail(cause, 'Привязка не записана')
+    return
+  } finally { binding.value = false }
+  // привязка записана; сбой обновления сверки — отдельная ошибка, а не «не записана»
+  await loadSummary()
 }
 async function previewConsumer() {
   if (!consumerNodeId.value) return
+  const requestBody: ConsumerBindRequest = { nodeId: consumerNodeId.value, buildingIds: parseIdList(consumerBuildings.value) }
   consumerBinding.value = true
   try {
-    consumerPreview.value = await fastApiService.bindAlsekoConsumerBuildings(consumerNodeId.value, { building_ids: parseIdList(consumerBuildings.value), dry_run: true })
+    consumerPreview.value = await fastApiService.bindAlsekoConsumerBuildings(requestBody.nodeId, { building_ids: requestBody.buildingIds, dry_run: true })
+    previewedConsumer = requestBody
   } catch (cause) { fail(cause, 'Предпросмотр не удался') } finally { consumerBinding.value = false }
 }
 async function applyConsumer() {
-  if (!consumerNodeId.value) return
+  const requestBody = previewedConsumer
+  if (!requestBody || !consumerPreview.value?.dry_run) return
   consumerBinding.value = true
   try {
-    consumerPreview.value = await fastApiService.bindAlsekoConsumerBuildings(consumerNodeId.value, { building_ids: parseIdList(consumerBuildings.value), dry_run: false })
-    await loadSummary()
-  } catch (cause) { fail(cause, 'Привязка не записана') } finally { consumerBinding.value = false }
+    consumerPreview.value = await fastApiService.bindAlsekoConsumerBuildings(requestBody.nodeId, { building_ids: requestBody.buildingIds, dry_run: false })
+    previewedConsumer = null
+  } catch (cause) {
+    fail(cause, 'Привязка не записана')
+    return
+  } finally { consumerBinding.value = false }
+  await loadSummary()
 }
 
 onMounted(() => {

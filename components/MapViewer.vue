@@ -147,6 +147,7 @@
         >
           <LazyDialogBoundary
             v-if="mountedDialogs[dialog.key]"
+            :ref="boundaryRef(dialog.key)"
             :name="dialogLabel(dialog.key)"
           >
             <component
@@ -160,6 +161,7 @@
         <!-- Attribute properties panel dialog (лениво: монтируется при первом identify-клике) -->
         <LazyDialogBoundary
           v-if="mountedDialogs.attributePanel"
+          :ref="boundaryRef('attributePanel')"
           name="Карточка объекта"
         >
           <LazyAttributePanel
@@ -194,6 +196,7 @@
         <!-- Node search dialog -->
         <LazyDialogBoundary
           v-if="mountedDialogs.nodeSearch"
+          :ref="boundaryRef('nodeSearch')"
           name="Поиск узлов"
         >
           <LazyNodeSearch
@@ -680,6 +683,7 @@ const attributePanelRef = ref<{
   close: () => void | Promise<void>;
   confirmLeaveEditing?: () => Promise<boolean>;
 } | null>(null);
+let stopPendingPanelShow: (() => void) | null = null;
 
 /**
  * Ленивое монтирование диалогов: тяжёлые журналы не попадают в основной чанк карты,
@@ -701,6 +705,21 @@ const dialogRef = (key: LazyDialogKey) =>
     dialogInstances[key] = (el as LazyDialogInstance | null) ?? null;
   });
 
+/** Границы ошибок по ключу: упавший диалог при новом открытии монтируется заново */
+type BoundaryHandle = { retry: () => void; failed: boolean };
+const boundaries: Partial<Record<LazyDialogKey | 'attributePanel', BoundaryHandle | null>> = {};
+const boundaryRefSetters: Partial<Record<LazyDialogKey | 'attributePanel', (el: any) => void>> = {};
+const boundaryRef = (key: LazyDialogKey | 'attributePanel') =>
+  (boundaryRefSetters[key] ??= (el: any) => {
+    boundaries[key] = (el as BoundaryHandle | null) ?? null;
+  });
+const reviveBoundary = (key: LazyDialogKey | 'attributePanel') => {
+  const boundary = boundaries[key];
+  if (boundary?.failed) boundary.retry();
+};
+/** Одно ожидание экземпляра на ключ: повторные клики до загрузки не копят наблюдателей, откроется последний */
+const pendingOpen: Partial<Record<LazyDialogKey, () => void>> = {};
+
 const onOpenTool = (event: ToolEvent) => {
   const key = TOOL_EVENT_TO_DIALOG[event];
   if (key) openLazyDialog(key);
@@ -708,16 +727,21 @@ const onOpenTool = (event: ToolEvent) => {
 
 const openLazyDialog = (key: LazyDialogKey, scope?: unknown) => {
   mountedDialogs[key] = true;
+  pendingOpen[key]?.();
+  delete pendingOpen[key];
   const current = dialogInstances[key];
   if (current) {
     current.openDialog(scope);
     return;
   }
+  reviveBoundary(key);
   const stop = watch(() => dialogInstances[key], (instance: LazyDialogInstance | null | undefined) => {
     if (!instance) return;
     stop();
+    delete pendingOpen[key];
     instance.openDialog(scope);
   });
+  pendingOpen[key] = stop;
 };
 
 // Диалог по запросу извне карты (протокол расчёта: «Исправить» → журнал температурных графиков)
@@ -1548,11 +1572,16 @@ onMounted(() => {
         attributePanelRef.value.show(properties, options);
         return;
       }
+      // одно ожидание карточки: клики до её загрузки не копятся, откроется последний объект
+      stopPendingPanelShow?.();
+      reviveBoundary('attributePanel');
       const stop = watch(attributePanelRef, (panel) => {
         if (!panel) return;
         stop();
+        stopPendingPanelShow = null;
         panel.show(properties, options);
       });
+      stopPendingPanelShow = stop;
     };
   }
 });

@@ -127,6 +127,11 @@ function onUp(e: PointerEvent) {
   stopListening()
   if (!moved) return
   dragging.value = false
+  // жест забрал браузер (прокрутка, системный жест): координата недостоверна — лист на прежнее место
+  if (e.type === 'pointercancel') {
+    applyVisible(settled.value)
+    return
+  }
   // палец остановился перед отпусканием — это не бросок
   const releaseVelocity = (e.timeStamp || performance.now()) - lastTime > FLICK_WINDOW_MS ? 0 : velocity
   const target = settleSheet(currentVisible(e.clientY), releaseVelocity, heights.value)

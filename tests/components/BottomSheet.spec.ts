@@ -65,4 +65,14 @@ describe('BottomSheet', () => {
     expect(w.emitted('dismiss')).toHaveLength(1);
     expect(visibleOf(w.find('.bottom-sheet').element)).toBe(heights.peek);
   });
+
+  it('жест отменён браузером (pointercancel) — лист остаётся на прежнем положении', async () => {
+    const w = mountSheet();
+    pointer('pointerdown', 400, 0, w.find('.bottom-sheet__handle').element);
+    pointer('pointermove', 300, 100);
+    pointer('pointercancel', 0, 120);
+    await w.vm.$nextTick();
+    expect(w.emitted('update:snap')).toBeUndefined();
+    expect(visibleOf(w.find('.bottom-sheet').element)).toBe(heights.half);
+  });
 });

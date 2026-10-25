@@ -615,6 +615,8 @@ import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
 import { useJournalEdit, type JournalEditSource } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
+import { useAuthStore } from '~/stores/authStore'
+import { canDo } from '~/utils/permissions'
 import { beginEquipmentEdit, saveEquipmentEdit } from '~/services/equipmentEditService'
 import { useNotificationStore } from '~/stores/notificationStore'
 import { formatApiError } from '~/utils/apiError'
@@ -647,7 +649,10 @@ const emit = defineEmits<{
   'locate-bypass': [payload: { longitude: number; latitude: number; id: number; lineId: number | null; label: string }]
 }>()
 const { isMobile } = useMobile()
-const mutationsEnabled = useMutationsEnabled('network')
+const canEditNetwork = useMutationsEnabled('network')
+const authStore = useAuthStore()
+// плюс право «оборудование: правка» из матрицы ролей — как у кнопки «Оборудование» в карточке объекта
+const mutationsEnabled = computed(() => canEditNetwork.value && canDo(authStore.permissions, 'equipment', 'edit'))
 const notifications = useNotificationStore()
 const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
 const visible = ref(false)
@@ -1031,6 +1036,7 @@ const saveChanges = async () => {
   try {
     await saveEquipmentEdit('bypass', id, editFields.value)
     markSaved(id)
+    notifications.showSuccess('Изменения сохранены')
     await Promise.all([loadInventory(), openItemDetails(id)])
   } catch (cause) {
     // текст — в карточке; конфликт версий (409) ещё и уведомлением с перезагрузкой
