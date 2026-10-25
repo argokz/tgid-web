@@ -15,6 +15,7 @@ import type { DeviceClass } from '~/utils/breakpoints';
  * верхний, кто согласился, закрывает своё; один слушатель клавиши на приложение — `useGlobalEscape`.
  * `rightInset` — ширина открытой панели карточки справа: полосы над картой центрируются по видимой части.
  * `bottomInset` — высота панели графиков снизу (`ChartDock`): перелёт к объекту ставит его над панелью.
+ * `leftInset` — ширина открытой панели слоёв слева (десктоп): легенда и панель графиков встают правее неё.
  */
 export type PanelKey = 'tools' | 'draw' | 'card';
 
@@ -62,6 +63,8 @@ export const useUiStore = defineStore('ui', () => {
   const rightInset = ref(0);
   /** Высота панели графиков у нижнего края, px (0 — закрыта или на телефоне) */
   const bottomInset = ref(0);
+  /** Ширина панели слоёв слева, px (0 — свёрнута или на телефоне) */
+  const leftInset = ref(0);
 
   const flags: Record<PanelKey, Ref<boolean>> = { tools: toolsPanelOpen, draw: drawPanelOpen, card: cardOpen };
 
@@ -101,6 +104,7 @@ export const useUiStore = defineStore('ui', () => {
   };
   const setRightInset = (px: number) => { rightInset.value = Math.max(0, Math.round(px)); };
   const setBottomInset = (px: number) => { bottomInset.value = Math.max(0, Math.round(px)); };
+  const setLeftInset = (px: number) => { leftInset.value = Math.max(0, Math.round(px)); };
 
   // Стек Esc: регистрируются открытые панели и меню; снимаются при закрытии (useEscapeClose)
   const escapeStack: { id: number; handle: EscapeHandler }[] = [];
@@ -136,6 +140,7 @@ export const useUiStore = defineStore('ui', () => {
     viewport,
     rightInset,
     bottomInset,
+    leftInset,
     openPanels,
     escapeDepth,
     isOpen,
@@ -148,6 +153,7 @@ export const useUiStore = defineStore('ui', () => {
     setViewport,
     setRightInset,
     setBottomInset,
+    setLeftInset,
     pushEscape,
     handleEscape,
   };

@@ -1,4 +1,6 @@
 import { appStorage } from '~/utils/appStorage';
+import { calculationColorExpression } from '~/utils/calculationScale';
+import { waitForStyleMutable } from '~/services/mapService';
 import { resetStaleMapPrefs } from '~/utils/mapDefaults';
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
@@ -490,6 +492,10 @@ export const useMapStore = defineStore('map', {
 
       try {
         const data = await fastApiService.getCalculationResultsGeoJSON(calculationId);
+        // стиль карты мог ещё грузиться (открытие карты, смена подложки) — слой добавляется после него
+        await waitForStyleMutable(this.map);
+        // пока грузилось, выбрали другой расчёт или убрали с карты — этот ответ уже не нужен
+        if (this.activeCalculationId !== calculationId) return;
         this.calculationResultsGeoJSON = data;
 
         if (!this.map.getSource('calculation-source')) {
@@ -500,15 +506,8 @@ export const useMapStore = defineStore('map', {
             source: 'calculation-source',
             paint: {
               'line-width': 4,
-              'line-color': [
-                'interpolate',
-                ['linear'],
-                ['get', this.calculationColorMode],
-                0, '#00ff00',
-                0.5, '#ffff00',
-                1.0, '#ff0000',
-                5.0, '#8b0000'
-              ]
+              // шкала — та же, что у легенды на карте (utils/calculationScale)
+              'line-color': calculationColorExpression(this.calculationColorMode) as any
             }
           });
           
@@ -537,24 +536,15 @@ export const useMapStore = defineStore('map', {
           this.updateCalculationColors();
         }
       } catch (e) {
-        console.error('Failed to load calculation results', e);
+        // окно расчётов покажет ошибку: раньше сбой глотался, а окно сообщало «загружен на карту»
+        if (this.activeCalculationId === calculationId) this.activeCalculationId = null;
+        throw e;
       }
     },
 
     updateCalculationColors() {
       if (!this.map || !this.map.getLayer('calculation-lines-layer')) return;
-      
-      const maxVal = this.calculationColorMode === 'pressure_drop' ? 5.0 : 3.0; // arbitrary max for coloring
-      
-      this.map.setPaintProperty('calculation-lines-layer', 'line-color', [
-        'interpolate',
-        ['linear'],
-        ['get', this.calculationColorMode],
-        0, '#00ff00',       // Green for 0
-        maxVal * 0.2, '#ffff00', // Yellow
-        maxVal * 0.6, '#ff0000', // Red
-        maxVal, '#8b0000'        // Dark red
-      ]);
+      this.map.setPaintProperty('calculation-lines-layer', 'line-color', calculationColorExpression(this.calculationColorMode) as any);
     },
 
     async toggleDefectsLayer() {

@@ -357,6 +357,29 @@
         />
         <!-- Координаты курсора внизу карты: WGS84 / местная / десктоп, копирование -->
         <CursorCoords />
+        <!-- Легенда раскраски результатов расчёта: та же шкала, что у слоя (utils/calculationScale) -->
+        <MapLegend
+          v-if="mapStore.activeCalculationId !== null"
+          :title="calculationLegend.title"
+          :subtitle="`Расчёт №${mapStore.activeCalculationId}`"
+          :stops="calculationLegend.stops"
+          :units="calculationLegend.units"
+        >
+          <template #actions>
+            <HintTip text="Убрать расчёт с карты">
+              <template #default="{ props: tip }">
+                <v-btn
+                  v-bind="tip"
+                  icon="mdi-close"
+                  size="x-small"
+                  variant="text"
+                  aria-label="Убрать расчёт с карты"
+                  @click="clearCalculationFromMap"
+                />
+              </template>
+            </HintTip>
+          </template>
+        </MapLegend>
         <LazyHotkeysHelp
           v-if="hotkeysHelpOpen"
           v-model="hotkeysHelpOpen"
@@ -510,6 +533,8 @@ import { useJournalContourLayer } from '~/composables/useJournalContourLayer';
 import { useOverlayLayer } from '~/composables/useOverlayLayer';
 import { useSelectionHighlight } from '~/composables/useSelectionHighlight';
 import { useRouteMapLink } from '~/composables/useRouteMapLink';
+import MapLegend from '~/components/MapLegend.vue';
+import { calculationScale } from '~/utils/calculationScale';
 import type { RegimePointsResult } from '~/utils/regimeMapPoints';
 import { useLocateMarkers } from '~/composables/useLocateMarkers';
 import { useMapDataVersion } from '~/composables/useMapDataVersion';
@@ -1221,6 +1246,14 @@ const onPiezometerDirectionLoad = (nodes: number[]) => {
   traceNodes.value = [...nodes];
   traceNodeFragments = nodes.map(() => null);
   buildPiezometerRoute();
+};
+
+/** Легенда раскраски расчёта на карте и снятие расчёта с карты из легенды */
+const calculationLegend = computed(() => calculationScale(mapStore.calculationColorMode));
+const clearCalculationFromMap = () => {
+  mapStore.loadCalculation(null).catch((err: unknown) => {
+    useNotificationStore().showError(formatApiError(err, 'Не удалось убрать расчёт с карты'));
+  });
 };
 
 /** Пьезометр ↔ карта: точка графика подсвечивает узел, курсор над узлом маршрута — точку графика (этап 6) */

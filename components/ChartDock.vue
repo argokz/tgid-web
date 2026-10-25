@@ -171,8 +171,11 @@ const sheetSnap = ref<SheetSnap>('half')
 
 /** Справа — колонка контролов карты (56 px + отступы) и открытая панель карточки */
 const CONTROLS_GUTTER_PX = 84
+/** Отступ слева — от края карты или от открытой панели слоёв */
+const DOCK_SIDE_GAP_PX = 16
 const dockStyle = computed(() => ({
   right: `${ui.rightInset + CONTROLS_GUTTER_PX}px`,
+  left: `${ui.leftInset + DOCK_SIDE_GAP_PX}px`,
   '--chart-dock-height': props.height
 }))
 

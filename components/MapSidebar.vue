@@ -101,11 +101,12 @@
 
 <script setup lang="ts">
 import { appStorage } from '~/utils/appStorage'
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted, watch, nextTick } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useLayerStore }    from '~/stores/layerStore'
 import { useFragmentStore } from '~/stores/fragmentStore'
 import { useMapStore }      from '~/stores/mapStore'
+import { useUiStore }       from '~/stores/uiStore'
 import { setMapSubLayerOpacity } from '~/utils/mapLayerOpacity'
 import MapSidebarPanel from './MapSidebarPanel.vue'
 
@@ -229,6 +230,14 @@ onMounted(() => {
 })
 
 watch([desktopCollapsed, mobileOpen, activeTab], saveSidebarState, { deep: false })
+
+/** Ширина открытой панели на десктопе — в uiStore: легенда и панель графиков встают правее (docs/ui-zones.md) */
+const SIDEBAR_WIDTH_PX = 340
+const ui = useUiStore()
+watch([mobile, desktopCollapsed], ([isMobile, collapsed]) => {
+  ui.setLeftInset(!isMobile && !collapsed ? SIDEBAR_WIDTH_PX : 0)
+}, { immediate: true })
+onBeforeUnmount(() => ui.setLeftInset(0))
 </script>
 
 <style scoped>
