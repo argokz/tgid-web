@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ITwin Map — варианты логотипа</title>
+<style>
+  :root { --primary: #1565c0; --accent: #d97706; --ink: #1d2330; --muted: #5b6475; --line: #e3e7ee; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px 48px; background: #f4f6f9; color: var(--ink);
+         font: 14px/1.45 Roboto, "Segoe UI", system-ui, sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .lead { color: var(--muted); margin: 0 0 20px; max-width: 760px; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .card h2 { font-size: 16px; margin: 0; }
+  .card header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  .hero { color: var(--primary); display: grid; place-items: center; padding: 20px 0; }
+  .sizes { display: flex; gap: 16px; align-items: flex-end; justify-content: center; color: var(--primary);
+           padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  figure { margin: 0; text-align: center; }
+  figcaption { font-size: 11px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .ctx { display: grid; gap: 8px; margin-top: 12px; }
+  .bar { height: 56px; border-radius: 8px; display: flex; align-items: center; padding: 0 14px; gap: 0; }
+  .bar .mark { display: inline-flex; margin-right: 8px; }
+  .bar b { font-weight: 700; font-size: 17.6px; letter-spacing: -0.02em; }
+  .bar i { font-style: normal; font-size: 13.6px; opacity: .7; margin-left: 3px; }
+  .bar .nav, .bar .cap { margin-left: auto; font-size: 12px; letter-spacing: .04em; color: var(--muted); }
+  .bar.light { background: #fff; border: 1px solid var(--line); }
+  .bar.light .mark { color: var(--primary); }
+  .bar.dark { background: #1f2933; color: #f1f5f9; --logo-accent: #f59e0b; }
+  .bar.dark .cap { color: #9aa5b1; }
+  .bar.print { background: #fff; border: 1px dashed #b8bfca; color: #000; --logo-accent: currentColor; }
+  .tab { display: inline-flex; align-items: center; gap: 8px; width: max-content; max-width: 100%; height: 32px;
+         padding: 0 10px; background: #dfe3ea; border-radius: 8px 8px 0 0; font-size: 12px; color: #202124; }
+  .tab .fav { display: inline-flex; color: var(--primary); }
+  .tab .x { color: #5f6368; margin-left: 12px; }
+  .app { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+  .app .icon { width: 56px; height: 56px; border-radius: 14px; background: var(--primary); color: #fff;
+               display: grid; place-items: center; --logo-accent: #fbbf24; }
+  .notes { margin-top: 20px; color: var(--muted); font-size: 13px; max-width: 760px; }
+  @media (max-width: 420px) { .bar .nav { display: none; } }
+</style>
+</head>
+<body>
+<h1>ITwin Map — варианты знака</h1>
+<p class="lead">Мотив «живая сеть»: трасса и узлы тепловой сети, один тёплый акцент — источник. Сетка 24, линия 2,
+без градиентов и теней. Знак рисуется <code>currentColor</code> (цвет задаёт место: синий в шапке, белый на тёмной
+карте, чёрный в печати), акцент — <code>--logo-accent</code> (в печати — тем же цветом). Словесная часть «ITwin Map»
+остаётся текстом шапки, как сейчас.</p>
+<div class="grid">
+<section class="card">
+  <header><h2>A. Сеть-M</h2><p>Монограмма M (Map) из трассы сети, источник в центре. Самый «буквенный», различим в 16 px.</p></header>
+  <div class="hero"><svg width="120" height="120" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <path d="M4 20V6l8 8 8-8v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="4" cy="20" r="2.25"/>
+    <circle cx="4" cy="6" r="2.25"/>
+    <circle cx="20" cy="6" r="2.25"/>
+    <circle cx="20" cy="20" r="2.25"/>
+  </g>
+  <circle cx="12" cy="14" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></div>
+  <div class="sizes"><figure><div class="sz"><svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <path d="M4 20V6l8 8 8-8v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="4" cy="20" r="2.25"/>
+    <circle cx="4" cy="6" r="2.25"/>
+    <circle cx="20" cy="6" r="2.25"/>
+    <circle cx="20" cy="20" r="2.25"/>
+  </g>
+  <circle cx="12" cy="14" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></div><figcaption>16</figcaption></figure><figure><div class="sz"><svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <path d="M4 20V6l8 8 8-8v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="4" cy="20" r="2.25"/>
+    <circle cx="4" cy="6" r="2.25"/>
+    <circle cx="20" cy="6" r="2.25"/>
+    <circle cx="20" cy="20" r="2.25"/>
+  </g>
+  <circle cx="12" cy="14" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></div><figcaption>24</figcaption></figure><figure><div class="sz"><svg width="32" height="32" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <path d="M4 20V6l8 8 8-8v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="4" cy="20" r="2.25"/>
+    <circle cx="4" cy="6" r="2.25"/>
+    <circle cx="20" cy="6" r="2.25"/>
+    <circle cx="20" cy="20" r="2.25"/>
+  </g>
+  <circle cx="12" cy="14" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></div><figcaption>32</figcaption></figure><figure><div class="sz"><svg width="48" height="48" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <path d="M4 20V6l8 8 8-8v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="4" cy="20" r="2.25"/>
+    <circle cx="4" cy="6" r="2.25"/>
+    <circle cx="20" cy="6" r="2.25"/>
+    <circle cx="20" cy="20" r="2.25"/>
+  </g>
+  <circle cx="12" cy="14" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></div><figcaption>48</figcaption></figure></div>
+  <div class="ctx">
+    <div class="bar light"><span class="mark"><svg width="26" height="26" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <path d="M4 20V6l8 8 8-8v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="4" cy="20" r="2.25"/>
+    <circle cx="4" cy="6" r="2.25"/>
+    <circle cx="20" cy="6" r="2.25"/>
+    <circle cx="20" cy="20" r="2.25"/>
+  </g>
+  <circle cx="12" cy="14" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></span><b>ITwin</b><i>Map</i><span class="nav">КАРТА&nbsp;&nbsp; РАСЧЁТ&nbsp;&nbsp; ПРОТОКОЛ</span></div>
+    <div class="bar dark"><span class="mark"><svg width="26" height="26" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <path d="M4 20V6l8 8 8-8v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="4" cy="20" r="2.25"/>
+    <circle cx="4" cy="6" r="2.25"/>
+    <circle cx="20" cy="6" r="2.25"/>
+    <circle cx="20" cy="20" r="2.25"/>
+  </g>
+  <circle cx="12" cy="14" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></span><b>ITwin</b><i>Map</i><span class="cap">тёмная подложка карты</span></div>
+    <div class="bar print"><span class="mark"><svg width="26" height="26" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <path d="M4 20V6l8 8 8-8v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="4" cy="20" r="2.25"/>
+    <circle cx="4" cy="6" r="2.25"/>
+    <circle cx="20" cy="6" r="2.25"/>
+    <circle cx="20" cy="20" r="2.25"/>
+  </g>
+  <circle cx="12" cy="14" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></span><b>ITwin</b><i>Map</i><span class="cap">печать, одним цветом</span></div>
+    <div class="tab"><span class="fav"><svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <path d="M4 20V6l8 8 8-8v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="4" cy="20" r="2.25"/>
+    <circle cx="4" cy="6" r="2.25"/>
+    <circle cx="20" cy="6" r="2.25"/>
+    <circle cx="20" cy="20" r="2.25"/>
+  </g>
+  <circle cx="12" cy="14" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></span>Алматы — ITwin Map<span class="x">×</span></div>
+    <div class="app"><div class="icon"><svg width="34" height="34" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <path d="M4 20V6l8 8 8-8v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="4" cy="20" r="2.25"/>
+    <circle cx="4" cy="6" r="2.25"/>
+    <circle cx="20" cy="6" r="2.25"/>
+    <circle cx="20" cy="20" r="2.25"/>
+  </g>
+  <circle cx="12" cy="14" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></div><span>ITwin Map</span></div>
+  </div>
+</section>
+<section class="card">
+  <header><h2>B. Кольцо</h2><p>Кольцевая магистраль, источник в центре. Спокойный, симметричный, хорошо в круглой аватарке.</p></header>
+  <div class="hero"><svg width="120" height="120" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/>
+  <path d="M12 12H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="4" r="2.25"/>
+    <circle cx="20" cy="12" r="2.25"/>
+    <circle cx="12" cy="20" r="2.25"/>
+    <circle cx="4" cy="12" r="2.25"/>
+  </g>
+  <circle cx="12" cy="12" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></div>
+  <div class="sizes"><figure><div class="sz"><svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/>
+  <path d="M12 12H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="4" r="2.25"/>
+    <circle cx="20" cy="12" r="2.25"/>
+    <circle cx="12" cy="20" r="2.25"/>
+    <circle cx="4" cy="12" r="2.25"/>
+  </g>
+  <circle cx="12" cy="12" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></div><figcaption>16</figcaption></figure><figure><div class="sz"><svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/>
+  <path d="M12 12H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="4" r="2.25"/>
+    <circle cx="20" cy="12" r="2.25"/>
+    <circle cx="12" cy="20" r="2.25"/>
+    <circle cx="4" cy="12" r="2.25"/>
+  </g>
+  <circle cx="12" cy="12" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></div><figcaption>24</figcaption></figure><figure><div class="sz"><svg width="32" height="32" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/>
+  <path d="M12 12H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="4" r="2.25"/>
+    <circle cx="20" cy="12" r="2.25"/>
+    <circle cx="12" cy="20" r="2.25"/>
+    <circle cx="4" cy="12" r="2.25"/>
+  </g>
+  <circle cx="12" cy="12" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></div><figcaption>32</figcaption></figure><figure><div class="sz"><svg width="48" height="48" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/>
+  <path d="M12 12H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="4" r="2.25"/>
+    <circle cx="20" cy="12" r="2.25"/>
+    <circle cx="12" cy="20" r="2.25"/>
+    <circle cx="4" cy="12" r="2.25"/>
+  </g>
+  <circle cx="12" cy="12" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></div><figcaption>48</figcaption></figure></div>
+  <div class="ctx">
+    <div class="bar light"><span class="mark"><svg width="26" height="26" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/>
+  <path d="M12 12H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="4" r="2.25"/>
+    <circle cx="20" cy="12" r="2.25"/>
+    <circle cx="12" cy="20" r="2.25"/>
+    <circle cx="4" cy="12" r="2.25"/>
+  </g>
+  <circle cx="12" cy="12" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></span><b>ITwin</b><i>Map</i><span class="nav">КАРТА&nbsp;&nbsp; РАСЧЁТ&nbsp;&nbsp; ПРОТОКОЛ</span></div>
+    <div class="bar dark"><span class="mark"><svg width="26" height="26" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/>
+  <path d="M12 12H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="4" r="2.25"/>
+    <circle cx="20" cy="12" r="2.25"/>
+    <circle cx="12" cy="20" r="2.25"/>
+    <circle cx="4" cy="12" r="2.25"/>
+  </g>
+  <circle cx="12" cy="12" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></span><b>ITwin</b><i>Map</i><span class="cap">тёмная подложка карты</span></div>
+    <div class="bar print"><span class="mark"><svg width="26" height="26" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/>
+  <path d="M12 12H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="4" r="2.25"/>
+    <circle cx="20" cy="12" r="2.25"/>
+    <circle cx="12" cy="20" r="2.25"/>
+    <circle cx="4" cy="12" r="2.25"/>
+  </g>
+  <circle cx="12" cy="12" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></span><b>ITwin</b><i>Map</i><span class="cap">печать, одним цветом</span></div>
+    <div class="tab"><span class="fav"><svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/>
+  <path d="M12 12H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="4" r="2.25"/>
+    <circle cx="20" cy="12" r="2.25"/>
+    <circle cx="12" cy="20" r="2.25"/>
+    <circle cx="4" cy="12" r="2.25"/>
+  </g>
+  <circle cx="12" cy="12" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></span>Алматы — ITwin Map<span class="x">×</span></div>
+    <div class="app"><div class="icon"><svg width="34" height="34" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/>
+  <path d="M12 12H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="4" r="2.25"/>
+    <circle cx="20" cy="12" r="2.25"/>
+    <circle cx="12" cy="20" r="2.25"/>
+    <circle cx="4" cy="12" r="2.25"/>
+  </g>
+  <circle cx="12" cy="12" r="3" fill="var(--logo-accent, #d97706)"/>
+</svg></div><span>ITwin Map</span></div>
+  </div>
+</section>
+<section class="card">
+  <header><h2>C. Тайл</h2><p>Лист карты, ветвь сети от источника. Лучше всего как иконка приложения (manifest, iOS).</p></header>
+  <div class="hero"><svg width="120" height="120" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="2"/>
+  <path d="M7 17l5-5h5M12 12V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="12" r="2"/>
+    <circle cx="17" cy="12" r="2"/>
+    <circle cx="12" cy="7" r="2"/>
+  </g>
+  <circle cx="7" cy="17" r="2.5" fill="var(--logo-accent, #d97706)"/>
+</svg></div>
+  <div class="sizes"><figure><div class="sz"><svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="2"/>
+  <path d="M7 17l5-5h5M12 12V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="12" r="2"/>
+    <circle cx="17" cy="12" r="2"/>
+    <circle cx="12" cy="7" r="2"/>
+  </g>
+  <circle cx="7" cy="17" r="2.5" fill="var(--logo-accent, #d97706)"/>
+</svg></div><figcaption>16</figcaption></figure><figure><div class="sz"><svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="2"/>
+  <path d="M7 17l5-5h5M12 12V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="12" r="2"/>
+    <circle cx="17" cy="12" r="2"/>
+    <circle cx="12" cy="7" r="2"/>
+  </g>
+  <circle cx="7" cy="17" r="2.5" fill="var(--logo-accent, #d97706)"/>
+</svg></div><figcaption>24</figcaption></figure><figure><div class="sz"><svg width="32" height="32" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="2"/>
+  <path d="M7 17l5-5h5M12 12V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="12" r="2"/>
+    <circle cx="17" cy="12" r="2"/>
+    <circle cx="12" cy="7" r="2"/>
+  </g>
+  <circle cx="7" cy="17" r="2.5" fill="var(--logo-accent, #d97706)"/>
+</svg></div><figcaption>32</figcaption></figure><figure><div class="sz"><svg width="48" height="48" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="2"/>
+  <path d="M7 17l5-5h5M12 12V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="12" r="2"/>
+    <circle cx="17" cy="12" r="2"/>
+    <circle cx="12" cy="7" r="2"/>
+  </g>
+  <circle cx="7" cy="17" r="2.5" fill="var(--logo-accent, #d97706)"/>
+</svg></div><figcaption>48</figcaption></figure></div>
+  <div class="ctx">
+    <div class="bar light"><span class="mark"><svg width="26" height="26" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="2"/>
+  <path d="M7 17l5-5h5M12 12V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="12" r="2"/>
+    <circle cx="17" cy="12" r="2"/>
+    <circle cx="12" cy="7" r="2"/>
+  </g>
+  <circle cx="7" cy="17" r="2.5" fill="var(--logo-accent, #d97706)"/>
+</svg></span><b>ITwin</b><i>Map</i><span class="nav">КАРТА&nbsp;&nbsp; РАСЧЁТ&nbsp;&nbsp; ПРОТОКОЛ</span></div>
+    <div class="bar dark"><span class="mark"><svg width="26" height="26" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="2"/>
+  <path d="M7 17l5-5h5M12 12V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="12" r="2"/>
+    <circle cx="17" cy="12" r="2"/>
+    <circle cx="12" cy="7" r="2"/>
+  </g>
+  <circle cx="7" cy="17" r="2.5" fill="var(--logo-accent, #d97706)"/>
+</svg></span><b>ITwin</b><i>Map</i><span class="cap">тёмная подложка карты</span></div>
+    <div class="bar print"><span class="mark"><svg width="26" height="26" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="2"/>
+  <path d="M7 17l5-5h5M12 12V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="12" r="2"/>
+    <circle cx="17" cy="12" r="2"/>
+    <circle cx="12" cy="7" r="2"/>
+  </g>
+  <circle cx="7" cy="17" r="2.5" fill="var(--logo-accent, #d97706)"/>
+</svg></span><b>ITwin</b><i>Map</i><span class="cap">печать, одним цветом</span></div>
+    <div class="tab"><span class="fav"><svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="2"/>
+  <path d="M7 17l5-5h5M12 12V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="12" r="2"/>
+    <circle cx="17" cy="12" r="2"/>
+    <circle cx="12" cy="7" r="2"/>
+  </g>
+  <circle cx="7" cy="17" r="2.5" fill="var(--logo-accent, #d97706)"/>
+</svg></span>Алматы — ITwin Map<span class="x">×</span></div>
+    <div class="app"><div class="icon"><svg width="34" height="34" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="ITwin Map">
+  <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="2"/>
+  <path d="M7 17l5-5h5M12 12V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="currentColor">
+    <circle cx="12" cy="12" r="2"/>
+    <circle cx="17" cy="12" r="2"/>
+    <circle cx="12" cy="7" r="2"/>
+  </g>
+  <circle cx="7" cy="17" r="2.5" fill="var(--logo-accent, #d97706)"/>
+</svg></div><span>ITwin Map</span></div>
+  </div>
+</section>
+</div>
+<p class="notes">После выбора: знак — компонент <code>AppLogo</code> в шапке вместо <code>mdi-layers</code>,
+<code>favicon.svg</code> + <code>favicon.ico</code> 16/32, <code>apple-touch-icon</code> 180, иконки manifest 192/512
+(на синей плашке, как «иконка приложения» выше), экран загрузки на том же знаке.</p>
+</body>
+</html>
