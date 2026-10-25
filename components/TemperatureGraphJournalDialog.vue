@@ -433,17 +433,14 @@
                   <div class="text-subtitle-2 font-weight-bold mb-2">
                     Развёрнутый температурный график
                   </div>
-                  <div
+                  <ChartFrame
                     v-if="details.points.length"
-                    class="chart-wrap"
-                  >
-                    <v-chart
-                      :theme="chartTheme"
-                      class="chart"
-                      :option="chartOptions"
-                      autoresize
-                    />
-                  </div>
+                    :option="chartOptions"
+                    :height="chartHeight"
+                    label="Температурный график"
+                    :export-name="`Температурный график — ${details.name}`"
+                    :summary="chartSummary"
+                  />
                   <StateView
                     v-else
                     empty
@@ -610,10 +607,8 @@ import StateView from '~/components/StateView.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { use } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
-import { CanvasRenderer } from 'echarts/renderers'
-import { DataZoomComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
-import VChart from 'vue-echarts'
-import { useChartTheme } from '~/composables/useChartTheme'
+import ChartFrame from '~/components/ChartFrame.vue'
+import { axisTooltip, zoomControls } from '~/utils/chartOptions'
 import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
 import { useJournalEdit, type JournalEditSource } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
@@ -640,8 +635,7 @@ import {
 type LocatePayload = { longitude: number; latitude: number; id: number; nodeId: number; label: string }
 type StationaryKey = 't1' | 't2' | 't3' | 'tv'
 
-use([CanvasRenderer, LineChart, DataZoomComponent, GridComponent, LegendComponent, TooltipComponent])
-const { chartTheme } = useChartTheme()
+use([LineChart])
 
 const emit = defineEmits<{ 'locate-source': [payload: LocatePayload] }>()
 const { isMobile } = useMobile()
@@ -797,17 +791,26 @@ const chartOptions = computed(() => {
     { name: 'Ветер tv', key: 'tv', color: '#f9a825' }
   ].filter(item => points.some(point => point[item.key] !== null))
   return {
-    tooltip: { trigger: 'axis' },
-    legend: { data: series.map(item => item.name) },
-    grid: { left: 55, right: 25, top: 45, bottom: 85 },
+    tooltip: axisTooltip({ digits: 1, units: () => '°C', title: params => `tн ${String(params[0]?.axisValue ?? '')} °C` }),
+    legend: { data: series.map(item => item.name), top: 0, left: 0, right: 120 },
+    grid: { left: 55, right: 25, top: 60, bottom: 85 },
     xAxis: { type: 'category', inverse: true, name: 't наружного воздуха, °C', nameLocation: 'middle', nameGap: 32, data: points.map(point => point.tn) },
     yAxis: { type: 'value', name: 't воды, °C', min: (value: { min: number }) => Math.floor(Math.min(0, value.min) / 10) * 10 },
-    dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 20 }],
+    dataZoom: zoomControls({ sliderBottom: 20 }),
     series: series.map(item => ({
       name: item.name, type: 'line', smooth: false, symbolSize: 5, itemStyle: { color: item.color }, lineStyle: { width: 2 },
       data: points.map(point => point[item.key])
     }))
   }
+})
+
+const chartHeight = computed(() => (isMobile.value ? 340 : 500))
+/** Описание графика текстом: диапазон tн и расчётные температуры (для чтения с экрана и как итог под графиком) */
+const chartSummary = computed(() => {
+  const item = details.value
+  if (!item) return ''
+  return `${item.point_count} точек, tн ${formatRange(item.min_outdoor_temperature, item.max_outdoor_temperature)}; `
+    + `расчётный режим ${formatNumber(item.design_flow_temperature)} / ${formatNumber(item.design_return_temperature)} °C`
 })
 
 const loadLookups = async () => {
@@ -1021,14 +1024,10 @@ defineExpose({ openDialog })
 .tg-alerts:empty { display: none; }
 .tg-graph-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .tg-graph-mode { flex: 1 1 220px; }
-.chart-wrap { height: 520px; }
-.chart { height: 100%; width: 100%; }
 .points-table { border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); border-radius: var(--radius-2, 8px); }
-@media (max-width: 960px) { .chart-wrap { height: 420px; } }
 @media (max-width: 600px) {
   .tg-journal { height: 100dvh; }
   .tg-kpi { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .tg-kpi > * { flex-shrink: 0; }
-  .chart-wrap { height: 340px; }
 }
 </style>

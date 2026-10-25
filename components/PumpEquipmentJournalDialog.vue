@@ -587,14 +587,13 @@
                 >
                   <template v-if="modelDetails">
                     <div class="text-subtitle-2 mb-2">Характеристики H(Q), N(Q), КПД(Q)</div>
-                    <div class="pump-chart-wrap mb-4">
-                      <VChart
-                        :theme="chartTheme"
-                        class="pump-chart"
-                        :option="chartOptions"
-                        autoresize
-                      />
-                    </div>
+                    <ChartFrame
+                      class="mb-4"
+                      :option="chartOptions"
+                      :height="isMobile ? 360 : 500"
+                      label="Характеристики насоса H(Q), N(Q), КПД(Q)"
+                      :export-name="`Насос — ${modelDetails.name || modelDetails.pump_type || modelDetails.id}`"
+                    />
                     <div class="text-subtitle-2 mb-2">Паспортные точки</div>
                     <DataTable
                       :columns="pointColumns"
@@ -687,10 +686,9 @@ import StateView from '~/components/StateView.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { use } from 'echarts/core'
 import { LineChart, ScatterChart } from 'echarts/charts'
-import { CanvasRenderer } from 'echarts/renderers'
-import { DataZoomComponent, GridComponent, LegendComponent, MarkAreaComponent, TooltipComponent } from 'echarts/components'
-import VChart from 'vue-echarts'
-import { useChartTheme } from '~/composables/useChartTheme'
+import { MarkAreaComponent } from 'echarts/components'
+import ChartFrame from '~/components/ChartFrame.vue'
+import { axisTooltip, formatChartNumber, zoomControls } from '~/utils/chartOptions'
 import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
 import { useJournalEdit, type JournalEditSource } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
@@ -714,7 +712,9 @@ import {
   type StandardPumpSummary
 } from '~/services/fastApiService'
 
-use([CanvasRenderer, LineChart, ScatterChart, DataZoomComponent, GridComponent, LegendComponent, MarkAreaComponent, TooltipComponent])
+use([LineChart, ScatterChart, MarkAreaComponent])
+/** Единицы серий по первой букве имени: H — напор, N — мощность, КПД; рабочая точка — напор */
+const pumpSeriesUnit = (name: string) => (name.startsWith('N') ? 'кВт' : name.startsWith('КПД') ? '%' : 'м')
 
 /**
  * Насосы — журнал оборудования с двумя разделами (docs/ui-modernization-progress.md, этап 5): установленные
@@ -735,7 +735,6 @@ const emit = defineEmits<{
   'locate-pump': [payload: { longitude: number; latitude: number; id: number; lineId: number | null; label: string }]
 }>()
 const { isMobile } = useMobile()
-const { chartTheme } = useChartTheme()
 const canEditNetwork = useMutationsEnabled('network')
 const authStore = useAuthStore()
 // плюс право «оборудование: правка» из матрицы ролей — как у кнопки «Оборудование» в карточке объекта
@@ -993,7 +992,8 @@ const chartOptions = computed(() => {
   adjusted.filter(item => item.data.length).forEach(item => series.push({ name: item.name, type: 'line', yAxisIndex: item.axis, data: item.data, showSymbol: false, lineStyle: { width: 2, type: 'dashed', color: item.color } }))
   if (Number.isFinite(workingFlow) && Number.isFinite(workingHead)) series.push({ name: 'Рабочая точка', type: 'scatter', yAxisIndex: 0, data: [[workingFlow, workingHead]], symbolSize: 13, itemStyle: { color: '#d32f2f' } })
   return {
-    tooltip: { trigger: 'axis' }, legend: { type: 'scroll' },
+    tooltip: axisTooltip({ units: pumpSeriesUnit, title: params => `Q ${formatChartNumber(params[0]?.axisValue, 1)} т/ч` }),
+    legend: { type: 'scroll', top: 0, left: 0, right: 120 },
     grid: { left: 65, right: 145, top: 55, bottom: 80 },
     xAxis: { type: 'value', name: 'Q, т/ч', nameLocation: 'middle', nameGap: 32, min: 0 },
     yAxis: [
@@ -1001,7 +1001,7 @@ const chartOptions = computed(() => {
       { type: 'value', name: 'N, кВт', position: 'right', axisLine: { show: true, lineStyle: { color: '#ef6c00' } } },
       { type: 'value', name: 'КПД, %', position: 'right', offset: 70, axisLine: { show: true, lineStyle: { color: '#2e7d32' } }, min: 0 }
     ],
-    dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 18 }], series
+    dataZoom: zoomControls({ sliderBottom: 18 }), series
   }
 })
 const detailTitle = computed(() => installedDetails.value
@@ -1233,9 +1233,6 @@ defineExpose({ openDialog })
 .pump-table--catalog { min-width: 1180px; }
 .pump-detail-alerts { display: grid; gap: var(--space-2); }
 .pump-detail-alerts:empty { display: none; }
-.pump-chart-wrap { height: 520px; }
-.pump-chart { height: 100%; width: 100%; }
 .pump-panel-table :deep(.v-expansion-panel-text__wrapper) { padding: 0; }
-@media (max-width: 960px) { .pump-chart-wrap { height: 420px; } }
 @media (max-width: 600px) { .pump-journal { height: 100dvh; } }
 </style>
