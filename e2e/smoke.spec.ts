@@ -29,11 +29,15 @@ test.describe('ITwin Map smoke', () => {
       .toBe(true);
   });
 
-  test('клик по участку открывает карточку', async ({ page }) => {
+  test('клик по участку: сводка у точки, из неё — карточка', async ({ page }) => {
     const pipe = await focusFragmentPipe(page);
+    const popover = page.locator('.map-popover');
     const card = page.locator('.inspector');
     // участок лежит в нескольких фрагментах → «Выберите объект», берём копию FRAGMENT_ID
-    await clickAndChooseFragment(page, pipe.mid, card);
+    await clickAndChooseFragment(page, pipe.mid, popover);
+    await expect(popover).toContainText(/Участок|участок/);
+    await popover.getByRole('button', { name: 'Карточка' }).click();
+    await expect(popover).toBeHidden();
     await expect(card).toBeVisible();
     await expect(card).toContainText(/Участок|участок/);
   });

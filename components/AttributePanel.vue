@@ -1129,6 +1129,96 @@
         </template>
 
       </InspectorPanel>
+    <!-- Сводка у точки клика: карточка закрыта → сначала поповер, действия — те же, что в шапке карточки -->
+    <MapPopover
+      v-if="summaryAnchor && summaryMap"
+      :map="summaryMap"
+      :lng-lat="summaryAnchor"
+      icon="mdi-information-outline"
+      :title="objectTitle || 'Объект'"
+      :subtitle="summarySubtitle"
+      @close="closeSummary"
+    >
+      <dl
+        v-if="summaryFields.length"
+        class="ap-summary"
+      >
+        <template
+          v-for="field in summaryFields"
+          :key="field.key"
+        >
+          <dt class="ap-summary__label">{{ field.label }}</dt>
+          <dd class="ap-summary__value num">{{ formatValue(field.value) }}</dd>
+        </template>
+      </dl>
+      <div
+        v-else
+        class="text-caption text-medium-emphasis"
+      >
+        Атрибуты не заполнены
+      </div>
+      <template #actions>
+        <v-btn
+          color="primary"
+          variant="flat"
+          size="small"
+          class="text-none"
+          prepend-icon="mdi-card-text-outline"
+          @click="openFromSummary()"
+        >
+          Карточка
+        </v-btn>
+        <v-btn
+          v-if="canEditCard"
+          variant="text"
+          size="small"
+          class="text-none"
+          prepend-icon="mdi-pencil-outline"
+          @click="openFromSummary(startEditing)"
+        >
+          Редактировать
+        </v-btn>
+        <v-spacer />
+        <HintTip
+          v-if="canOpenDefectJournal"
+          text="Журнал нарушений объекта"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              variant="text"
+              size="small"
+              density="comfortable"
+              color="error"
+              aria-label="Журнал нарушений объекта"
+              @click="runFromSummary(openDefectJournal)"
+            >
+              <v-icon size="18">mdi-alert-decagram-outline</v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
+        <HintTip
+          v-if="passportTarget"
+          text="Скачать паспорт (Excel)"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              variant="text"
+              size="small"
+              density="comfortable"
+              color="success"
+              aria-label="Скачать паспорт (Excel)"
+              @click="downloadPassport"
+            >
+              <v-icon size="18">mdi-file-excel-box</v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
+      </template>
+    </MapPopover>
 
 
     <!-- Превью разворота участка (dry-run → подтверждение) -->
@@ -1183,6 +1273,8 @@ import { ApiError, fastApiService, type ReverseLineReport } from '~/services/fas
 import { getFeatureFragmentId, getSectionRowId, resolveCardObject, type CardObject } from '~/utils/networkFeature'
 import { canDo, canEditFragment, cardPermKind } from '~/utils/permissions'
 import InspectorPanel, { type InspectorTab } from '~/components/InspectorPanel.vue'
+import MapPopover, { type MapPopoverMap } from '~/components/MapPopover.vue'
+import HintTip from '~/components/HintTip.vue'
 import ObjectCardEdit from '~/components/objectCard/ObjectCardEdit.vue'
 import NodeEquipmentList from '~/components/objectCard/NodeEquipmentList.vue'
 import {
@@ -1266,6 +1358,29 @@ const visible = ref(false)
 const mapStoreForHighlight = useMapStore()
 watch(visible, (open) => {
   if (!open) mapStoreForHighlight.selectionTarget = null
+})
+
+/** Точка сводки-поповера (lng, lat); null — сводка закрыта */
+const summaryAnchor = ref<[number, number] | null>(null)
+const summaryMap = computed(() => (mapStoreForHighlight.map as unknown as MapPopoverMap | null) ?? null)
+const closeSummary = () => {
+  summaryAnchor.value = null
+  if (!visible.value) mapStoreForHighlight.selectionTarget = null
+}
+/** Из сводки в карточку; `then` — действие уже в открытой карточке (правка) */
+const openFromSummary = (then?: () => void) => {
+  summaryAnchor.value = null
+  visible.value = true
+  then?.()
+}
+/** Действие, которому карточка не нужна (журнал): сводка закрывается */
+const runFromSummary = (action: () => void) => {
+  closeSummary()
+  action()
+}
+// Новый identify-клик закрывает сводку; найдётся объект — откроется новая
+watch(() => mapStoreForHighlight.identifyRequestId, () => {
+  if (summaryAnchor.value) closeSummary()
 })
 
 const attributes = ref<Record<string, any>>({})
@@ -1644,6 +1759,19 @@ const canOpenNetworkDiaphragms = computed(() => Boolean(cardLineId.value) || (Bo
 
 
 const hasTabsStructure = computed(() => objectTabsData.value !== null && tabsData.value.length > 0)
+/** Сводка: первые заполненные поля карточки в порядке десктопа */
+const SUMMARY_FIELD_LIMIT = 5
+const summaryFields = computed(() =>
+  tabsData.value
+    .flatMap(tab => tab.sections.flatMap(section => section.fields))
+    .filter(field => hasValue(field.value))
+    .slice(0, SUMMARY_FIELD_LIMIT),
+)
+const summarySubtitle = computed(() => {
+  const { network, networkId } = cardObject.value
+  if (!networkId) return ''
+  return network === 'line' ? `Участок ${networkId}` : network === 'node' ? `Узел ${networkId}` : ''
+})
 /** Вкладки для InspectorPanel: имя и число полей (с учётом поиска) */
 const inspectorTabs = computed<InspectorTab[]>(() =>
   tabsData.value.map((tab, idx) => ({ value: idx, label: tab.tabName, count: getTabFieldsCount(tab) })),
@@ -1773,7 +1901,7 @@ const getObjectTitle = (props: Record<string, any>): string => {
 }
 
 
-const show = (props: Record<string, any>) => {
+const show = (props: Record<string, any>, options: { anchor?: [number, number] | null } = {}) => {
   editing.value = false
   editDirty.value = false
   batchIds.value = null
@@ -1865,10 +1993,14 @@ const show = (props: Record<string, any>) => {
     uncategorizedAttributes.value = []
 
   }
-
-
+  // Клик по карте при закрытой карточке — сначала сводка у точки; открытая карточка обновляется сразу.
+  // На телефоне — сразу карточка (нижний лист — отдельный шаг)
+  if (options.anchor && !visible.value && !isMobile.value) {
+    summaryAnchor.value = options.anchor
+    return
+  }
+  summaryAnchor.value = null
   visible.value = true
-
 }
 
 
@@ -2513,6 +2645,16 @@ defineExpose({ show, close, confirmLeaveEditing })
 }
 
 
+/* ── Сводка у точки ── */
+.ap-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px var(--space-3);
+  margin: 0;
+  font-size: 0.8rem;
+}
+.ap-summary__label { color: rgba(var(--v-theme-on-surface), 0.6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-summary__value { margin: 0; text-align: right; font-weight: 500; overflow-wrap: anywhere; }
 /* ── Mobile ── */
 
 @media (max-width: 600px) {

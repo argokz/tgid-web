@@ -324,7 +324,7 @@ const selectFeature = (feature: any, index: number) => {
     mapStore.resolveFeatureChoice(index)
     return
   }
-  mapStore.selectFeature(feature)
+  mapStore.selectFeature(feature, { anchor: mapStore.identifyAnchor })
 }
 
 // Меню объекта над картой — не v-overlay: Esc берёт сам, раньше инструментов (область popover реестра хоткеев)

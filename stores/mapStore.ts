@@ -15,7 +15,6 @@ import { fastApiService } from '~/services/fastApiService';
 import { useGeoServer } from '~/composables/useGeoServer';
 import { useLayerStore } from '~/stores/layerStore';
 import { useLabelStore, TECHNICAL_LABELS } from '~/stores/labelStore';
-import { usePopupStore } from '~/stores/popupStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { escapeHtml } from '~/utils/escapeHtml';
 import { nearestGroup, queryRenderedNear } from '~/utils/mapPick';
@@ -76,9 +75,8 @@ let pendingFeatureChoice: ((index: number | null) => void) | null = null;
 export const useMapStore = defineStore('map', {
   state: () => ({
     map: null as any,
-    popup: null as any,
     highlightedFeature: null as string | null,
-    _attributePanelShow: null as ((properties: Record<string, any>) => void | Promise<void>) | null,
+    _attributePanelShow: null as ((properties: Record<string, any>, options?: { anchor?: [number, number] | null }) => void | Promise<void>) | null,
     // Diagnostics Fault Layers
     isDefectsLayerVisible: false,
     isCorrosionLayerVisible: false,
@@ -173,6 +171,8 @@ export const useMapStore = defineStore('map', {
     contextHoverInspectEnabled: false,
     contextHoverPopup: null as any,
     identifyRequestId: 0,
+    /** Точка последнего identify-клика (lng, lat): к ней привязывается сводка объекта */
+    identifyAnchor: null as [number, number] | null,
     identifyModeEnabled: true,
 
     // Feature Selection Menu state
@@ -271,9 +271,6 @@ export const useMapStore = defineStore('map', {
 
         // Initialize other stores
         const labelStore = useLabelStore();
-        const popupStore = usePopupStore();
-        
-        popupStore.setMap(this.map as any);
         labelStore.loadLayerLabels();
         resolve();
       });
@@ -752,10 +749,6 @@ export const useMapStore = defineStore('map', {
         this.contextHoverPopup.remove();
         this.contextHoverPopup = null;
       }
-      if (this.popup) {
-        this.popup.remove();
-        this.popup = null;
-      }
     },
 
     /**
@@ -800,16 +793,12 @@ export const useMapStore = defineStore('map', {
       if (!this.map) return;
       const layerStore = useLayerStore();
       const requestId = ++this.identifyRequestId;
+      this.identifyAnchor = [e.lngLat.lng, e.lngLat.lat];
       
       // Clear previous states
       this.featureMenuVisible = false;
       this.potentialFeatures = [];
       this.featureMenuPosition = { x: e.point.x, y: e.point.y };
-
-      if (this.popup) {
-        this.popup.remove();
-        this.popup = null;
-      }
       
       const allFoundFeatures: any[] = [];
 
@@ -957,7 +946,7 @@ export const useMapStore = defineStore('map', {
 
       if (uniqueFoundFeatures.length === 1) {
         // Only one feature, select it immediately
-        await this.selectFeature(uniqueFoundFeatures[0]);
+        await this.selectFeature(uniqueFoundFeatures[0], { anchor: this.identifyAnchor });
       } else {
         // Multiple features, show selection menu
         this.potentialFeatures = uniqueFoundFeatures;
@@ -965,7 +954,8 @@ export const useMapStore = defineStore('map', {
       }
     },
 
-    async selectFeature(feature: any) {
+    /** `anchor` — точка клика: при закрытой карточке объект сначала показывается сводкой у неё */
+    async selectFeature(feature: any, options: { anchor?: [number, number] | null } = {}) {
       if (!this.map) return;
       this.featureMenuVisible = false;
       this.objectDataLoading = true;
@@ -1180,7 +1170,7 @@ export const useMapStore = defineStore('map', {
       // Show Attribute Panel
       const safeProperties = this.toPlainObject(properties);
       if (this._attributePanelShow) {
-        this._attributePanelShow(safeProperties);
+        this._attributePanelShow(safeProperties, { anchor: options.anchor ?? null });
       } else {
         console.error('[selectFeature] _attributePanelShow is not set – panel will not open!');
       }
@@ -1248,25 +1238,6 @@ export const useMapStore = defineStore('map', {
       } catch (error) {
         console.error('Failed to invalidate server cache:', error);
       }
-    },
-
-
-
-    async showPopup(lngLat: LngLat, html: string) {
-      if (!this.map) return;
-
-      const maplibregl = await getMaplibreDefault();
-      const popup = new maplibregl.Popup({
-        closeButton: true,
-        closeOnClick: false,
-        className: 'custom-popup',
-        offset: [0, -10]
-      })
-        .setLngLat(lngLat)
-        .setHTML(html);
-        
-      popup.addTo(this.map as any);
-      this.popup = markRaw(popup);
     },
 
     getVisibleLayerIdsForPointer(layerStore: ReturnType<typeof useLayerStore>): string[] {

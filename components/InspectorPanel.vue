@@ -61,7 +61,9 @@
                 :aria-label="layout.mode === 'panel' ? 'Открепить в отдельное окно' : 'Закрепить панелью справа'"
                 @click="toggleMode"
               >
-                <v-icon size="18">{{ layout.mode === 'panel' ? 'mdi-dock-window' : 'mdi-dock-right' }}</v-icon>
+                <v-icon size="18">
+                  {{ layout.mode === 'panel' ? 'mdi-dock-window' : 'mdi-dock-right' }}
+                </v-icon>
               </v-btn>
             </template>
           </HintTip>

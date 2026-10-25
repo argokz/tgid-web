@@ -484,7 +484,6 @@ import { appStorage } from '~/utils/appStorage';
 import { formatApiError } from '~/utils/apiError';
 import { activeDrawMode, isMapMeasureActive } from '~/composables/useMapDraw';
 import { useMapStore } from '~/stores/mapStore';
-import { usePopupStore } from '~/stores/popupStore';
 import { useLayerStore } from '~/stores/layerStore';
 import { useCesiumStore } from '~/stores/cesiumStore';
 import { useUiStore } from '~/stores/uiStore';
@@ -524,7 +523,6 @@ const props = defineProps<{
 defineEmits<{ (e: 'retry-layers'): void }>();
 
 const mapStore = useMapStore();
-const popupStore = usePopupStore();
 const layerStore = useLayerStore();
 const fragmentStore = useFragmentStore();
 const cesiumStore = useCesiumStore();
@@ -678,7 +676,7 @@ const waitForMapContainer = async (attempts = 20, delayMs = 50): Promise<boolean
 };
 
 const attributePanelRef = ref<{
-  show: (props: Record<string, any>) => void;
+  show: (props: Record<string, any>, options?: { anchor?: [number, number] | null }) => void;
   close: () => void | Promise<void>;
   confirmLeaveEditing?: () => Promise<boolean>;
 } | null>(null);
@@ -1450,7 +1448,6 @@ const initMap = async () => {
   markPerf('map:init:start');
   try {
     await import('maplibre-gl/dist/maplibre-gl.css');
-    popupStore.initPopupSettings();
 
     const settingsStore = useSettingsStore();
     if (!settingsStore.workspaces.length) {
@@ -1543,18 +1540,18 @@ onMounted(() => {
     void fragmentStore.initVisibleFragments();
     // Wire AttributePanel into mapStore so any click on a feature opens it.
     // Панель лениво монтируется при первом identify-клике, поэтому дожидаемся её загрузки.
-    mapStore._attributePanelShow = async (properties: Record<string, any>) => {
+    mapStore._attributePanelShow = async (properties: Record<string, any>, options = {}) => {
       mountedDialogs.attributePanel = true;
       if (attributePanelRef.value) {
         // в карточке несохранённые правки — другой объект откроется, только если их можно потерять
         if (attributePanelRef.value.confirmLeaveEditing && !(await attributePanelRef.value.confirmLeaveEditing())) return;
-        attributePanelRef.value.show(properties);
+        attributePanelRef.value.show(properties, options);
         return;
       }
       const stop = watch(attributePanelRef, (panel) => {
         if (!panel) return;
         stop();
-        panel.show(properties);
+        panel.show(properties, options);
       });
     };
   }
