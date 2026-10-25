@@ -828,9 +828,11 @@ const downloadExcel = async (docType: string) => {
 }
 .app-main {
   min-height: calc(100vh - 56px);
+  min-height: calc(100dvh - 56px);
 }
 .login-required-backdrop {
   min-height: calc(100vh - 56px);
+  min-height: calc(100dvh - 56px);
   display: flex;
   align-items: center;
   justify-content: center;

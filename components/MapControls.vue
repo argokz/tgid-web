@@ -1018,8 +1018,8 @@ defineExpose({ identifyMode })
 .map-controls {
   position: fixed;
   top: 68px; /* 56px app bar + 12px gap */
-  right: 12px;
-  bottom: 36px; /* над строкой атрибуции MapLibre */
+  right: calc(12px + var(--safe-right, 0px));
+  bottom: calc(36px + var(--safe-bottom, 0px)); /* над строкой атрибуции MapLibre */
   z-index: 200;
   display: flex;
   flex-direction: column;

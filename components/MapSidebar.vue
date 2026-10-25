@@ -244,7 +244,7 @@ onBeforeUnmount(() => ui.setLeftInset(0))
 .sidebar-toggle-wrap {
   position: fixed;
   top: 68px;
-  left: 12px;
+  left: calc(12px + var(--safe-left, 0px));
   z-index: 200;
 }
 
@@ -255,6 +255,8 @@ onBeforeUnmount(() => ui.setLeftInset(0))
   left: 0;
   z-index: 199;
   height: calc(100vh - 56px);
+  /* адресная строка мобильного браузера: видимая высота, а не высота без панелей */
+  height: calc(100dvh - 56px);
   width: 340px;
   pointer-events: all;
 }

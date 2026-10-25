@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { nearestGroup, queryRenderedNear, screenDistance } from '../../utils/mapPick'
+import { nearestGroup, queryEditorHits, queryRenderedNear, screenDistance } from '../../utils/mapPick'
 
 // Координаты в тестах — сразу пиксели экрана (project — тождество)
 const project = ([x, y]: [number, number]) => ({ x, y })
@@ -81,5 +81,25 @@ describe('nearestGroup', () => {
     ]
     expect(nearestGroup(features).map((f) => f.id)).toEqual([10, 11])
     expect(nearestGroup([])).toEqual([])
+  })
+})
+
+describe('queryEditorHits', () => {
+  it('мышь — только точно под курсором, как было', () => {
+    const map = mapWith([node(1, 52, 50)], [])
+    expect(queryEditorHits(map, { x: 50, y: 50 }, false)).toEqual([])
+    expect(map.queryRenderedFeatures).toHaveBeenCalledWith([50, 50])
+  })
+
+  it('палец — в радиусе касания; из узлов и участков остаются ближайшие, дальний узел не создаёт меню', () => {
+    const near = node(1, 58, 50)
+    const farther = node(2, 50, 63)
+    const tube = pipe(10, [[0, 60], [100, 60]])
+    const map = mapWith([farther, tube, near, building(7)])
+    const ids = queryEditorHits(map, { x: 50, y: 50 }, true).map((f: any) => f.id)
+    expect(ids).toContain(1)
+    expect(ids).toContain(10)
+    expect(ids).not.toContain(2)
+    expect(map.queryRenderedFeatures).toHaveBeenCalledWith([[36, 36], [64, 64]])
   })
 })

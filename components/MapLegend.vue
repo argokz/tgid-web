@@ -79,7 +79,7 @@ const ticks = computed(() => props.stops.map(([value], index) => {
 <style scoped>
 .map-legend {
   position: absolute;
-  bottom: 40px;
+  bottom: calc(40px + var(--safe-bottom, 0px));
   z-index: var(--z-hud);
   width: 248px;
   padding: var(--space-2) var(--space-3);

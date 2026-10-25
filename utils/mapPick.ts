@@ -21,16 +21,16 @@ const LINE_HIT_PX = 3;
 /** Объекты не дальше ближайшего + TIE_PX считаются равноудалёнными — тогда меню выбора */
 export const PICK_TIE_PX = 3;
 
-export const pickRadius = (): number => {
+/** Палец (pointer: coarse); без matchMedia — мышь */
+const isCoarsePointer = (): boolean => {
   try {
-    if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) {
-      return PICK_RADIUS_TOUCH_PX;
-    }
+    return typeof window !== 'undefined' && Boolean(window.matchMedia?.('(pointer: coarse)').matches);
   } catch {
-    // matchMedia недоступен — допуск мыши
+    return false;
   }
-  return PICK_RADIUS_PX;
 };
+
+export const pickRadius = (): number => (isCoarsePointer() ? PICK_RADIUS_TOUCH_PX : PICK_RADIUS_PX);
 
 const segmentDistance = (p: ScreenPoint, a: ScreenPoint, b: ScreenPoint): number => {
   const dx = b.x - a.x;
@@ -153,4 +153,30 @@ export const nearestGroup = <T extends { _pickDistance?: number }>(features: rea
   if (onIcon.length) return onIcon;
   const best = features[0]._pickDistance ?? 0;
   return features.filter((f) => (f._pickDistance ?? 0) <= best + tie);
+};
+
+const geometryGroup = (f: any): 'point' | 'line' | 'other' => {
+  const type = f?.geometry?.type;
+  if (type === 'Point' || type === 'MultiPoint') return 'point';
+  if (type === 'LineString' || type === 'MultiLineString') return 'line';
+  return 'other';
+};
+
+/**
+ * Объекты под указателем для редактора сети. Мышь — точно под курсором (как было: редактор различает
+ * соседние узлы и участки). Палец — в радиусе касания (PICK_RADIUS_TOUCH_PX): узел 6 px и участок 3 px
+ * пальцем точно не попасть. Чтобы касание рядом с узлом не превращалось в меню «какой из узлов», из
+ * каждой группы (узлы, участки) остаются только ближайшие с допуском PICK_TIE_PX: узел ищется среди
+ * узлов, участок — среди участков.
+ */
+export const queryEditorHits = (map: any, point: ScreenPoint, coarse = isCoarsePointer()): any[] => {
+  if (!map) return [];
+  if (!coarse) return map.queryRenderedFeatures([point.x, point.y]);
+  const near = queryRenderedNear(map, point, { radius: PICK_RADIUS_TOUCH_PX });
+  const best = new Map<string, number>();
+  for (const f of near) {
+    const group = geometryGroup(f);
+    if (!best.has(group)) best.set(group, f._pickDistance ?? 0);
+  }
+  return near.filter((f) => (f._pickDistance ?? 0) <= (best.get(geometryGroup(f)) ?? 0) + PICK_TIE_PX);
 };

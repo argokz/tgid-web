@@ -26,7 +26,7 @@ const toolInfo = computed(() => EDITOR_TOOLS.find((t) => t.value === props.tool)
 <style scoped>
 .editor-status-bar {
   position: absolute;
-  bottom: 28px;
+  bottom: calc(28px + var(--safe-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   max-width: calc(100% - 32px);

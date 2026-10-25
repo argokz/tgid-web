@@ -1,6 +1,7 @@
 @use 'variables' as *;
 @use 'tokens';
 @use 'motion';
+@use 'device';
 
 /* Глобальные стили для панели слоев */
 .v-navigation-drawer {

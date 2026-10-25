@@ -208,7 +208,7 @@ onBeforeUnmount(() => {
 .cursor-coords {
   position: absolute;
   left: 50%;
-  bottom: 4px;
+  bottom: calc(4px + var(--safe-bottom, 0px));
   transform: translateX(-50%);
   z-index: var(--z-hud);
   display: flex;

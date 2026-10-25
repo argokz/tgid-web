@@ -223,7 +223,7 @@ watch(() => props.modelValue, (open) => {
 .chart-dock--desktop {
   position: fixed;
   left: var(--space-4, 16px);
-  bottom: var(--space-3, 12px);
+  bottom: calc(var(--space-3, 12px) + var(--safe-bottom, 0px));
   z-index: var(--z-toolbar);
   border-radius: var(--radius-3, 12px);
   background: rgb(var(--v-theme-surface));
