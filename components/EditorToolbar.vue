@@ -388,6 +388,7 @@ import { POLAR_STEP_ITEMS } from '~/utils/cadConstraint';
 import { topologyOperationLabel } from '~/utils/topologyLabels';
 import { fragmentChoices, fragmentLabel } from '~/utils/editFragment';
 import { useFragmentStore } from '~/stores/fragmentStore';
+import { useUiStore } from '~/stores/uiStore';
 import { appStorage } from '~/utils/appStorage';
 import { useFloatingDrag, usePersistedPanelPos } from '~/composables/useFloatingDrag';
 
@@ -407,7 +408,21 @@ const rootEl = ref<HTMLElement | null>(null);
 /** null — на месте по умолчанию (сверху по центру карты) */
 const { pos, save: savePos, reset: resetStoredPos } = usePersistedPanelPos('editorToolbarPos');
 const pinned = ref(readPinned());
-const posStyle = computed(() => (pos.value ? { left: `${pos.value.x}px`, top: `${pos.value.y}px` } : undefined));
+const ui = useUiStore();
+/** Зазор между панелью и краями видимой части карты, px */
+const VISIBLE_GAP_PX = 16;
+// Место по умолчанию — по центру видимой части карты (между панелью слоёв и карточкой), не шире её:
+// при масштабе 125–150 % между ними 480–740 px, и панель по центру всей карты наезжала на обе
+const posStyle = computed(() => {
+  if (pos.value) return { left: `${pos.value.x}px`, top: `${pos.value.y}px` };
+  const left = ui.leftInset;
+  const right = ui.rightInset;
+  if (!left && !right) return undefined;
+  return {
+    left: `calc(${left}px + (100% - ${left + right}px) / 2)`,
+    maxWidth: `calc(100% - ${left + right + 2 * VISIBLE_GAP_PX}px)`,
+  };
+});
 const { dragging, onPointerDown: onHandleDown, onKeydown: onHandleKeydown, reclamp } = useFloatingDrag({
   target: rootEl,
   pos,
