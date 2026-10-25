@@ -320,7 +320,9 @@
           :calculation-id2="piezometerCalc2"
           :fragment-ids="piezometerRoute?.fragment_ids ?? []"
           :static-head="piezometerRoute?.static_head ?? null"
+          :focus-node-id="piezometerMapLink.mapFocusId.value"
           @node-hover="onPiezometerNodeHover"
+          @node-focus="piezometerMapLink.focusFromChart"
           @double="onPiezometerDouble"
         />
         <LazyPiezometerDirectionsDialog
@@ -507,6 +509,7 @@ import { useTopologyEditor } from '~/composables/useTopologyEditor';
 import { useJournalContourLayer } from '~/composables/useJournalContourLayer';
 import { useOverlayLayer } from '~/composables/useOverlayLayer';
 import { useSelectionHighlight } from '~/composables/useSelectionHighlight';
+import { useRouteMapLink } from '~/composables/useRouteMapLink';
 import type { RegimePointsResult } from '~/utils/regimeMapPoints';
 import { useLocateMarkers } from '~/composables/useLocateMarkers';
 import { useMapDataVersion } from '~/composables/useMapDataVersion';
@@ -1220,10 +1223,18 @@ const onPiezometerDirectionLoad = (nodes: number[]) => {
   buildPiezometerRoute();
 };
 
+/** Пьезометр ↔ карта: точка графика подсвечивает узел, курсор над узлом маршрута — точку графика (этап 6) */
+const piezometerMapLink = useRouteMapLink(
+  () => mapStore.map,
+  () => piezometerPathData.value,
+  () => piezometerModalOpen.value && piezometerPathData.value.length > 0,
+);
+
 const onPiezometerNodeHover = (nodeId: number) => {
   const node = piezometerPathData.value.find((p: any) => p.node_id === nodeId);
   if (!node || node.lng == null || node.lat == null || !mapStore.map) return;
-  mapStore.map.flyTo({ center: [node.lng, node.lat], zoom: 18, duration: 600, essential: true });
+  // узел — над панелью графиков снизу, а не под ней (offset — только на этот перелёт, padding карта запомнила бы)
+  mapStore.map.flyTo({ center: [node.lng, node.lat], zoom: 18, duration: 600, essential: true, offset: [0, -uiStore.bottomInset / 2] });
 };
 
 /** Меню «Выберите объект» для инструментов: несколько объектов сети под курсором (QA F53) */

@@ -1,40 +1,31 @@
 <template>
-  <v-dialog
+  <ChartDock
     :model-value="modelValue"
-    max-width="1240"
+    title="Пьезометрический график"
+    :subtitle="dockSubtitle"
+    icon="mdi-chart-line-variant"
     @update:model-value="$emit('update:modelValue', $event)"
   >
-    <v-card>
-      <v-toolbar
-        color="primary"
-        density="compact"
-      >
-        <v-toolbar-title>Пьезометрический график</v-toolbar-title>
-        <v-spacer />
-        <span
-          v-if="!loading && !error && totalLength"
-          class="text-caption me-3"
-        >
-          Длина маршрута: {{ formatLength(totalLength) }} · узлов: {{ pathData.length }}
-        </span>
+    <template #actions>
+      <template v-if="!loading && !error && pathData.length">
         <v-btn
-          v-if="!loading && !error && pathData.length && staticHead"
+          v-if="staticHead"
           icon
           size="small"
           :variant="showStatic ? 'tonal' : 'text'"
+          :aria-pressed="showStatic"
           aria-label="Статика"
           @click="showStatic = !showStatic"
         >
           <v-icon>mdi-arrow-collapse-horizontal</v-icon>
           <v-tooltip
             activator="parent"
-            location="bottom"
+            location="top"
           >
             Статика: {{ fmt(staticHead.value) }} м (max отметка + высота здания + {{ staticHead.reserve_m }} м)
           </v-tooltip>
         </v-btn>
         <v-menu
-          v-if="!loading && !error && pathData.length"
           :close-on-content-click="true"
           @update:model-value="onDoubleMenu"
         >
@@ -85,7 +76,6 @@
           </v-list>
         </v-menu>
         <v-btn
-          v-if="!loading && !error && pathData.length"
           icon
           size="small"
           aria-label="Выгрузить CSV"
@@ -98,7 +88,6 @@
           >Выгрузить CSV</v-tooltip>
         </v-btn>
         <v-btn
-          v-if="!loading && !error && pathData.length"
           icon
           size="small"
           aria-label="Выгрузить в Excel (p_excel)"
@@ -111,238 +100,214 @@
             location="bottom"
           >Скачать официальный профиль (Excel)</v-tooltip>
         </v-btn>
-        <v-btn
-          icon
-          size="small"
-          aria-label="Закрыть"
-          @click="$emit('update:modelValue', false)"
+      </template>
+    </template>
+
+    <StateView
+      variant="chart"
+      :loading="loading"
+      :error="error"
+      error-title="График не построен"
+      :retry="false"
+    >
+      <template v-if="!loading && !error">
+        <v-alert
+          v-if="!hasCalculation"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="ma-3"
         >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </v-toolbar>
+          Расчётные напоры для этого маршрута отсутствуют — показан профиль рельефа (Z).
+          Напоры и температуры появятся после выполнения гидравлического расчёта сети.
+        </v-alert>
 
-      <v-card-text class="pa-0">
-        <div
-          v-if="loading"
-          class="d-flex justify-center align-center py-10"
-        >
-          <v-progress-circular
-            indeterminate
-            color="primary"
-          />
-          <span class="ml-3">Построение пути и графика…</span>
-        </div>
-
-        <div
-          v-else-if="error"
-          class="d-flex justify-center align-center py-10 text-error"
-        >
-          <v-icon
-            color="error"
-            class="mr-2"
-          >mdi-alert</v-icon>
-          {{ error }}
-        </div>
-
-        <template v-else>
-          <v-alert
-            v-if="!hasCalculation"
-            type="info"
-            variant="tonal"
-            density="compact"
-            class="ma-3"
-          >
-            Расчётные напоры для этого маршрута отсутствуют — показан профиль рельефа (Z).
-            Напоры и температуры появятся после выполнения гидравлического расчёта сети.
-          </v-alert>
-
-          <v-tabs
+        <div class="px-3 pt-2 pb-1">
+          <SegmentedToggle
             v-model="tab"
-            density="compact"
-            color="primary"
-          >
-            <v-tab value="chart">График</v-tab>
-            <v-tab value="table">Таблица узлов</v-tab>
-            <v-tab value="time">Время прохождения</v-tab>
-          </v-tabs>
-          <v-divider />
+            :items="tabItems"
+            aria-label="Вид пьезометра"
+          />
+        </div>
 
-          <v-window v-model="tab">
-            <v-window-item value="chart">
-              <div style="height: 560px; width: 100%;">
-                <v-chart
-                  :theme="chartTheme"
-                  class="chart"
-                  :option="chartOptions"
-                  autoresize
-                  @click="onChartClick"
+        <v-window v-model="tab">
+          <v-window-item value="chart">
+            <ChartFrame
+              ref="frameRef"
+              class="px-2"
+              :option="chartOptions"
+              :height="chartHeight"
+              label="Пьезометрический график"
+              export-name="Пьезометрический график"
+              :summary="chartSummary"
+              @click="onChartClick"
+              @update-axis-pointer="onAxisPointer"
+              @globalout="emit('node-focus', null)"
+            />
+          </v-window-item>
+
+          <v-window-item value="table">
+            <div class="piezo-scroll">
+              <v-table
+                density="compact"
+                class="piezo-table"
+              >
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Узел</th>
+                    <th class="text-right">L, м</th>
+                    <th class="text-right">Z, м</th>
+                    <th class="text-right">H под., м</th>
+                    <th class="text-right">H обр., м</th>
+                    <template v-if="isDouble">
+                      <th class="text-right">H под., м (№{{ calculationId2 }})</th>
+                      <th class="text-right">H обр., м (№{{ calculationId2 }})</th>
+                    </template>
+                    <th class="text-right">t под., °C</th>
+                    <th class="text-right">t обр., °C</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(node, idx) in pathData"
+                    :key="node.node_id"
+                    class="piezo-row"
+                    @click="$emit('node-hover', node.node_id)"
+                  >
+                    <td>{{ idx + 1 }}</td>
+                    <td>{{ node.label || node.node_id }}</td>
+                    <td class="text-right">{{ fmt(node.distance) }}</td>
+                    <td class="text-right">{{ fmt(node.z) }}</td>
+                    <td class="text-right">{{ fmt(node.h_pod) }}</td>
+                    <td class="text-right">{{ fmt(node.h_obr) }}</td>
+                    <template v-if="isDouble">
+                      <td class="text-right">{{ fmt(node.h_pod_2) }}</td>
+                      <td class="text-right">{{ fmt(node.h_obr_2) }}</td>
+                    </template>
+                    <td class="text-right">{{ fmt(node.t_pod) }}</td>
+                    <td class="text-right">{{ fmt(node.t_obr) }}</td>
+                  </tr>
+                </tbody>
+              </v-table>
+            </div>
+          </v-window-item>
+
+          <v-window-item value="time">
+            <div class="pa-3">
+              <div
+                v-if="travelLoading"
+                class="d-flex align-center py-6 justify-center"
+              >
+                <v-progress-circular
+                  indeterminate
+                  color="primary"
+                  size="24"
                 />
+                <span class="ml-3">Расчёт времени прохождения…</span>
               </div>
-            </v-window-item>
-
-            <v-window-item value="table">
-              <div style="max-height: 560px; overflow-y: auto;">
-                <v-table
-                  density="compact"
-                  class="piezo-table"
-                >
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Узел</th>
-                      <th class="text-right">L, м</th>
-                      <th class="text-right">Z, м</th>
-                      <th class="text-right">H под., м</th>
-                      <th class="text-right">H обр., м</th>
-                      <template v-if="isDouble">
-                        <th class="text-right">H под., м (№{{ calculationId2 }})</th>
-                        <th class="text-right">H обр., м (№{{ calculationId2 }})</th>
-                      </template>
-                      <th class="text-right">t под., °C</th>
-                      <th class="text-right">t обр., °C</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="(node, idx) in pathData"
-                      :key="node.node_id"
-                      class="piezo-row"
-                      @click="$emit('node-hover', node.node_id)"
+              <v-alert
+                v-else-if="travelError"
+                type="error"
+                variant="tonal"
+                density="compact"
+              >
+                {{ travelError }}
+              </v-alert>
+              <template v-else-if="travel">
+                <div class="d-flex flex-wrap ga-4 mb-2">
+                  <div>
+                    <div class="text-caption text-medium-emphasis">Подающий теплопровод</div>
+                    <div
+                      class="text-subtitle-1"
+                      :class="{ 'text-error': travel.supply.no_flow }"
                     >
-                      <td>{{ idx + 1 }}</td>
-                      <td>{{ node.label || node.node_id }}</td>
-                      <td class="text-right">{{ fmt(node.distance) }}</td>
-                      <td class="text-right">{{ fmt(node.z) }}</td>
-                      <td class="text-right">{{ fmt(node.h_pod) }}</td>
-                      <td class="text-right">{{ fmt(node.h_obr) }}</td>
-                      <template v-if="isDouble">
-                        <td class="text-right">{{ fmt(node.h_pod_2) }}</td>
-                        <td class="text-right">{{ fmt(node.h_obr_2) }}</td>
-                      </template>
-                      <td class="text-right">{{ fmt(node.t_pod) }}</td>
-                      <td class="text-right">{{ fmt(node.t_obr) }}</td>
-                    </tr>
-                  </tbody>
-                </v-table>
-              </div>
-            </v-window-item>
-
-            <v-window-item value="time">
-              <div class="pa-3">
-                <div
-                  v-if="travelLoading"
-                  class="d-flex align-center py-6 justify-center"
-                >
-                  <v-progress-circular
-                    indeterminate
-                    color="primary"
-                    size="24"
-                  />
-                  <span class="ml-3">Расчёт времени прохождения…</span>
+                      {{ travel.supply.text }}
+                    </div>
+                  </div>
+                  <div>
+                    <div class="text-caption text-medium-emphasis">Обратный теплопровод</div>
+                    <div
+                      class="text-subtitle-1"
+                      :class="{ 'text-error': travel.return.no_flow }"
+                    >
+                      {{ travel.return.text }}
+                    </div>
+                  </div>
                 </div>
+                <p class="text-caption text-medium-emphasis mb-2">
+                  Как в десктопе («Время прохождения»): время участков (ut_out a11) суммируется по маршруту
+                  со знаком ориентации линии; расход против принятого направления — «нет движения».
+                  <template v-if="travel.calculation_ids.length"> Расчёт: {{ travel.calculation_ids.join(', ') }}.</template>
+                </p>
                 <v-alert
-                  v-else-if="travelError"
-                  type="error"
+                  v-if="travel.note"
+                  type="warning"
                   variant="tonal"
                   density="compact"
+                  class="mb-2"
                 >
-                  {{ travelError }}
+                  {{ travel.note }}. Простая сумма времени участков:
+                  подача {{ fmt(travel.supply.sum_segments_min) }} мин, обратка {{ fmt(travel.return.sum_segments_min) }} мин.
                 </v-alert>
-                <template v-else-if="travel">
-                  <div class="d-flex flex-wrap ga-4 mb-2">
-                    <div>
-                      <div class="text-caption text-medium-emphasis">Подающий теплопровод</div>
-                      <div
-                        class="text-subtitle-1"
-                        :class="{ 'text-error': travel.supply.no_flow }"
-                      >
-                        {{ travel.supply.text }}
-                      </div>
-                    </div>
-                    <div>
-                      <div class="text-caption text-medium-emphasis">Обратный теплопровод</div>
-                      <div
-                        class="text-subtitle-1"
-                        :class="{ 'text-error': travel.return.no_flow }"
-                      >
-                        {{ travel.return.text }}
-                      </div>
-                    </div>
-                  </div>
-                  <p class="text-caption text-medium-emphasis mb-2">
-                    Как в десктопе («Время прохождения»): время участков (ut_out a11) суммируется по маршруту
-                    со знаком ориентации линии; расход против принятого направления — «нет движения».
-                    <template v-if="travel.calculation_ids.length"> Расчёт: {{ travel.calculation_ids.join(', ') }}.</template>
-                  </p>
-                  <v-alert
-                    v-if="travel.note"
-                    type="warning"
-                    variant="tonal"
+                <div class="piezo-scroll">
+                  <v-table
                     density="compact"
-                    class="mb-2"
+                    class="piezo-table"
                   >
-                    {{ travel.note }}. Простая сумма времени участков:
-                    подача {{ fmt(travel.supply.sum_segments_min) }} мин, обратка {{ fmt(travel.return.sum_segments_min) }} мин.
-                  </v-alert>
-                  <div style="max-height: 440px; overflow-y: auto;">
-                    <v-table
-                      density="compact"
-                      class="piezo-table"
-                    >
-                      <thead>
-                        <tr>
-                          <th rowspan="2">#</th>
-                          <th rowspan="2">Участок</th>
-                          <th
-                            rowspan="2"
-                            class="text-right"
-                          >L, м</th>
-                          <th
-                            colspan="3"
-                            class="text-center"
-                          >Подача</th>
-                          <th
-                            colspan="3"
-                            class="text-center"
-                          >Обратка</th>
-                        </tr>
-                        <tr>
-                          <th class="text-right">G, т/ч</th>
-                          <th class="text-right">t, мин</th>
-                          <th class="text-right">Σt, мин</th>
-                          <th class="text-right">G, т/ч</th>
-                          <th class="text-right">t, мин</th>
-                          <th class="text-right">Σt, мин</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr
-                          v-for="row in travel.items"
-                          :key="row.index"
-                          class="piezo-row"
-                          @click="$emit('node-hover', row.node2_id)"
-                        >
-                          <td>{{ row.index }}</td>
-                          <td>{{ nodeLabel(row.node1_id, row.node1_label) }} → {{ nodeLabel(row.node2_id, row.node2_label) }}</td>
-                          <td class="text-right">{{ fmt(row.supply?.length_m ?? row.return?.length_m) }}</td>
-                          <td class="text-right">{{ fmt(row.supply?.q) }}</td>
-                          <td class="text-right">{{ fmt(row.supply?.time_min) }}</td>
-                          <td class="text-right">{{ cumText(row.supply) }}</td>
-                          <td class="text-right">{{ fmt(row.return?.q) }}</td>
-                          <td class="text-right">{{ fmt(row.return?.time_min) }}</td>
-                          <td class="text-right">{{ cumText(row.return) }}</td>
-                        </tr>
-                      </tbody>
-                    </v-table>
-                  </div>
-                </template>
-              </div>
-            </v-window-item>
-          </v-window>
-        </template>
-      </v-card-text>
-    </v-card>
-  </v-dialog>
+                    <thead>
+                      <tr>
+                        <th rowspan="2">#</th>
+                        <th rowspan="2">Участок</th>
+                        <th
+                          rowspan="2"
+                          class="text-right"
+                        >L, м</th>
+                        <th
+                          colspan="3"
+                          class="text-center"
+                        >Подача</th>
+                        <th
+                          colspan="3"
+                          class="text-center"
+                        >Обратка</th>
+                      </tr>
+                      <tr>
+                        <th class="text-right">G, т/ч</th>
+                        <th class="text-right">t, мин</th>
+                        <th class="text-right">Σt, мин</th>
+                        <th class="text-right">G, т/ч</th>
+                        <th class="text-right">t, мин</th>
+                        <th class="text-right">Σt, мин</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        v-for="row in travel.items"
+                        :key="row.index"
+                        class="piezo-row"
+                        @click="$emit('node-hover', row.node2_id)"
+                      >
+                        <td>{{ row.index }}</td>
+                        <td>{{ nodeLabel(row.node1_id, row.node1_label) }} → {{ nodeLabel(row.node2_id, row.node2_label) }}</td>
+                        <td class="text-right">{{ fmt(row.supply?.length_m ?? row.return?.length_m) }}</td>
+                        <td class="text-right">{{ fmt(row.supply?.q) }}</td>
+                        <td class="text-right">{{ fmt(row.supply?.time_min) }}</td>
+                        <td class="text-right">{{ cumText(row.supply) }}</td>
+                        <td class="text-right">{{ fmt(row.return?.q) }}</td>
+                        <td class="text-right">{{ fmt(row.return?.time_min) }}</td>
+                        <td class="text-right">{{ cumText(row.return) }}</td>
+                      </tr>
+                    </tbody>
+                  </v-table>
+                </div>
+              </template>
+            </div>
+          </v-window-item>
+        </v-window>
+      </template>
+    </StateView>
+  </ChartDock>
 </template>
 
 <script setup lang="ts">
@@ -357,28 +322,21 @@ import {
   type TravelTimeSide,
 } from '~/services/fastApiService';
 import { use } from 'echarts/core';
-import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart } from 'echarts/charts';
-import {
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-  GridComponent,
-  DataZoomComponent,
-} from 'echarts/components';
-import VChart from 'vue-echarts'
-import { useChartTheme } from '~/composables/useChartTheme';
+import ChartDock from '~/components/ChartDock.vue';
+import ChartFrame from '~/components/ChartFrame.vue';
+import SegmentedToggle, { type SegmentedToggleItem } from '~/components/SegmentedToggle.vue';
+import StateView from '~/components/StateView.vue';
+import { useMobile } from '~/composables/useMobile';
+import { axisTooltip, formatChartNumber, zoomControls } from '~/utils/chartOptions';
 
-use([
-  CanvasRenderer,
-  LineChart,
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-  GridComponent,
-  DataZoomComponent,
-]);
-const { chartTheme } = useChartTheme()
+use([LineChart]);
+
+/**
+ * Пьезометрический график маршрута — панель графиков у нижнего края (`ChartDock`, этап 6): карта остаётся
+ * видимой. Наведение на точку графика — событие `node-focus` (MapViewer подсвечивает узел на карте), курсор над
+ * узлом маршрута на карте — `focusNodeId` (точка графика с тултипом); щелчок — `node-hover` (карта летит к узлу).
+ */
 
 const props = defineProps<{
   modelValue: boolean;
@@ -395,16 +353,43 @@ const props = defineProps<{
   fragmentIds?: number[];
   /** Линия статики (gid8 Pjezo m_stat) */
   staticHead?: PiezometerStaticHead | null;
+  /** Узел маршрута под курсором на карте — показать его точку на графике */
+  focusNodeId?: number | null;
 }>();
 
 const emit = defineEmits<{
   'update:modelValue': [boolean];
   'node-hover': [number];
+  /** Наведение на точку графика: узел маршрута или null — курсор ушёл с графика */
+  'node-focus': [number | null];
   /** Двойной пьезометр: id второго расчёта или null — выключить (родитель перестраивает маршрут) */
   double: [number | null];
 }>();
 
-const tab = ref<'chart' | 'table' | 'time'>('chart');
+type PiezoTab = 'chart' | 'table' | 'time';
+const tab = ref<PiezoTab>('chart');
+const tabItems: SegmentedToggleItem<PiezoTab>[] = [
+  { value: 'chart', label: 'График', icon: 'mdi-chart-line' },
+  { value: 'table', label: 'Таблица узлов', icon: 'mdi-table' },
+  { value: 'time', label: 'Время прохождения', icon: 'mdi-timer-outline' },
+];
+const { isMobile } = useMobile();
+const chartHeight = computed(() => (isMobile.value ? 320 : 'calc(min(46vh, 560px) - 150px)'));
+const frameRef = ref<InstanceType<typeof ChartFrame> | null>(null);
+
+const dockSubtitle = computed(() => {
+  if (props.loading) return 'Построение пути и графика…';
+  if (props.error || !props.totalLength) return '';
+  return `Длина маршрута ${formatLength(props.totalLength)} · узлов ${props.pathData.length}`;
+});
+/** Итог графика текстом (читается с экрана, виден под графиком) */
+const chartSummary = computed(() => {
+  const pods = (props.pathData || []).map((d) => d.h_pod).filter((v) => v != null) as number[];
+  const obrs = (props.pathData || []).map((d) => d.h_obr).filter((v) => v != null) as number[];
+  if (!pods.length || !obrs.length) return '';
+  const range = (values: number[]) => `${formatChartNumber(Math.min(...values), 1)} … ${formatChartNumber(Math.max(...values), 1)} м`;
+  return `Напор в подающем ${range(pods)}, в обратном ${range(obrs)}`;
+});
 
 // Статика в десктопе включена по умолчанию (m_stat = true)
 const showStatic = ref(true);
@@ -610,20 +595,15 @@ const chartOptions = computed(() => {
   }
 
   return {
-    tooltip: {
-      trigger: 'axis',
-      formatter: (params: any) => {
-        const idx = params[0].dataIndex;
-        let res = `<b>${labels[idx]}</b><br/>Расстояние: ${params[0].axisValue} м<br/>`;
-        params.forEach((item: any) => {
-          const value = typeof item.data === 'number' ? item.data.toFixed(2) : '—';
-          res += `${item.marker} ${item.seriesName}: <b>${value}</b><br/>`;
-        });
-        return res;
-      },
-    },
-    legend: { data: legendData },
-    grid: { left: '3%', right: hasTemperatures.value ? '6%' : '4%', bottom: '12%', containLabel: true },
+    // подписи узлов из базы — в тултипе экранируются (раньше вставлялись в HTML как есть)
+    tooltip: axisTooltip({
+      digits: 2,
+      units: (name) => (name.startsWith('t ') ? '°C' : 'м'),
+      title: (params) => labels[params[0]?.dataIndex ?? 0] ?? '',
+      subtitle: (params) => `Расстояние: ${formatChartNumber(params[0]?.axisValue, 0)} м`,
+    }),
+    legend: { data: legendData, type: 'scroll', top: 0, left: 0, right: 120 },
+    grid: { left: '3%', right: hasTemperatures.value ? '6%' : '4%', top: 48, bottom: 56, containLabel: true },
     xAxis: {
       type: 'category',
       boundaryGap: false,
@@ -633,12 +613,32 @@ const chartOptions = computed(() => {
       nameGap: 30,
     },
     yAxis,
-    dataZoom: [
-      { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
-      { type: 'slider', xAxisIndex: 0, filterMode: 'none' },
-    ],
+    dataZoom: zoomControls({ sliderBottom: 8 }),
     series,
   };
+});
+
+/** Кроссхэйр на графике сдвинулся — узел маршрута под ним (ось X — категории, value = индекс точки) */
+const onAxisPointer = (event: { axesInfo?: Array<{ axisDim?: string; value?: unknown }> }) => {
+  const info = event?.axesInfo?.find((axis) => axis.axisDim === 'x');
+  const index = Number(info?.value);
+  const node = Number.isInteger(index) ? props.pathData[index] : null;
+  emit('node-focus', node ? node.node_id : null);
+};
+
+/** Курсор над узлом маршрута на карте — тултип на его точке; ушёл — тултип скрыть */
+watch(() => props.focusNodeId, (id) => {
+  const chart = frameRef.value?.chart();
+  if (!chart || tab.value !== 'chart') return;
+  const index = id == null ? -1 : props.pathData.findIndex((d) => d.node_id === id);
+  if (index < 0) {
+    chart.dispatchAction({ type: 'hideTip' });
+    return;
+  }
+  // серия со значением в этой точке: без расчёта напоры пустые, есть только рельеф (Z) — на пустой тултип не встаёт
+  const series = (chart.getOption() as { series?: Array<{ data?: unknown[] }> }).series || [];
+  const seriesIndex = series.findIndex((item) => item.data?.[index] != null);
+  if (seriesIndex >= 0) chart.dispatchAction({ type: 'showTip', seriesIndex, dataIndex: index });
 });
 
 const onChartClick = (params: any) => {
@@ -705,9 +705,12 @@ const exportExcel = async () => {
 </script>
 
 <style scoped>
-.chart {
-  height: 100%;
-  width: 100%;
+.piezo-scroll {
+  max-height: calc(min(46vh, 560px) - 110px);
+  overflow-y: auto;
+}
+@media (max-width: 600px) {
+  .piezo-scroll { max-height: none; }
 }
 .piezo-row {
   cursor: pointer;
