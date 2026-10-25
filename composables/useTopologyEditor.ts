@@ -16,7 +16,7 @@ import type {
 import { useNotificationStore } from '~/stores/notificationStore';
 import { useLineVertexEditor } from '~/composables/useLineVertexEditor';
 import { pickNetworkFeature } from '~/utils/networkFeature';
-import { queryEditorHits } from '~/utils/mapPick';
+import { isTouchInput, queryEditorHits } from '~/utils/mapPick';
 import type { PickCandidate, PickOptions } from '~/utils/networkFeature';
 import { pickNetworkSnap } from '~/utils/networkSnap';
 import { registerHotkeys } from '~/composables/useHotkeys';
@@ -1242,7 +1242,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     pick: PickOptions,
   ): Promise<{ candidate: PickCandidate | null; present: boolean }> => {
     // палец — с радиусом касания (queryEditorHits), мышь — точно под курсором
-    const res = pickNetworkFeature(queryEditorHits(getMap(), e.point), pick);
+    const res = pickNetworkFeature(queryEditorHits(getMap(), e.point, isTouchInput(e)), pick);
     if (res.status === 'single') return { candidate: res.candidate, present: true };
     const what = pick.kind === 'node' ? 'узлов' : 'участков';
     if (res.status === 'ambiguous') {

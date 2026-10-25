@@ -86,6 +86,25 @@ describe('useFloatingDrag', () => {
     w.unmount();
   });
 
+  it('отмена с места по умолчанию — pos снова null; потерянный pointerup не блокирует следующее', () => {
+    const { w, el, pos, onCommit, api } = mountPanel();
+    const down = (x: number, y: number) => api().onPointerDown(
+      { button: 0, clientX: x, clientY: y, target: el, preventDefault: vi.fn() } as unknown as PointerEvent);
+    down(310, 60);
+    pointer('pointermove', 410, 160);
+    pointer('pointercancel', 410, 160);
+    expect(pos.value).toBeNull();
+    // pointerup не пришёл (окно потеряло фокус в другом месте) — новое нажатие всё равно тащит
+    down(310, 60);
+    pointer('pointermove', 360, 60);
+    down(310, 60);
+    pointer('pointermove', 410, 60);
+    pointer('pointerup', 410, 60);
+    expect(pos.value).toEqual({ x: 400, y: 50 });
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
   it('ручка: за кнопку внутри не тащит; выключено — не тащит', () => {
     const off = ref(false);
     const { w, el, pos, api } = mountPanel({ handle: '[data-drag]', enabled: () => !off.value, start: { x: 100, y: 100 } });

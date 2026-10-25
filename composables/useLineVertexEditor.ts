@@ -20,7 +20,7 @@ import {
   type LngLat,
 } from '~/utils/lineVertices';
 import { pickNetworkSnap } from '~/utils/networkSnap';
-import { PICK_RADIUS_TOUCH_PX, pickRadius } from '~/utils/mapPick';
+import { PICK_RADIUS_TOUCH_PX, isTouchInput } from '~/utils/mapPick';
 
 const SOURCE_ID = 'topology-vertex-edit';
 const LAYER_LINE = 'topology-vertex-line';
@@ -132,7 +132,7 @@ export function useLineVertexEditor(getMap: () => MapLibreMap | null | undefined
     const layers = [LAYER_VERTEX, LAYER_MID].filter((l) => map.getLayer(l));
     if (!layers.length) return null;
     // ручку вершины пальцем не поймать в 6 px — на тач-экране радиус касания
-    const pad = pickRadius() === PICK_RADIUS_TOUCH_PX ? PICK_RADIUS_TOUCH_PX : 6;
+    const pad = isTouchInput(e) ? PICK_RADIUS_TOUCH_PX : 6;
     const hits = map.queryRenderedFeatures(
       [[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]],
       { layers },

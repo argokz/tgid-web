@@ -67,6 +67,28 @@ describe('HintTip', () => {
       w.unmount();
     });
 
+    it('после долгого нажатия click не пришёл (палец ушёл с кнопки) — следующее нажатие не глотается', () => {
+      vi.useFakeTimers();
+      const { w, onClick, btn } = mountWithClick();
+      btn.dispatchEvent(touch('pointerdown'));
+      vi.advanceTimersByTime(500);
+      btn.dispatchEvent(touch('pointercancel'));
+      vi.advanceTimersByTime(400);
+      btn.click();
+      expect(onClick).toHaveBeenCalledTimes(1);
+
+      // и мышью сразу после долгого нажатия — нажатие проходит
+      btn.dispatchEvent(touch('pointerdown'));
+      vi.advanceTimersByTime(500);
+      btn.dispatchEvent(touch('pointerup'));
+      const mouse = new MouseEvent('pointerdown', { bubbles: true });
+      Object.assign(mouse, { pointerType: 'mouse' });
+      btn.dispatchEvent(mouse);
+      btn.click();
+      expect(onClick).toHaveBeenCalledTimes(2);
+      w.unmount();
+    });
+
     it('палец сдвинулся — это прокрутка, подсказки нет', () => {
       vi.useFakeTimers();
       const { w, btn } = mountWithClick();

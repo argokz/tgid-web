@@ -73,7 +73,9 @@ export function useFloatingDrag(opts: FloatingDragOptions) {
   let stopDrag: ((commit: boolean) => void) | null = null;
 
   const onPointerDown = (e: PointerEvent) => {
-    if (!isEnabled() || stopDrag || e.button !== 0) return;
+    if (!isEnabled() || e.button !== 0) return;
+    // прошлое перетаскивание не получило pointerup (окно потеряло фокус, перо ушло) — не блокировать новое
+    stopDrag?.(false);
     const el = target.value;
     if (!el) return;
     if (handle) {
@@ -85,6 +87,8 @@ export function useFloatingDrag(opts: FloatingDragOptions) {
     if (!box) return;
     e.preventDefault();
     const base = currentPos(el, box);
+    /** Положение до перетаскивания: отмена возвращает его (и не оставляет в pos место на экране, ужатое окном) */
+    const before = pos.value;
     const panel = panelSize(el);
     const start = { x: e.clientX, y: e.clientY };
     let next = base;
@@ -114,19 +118,25 @@ export function useFloatingDrag(opts: FloatingDragOptions) {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('blur', cancel);
       if (frame) cancelAnimationFrame(frame);
       stopDrag = null;
       // transform снимается в том же такте, где положение уходит в style через Vue, — без мигания
       el.style.transform = '';
       el.style.willChange = '';
       dragging.value = false;
-      if (!moved || !commit) return;
+      if (!moved) return;
+      if (!commit) {
+        pos.value = before;
+        return;
+      }
       pos.value = next;
       onCommit?.(next);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', cancel);
+    window.addEventListener('blur', cancel);
   };
 
   /** Стрелки на ручке: сдвиг без мыши (без магнита — иначе у края шаг возвращал бы обратно) */

@@ -34,6 +34,8 @@
     translate var(--duration-exit) var(--ease-in),
     scale var(--duration-exit) var(--ease-in),
     opacity var(--duration-exit) var(--ease-in);
+  // уходящая панель уже закрыта — нажатие за 160 мс анимации попадает в карту под ней, а не в панель
+  pointer-events: none;
 }
 
 .motion-panel-right-enter-from,

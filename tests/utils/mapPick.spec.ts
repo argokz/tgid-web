@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { nearestGroup, queryEditorHits, queryRenderedNear, screenDistance } from '../../utils/mapPick'
+import { isTouchInput, nearestGroup, queryEditorHits, queryRenderedNear, screenDistance } from '../../utils/mapPick'
 
 // Координаты в тестах — сразу пиксели экрана (project — тождество)
 const project = ([x, y]: [number, number]) => ({ x, y })
@@ -81,6 +81,14 @@ describe('nearestGroup', () => {
     ]
     expect(nearestGroup(features).map((f) => f.id)).toEqual([10, 11])
     expect(nearestGroup([])).toEqual([])
+  })
+})
+
+describe('isTouchInput', () => {
+  it('по pointerType события карты, а не по устройству', () => {
+    expect(isTouchInput({ originalEvent: { pointerType: 'touch' } })).toBe(true)
+    expect(isTouchInput({ originalEvent: { pointerType: 'mouse' } })).toBe(false)
+    expect(isTouchInput({ originalEvent: { pointerType: 'pen' } })).toBe(false)
   })
 })
 

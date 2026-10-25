@@ -61,12 +61,27 @@ const open = ref(false);
 const LONG_PRESS_MS = 500;
 const TOUCH_HINT_MS = 2500;
 const LONG_PRESS_SLOP_PX = 10;
+/** Click после отпускания приходит сразу; не пришёл (палец ушёл с кнопки, pointercancel) — флаг снимается сам */
+const SWALLOW_CLICK_MS = 400;
 
 let pressTimer: ReturnType<typeof setTimeout> | null = null;
 let hideTimer: ReturnType<typeof setTimeout> | null = null;
 let pressStart: { x: number; y: number } | null = null;
 /** Долгое нажатие сработало — следующий click (на отпускании) — не нажатие кнопки */
 let swallowClick = false;
+let swallowTimer: ReturnType<typeof setTimeout> | null = null;
+
+const resetSwallow = () => {
+  if (swallowTimer) clearTimeout(swallowTimer);
+  swallowTimer = null;
+  swallowClick = false;
+};
+const releasePress = () => {
+  cancelPress();
+  if (!swallowClick) return;
+  if (swallowTimer) clearTimeout(swallowTimer);
+  swallowTimer = setTimeout(resetSwallow, SWALLOW_CLICK_MS);
+};
 
 const cancelPress = () => {
   if (pressTimer) clearTimeout(pressTimer);
@@ -76,9 +91,10 @@ const cancelPress = () => {
 
 const touchHandlers = {
   onPointerdown: (e: PointerEvent) => {
+    // любое новое нажатие (и мышью) — уже не отпускание после долгого нажатия
+    resetSwallow();
     if (e.pointerType !== 'touch' || props.disabled || !props.text) return;
     cancelPress();
-    swallowClick = false;
     pressStart = { x: e.clientX, y: e.clientY };
     pressTimer = setTimeout(() => {
       pressTimer = null;
@@ -91,15 +107,17 @@ const touchHandlers = {
   onPointermove: (e: PointerEvent) => {
     if (pressStart && Math.hypot(e.clientX - pressStart.x, e.clientY - pressStart.y) > LONG_PRESS_SLOP_PX) cancelPress();
   },
-  onPointerup: cancelPress,
-  onPointercancel: cancelPress,
+  onPointerup: releasePress,
+  onPointercancel: releasePress,
+  // Enter/Space с клавиатуры — настоящее нажатие
+  onKeydown: resetSwallow,
   // долгое нажатие на телефоне открывает контекстное меню браузера — здесь вместо него подсказка
   onContextmenu: (e: Event) => {
     if (swallowClick || pressTimer) e.preventDefault();
   },
   onClickCapture: (e: Event) => {
     if (!swallowClick) return;
-    swallowClick = false;
+    resetSwallow();
     e.preventDefault();
     e.stopImmediatePropagation();
   },
@@ -109,6 +127,7 @@ const withLongPress = (activatorProps: Record<string, unknown>) => mergeProps(ac
 
 onBeforeUnmount(() => {
   cancelPress();
+  resetSwallow();
   if (hideTimer) clearTimeout(hideTimer);
 });
 

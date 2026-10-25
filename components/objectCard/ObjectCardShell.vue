@@ -228,10 +228,13 @@ const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
 }
 .oc-shell--float :deep([data-card-drag]) {
   cursor: move;
+  /* палец тянет окно, а не прокручивает страницу (иначе браузер шлёт pointercancel и окно не едет) */
+  touch-action: none;
 }
 .oc-resize {
   position: absolute;
   z-index: 2;
+  touch-action: none;
 }
 .oc-resize--left {
   left: -3px;

@@ -32,6 +32,17 @@ const isCoarsePointer = (): boolean => {
 
 export const pickRadius = (): number => (isCoarsePointer() ? PICK_RADIUS_TOUCH_PX : PICK_RADIUS_PX);
 
+/**
+ * Касание пальцем — по самому событию карты (originalEvent.pointerType / TouchEvent): ноутбук с сенсорным
+ * экраном отвечает на (pointer: coarse) «мышь», а планшет с мышью — «палец». Тип не известен — по устройству.
+ */
+export const isTouchInput = (event: any): boolean => {
+  const original = event?.originalEvent ?? event;
+  if (typeof original?.pointerType === 'string' && original.pointerType) return original.pointerType === 'touch';
+  if (typeof TouchEvent !== 'undefined' && original instanceof TouchEvent) return true;
+  return isCoarsePointer();
+};
+
 const segmentDistance = (p: ScreenPoint, a: ScreenPoint, b: ScreenPoint): number => {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
