@@ -866,6 +866,13 @@ const resetFilters = () => {
   void loadSources()
 }
 
+/** После долгого действия карточку обновить, только если открыт тот же источник; сбой обновления — предупредить */
+const refreshAfterWrite = async (id: number) => {
+  const sameCard = detailVisible.value && details.value?.id === id
+  await Promise.all([loadSources(), sameCard ? openDetails(id) : Promise.resolve()])
+  if (error.value || (sameCard && detailError.value)) notifications.showWarning('Записано, но данные не обновились — нажмите «Обновить»')
+}
+
 /** Номер последнего запроса карточки: ответ более раннего запроса не перекрывает поздний */
 let detailRequest = 0
 const openDetails = async (sourceId: number) => {
@@ -938,7 +945,7 @@ const saveInputs = async () => {
     await fastApiService.updateObjectAttributes('heatsources', id, changed)
     markSaved(id)
     notifications.showSuccess('Параметры источника сохранены')
-    await Promise.all([loadSources(), openDetails(id)])
+    await refreshAfterWrite(id)
   } catch (cause) {
     reportSaveError(cause, () => openDetails(id))
   } finally {
@@ -955,7 +962,7 @@ const recalculateGraph = async () => {
     const result = await fastApiService.recalculateTemperatureGraph(id, graphMode.value)
     const title = graphModes.find(item => item.value === result.mode)?.title || result.mode
     notifications.showSuccess(`Температурный график ${title}: ${result.points} точек`)
-    await Promise.all([loadSources(), openDetails(id)])
+    await refreshAfterWrite(id)
   } catch (cause) {
     notifications.showError(formatApiError(cause, 'Не удалось пересчитать температурный график'))
   } finally {
@@ -983,7 +990,7 @@ const applyStationary = async () => {
     const result = await fastApiService.applyStationaryTemperatureGraph(id, values)
     notifications.showSuccess(`Стационарный: обновлено ${result.updated_points} точек`)
     stationaryDialog.value = false
-    await Promise.all([loadSources(), openDetails(id)])
+    await refreshAfterWrite(id)
   } catch (cause) {
     notifications.showError(formatApiError(cause, 'Не удалось применить стационарный график'))
   } finally {

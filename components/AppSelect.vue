@@ -118,10 +118,16 @@ const emit = defineEmits<{
 
 const SEARCH_THRESHOLD_DEFAULT = 50;
 
-/** Поиск внутри списка: явный `searchable` или число пунктов больше порога */
-const hasSearch = computed(() =>
-  props.searchable ?? props.items.length > (props.searchThreshold ?? SEARCH_THRESHOLD_DEFAULT),
-);
+/**
+ * Поиск внутри списка: явный `searchable` или число пунктов больше порога. Порог пройден — поиск остаётся:
+ * иначе справочник, догрузившийся до 50+ пунктов, пересоздал бы поле (VSelect → VAutocomplete) и сбросил фокус.
+ */
+let searchLatched = false;
+const hasSearch = computed(() => {
+  if (props.searchable != null) return props.searchable;
+  if ((props.items?.length ?? 0) > (props.searchThreshold ?? SEARCH_THRESHOLD_DEFAULT)) searchLatched = true;
+  return searchLatched;
+});
 
 const search = ref('');
 const onSearch = (value: string) => {

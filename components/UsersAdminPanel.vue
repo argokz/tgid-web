@@ -143,6 +143,7 @@
             variant="plain"
             multiple
             chips
+            :closable-chips="false"
             :disabled="!canWrite || busyId === item.id"
             style="min-width: 190px; max-width: 280px;"
             :aria-label="`Города пользователя ${item.username}`"

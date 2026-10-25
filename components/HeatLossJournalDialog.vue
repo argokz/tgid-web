@@ -999,6 +999,7 @@ const saveSeason = async () => {
     // сезоны нормативного расчёта перечитаются при следующем открытии раздела
     allSeasons.value = []
     await Promise.all([loadSeasons(), openSeason(id)])
+    if (seasonsError.value || detailError.value) notifications.showWarning('Сохранено, но данные не обновились — откройте сезон заново')
   } catch (cause) {
     reportSaveError(cause, () => openSeason(id))
   } finally {
@@ -1028,6 +1029,8 @@ const downloadSeasonsExcel = async () => {
 
 const POLL_MS = 2000
 const POLL_LIMIT = 180
+/** Сколько сбоев запроса статуса подряд терпим: задача на сервере идёт и без нас */
+const POLL_ERRORS_MAX = 5
 let unmounted = false
 onBeforeUnmount(() => { unmounted = true })
 const runHeatLossForSource = async () => {
@@ -1042,31 +1045,47 @@ const runHeatLossForSource = async () => {
       return
     }
     notifications.showSuccess(`Теплопотери в очереди: ${taskId}`)
-    let lastStatus = ''
-    for (let i = 0; i < POLL_LIMIT && !unmounted; i++) {
-      await new Promise((resolve) => setTimeout(resolve, POLL_MS))
-      const statusResponse = await fastApiService.getTaskStatus(taskId)
-      const status = String(statusResponse.status || '')
-      if (status && status !== lastStatus) {
-        lastStatus = status
-        if (status !== 'SUCCESS' && status !== 'FAILURE') notifications.showSuccess(`Теплопотери: ${status}`)
-      }
-      if (status === 'SUCCESS') {
-        notifications.showSuccess(statusResponse.result?.message || 'Теплопотери завершены')
-        if (sourceDetails.value?.id === src.id) await openSource(src.id)
-        return
-      }
-      if (status === 'FAILURE') {
-        notifications.showError(statusResponse.error || 'Ошибка расчёта теплопотерь')
-        return
-      }
-    }
-    if (!unmounted) notifications.showError('Таймаут ожидания теплопотерь (6 мин)')
+    await pollHeatLossTask(taskId, src.id)
   } catch (cause) {
     notifications.showError(formatApiError(cause, 'Не удалось запустить теплопотери'))
   } finally {
     runningHeatLoss.value = false
   }
+}
+
+/** Ожидание задачи расчёта: сбой запроса статуса не прекращает ожидание сразу — задача на сервере идёт */
+const pollHeatLossTask = async (taskId: string, sourceId: number) => {
+  let lastStatus = ''
+  let statusErrors = 0
+  for (let i = 0; i < POLL_LIMIT && !unmounted; i++) {
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS))
+    let statusResponse: Awaited<ReturnType<typeof fastApiService.getTaskStatus>>
+    try {
+      statusResponse = await fastApiService.getTaskStatus(taskId)
+      statusErrors = 0
+    } catch (cause) {
+      statusErrors += 1
+      if (statusErrors < POLL_ERRORS_MAX) continue
+      notifications.showWarning(formatApiError(cause, `Статус расчёта ${taskId} недоступен — расчёт идёт на сервере, проверьте позже`))
+      return
+    }
+    const status = String(statusResponse.status || '')
+    if (status && status !== lastStatus) {
+      lastStatus = status
+      if (status !== 'SUCCESS' && status !== 'FAILURE') notifications.showInfo(`Теплопотери: ${status}`)
+    }
+    if (status === 'SUCCESS') {
+      notifications.showSuccess(statusResponse.result?.message || 'Теплопотери завершены')
+      // карточку того же источника обновить, только если она ещё открыта
+      if (detailsVisible.value && sourceDetails.value?.id === sourceId) await openSource(sourceId)
+      return
+    }
+    if (status === 'FAILURE') {
+      notifications.showError(statusResponse.error || 'Ошибка расчёта теплопотерь')
+      return
+    }
+  }
+  if (!unmounted) notifications.showWarning(`Расчёт ${taskId} идёт дольше 6 минут — проверьте результат позже`)
 }
 
 const locateSource = (item: Record<string, unknown>) => {

@@ -594,6 +594,8 @@ const lookupItemsFor = (key: string, type: ElectricalObjectType): unknown[] | nu
 const lookupName = (items: unknown[], value: unknown) =>
   (items as Array<{ id: unknown; name?: unknown }>).find(item => String(item.id) === String(value))?.name
 
+/** Журнал черновика по виду объекта; фиксируется при начале правки — смена паспорта во время подтверждения его не сдвигает */
+const draftJournal = ref('electrical-line')
 /** Записываемые колонки паспорта текущего объекта */
 const editableKeys = computed(() => Object.keys(selected.value?.attributes || {})
   .filter(key => !READONLY_KEYS.has(key) && !key.endsWith('_name')))
@@ -606,7 +608,7 @@ const editSource: JournalEditSource = {
 const {
   isEditing, saving, editFields, flashId, isDirty, isFieldDirty, editable, setEditField,
   beginEdit, resetEdit, cancel, closeKeepingDraft, markSaved
-} = useJournalEdit(() => `electrical-${selected.value?.object_type ?? 'line'}`, editSource, selected, {
+} = useJournalEdit(() => draftJournal.value, editSource, selected, {
   toForm: record => Object.fromEntries(editableKeys.value.map(key => [key, record.attributes?.[key] ?? null]))
 })
 /** Подсветка сохранённой строки: id сохранённого объекта и его вид */
@@ -769,6 +771,7 @@ const openDialog = async (nextScope: ElectricalNetworkJournalScope = {}) => {
 
 const startEdit = async () => {
   clearSaveError()
+  if (selected.value) draftJournal.value = `electrical-${selected.value.object_type}`
   await beginEdit()
 }
 
@@ -798,6 +801,7 @@ const saveChanges = async () => {
     markSaved(item.id)
     notifications.showSuccess('Изменения сохранены')
     await Promise.all([loadPage(), openDetails(item.object_type, item.id)])
+    if (error.value || detailsError.value) notifications.showWarning('Сохранено, но данные не обновились — нажмите «Обновить»')
   } catch (cause) {
     reportSaveError(cause, () => openDetails(item.object_type, item.id))
   } finally {

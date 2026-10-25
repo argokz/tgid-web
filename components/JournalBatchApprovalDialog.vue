@@ -187,7 +187,7 @@
         <v-btn
           color="teal"
           variant="flat"
-          :disabled="!selectedIds.length || !approvedOn"
+          :disabled="!schema || !selectedIds.length || !approvedOn"
           :loading="approving"
           @click="approve"
         >
