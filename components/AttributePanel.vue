@@ -2,71 +2,24 @@
 
   <Teleport to="body">
 
-    <ObjectCardShell
+    <InspectorPanel
       v-model="visible"
       :mobile="isMobile"
+      icon="mdi-information-outline"
+      :title="objectTitle || 'Информация об объекте'"
+      :subtitle="`${filledCount} из ${totalAttributesCount} заполнено`"
+      :searchable="viewMode"
+      :search="search ?? ''"
+      search-placeholder="Поиск атрибутов..."
+      :search-count="search && totalFilteredCount !== totalAttributesCount ? totalFilteredCount : null"
+      :tabs="viewMode && hasTabsStructure ? inspectorTabs : []"
+      :tab="activeTab"
+      manual-close
+      @update:search="search = $event"
+      @update:tab="activeTab = Number($event)"
+      @close="close"
     >
-
-      <v-card
-
-        class="ap-card"
-
-        :class="{ 'ap-card--mobile': isMobile }"
-
-        elevation="0"
-
-        rounded="0"
-      >
-
-        <!-- ── Шапка ── -->
-
-        <div
-          class="ap-header"
-          :class="isMobile ? 'pa-3' : 'pa-4'"
-          data-card-drag
-        >
-
-          <div
-            class="d-flex align-center"
-            style="gap: 12px; min-width: 200px; flex: 1 1 200px;"
-          >
-
-            <v-avatar
-              size="40"
-              color="primary"
-              class="ap-avatar flex-shrink-0"
-            >
-
-              <v-icon
-                size="20"
-                color="white"
-              >mdi-information-outline</v-icon>
-
-            </v-avatar>
-
-            <div style="min-width: 0;">
-
-              <div class="text-subtitle-1 font-weight-bold text-truncate ap-title">
-
-                {{ objectTitle || 'Информация об объекте' }}
-
-              </div>
-
-              <div class="text-caption text-medium-emphasis">
-
-                {{ filledCount }} из {{ totalAttributesCount }} заполнено
-
-              </div>
-
-            </div>
-
-          </div>
-
-          <!-- у участка до 14 кнопок: переносятся, а не сжимают заголовок в столбик -->
-          <div
-            class="d-flex align-center flex-wrap justify-end"
-            style="gap: 4px; flex: 0 1 auto; min-width: 0;"
-          >
+      <template #actions>
 
             <v-btn
 
@@ -760,42 +713,7 @@
                 location="bottom"
               >{{ batchLabel }}: выбрать на карте (Shift + рамка — все в рамке)</v-tooltip>
             </v-btn>
-
-            <v-btn
-              v-if="!isMobile"
-              icon
-              variant="text"
-              size="small"
-              color="secondary"
-              :aria-label="cardLayout.mode === 'panel' ? 'Открепить в отдельное окно' : 'Закрепить панелью справа'"
-              @click="toggleCardMode"
-            >
-              <v-icon size="18">{{ cardLayout.mode === 'panel' ? 'mdi-dock-window' : 'mdi-dock-right' }}</v-icon>
-              <v-tooltip
-                activator="parent"
-                location="bottom"
-              >{{ cardLayout.mode === 'panel' ? 'Открепить в отдельное окно' : 'Закрепить панелью справа' }}</v-tooltip>
-            </v-btn>
-
-            <v-btn
-              icon
-              variant="text"
-              size="small"
-              color="secondary"
-              aria-label="Закрыть"
-              @click="close"
-            >
-
-              <v-icon>mdi-close</v-icon>
-
-            </v-btn>
-
-          </div>
-
-        </div>
-
-
-        <v-divider />
+      </template>
 
 
         <NodeTypeDialog
@@ -876,105 +794,6 @@
         />
 
         <template v-else>
-        <!-- ── Поиск ── -->
-
-        <div
-          class="ap-search"
-          :class="isMobile ? 'pa-3 pb-2' : 'pa-3 pb-2'"
-        >
-
-          <v-text-field
-
-            v-model="search"
-
-            prepend-inner-icon="mdi-magnify"
-
-            placeholder="Поиск атрибутов..."
-
-            variant="outlined"
-
-            density="compact"
-
-            hide-details
-
-            clearable
-
-            rounded="lg"
-
-            bg-color="grey-lighten-5"
-          >
-
-            <template
-              v-if="search && totalFilteredCount !== totalAttributesCount"
-              #append-inner
-            >
-
-              <v-chip
-                size="x-small"
-                color="primary"
-                variant="tonal"
-              >{{ totalFilteredCount }}</v-chip>
-
-            </template>
-
-          </v-text-field>
-
-        </div>
-
-
-        <!-- ── Табы ── -->
-
-        <template v-if="hasTabsStructure">
-
-          <v-tabs
-
-            v-model="activeTab"
-
-            bg-color="surface"
-
-            color="primary"
-
-            density="compact"
-
-            slider-color="primary"
-
-            class="ap-tabs"
-          >
-
-            <v-tab
-
-              v-for="(tab, idx) in tabsData"
-
-              :key="idx"
-
-              :value="idx"
-
-              class="ap-tab"
-            >
-
-              {{ tab.tabName }}
-
-              <v-chip
-                size="x-small"
-                color="primary"
-                variant="tonal"
-                class="ml-1"
-                style="pointer-events:none;"
-              >
-
-                {{ getTabFieldsCount(tab) }}
-
-              </v-chip>
-
-            </v-tab>
-
-          </v-tabs>
-
-          <v-divider />
-
-        </template>
-
-
         <!-- ── Контент ── -->
 
         <div class="ap-content">
@@ -1309,9 +1128,7 @@
         </div>
         </template>
 
-      </v-card>
-
-    </ObjectCardShell>
+      </InspectorPanel>
 
 
     <!-- Превью разворота участка (dry-run → подтверждение) -->
@@ -1365,10 +1182,9 @@ import { formatDesktopNumber } from '~/utils/desktopNumber'
 import { ApiError, fastApiService, type ReverseLineReport } from '~/services/fastApiService'
 import { getFeatureFragmentId, getSectionRowId, resolveCardObject, type CardObject } from '~/utils/networkFeature'
 import { canDo, canEditFragment, cardPermKind } from '~/utils/permissions'
-import ObjectCardShell from '~/components/objectCard/ObjectCardShell.vue'
+import InspectorPanel, { type InspectorTab } from '~/components/InspectorPanel.vue'
 import ObjectCardEdit from '~/components/objectCard/ObjectCardEdit.vue'
 import NodeEquipmentList from '~/components/objectCard/NodeEquipmentList.vue'
-import { useObjectCardLayout } from '~/composables/useObjectCardLayout'
 import {
   CARD_KIND_BY_TABLE, EQUIPMENT_KINDS, equipmentTitle, isEquipmentKind, KIND_TEXT, type CardKind, type EquipmentKind, type NodeEquipmentItem,
 } from '~/utils/objectCard'
@@ -1559,8 +1375,6 @@ const networkJournalScope = computed<{ lineId: number } | { nodeId: number } | n
 const cardTable = computed(() => cardObject.value.table)
 
 // ── Окно свойств: размещение (панель/окно) и правка карточки (routers/card_edit.py) ──
-const cardLayout = useObjectCardLayout()
-const toggleCardMode = () => { cardLayout.mode = cardLayout.mode === 'panel' ? 'float' : 'panel' }
 // Что правится через карточку (этапы окна свойств: участки, узлы, потребители, источники…).
 // Линия в десктопе — всегда карточка участка heatPipeSections (PropertyDial::init_gid);
 // объекты в узле (узел и камера, потребители, источники, насосные) — карточка своей таблицы по id узла
@@ -1830,6 +1644,12 @@ const canOpenNetworkDiaphragms = computed(() => Boolean(cardLineId.value) || (Bo
 
 
 const hasTabsStructure = computed(() => objectTabsData.value !== null && tabsData.value.length > 0)
+/** Вкладки для InspectorPanel: имя и число полей (с учётом поиска) */
+const inspectorTabs = computed<InspectorTab[]>(() =>
+  tabsData.value.map((tab, idx) => ({ value: idx, label: tab.tabName, count: getTabFieldsCount(tab) })),
+)
+/** Просмотр атрибутов (не правка и не список оборудования): тогда видны поиск и вкладки */
+const viewMode = computed(() => !(editing.value && activeEdit.value) && !(equipmentOpen.value && cardNodeId.value))
 
 
 const filteredAttributesList = computed(() => {
@@ -2502,93 +2322,20 @@ defineExpose({ show, close, confirmLeaveEditing })
   white-space: nowrap;
 }
 
-/* ── Card ── */
-
-.ap-card {
-
-  display: flex;
-
-  flex-direction: column;
-
-  height: 100%;
-  max-height: 100%;
-
-  background: rgb(var(--v-theme-surface));
-
-}
-
-.ap-card--mobile {
-
-  max-height: 100dvh;
-
-}
 
 
-/* ── Header ── */
-
-.ap-header {
-
-  display: flex;
-
-  align-items: center;
-
-  justify-content: space-between;
-
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-
-  flex-shrink: 0;
-
-  background: rgb(var(--v-theme-surface));
-
-}
-
-.ap-avatar :deep(svg),
-
-.ap-avatar :deep(path) {
-
-  fill: white;
-
-  color: white;
-
-}
-
-.ap-title {
-
-  font-size: 0.9rem;
-
-  max-width: 340px;
-
-}
 
 
-/* ── Search ── */
-
-.ap-search {
-
-  flex-shrink: 0;
-
-  background: rgb(var(--v-theme-surface));
-
-}
 
 
-/* ── Tabs ── */
 
-.ap-tabs {
 
-  flex-shrink: 0;
 
-}
 
-.ap-tab {
 
-  font-size: 0.8rem;
 
-  min-width: 0;
 
-  padding: 0 12px;
 
-}
 
 
 /* ── Content ── */
@@ -2770,7 +2517,6 @@ defineExpose({ show, close, confirmLeaveEditing })
 
 @media (max-width: 600px) {
 
-  .ap-title { max-width: 200px; font-size: 0.85rem; }
 
   .ap-field-row { padding: 7px 12px; }
 

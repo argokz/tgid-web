@@ -31,7 +31,7 @@ test.describe('ITwin Map smoke', () => {
 
   test('клик по участку открывает карточку', async ({ page }) => {
     const pipe = await focusFragmentPipe(page);
-    const card = page.locator('.ap-card');
+    const card = page.locator('.inspector');
     // участок лежит в нескольких фрагментах → «Выберите объект», берём копию FRAGMENT_ID
     await clickAndChooseFragment(page, pipe.mid, card);
     await expect(card).toBeVisible();
