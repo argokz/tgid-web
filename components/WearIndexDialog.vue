@@ -39,35 +39,27 @@
       <v-divider />
       <v-card-text class="pt-3">
         <div class="d-flex flex-wrap ga-2 align-center">
-          <v-select
+          <AppSelect
             v-model="calculationId"
             :items="runItems"
             item-title="title"
             item-value="id"
-            density="compact"
-            variant="outlined"
-            hide-details
             label="Расчёт износа"
             class="wear__run"
+            :clearable="false"
             @update:model-value="load"
           />
-          <v-select
+          <AppSelect
             v-model="order"
             :items="orderItems"
-            density="compact"
-            variant="outlined"
-            hide-details
             label="Сортировка"
             class="wear__order"
+            :clearable="false"
             @update:model-value="loadSections"
           />
-          <v-select
+          <AppSelect
             v-model="minCategory"
             :items="categoryItems"
-            density="compact"
-            variant="outlined"
-            hide-details
-            clearable
             label="Категория от"
             class="wear__order"
             @update:model-value="loadSections"
@@ -339,6 +331,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { useOverlayLayer } from '~/composables/useOverlayLayer';
 import { useDialogMapOverlay } from '~/composables/useDialogMapOverlay';

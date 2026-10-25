@@ -25,16 +25,14 @@
       </v-card-title>
       <v-card-text>
         <div class="d-flex flex-wrap align-center ga-2 mb-3">
-          <v-select
+          <AppSelect
             v-model="role"
             :items="roleItems"
             item-title="title"
             item-value="value"
             label="Роль-шаблон"
-            variant="outlined"
-            density="compact"
-            hide-details
             style="max-width: 260px;"
+            :clearable="false"
             @update:model-value="resetToRole"
           />
           <v-btn
@@ -161,6 +159,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
 /** Права пользователя UsersDB: роль-шаблон + галочки «нет / свои / все» по видам объектов и общие права */
 import { computed, ref, watch } from 'vue'
 import type { AdminUser, AdminUserUpdate, PermissionsModel, UserRole } from '~/services/fastApiService'

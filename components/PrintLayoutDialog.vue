@@ -38,28 +38,25 @@
           >
             <div class="text-subtitle-2 mb-1">Лист</div>
             <div class="d-flex ga-2">
-              <v-select
+              <AppSelect
                 v-model="form.format"
                 :items="formats"
                 label="Формат"
-                density="compact"
-                hide-details
+                :clearable="false"
               />
-              <v-select
+              <AppSelect
                 v-model="form.orientation"
                 :items="orientations"
                 label="Ориентация"
-                density="compact"
-                hide-details
+                :clearable="false"
               />
             </div>
-            <v-select
+            <AppSelect
               v-model="form.dpi"
               :items="dpiItems"
               label="Разрешение"
-              density="compact"
-              hide-details
               class="mt-2"
+              :clearable="false"
             />
             <div class="text-subtitle-2 mt-3 mb-1">Масштаб</div>
             <v-radio-group
@@ -221,6 +218,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';

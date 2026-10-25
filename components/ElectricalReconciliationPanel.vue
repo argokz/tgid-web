@@ -25,13 +25,10 @@
         hide-details
         style="max-width: 130px"
       />
-      <v-select
+      <AppSelect
         v-model="objectType"
         :items="typeItems"
         label="Вид объекта"
-        density="compact"
-        clearable
-        hide-details
         style="max-width: 200px"
         @update:model-value="load"
       />
@@ -234,6 +231,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
 import { formatApiError } from '~/utils/apiError'
 import { pluralRu } from '~/utils/pluralRu'
 import { confirmAction } from '~/composables/useConfirm'

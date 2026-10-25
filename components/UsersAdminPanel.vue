@@ -66,17 +66,16 @@
           style="min-width: 180px; flex: 2 1 180px;"
           autocomplete="new-password"
         />
-        <v-select
+        <AppSelect
           v-model="newUser.role"
           :items="roleItems"
           item-title="title"
           item-value="value"
           label="Роль"
-          variant="outlined"
-          density="compact"
           style="min-width: 150px; flex: 1 1 150px;"
+          :clearable="false"
         />
-        <v-select
+        <AppSelect
           v-if="showCities"
           v-model="newUser.cities"
           :items="cityItems"
@@ -85,12 +84,11 @@
           label="Города"
           placeholder="Все города"
           persistent-placeholder
-          variant="outlined"
-          density="compact"
           multiple
           chips
           closable-chips
           style="min-width: 200px; flex: 2 1 200px;"
+          :clearable="false"
         />
         <v-btn
           type="submit"
@@ -122,21 +120,20 @@
           </div>
         </template>
         <template #[`item.role`]="{ item }">
-          <v-select
+          <AppSelect
             :model-value="item.role"
             :items="roleItems"
             item-title="title"
             item-value="value"
             variant="plain"
-            density="compact"
-            hide-details
             :disabled="!canWrite || busyId === item.id"
             style="min-width: 150px; max-width: 180px;"
-            @update:model-value="(role: UserRole) => changeRole(item, role)"
+            :clearable="false"
+            @update:model-value="(role: unknown) => changeRole(item, role as UserRole)"
           />
         </template>
         <template #[`item.cities`]="{ item }">
-          <v-select
+          <AppSelect
             :model-value="item.cities || []"
             :items="cityItems"
             item-title="title"
@@ -144,14 +141,13 @@
             placeholder="Все города"
             persistent-placeholder
             variant="plain"
-            density="compact"
             multiple
             chips
-            hide-details
             :disabled="!canWrite || busyId === item.id"
             style="min-width: 190px; max-width: 280px;"
             :aria-label="`Города пользователя ${item.username}`"
-            @update:model-value="(codes: string[]) => changeCities(item, codes)"
+            :clearable="false"
+            @update:model-value="(codes: unknown) => changeCities(item, codes as string[])"
           />
         </template>
         <template #[`item.caps`]="{ item }">
@@ -313,14 +309,13 @@
             variant="outlined"
             density="compact"
           />
-          <v-select
+          <AppSelect
             v-model="editForm.role"
             :items="roleItems"
             item-title="title"
             item-value="value"
             label="Роль"
-            variant="outlined"
-            density="compact"
+            :clearable="false"
           />
           <div class="text-subtitle-2 mt-1">
             Предметные права
@@ -439,6 +434,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
 /** Пользователи и роли: список, создание, роль, блокировка, пароль, удаление (только admin) */
 import { formatApiError } from '~/utils/apiError'
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'

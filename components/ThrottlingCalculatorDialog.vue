@@ -76,16 +76,14 @@
                 >
                   <div class="text-subtitle-1 font-weight-bold mb-3">Параметры ввода</div>
 
-                  <v-select
+                  <AppSelect
                     v-model="orificeForm.scheme"
                     :items="schemeOptions"
                     item-title="title"
                     item-value="value"
                     label="Схема установки шайбы"
-                    density="compact"
-                    variant="outlined"
                     class="mb-3"
-                    hide-details
+                    :clearable="false"
                   />
 
                   <div class="d-flex ga-2 mb-3">
@@ -472,14 +470,12 @@
                       density="compact"
                       variant="outlined"
                     /></v-col>
-                    <v-col cols="6"><v-select
+                    <v-col cols="6"><AppSelect
                       v-model="engineElevator.regime"
                       :items="[1, 6]"
                       label="Режим расчёта"
-                      density="compact"
-                      variant="outlined"
                       hint="6: при напоре > 40 м половину гасит диафрагма"
-                      persistent-hint
+                      :clearable="false"
                     /></v-col>
                     <v-col cols="6"><v-text-field
                       v-model.number="engineElevator.street_share"
@@ -776,6 +772,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { fmtFixed, fmtNum, missingFields, missingFieldsText, optNum } from '~/utils/calcInput';
 import { computed, reactive, ref, watch } from 'vue';

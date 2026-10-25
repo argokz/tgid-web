@@ -132,18 +132,16 @@
                   variant="outlined"
                   hide-details
                 />
-                <v-select
+                <AppSelect
                   v-if="selected.uses_calculation"
                   v-model="calculationId"
                   :items="calculationItems"
                   item-title="title"
                   item-value="value"
                   label="Расчёт"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
                   :loading="loadingCalculations"
                   :disabled="!fragmentId"
+                  :clearable="false"
                 />
                 <v-text-field
                   v-if="selected.params.year"
@@ -207,6 +205,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
 import { formatApiError } from '~/utils/apiError'
 import { computed, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'

@@ -174,26 +174,22 @@
               :key="idx"
               class="d-flex flex-wrap ga-2 align-start mb-2"
             >
-              <v-select
+              <AppSelect
                 v-model="cond.field"
                 :items="filterFieldItems"
                 item-title="title"
                 item-value="value"
                 label="Поле"
-                variant="outlined"
-                density="compact"
-                hide-details
                 style="flex: 1 1 220px;"
+                :clearable="false"
                 @update:model-value="cond.value = null"
               />
-              <v-select
+              <AppSelect
                 v-model="cond.op"
                 :items="opItems"
                 label="Условие"
-                variant="outlined"
-                density="compact"
-                hide-details
                 style="flex: 0 1 150px;"
+                :clearable="false"
               />
               <div
                 v-if="cond.op === 'eq' && settersByKey[cond.field]"
@@ -360,6 +356,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { pluralRu } from '~/utils/pluralRu'
 import { allows } from '~/utils/permissions'
 import { confirmAction } from '~/composables/useConfirm'

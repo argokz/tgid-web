@@ -86,36 +86,24 @@
           variant="outlined"
           @keyup.enter="reload"
         />
-        <v-select
+        <AppSelect
           v-model="filters.consumer_type"
           :items="consumerTypeOptions"
-          clearable
-          density="compact"
-          hide-details
           label="Тип потребителя"
-          variant="outlined"
         />
-        <v-select
+        <AppSelect
           v-model="filters.fragment_id"
           :items="lookups.fragments"
-          clearable
-          density="compact"
-          hide-details
           item-title="name"
           item-value="id"
           label="Фрагмент схемы"
-          variant="outlined"
         />
-        <v-select
+        <AppSelect
           v-model="filters.state_id"
           :items="lookups.states"
-          clearable
-          density="compact"
-          hide-details
           item-title="name"
           item-value="id"
           label="Состояние"
-          variant="outlined"
         />
         <v-btn
           color="teal-darken-3"
@@ -436,6 +424,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
 import { hasLonLat } from '~/utils/journalFields'
 import { defineComponent, h, type PropType } from 'vue'
 import { useMobile } from '~/composables/useMobile'

@@ -30,18 +30,17 @@
             cols="12"
             md="8"
           >
-            <v-select
+            <AppSelect
               v-model="selectedCalculationId"
               :items="calculationOptions"
               item-title="title"
               item-value="id"
               label="Выберите гидравлический расчёт"
-              variant="outlined"
               density="comfortable"
               :loading="loadingCalculations"
               prepend-inner-icon="mdi-calculator-variant"
-              hide-details
-              @update:model-value="onSelectCalculation"
+              :clearable="false"
+              @update:model-value="onSelectCalculation($event as number)"
             />
           </v-col>
           <v-col
@@ -266,6 +265,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { ref, computed } from 'vue';
 import { fastApiService, type CalculationSummaryItem, type CalculationGeoJsonResponse } from '~/services/fastApiService';

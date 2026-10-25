@@ -44,16 +44,12 @@
             hide-details
             style="min-width: 220px; flex: 2 1 220px;"
           />
-          <v-select
+          <AppSelect
             v-model="filter.mode"
             :items="modeOptions"
             item-title="label"
             item-value="value"
             label="Режим"
-            variant="outlined"
-            density="compact"
-            clearable
-            hide-details
             style="min-width: 160px; flex: 1 1 160px;"
           />
           <v-text-field
@@ -204,6 +200,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { formatApiError } from '~/utils/apiError';
 import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';

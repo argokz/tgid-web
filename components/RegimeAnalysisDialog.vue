@@ -35,29 +35,25 @@
             hide-details
             style="min-width: 260px; max-width: 360px"
           />
-          <v-select
+          <AppSelect
             v-model="calculationId"
             :items="calculationItems"
             item-title="title"
             item-value="value"
             label="Расчёт"
-            density="compact"
-            variant="outlined"
-            hide-details
             :loading="calculationsLoading"
             :disabled="!fragmentId"
             style="min-width: 240px; max-width: 340px"
+            :clearable="false"
           />
-          <v-select
+          <AppSelect
             v-model="queryKey"
             :items="queryItems"
             item-title="title"
             item-value="value"
             label="Запрос"
-            density="compact"
-            variant="outlined"
-            hide-details
             style="min-width: 320px; flex: 1"
+            :clearable="false"
           />
           <v-btn
             color="primary"
@@ -204,6 +200,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
 import { formatApiError } from '~/utils/apiError'
 import { computed, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'

@@ -51,17 +51,15 @@
         </v-alert>
 
         <div class="d-flex flex-wrap ga-2 mb-2">
-          <v-select
+          <AppSelect
             v-model="dictKey"
             :items="dictionaries"
             item-title="label"
             item-value="key"
             label="Справочник"
-            variant="outlined"
-            density="compact"
-            hide-details
             :loading="loadingSchema"
             style="flex: 2 1 260px;"
+            :clearable="false"
           />
           <v-autocomplete
             v-if="info?.fragment_scoped"
@@ -184,17 +182,13 @@
               v-for="f in info?.fields || []"
               :key="f.column"
             >
-              <v-select
+              <AppSelect
                 v-if="f.lookup"
                 v-model="form[f.column]"
                 :items="lookupItems(f.column, f.lookup)"
                 item-title="title"
                 item-value="value"
                 :label="fieldLabel(f)"
-                variant="outlined"
-                density="compact"
-                hide-details="auto"
-                clearable
                 :readonly="!canEditData"
               />
               <v-checkbox
@@ -243,6 +237,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { confirmAction } from '~/composables/useConfirm'
 import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';

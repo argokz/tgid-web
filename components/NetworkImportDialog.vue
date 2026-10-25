@@ -72,14 +72,13 @@
             style="min-width: 320px; flex: 1"
             @update:model-value="resetInspect"
           />
-          <v-select
+          <AppSelect
             v-if="inspect?.sheets?.length && inspect.sheets.length > 1"
             v-model="sheet"
             :items="inspect.sheets"
             label="Лист"
-            density="compact"
-            hide-details
             style="max-width: 200px"
+            :clearable="false"
             @update:model-value="runInspect"
           />
           <v-btn
@@ -139,12 +138,11 @@
               cols="12"
               md="4"
             >
-              <v-select
+              <AppSelect
                 v-model="sourceCrs"
                 :items="crsItems"
                 label="Система координат"
-                density="compact"
-                hide-details
+                :clearable="false"
               />
             </v-col>
             <v-col
@@ -152,12 +150,11 @@
               cols="12"
               md="4"
             >
-              <v-select
+              <AppSelect
                 v-model="matchBy"
                 :items="matchItems"
                 label="Узел в файле — это"
-                density="compact"
-                hide-details
+                :clearable="false"
               />
             </v-col>
             <v-col
@@ -180,15 +177,14 @@
               v-if="inspect.layers?.length"
               cols="12"
             >
-              <v-select
+              <AppSelect
                 v-model="layers"
                 :items="inspect.layers.map((l) => ({ title: `${l.layer} (${l.count})`, value: l.layer }))"
                 label="Слои DXF (пусто — все)"
                 multiple
                 chips
                 closable-chips
-                density="compact"
-                hide-details
+                :clearable="false"
               />
             </v-col>
           </v-row>
@@ -226,13 +222,10 @@
                   class="text-error"
                 > *</span></td>
                 <td style="min-width: 220px">
-                  <v-select
+                  <AppSelect
                     v-model="mapping[t.key]"
                     :items="inspect.columns"
-                    density="compact"
                     variant="plain"
-                    clearable
-                    hide-details
                     placeholder="— не импортировать —"
                   />
                 </td>
@@ -357,6 +350,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { computed, reactive, ref, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';
 import { fastApiService } from '~/services/fastApiService';

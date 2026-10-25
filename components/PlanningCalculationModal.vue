@@ -58,17 +58,15 @@
             </v-btn>
           </v-btn-toggle>
 
-          <v-select
+          <AppSelect
             v-if="runKind === 'list'"
             v-model="listMode"
             :items="listModeOptions"
             item-title="label"
             item-value="value"
             label="Тип расчёта для фрагментов списка"
-            variant="outlined"
-            density="compact"
             class="mb-3"
-            hide-details
+            :clearable="false"
           />
 
           <p
@@ -178,14 +176,12 @@
                 <p class="text-subtitle-2 mb-1 mt-1">
                   Температура расчёта тепловых потерь
                 </p>
-                <v-select
+                <AppSelect
                   v-model="heatLossTemperature"
                   :items="heatLossTemperatureOptions"
                   item-title="label"
                   item-value="value"
-                  variant="outlined"
-                  density="compact"
-                  hide-details
+                  :clearable="false"
                 />
               </div>
             </div>
@@ -408,6 +404,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { ref, computed, watch } from 'vue';
 import { useMobile } from '~/composables/useMobile';

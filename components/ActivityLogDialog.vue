@@ -47,27 +47,19 @@
             clearable
             style="min-width: 180px; flex: 1 1 180px;"
           />
-          <v-select
+          <AppSelect
             v-model="filter.action"
             :items="lookups.actions"
             item-title="title"
             item-value="value"
             label="Действие"
-            density="compact"
-            variant="outlined"
-            hide-details
-            clearable
             style="min-width: 190px; flex: 1 1 190px;"
           />
-          <v-select
+          <AppSelect
             v-if="lookups.cities.length > 1"
             v-model="filter.city"
             :items="lookups.cities"
             label="Город"
-            density="compact"
-            variant="outlined"
-            hide-details
-            clearable
             style="min-width: 120px; flex: 0 1 140px;"
           />
           <v-text-field
@@ -163,6 +155,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
 /** Журнал действий всех пользователей (activity_log, право «Просмотр журнала действий») */
 import { reactive, ref, watch } from 'vue'
 import { useDisplay } from 'vuetify'

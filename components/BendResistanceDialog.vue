@@ -74,15 +74,13 @@
                 class="d-flex align-center ga-2 mb-2"
               >
                 <span class="text-body-2 bend-cls">{{ c.title }} × {{ c.count }}</span>
-                <v-select
+                <AppSelect
                   v-model="choice[c.cls]"
                   :items="c.options"
                   item-title="name"
                   item-value="id"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
                   :disabled="saving"
+                  :clearable="false"
                 >
                   <template #item="{ props: p, item }">
                     <v-list-item
@@ -90,7 +88,7 @@
                       :subtitle="`ζ = ${formatCoef(item.raw.v)}`"
                     />
                   </template>
-                </v-select>
+                </AppSelect>
               </div>
 
               <v-radio-group
@@ -210,6 +208,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { computed, reactive, ref, watch } from 'vue';
 import { fastApiService } from '~/services/fastApiService';
 import { formatApiError } from '~/utils/apiError';

@@ -13,16 +13,14 @@
       </v-card-title>
 
       <v-card-text class="pa-4">
-        <v-select
+        <AppSelect
           v-model="crs"
           :items="POINT_CRS_ITEMS"
           item-title="title"
           item-value="value"
           label="Система координат"
-          density="compact"
-          variant="outlined"
-          hide-details
           class="mb-3"
+          :clearable="false"
         />
         <div class="d-flex ga-2">
           <v-text-field
@@ -96,6 +94,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { computed, ref, watch } from 'vue';
 import { appStorage } from '~/utils/appStorage';
 import { formatApiError } from '~/utils/apiError';

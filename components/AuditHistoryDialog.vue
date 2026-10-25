@@ -66,14 +66,10 @@
             hide-details
             style="min-width: 150px; flex: 1 1 150px;"
           />
-          <v-select
+          <AppSelect
             v-model="filter.operation"
             :items="lookups.operations.map((o) => o.name)"
             label="Операция"
-            variant="outlined"
-            density="compact"
-            clearable
-            hide-details
             style="min-width: 130px; flex: 1 1 130px;"
           />
           <v-text-field
@@ -217,6 +213,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
 import { formatApiError } from '~/utils/apiError'
 import { authorLabel } from '~/utils/auditAuthor'
 import { reactive, ref, watch } from 'vue'

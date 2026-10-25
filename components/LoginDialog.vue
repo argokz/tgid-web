@@ -79,16 +79,15 @@
           >mdi-apple-keyboard-caps</v-icon>
           Включён Caps Lock
         </div>
-        <v-select
+        <AppSelect
           v-if="allowRolePick"
           v-model="role"
           :items="roles"
           label="Роль (только DEV_LOGIN)"
-          variant="outlined"
           density="comfortable"
           rounded="lg"
-          hide-details
           class="mb-3"
+          :clearable="false"
         />
         <v-expand-transition>
           <v-alert
@@ -121,6 +120,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
 import { fastApiService } from '~/services/fastApiService'
 import { formatApiError } from '~/utils/apiError'
 

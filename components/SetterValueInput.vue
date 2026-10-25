@@ -31,16 +31,14 @@
       </div>
     </template>
   </v-autocomplete>
-  <v-select
+  <AppSelect
     v-else-if="setter.kind === 'choice'"
     :model-value="modelValue"
     :items="setter.choices"
     item-title="label"
     item-value="value"
     :label="label || setter.field_label"
-    variant="outlined"
-    density="compact"
-    hide-details="auto"
+    :clearable="false"
     @update:model-value="emit('update:modelValue', $event)"
   />
   <v-text-field
@@ -68,6 +66,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import { computed, ref, watch } from 'vue';
 import { groupSettersService, type GroupSetterInfo, type SetterOption } from '~/services/groupSettersService';
 

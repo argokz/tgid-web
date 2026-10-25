@@ -82,28 +82,24 @@
 
       <!-- Параметры активного инструмента -->
       <template v-if="activeTool === 'trace' || activeTool === 'entry'">
-        <v-select
+        <AppSelect
           v-model="pipeMode"
           :items="PIPE_MODE_ITEMS"
           item-title="title"
           item-value="value"
           label="Трубы"
-          density="compact"
-          variant="outlined"
-          hide-details
           class="editor-toolbar__select editor-toolbar__select--pipe"
+          :clearable="false"
         />
-        <v-select
+        <AppSelect
           v-if="activeTool === 'trace'"
           v-model="newNodeType"
           :items="NODE_TYPE_ITEMS"
           item-title="title"
           item-value="value"
           label="Конечный узел"
-          density="compact"
-          variant="outlined"
-          hide-details
           class="editor-toolbar__select"
+          :clearable="false"
         >
           <v-tooltip
             activator="parent"
@@ -112,17 +108,15 @@
             Тип нового узла в конце трассы: карточка потребителя, источника или насосной станции
             создаётся вместе с ним. Узлы на изломах — обычные
           </v-tooltip>
-        </v-select>
-        <v-select
+        </AppSelect>
+        <AppSelect
           v-model="polarStep"
           :items="POLAR_STEP_ITEMS"
           item-title="title"
           item-value="value"
           label="Шаг угла"
-          density="compact"
-          variant="outlined"
-          hide-details
           class="editor-toolbar__select editor-toolbar__select--polar"
+          :clearable="false"
         >
           <v-tooltip
             activator="parent"
@@ -131,7 +125,7 @@
             Направление следующего участка прилипает к шагу угла и к ∥ / ⊥ соседней трубы.
             Shift — строго 90°, Alt — без привязок. Цифры — длина, Tab — угол, Enter — точка
           </v-tooltip>
-        </v-select>
+        </AppSelect>
         <v-btn
           size="small"
           :color="contextSnapEnabled ? 'brown' : 'default'"
@@ -167,17 +161,15 @@
           </v-tooltip>
         </v-btn>
       </template>
-      <v-select
+      <AppSelect
         v-else-if="activeTool === 'node'"
         v-model="newNodeType"
         :items="NODE_TYPE_ITEMS"
         item-title="title"
         item-value="value"
         label="Тип узла"
-        density="compact"
-        variant="outlined"
-        hide-details
         class="editor-toolbar__select"
+        :clearable="false"
       />
       <template v-else-if="activeTool === 'vertex' && vertexEditor.active.value">
         <v-btn
@@ -323,29 +315,21 @@
           <div class="text-subtitle-2 mb-2">
             Шаблоны для новых объектов
           </div>
-          <v-select
+          <AppSelect
             v-model="newLineTemplateId"
             :items="lineTemplates"
             item-title="name"
             item-value="id"
             label="Участки"
-            density="compact"
-            variant="outlined"
-            clearable
-            hide-details
             class="mb-2"
             no-data-text="Шаблонов нет — сохраните в окне свойств участка"
           />
-          <v-select
+          <AppSelect
             v-model="newNodeTemplateId"
             :items="nodeTemplates"
             item-title="name"
             item-value="id"
             label="Узлы"
-            density="compact"
-            variant="outlined"
-            clearable
-            hide-details
             no-data-text="Шаблонов нет — сохраните в окне свойств узла"
           />
         </v-card>
@@ -389,6 +373,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue';
 import FloatingToolbar from '~/components/FloatingToolbar.vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { useTopologyEditor } from '~/composables/useTopologyEditor';

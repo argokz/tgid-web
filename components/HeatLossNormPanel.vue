@@ -17,26 +17,20 @@
           size="small"
         >Фактические</v-btn>
       </v-btn-toggle>
-      <v-select
+      <AppSelect
         v-model="seasonId"
         :items="seasonItems"
         item-title="title"
         item-value="value"
         label="Отопительный сезон"
-        density="compact"
-        variant="outlined"
-        hide-details
+        :clearable="false"
       />
-      <v-select
+      <AppSelect
         v-model="fragmentId"
         :items="fragments"
         item-title="name"
         item-value="id"
         label="Фрагмент («по фрагменту» десктопа)"
-        density="compact"
-        variant="outlined"
-        clearable
-        hide-details
       />
       <v-btn
         color="deep-orange-darken-3"
@@ -255,16 +249,12 @@
 
         <div v-else-if="view === 'sections'">
           <div class="d-flex ga-2 align-center mb-2">
-            <v-select
+            <AppSelect
               v-model="sectionSource"
               :items="run.sources"
               :item-title="(s: any) => `${s.name || s.sourcename} (№${s.id})`"
               item-value="id"
               label="Источник"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
               style="max-width: 320px"
               @update:model-value="loadSections(1)"
             />
@@ -355,6 +345,7 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
 import { formatApiError } from '~/utils/apiError'
 import { confirmAction } from '~/composables/useConfirm'
 import { useAuthStore } from '~/stores/authStore'

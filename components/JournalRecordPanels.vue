@@ -366,16 +366,12 @@
               cols="12"
               sm="4"
             >
-              <v-select
+              <AppSelect
                 v-model="docForm.document_type_id"
                 :items="schema.document_types || []"
                 item-title="name"
                 item-value="id"
                 label="Вид документа"
-                density="compact"
-                variant="outlined"
-                clearable
-                hide-details
               />
             </v-col>
             <v-col
