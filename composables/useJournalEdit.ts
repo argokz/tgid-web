@@ -21,6 +21,11 @@ export interface JournalEditOptions {
   dateKeys?: readonly string[];
   /** Сколько держать подсветку сохранённой строки, мс */
   flashMs?: number;
+  /**
+   * Поля формы из записи, когда ключи формы — не ключи записи (оборудование: колонки таблицы `throtdiaphloc`
+   * против ключей карточки `installation_place`). По умолчанию форма — копия записи.
+   */
+  toForm?: (record: Record<string, any>) => Record<string, unknown>;
 }
 
 /** Итог отмены: правка закрыта или оставлена; `wasNew` — закрыли создание (диалогу — закрыть карточку) */
@@ -127,7 +132,7 @@ export function useJournalEdit(
     isEditing.value = true;
     activeKey.value = record.id;
     wasDirty = false;
-    editFields.value = withDateInputs({ ...record }, [...(options.dateKeys ?? [])]);
+    editFields.value = withDateInputs(options.toForm ? options.toForm(record) : { ...record }, [...(options.dateKeys ?? [])]);
     editOriginal.value = { ...editFields.value };
     offerDraft();
     return true;

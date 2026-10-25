@@ -37,43 +37,41 @@
         @click="downloadReport"
       >Отчёт Excel</v-btn>
     </div>
-    <div class="d-flex flex-wrap ga-2 mb-3">
-      <v-chip
+    <!-- Виды несоответствий — плитки-фильтры: ноль — в порядке, иначе внимание -->
+    <div class="rec-kinds mb-3">
+      <KpiTile
         v-for="k in summary?.kinds || []"
         :key="k.kind"
-        size="small"
-        :color="k.kind === kind ? 'indigo-darken-2' : (k.count ? 'orange-darken-2' : 'green')"
-        :variant="k.kind === kind ? 'flat' : 'tonal'"
+        :label="k.label"
+        :value="k.count"
+        :status="k.count ? 'warning' : 'good'"
         :title="k.desktop_report ? `Отчёт десктопа ${k.desktop_report}` : 'Дополнительная проверка веба'"
-        @click="selectKind(k.kind)"
-      >
-        {{ k.label }}: {{ fmtInt(k.count) }}
-      </v-chip>
+        selectable
+        :active="k.kind === kind"
+        @select="selectKind(k.kind)"
+      />
     </div>
-    <div
-      v-if="issues"
+    <StateView
+      v-if="kind"
+      variant="table"
+      :rows="6"
+      :loading="loadingIssues && !issues"
+      :empty="Boolean(issues && !issues.items.length)"
+      empty-title="Несоответствий нет"
+      :retry="false"
       class="rec-table-wrap mb-2"
     >
-      <table class="rec-table">
-        <thead><tr><th
-          v-for="c in issueColumns"
-          :key="c"
-        >{{ columnTitle(c) }}</th></tr></thead>
-        <tbody>
-          <tr
-            v-for="(row, i) in issues.items"
-            :key="i"
-            @click="openIssue(row)"
-          >
-            <td
-              v-for="c in issueColumns"
-              :key="c"
-            >{{ cell(row[c]) }}</td>
-          </tr>
-          <tr v-if="!issues.items.length"><td :colspan="issueColumns.length || 1">Несоответствий нет</td></tr>
-        </tbody>
-      </table>
-    </div>
+      <DataTable
+        v-if="issues"
+        :columns="issueTableColumns"
+        :items="issueRows"
+        item-key="__row"
+        selectable
+        density="compact"
+        :loading="loadingIssues"
+        @select="openIssue"
+      />
+    </StateView>
     <div
       v-if="issues && issuePages > 1"
       class="d-flex justify-center"
@@ -193,7 +191,19 @@
       >
         Этот адрес уже записан в здания: {{ addressPreview.other_buildings_with_address.join(', ') }} — адрес станет неоднозначным.
       </v-alert>
-      <ChangesTable :changes="addressPreview.changes" />
+      <DataTable
+        v-if="addressPreview.changes.length"
+        :columns="changeColumns"
+        :items="changeRows"
+        item-key="field"
+        density="compact"
+      />
+      <div
+        v-else
+        class="text-caption text-medium-emphasis"
+      >
+        Изменений нет — здание уже в этом состоянии.
+      </div>
       <div
         v-if="!addressPreview.dry_run"
         class="text-caption text-green-darken-2"
@@ -281,8 +291,11 @@
 </template>
 
 <script setup lang="ts">
+import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
+import KpiTile from '~/components/KpiTile.vue'
+import StateView from '~/components/StateView.vue'
 import { formatApiError } from '~/utils/apiError'
-import { computed, defineComponent, h, onMounted, ref, watch, type PropType } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import {
   fastApiService,
   type AlsekoAddressBindResult,
@@ -298,16 +311,6 @@ import { parseIdList, alsekoColumnTitle, ALSEKO_BUILDING_KINDS, ALSEKO_LOAD_KIND
 const props = defineProps<{ buildingId?: number | null }>()
 const emit = defineEmits<{ 'open-building': [id: number]; 'open-load': [id: number] }>()
 
-const ChangesTable = defineComponent({
-  props: { changes: { type: Array as PropType<AlsekoFieldChange[]>, required: true } },
-  setup: (p) => () => p.changes.length
-    ? h('table', { class: 'rec-table' }, [
-        h('thead', h('tr', ['Поле', 'Было', 'Станет'].map((t) => h('th', t)))),
-        h('tbody', p.changes.map((c) => h('tr', [h('td', c.field), h('td', cell(c.old)), h('td', cell(c.new))])))
-      ])
-    : h('div', { class: 'text-caption text-medium-emphasis' }, 'Изменений нет — здание уже в этом состоянии.')
-})
-
 const authStore = useAuthStore()
 const canEdit = computed(() => authStore.canEdit)
 const canEditData = computed(() => authStore.canEditData)
@@ -318,7 +321,19 @@ const loadingSummary = ref(false), downloading = ref(false)
 const kind = ref(''), issues = ref<AlsekoReconciliationIssues | null>(null), issuePage = ref(1)
 const PAGE = 50
 const issuePages = computed(() => issues.value ? Math.ceil(issues.value.total / PAGE) : 0)
+const loadingIssues = ref(false)
 const issueColumns = computed(() => Object.keys(issues.value?.items[0] || {}))
+const issueTableColumns = computed((): DataTableColumn[] => issueColumns.value.map((c) => ({ key: c, title: columnTitle(c), sortable: false })))
+/** Строки таблицы: значения уже в текстовом виде, ключ — номер строки (у несоответствий нет своего id) */
+const issueRows = computed(() => (issues.value?.items || []).map((row, i) => ({
+  ...Object.fromEntries(issueColumns.value.map((c) => [c, cell(row[c])])), __row: i, __source: row,
+})))
+const changeColumns: DataTableColumn[] = [
+  { key: 'field', title: 'Поле', sortable: false },
+  { key: 'old', title: 'Было', sortable: false },
+  { key: 'new', title: 'Станет', sortable: false },
+]
+const changeRows = computed(() => (addressPreview.value?.changes || []).map((c: AlsekoFieldChange) => ({ field: c.field, old: cell(c.old), new: cell(c.new) })))
 
 const buildingId = ref<number | null>(props.buildingId ?? null)
 const addressQuery = ref(''), searching = ref(false), searched = ref(false)
@@ -359,9 +374,13 @@ async function loadSummary() {
 async function selectKind(k: string) { kind.value = k; issuePage.value = 1; await loadIssues() }
 async function loadIssues() {
   if (!kind.value) return
-  try { issues.value = await fastApiService.getAlsekoReconciliationIssues(kind.value, PAGE, (issuePage.value - 1) * PAGE) } catch (cause) { fail(cause, 'Не удалось загрузить несоответствия') }
+  loadingIssues.value = true
+  try { issues.value = await fastApiService.getAlsekoReconciliationIssues(kind.value, PAGE, (issuePage.value - 1) * PAGE) }
+  catch (cause) { fail(cause, 'Не удалось загрузить несоответствия') }
+  finally { loadingIssues.value = false }
 }
-function openIssue(row: Record<string, unknown>) {
+function openIssue(selectedRow: Record<string, unknown>) {
+  const row = (selectedRow.__source as Record<string, unknown> | undefined) || selectedRow
   const id = Number(row.id)
   if (!id) return
   if (ALSEKO_BUILDING_KINDS.has(kind.value)) { buildingId.value = id; emit('open-building', id) } else if (ALSEKO_LOAD_KINDS.has(kind.value)) emit('open-load', id)
@@ -430,11 +449,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.rec-table-wrap { max-height: 360px; overflow: auto; border: 1px solid #e0e0e0; border-radius: 6px; }
-.rec-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
-.rec-table th { position: sticky; top: 0; background: #e8eaf6; color: #3949ab; text-align: left; padding: 6px 8px; white-space: nowrap; }
-.rec-table td { padding: 5px 8px; border-bottom: 1px solid #eceff1; vertical-align: top; }
-.rec-table tbody tr { cursor: pointer; }
-.rec-table tbody tr:hover { background: #f3f4fb; }
-.candidate-list { max-height: 240px; overflow: auto; border: 1px solid #e0e0e0; border-radius: 6px; }
+.rec-kinds { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.rec-table-wrap { max-height: 360px; overflow: auto; border: 1px solid rgba(var(--v-theme-on-surface), 0.12); border-radius: var(--radius-sm); }
+.candidate-list { max-height: 240px; overflow: auto; border: 1px solid rgba(var(--v-theme-on-surface), 0.12); border-radius: var(--radius-sm); }
 </style>

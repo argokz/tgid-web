@@ -1,687 +1,873 @@
 <template>
-  <v-dialog
-    v-model="visible"
-    :fullscreen="isMobile"
-    max-width="1540"
-    scrollable
-  >
-    <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar
-        color="teal-darken-4"
-        density="compact"
+  <Teleport to="body">
+    <v-dialog
+      v-model="visible"
+      :fullscreen="isMobile"
+      max-width="1400"
+      scrollable
+    >
+      <v-card
+        class="diaphragm-journal"
+        :rounded="isMobile ? 0 : 'lg'"
       >
-        <v-icon class="ml-3 mr-2">mdi-circle-slice-8</v-icon>
-        <v-toolbar-title>Диафрагмы наружных теплопроводов</v-toolbar-title>
-        <v-chip
-          class="mr-2"
-          size="small"
-          color="white"
-          variant="outlined"
-        >
-          {{ lookups.counts.ready || 0 }}/{{ lookups.counts.total || 0 }} готовы
-        </v-chip>
-        <v-btn
-          icon="mdi-close"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
-      </v-toolbar>
+        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
+          <v-avatar
+            color="teal-lighten-5"
+            size="40"
+          >
+            <v-icon color="teal-darken-2">mdi-circle-slice-8</v-icon>
+          </v-avatar>
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
+            <div class="text-subtitle-1 font-weight-bold">Диафрагмы наружных теплопроводов</div>
+            <div class="text-caption text-medium-emphasis text-truncate">
+              {{ scopeTitle }} · найдено {{ total }} · готовы {{ lookups.counts.ready || 0 }} из {{ lookups.counts.total || 0 }}
+            </div>
+          </div>
+          <HintTip
+            text="Закрыть журнал"
+            hotkey="Esc"
+            location="bottom"
+          >
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Закрыть журнал"
+                @click="visible = false"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
+        </v-card-title>
 
-      <div class="alerts pa-3 pb-0">
-        <v-alert
-          type="warning"
-          variant="tonal"
-          density="compact"
-        >
-          В текущей БД найдено {{ lookups.counts.total || 0 }} диафрагм, но их старые линии не имеют полной
-          топологии и геометрии. Паспортные данные доступны, позиционирование на карте — только после восстановления связей.
-        </v-alert>
-        <v-alert
-          v-if="lookups.result_count === 0"
-          type="info"
-          variant="tonal"
-          density="compact"
-        >
-          Таблицы <code>calculation</code> и <code>DRO_OUT</code> пусты. Расход, потери напора и сопротивление
-          показаны как отсутствующие и не подменяются нулями.
-        </v-alert>
-      </div>
+        <v-divider />
 
-      <div class="metric-row pa-3 pb-0">
-        <v-chip
-          v-for="metric in qualityMetrics"
-          :key="metric.value"
-          :color="metric.color"
-          :variant="filters.quality_status === metric.value ? 'flat' : 'tonal'"
-          @click="setQualityStatus(metric.value)"
-        >
-          {{ metric.label }}: {{ lookups.counts[metric.value] || 0 }}
-        </v-chip>
-      </div>
-      <div class="metric-row pa-3 pb-0">
-        <v-chip
-          color="blue"
-          variant="tonal"
-        >Диаметр записан: {{ lookups.counts.diameter_available || 0 }}</v-chip>
-        <v-chip
-          color="cyan-darken-3"
-          variant="tonal"
-        >Ожидает расчёт: {{ lookups.counts.diameter_pending_calculation || 0 }}</v-chip>
-        <v-chip
-          color="orange"
-          variant="tonal"
-        >Диаметр недоступен: {{ lookups.counts.diameter_unavailable || 0 }}</v-chip>
-        <v-chip
-          color="brown"
-          variant="tonal"
-        >Некорректное количество: {{ lookups.counts.installed_count_invalid || 0 }}</v-chip>
-        <v-chip
-          color="grey"
-          variant="tonal"
-        >С координатой: {{ lookups.counts.locatable || 0 }}</v-chip>
-      </div>
-
-      <div class="filters pa-3">
-        <v-text-field
-          v-model="filters.search"
-          label="ID, линия, узел, место или владелец"
-          prepend-inner-icon="mdi-magnify"
-          density="compact"
-          variant="outlined"
-          clearable
-          hide-details
-          @keyup.enter="reload"
-        />
-        <v-select
-          v-model="filters.quality_status"
-          :items="qualityOptions"
-          label="Качество данных"
-          density="compact"
-          variant="outlined"
-          clearable
-          hide-details
-        />
-        <v-select
-          v-model="filters.diameter_mode"
-          :items="diameterOptions"
-          label="Режим диаметра"
-          density="compact"
-          variant="outlined"
-          clearable
-          hide-details
-        />
-        <v-select
-          v-model="filters.installation_place"
-          :items="lookups.locations"
-          item-title="name"
-          item-value="name"
-          label="Место установки"
-          density="compact"
-          variant="outlined"
-          clearable
-          hide-details
-        />
-        <v-select
-          v-model="filters.state_id"
-          :items="lookups.states"
-          item-title="name"
-          item-value="id"
-          label="Состояние"
-          density="compact"
-          variant="outlined"
-          clearable
-          hide-details
-        />
-        <v-select
-          v-model="filters.external_sign_line_id"
-          :items="lookups.external_signs"
-          item-title="name"
-          item-value="id"
-          label="Признак линии"
-          density="compact"
-          variant="outlined"
-          clearable
-          hide-details
-        />
-        <v-btn
-          color="teal-darken-4"
-          :loading="loading"
-          @click="reload"
-        >Найти</v-btn>
-      </div>
-
-      <StateView
-        class="table-wrap"
-        variant="table"
-        :rows="12"
-        :loading="loading && !items.length"
-        :error="error"
-        :empty="!items.length"
-        empty-title="Диафрагмы по выбранным условиям не найдены"
-        empty-text="Измените фильтры или сбросьте их"
-        action-label="Сбросить фильтры"
-        error-title="Не удалось загрузить диафрагмы"
-        :retrying="loading"
-        @retry="reload"
-        @action="resetFilters"
-      >
-        <table class="journal-table">
-          <thead>
-            <tr><th>ID</th><th>Место установки</th><th>Линия / узлы</th><th>Диаметр</th><th>Количество</th><th>Запись расчёта</th><th>Линия</th><th>Состояние</th><th>Качество</th><th /></tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="item in items"
-              :key="item.id"
-              @click="openDetails(item.id)"
-            >
-              <td>{{ item.id }}</td>
-              <td><strong>{{ item.installation_place || item.display_name }}</strong></td>
-              <td>{{ item.line_id ?? '—' }}<div class="muted">{{ nodeLabel(item.node_code_1, item.node_name_1, item.node_id_1) }} → {{ nodeLabel(item.node_code_2, item.node_name_2, item.node_id_2) }}</div></td>
-              <td>{{ diameterLabel(item) }}<div class="muted">{{ diameterModeLabel(item.diameter_mode) }}</div></td>
-              <td>{{ item.installed_count ?? '—' }}</td>
-              <td><v-chip
-                size="x-small"
-                :color="item.calculation_writeback_allowed ? 'green' : 'grey'"
-              >{{ item.entry_mark || 'не разрешена' }}</v-chip></td>
-              <td>{{ item.external_sign_line_name || '—' }}</td>
-              <td>{{ item.state_name || '—' }}</td>
-              <td>
-                <v-chip
-                  size="x-small"
-                  :color="qualityColor(item.quality_status)"
-                >{{ qualityLabel(item.quality_status) }}</v-chip>
-                <div
-                  v-if="!hasCoordinates(item)"
-                  class="muted"
-                >карта недоступна</div>
-              </td>
-              <td>
-                <v-tooltip
-                  v-if="!hasCoordinates(item)"
-                  text="Нет координат: линия отсутствует или без узлов"
-                  location="left"
-                >
-                  <template #activator="{ props }">
-                    <v-btn
-                      v-bind="props"
-                      icon="mdi-map-marker-off"
-                      size="x-small"
-                      variant="text"
-                      disabled
-                      aria-label="Нет координат: линия отсутствует или без узлов"
-                    />
-                  </template>
-                </v-tooltip>
-                <v-btn
-                  v-else
-                  icon="mdi-map-marker"
-                  size="x-small"
-                  variant="text"
-                  aria-label="Показать диафрагму на карте"
-                  @click.stop="locate(item)"
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <v-progress-linear
-          v-if="loading"
-          indeterminate
-          color="teal-darken-4"
-        />
-      </StateView>
-      <v-pagination
-        v-if="pages > 1"
-        v-model="page"
-        :length="pages"
-        density="comfortable"
-        @update:model-value="loadItems"
-      />
-    </v-card>
-  </v-dialog>
-
-  <v-dialog
-    v-model="detailVisible"
-    :fullscreen="isMobile"
-    max-width="1180"
-    scrollable
-  >
-    <v-card :rounded="isMobile ? 0 : 'lg'">
-      <v-toolbar
-        color="teal-darken-4"
-        density="compact"
-      >
-        <v-btn
-          icon="mdi-arrow-left"
-          aria-label="Вернуться к журналу"
-          @click="detailVisible = false"
-        />
-        <v-toolbar-title>{{ details ? `Диафрагма №${details.id}` : 'Паспорт диафрагмы' }}</v-toolbar-title>
-        <v-btn
-          icon="mdi-close"
-          aria-label="Закрыть карточку"
-          @click="detailVisible = false"
-        />
-      </v-toolbar>
-      <v-progress-linear
-        v-if="detailLoading"
-        indeterminate
-        color="teal-darken-4"
-      />
-
-      <template v-if="details && !detailLoading">
-        <div class="alerts pa-3 pb-0">
+        <div class="px-3 px-md-4 pt-3 diaphragm-alerts">
           <v-alert
-            v-if="details.quality_status !== 'ready'"
-            :type="details.quality_status === 'line_missing' ? 'error' : 'warning'"
+            type="warning"
             variant="tonal"
             density="compact"
           >
-            {{ qualityDescription(details.quality_status) }}
+            Старые линии диафрагм без полной топологии и геометрии: паспортные данные доступны, положение на карте —
+            только после восстановления связей.
           </v-alert>
           <v-alert
-            v-if="details.diameter_mode === 'pending_calculation'"
+            v-if="lookupsLoaded && lookups.result_count === 0"
             type="info"
             variant="tonal"
             density="compact"
           >
-            Нулевой диаметр является штатным: desktop разрешает расчёту подобрать и записать диаметр диафрагмы.
+            Таблицы <code>calculation</code> и <code>DRO_OUT</code> пусты: расход, потери напора и сопротивление показаны
+            как отсутствующие и не подменяются нулями.
           </v-alert>
         </div>
-        <v-card-text>
-          <v-row>
+
+        <!-- Плитки из справочника (на всю базу): качество и режим диаметра — фильтры, остальные — справка -->
+        <div class="diaphragm-kpi px-3 px-md-4 pt-3">
+          <KpiTile
+            v-for="metric in qualityMetrics"
+            :key="metric.value"
+            :label="metric.label"
+            :value="lookups.counts[metric.value] || 0"
+            :compact="false"
+            :status="metric.status"
+            selectable
+            :active="qualityStatus === metric.value"
+            @select="toggleQuality(metric.value)"
+          />
+        </div>
+        <div class="diaphragm-kpi px-3 px-md-4 pt-2">
+          <KpiTile
+            v-for="mode in diameterMetrics"
+            :key="mode.value"
+            :label="mode.label"
+            :value="lookups.counts[mode.countKey] || 0"
+            :compact="false"
+            selectable
+            :active="diameterMode === mode.value"
+            @select="toggleDiameterMode(mode.value)"
+          />
+          <KpiTile
+            label="Некорректное количество"
+            :value="lookups.counts.installed_count_invalid || 0"
+            :compact="false"
+            :status="(lookups.counts.installed_count_invalid || 0) > 0 ? 'warning' : 'good'"
+          />
+          <KpiTile
+            label="С координатой"
+            :value="lookups.counts.locatable || 0"
+            :compact="false"
+          />
+        </div>
+
+        <div class="pa-3 pa-md-4 diaphragm-filters">
+          <v-row dense>
             <v-col
               cols="12"
-              md="6"
-            ><v-card
-              variant="outlined"
-              class="h-100"
-            ><v-card-title class="text-subtitle-1">Сетевая привязка</v-card-title><v-card-text class="detail-grid">
-              <DetailValue
-                label="Диафрагма / ID"
-                :value="details.id"
-              /><DetailValue
-                label="Линия"
-                :value="details.line_id"
-              />
-              <DetailValue
-                label="Начальный узел"
-                :value="nodeLabel(details.node_code_1, details.node_name_1, details.node_id_1)"
-              /><DetailValue
-                label="Конечный узел"
-                :value="nodeLabel(details.node_code_2, details.node_name_2, details.node_id_2)"
-              />
-              <DetailValue
-                label="Внутренний потребитель"
-                :value="nodeLabel(details.internal_node_code, details.internal_node_name, details.internal_node_id)"
-              /><DetailValue
-                label="Фрагмент"
-                :value="details.fragment_name || details.fragment_id"
-              />
-              <DetailValue
-                label="Признак линии"
-                :value="details.external_sign_line_name"
-              /><DetailValue
-                label="Сопротивление линии"
-                :value="formatNumber(details.line_hydraulic_resistance, 8)"
-              />
-            </v-card-text></v-card></v-col>
-            <v-col
-              cols="12"
-              md="6"
-            ><v-card
-              variant="outlined"
-              class="h-100"
+              md="4"
             >
-              <v-card-title class="text-subtitle-1">Паспорт диафрагмы</v-card-title>
-              <v-card-text
-                class="detail-grid"
-                v-if="!isEditing"
-              >
-                <DetailValue
-                  label="Место установки"
-                  :value="details.installation_place"
-                /><DetailValue
-                  label="Состояние"
-                  :value="details.state_name"
-                />
-                <DetailValue
-                  label="Внутренний диаметр"
-                  :value="diameterLabel(details)"
-                /><DetailValue
-                  label="Режим диаметра"
-                  :value="diameterModeLabel(details.diameter_mode)"
-                />
-                <DetailValue
-                  label="Количество последовательно"
-                  :value="details.installed_count"
-                /><DetailValue
-                  label="Разрешение записи расчёта"
-                  :value="details.entry_mark || 'не разрешена'"
-                />
-              </v-card-text>
-              <v-card-text v-else>
-                <v-row dense>
-                  <v-col
-                    v-for="field in buildFields()"
-                    :key="field.key"
-                    cols="12"
-                    sm="6"
-                  >
-                    <div class="detail-label mb-1">{{ field.label }}</div>
-                    <v-select
-                      v-if="field.type === 'select'"
-                      v-model="editFields[field.key]"
-                      :items="field.items"
-                      item-title="name"
-                      item-value="id"
-                      density="compact"
-                      hide-details
-                      variant="outlined"
-                      clearable
-                    />
-                    <v-text-field
-                      v-else
-                      v-model="editFields[field.key]"
-                      :type="field.type === 'number' ? 'number' : 'text'"
-                      density="compact"
-                      hide-details
-                      variant="outlined"
-                      clearable
-                    />
-                  </v-col>
-                </v-row>
-              </v-card-text>
-            </v-card></v-col>
+              <SearchField
+                :model-value="search"
+                label="ID, линия, узел, место или владелец"
+                :debounce="350"
+                :loading="loading"
+                @update:model-value="search = $event"
+                @search="onSearch"
+              />
+            </v-col>
             <v-col
               cols="12"
-              md="6"
-            ><v-card
-              variant="outlined"
-              class="h-100"
-            ><v-card-title class="text-subtitle-1">Архивные реквизиты линии</v-card-title><v-card-text class="detail-grid">
-              <DetailValue
-                label="Регистрационный номер"
-                :value="details.registration_number"
-              /><DetailValue
-                label="Ввод в эксплуатацию"
-                :value="formatDate(details.commissioned_at)"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="qualityStatus"
+                :items="qualityOptions"
+                item-title="title"
+                item-value="value"
+                label="Качество данных"
               />
-              <DetailValue
-                label="Последний ремонт"
-                :value="formatDate(details.last_maintenance_at)"
-              /><DetailValue
-                label="Владелец"
-                :value="details.organization_name"
-              />
-              <DetailValue
-                label="Оператор"
-                :value="details.operator_name"
-              />
-            </v-card-text></v-card></v-col>
+            </v-col>
             <v-col
               cols="12"
-              md="6"
-            ><v-card
-              variant="outlined"
-              class="h-100"
-            ><v-card-title class="text-subtitle-1">Расчётный режим DRO_OUT</v-card-title>
-              <v-card-text
-                v-if="details.latest_output"
-                class="detail-grid"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="diameterMode"
+                :items="diameterOptions"
+                item-title="title"
+                item-value="value"
+                label="Режим диаметра"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="installationPlace"
+                :items="lookups.locations"
+                item-title="name"
+                item-value="name"
+                label="Место установки"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="stateId"
+                :items="lookups.states"
+                item-title="name"
+                item-value="id"
+                label="Состояние"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="externalSignId"
+                :items="lookups.external_signs"
+                item-title="name"
+                item-value="id"
+                label="Признак линии"
+              />
+            </v-col>
+          </v-row>
+
+          <div class="d-flex align-center flex-wrap ga-2 mt-3">
+            <v-chip
+              v-if="scope.lineId"
+              size="small"
+              color="primary"
+              closable
+              @click:close="clearScope"
+            >
+              Линия {{ scope.lineId }}
+            </v-chip>
+            <v-spacer />
+            <v-btn
+              variant="text"
+              prepend-icon="mdi-filter-remove-outline"
+              :disabled="!filtersActive"
+              @click="resetFilters"
+            >
+              Сбросить
+            </v-btn>
+            <v-btn
+              color="primary"
+              prepend-icon="mdi-refresh"
+              :loading="loading"
+              @click="loadItems"
+            >
+              Обновить
+            </v-btn>
+          </div>
+        </div>
+
+        <v-divider />
+
+        <v-card-text class="pa-0 diaphragm-table-wrap">
+          <StateView
+            variant="table"
+            :rows="10"
+            :loading="loading && !items.length"
+            :error="error"
+            :empty="!loading && !items.length"
+            empty-title="Диафрагмы не найдены"
+            :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В базе нет диафрагм'"
+            empty-icon="mdi-circle-slice-8"
+            :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
+            error-title="Не удалось загрузить диафрагмы"
+            :retrying="loading"
+            @retry="loadItems"
+            @action="resetFilters"
+          >
+            <v-progress-linear
+              v-if="loading"
+              indeterminate
+              color="primary"
+            />
+            <DataTable
+              :columns="tableColumns"
+              :items="(items as Record<string, unknown>[])"
+              item-key="id"
+              selectable
+              :selected-key="flashId"
+              density="compact"
+              class="diaphragm-table"
+              @select="openDetails(Number($event.id))"
+            >
+              <template #[`item.installation_place`]="{ item }">
+                <div class="text-truncate">
+                  {{ item.installation_place || item.display_name || '—' }}
+                </div>
+              </template>
+              <template #[`item.line_id`]="{ item }">
+                <span class="num">{{ item.line_id ?? '—' }}</span>
+                <div class="text-caption text-medium-emphasis text-truncate">
+                  {{ nodeLabel(item.node_code_1, item.node_name_1, item.node_id_1) }} → {{ nodeLabel(item.node_code_2, item.node_name_2, item.node_id_2) }}
+                </div>
+              </template>
+              <template #[`item.internal_diameter`]="{ item }">
+                {{ diameterLabel(item) }}
+                <div class="text-caption text-medium-emphasis">
+                  {{ diameterModeLabel(item.diameter_mode as NetworkDiaphragmDiameterMode) }}
+                </div>
+              </template>
+              <template #[`item.installed_count`]="{ item }">
+                {{ item.installed_count ?? '—' }}
+              </template>
+              <template #[`item.entry_mark`]="{ item }">
+                <v-chip
+                  size="x-small"
+                  variant="tonal"
+                  :color="item.calculation_writeback_allowed ? 'success' : 'grey'"
+                >
+                  {{ item.entry_mark || 'не разрешена' }}
+                </v-chip>
+              </template>
+              <template #[`item.external_sign_line_name`]="{ item }">
+                {{ item.external_sign_line_name || '—' }}
+              </template>
+              <template #[`item.state_name`]="{ item }">
+                {{ item.state_name || '—' }}
+              </template>
+              <template #[`item.quality_status`]="{ item }">
+                <v-chip
+                  size="x-small"
+                  variant="tonal"
+                  :color="qualityColor(item.quality_status as NetworkDiaphragmQualityStatus)"
+                >
+                  {{ qualityLabel(item.quality_status as NetworkDiaphragmQualityStatus) }}
+                </v-chip>
+              </template>
+              <template #[`item.actions`]="{ item }">
+                <HintTip
+                  v-if="hasCoordinates(item)"
+                  text="Показать диафрагму на карте"
+                  hint="Журнал закроется, маркер останется"
+                >
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon="mdi-crosshairs-gps"
+                      size="x-small"
+                      variant="text"
+                      color="primary"
+                      aria-label="Показать диафрагму на карте"
+                      @click.stop="locate(item)"
+                    />
+                  </template>
+                </HintTip>
+                <HintTip
+                  v-else
+                  text="Карта недоступна"
+                  hint="Нет координат: линия отсутствует или без узлов"
+                >
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon="mdi-map-marker-off"
+                      size="x-small"
+                      variant="text"
+                      aria-disabled="true"
+                      aria-label="Нет координат: линия отсутствует или без узлов"
+                      @click.stop
+                    />
+                  </template>
+                </HintTip>
+                <HintTip text="Открыть паспорт">
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon="mdi-chevron-right"
+                      size="x-small"
+                      variant="text"
+                      aria-label="Открыть паспорт диафрагмы"
+                      @click.stop="openDetails(Number(item.id))"
+                    />
+                  </template>
+                </HintTip>
+              </template>
+            </DataTable>
+          </StateView>
+        </v-card-text>
+
+        <v-divider />
+        <v-card-actions class="px-4 py-2">
+          <span class="text-caption text-medium-emphasis">Страница {{ page }}{{ pages ? ` из ${pages}` : '' }}</span>
+          <v-spacer />
+          <v-pagination
+            v-if="pages > 1"
+            v-model="page"
+            :length="pages"
+            :total-visible="isMobile ? 3 : 7"
+            density="compact"
+          />
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog
+      v-model="detailVisible"
+      :persistent="saving"
+      :fullscreen="isMobile"
+      max-width="980"
+      scrollable
+    >
+      <v-card :rounded="isMobile ? 0 : 'lg'">
+        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
+          <v-icon color="teal-darken-2">mdi-circle-slice-8</v-icon>
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
+            <div class="text-subtitle-1 font-weight-bold d-flex align-center ga-2">
+              <span class="text-truncate">{{ details ? `Диафрагма №${details.id}` : 'Паспорт диафрагмы' }}</span>
+              <v-chip
+                v-if="isEditing && isDirty"
+                size="x-small"
+                color="accent"
+                variant="tonal"
               >
-                <DetailValue
-                  label="Расход через диафрагму"
-                  :value="formatUnit(outputValue('flow'), 'т/ч')"
-                /><DetailValue
-                  label="Потери напора"
-                  :value="formatUnit(outputValue('head_loss'), 'м')"
-                />
-                <DetailValue
-                  label="Полное гидравлическое сопротивление"
-                  :value="formatNumber(outputValue('total_hydraulic_resistance'), 8)"
-                /><DetailValue
-                  label="Располагаемый напор в конечном узле"
-                  :value="formatUnit(outputValue('available_head_end'), 'м')"
-                />
-                <DetailValue
-                  label="Пьезометрический напор"
-                  :value="formatUnit(outputValue('piezometric_head_end'), 'м')"
-                /><DetailValue
-                  label="Геодезическая отметка"
-                  :value="formatUnit(outputValue('geodetic_mark_end'), 'м')"
-                />
-                <DetailValue
-                  label="Полный напор"
-                  :value="formatUnit(outputValue('total_head_end'), 'м')"
-                /><DetailValue
-                  label="Источник тепла"
-                  :value="String(outputValue('heat_source_name') || outputValue('heat_source_id') || '—')"
-                />
-              </v-card-text>
-              <v-card-text v-else><v-alert
+                Не сохранено
+              </v-chip>
+            </div>
+            <div class="text-caption text-medium-emphasis text-truncate">
+              {{ details ? `линия ${details.line_id ?? '—'} · ${details.state_name || 'состояние не указано'}` : '' }}
+            </div>
+          </div>
+          <v-btn
+            icon
+            variant="text"
+            aria-label="Закрыть паспорт"
+            @click="detailVisible = false"
+          >
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-card-title>
+        <v-divider />
+
+        <v-card-text class="pa-4">
+          <StateView
+            variant="form"
+            :rows="8"
+            :loading="detailLoading"
+            :error="detailError"
+            :empty="!detailLoading && !detailError && !details"
+            empty-title="Паспорт не выбран"
+            :retry="false"
+          >
+            <template v-if="details">
+              <v-alert
+                v-if="details.quality_status !== 'ready'"
+                class="mb-3"
+                :type="details.quality_status === 'line_missing' ? 'error' : 'warning'"
+                variant="tonal"
+                density="compact"
+              >
+                {{ qualityDescription(details.quality_status as NetworkDiaphragmQualityStatus) }}
+              </v-alert>
+              <v-alert
+                v-if="details.diameter_mode === 'pending_calculation'"
+                class="mb-3"
                 type="info"
                 variant="tonal"
                 density="compact"
-              >Расчётный результат для этой диафрагмы отсутствует.</v-alert></v-card-text>
-            </v-card></v-col>
-            <v-col cols="12"><v-card variant="outlined"><v-card-title class="text-subtitle-1">Исходные поля diaphragms</v-card-title><v-card-text class="attribute-grid">
-              <DetailValue
-                v-for="entry in attributeEntries"
-                :key="entry[0]"
-                :label="entry[0]"
-                :value="formatAttribute(entry[1])"
+              >
+                Нулевой диаметр штатный: расчёту разрешено подобрать и записать диаметр диафрагмы.
+              </v-alert>
+              <JournalDetailFields
+                :groups="detailGroups"
+                :model="editFields"
+                :editable="editable"
+                :is-field-dirty="isFieldDirty"
+                :open-panels="[0, 1]"
+                @update:field="setEditField"
               />
-            </v-card-text></v-card></v-col>
-          </v-row>
+              <v-alert
+                v-if="isEditing && saveError"
+                type="error"
+                variant="tonal"
+                density="compact"
+                class="mt-3"
+                data-testid="equipment-save-error"
+              >
+                {{ saveError }}
+              </v-alert>
+            </template>
+          </StateView>
         </v-card-text>
+
         <v-divider />
-        <v-alert
-          v-if="isEditing && saveError"
-          type="error"
-          variant="tonal"
-          density="compact"
-          class="mx-4 my-2"
-          data-testid="equipment-save-error"
-        >{{ saveError }}</v-alert>
-        <v-card-actions class="px-4 py-3 bg-grey-lighten-4">
+        <v-card-actions class="px-4 py-3">
           <v-spacer />
-          <v-btn
-            v-if="!isEditing && hasCoordinates(details)"
-            color="teal-darken-4"
-            variant="text"
-            prepend-icon="mdi-map-marker"
-            @click="locate(details)"
-          >Показать на карте</v-btn>
-          <template v-if="!isEditing">
+          <template v-if="isEditing">
             <v-btn
-              v-if="mutationsEnabled"
+              variant="text"
+              :disabled="saving"
+              @click="cancelEdit"
+            >
+              Отмена
+            </v-btn>
+            <v-btn
               color="primary"
               variant="flat"
-              prepend-icon="mdi-pencil"
-              @click="startEdit"
-            >Редактировать</v-btn>
+              :loading="saving"
+              :disabled="!isDirty"
+              @click="saveChanges"
+            >
+              Сохранить
+            </v-btn>
           </template>
           <template v-else>
             <v-btn
-              v-if="mutationsEnabled"
-              color="error"
-              variant="text"
-              @click="cancelEdit"
-              :disabled="saving"
-            >Отмена</v-btn>
-            <v-btn
-              v-if="mutationsEnabled"
+              v-if="details && hasCoordinates(details)"
               color="primary"
-              variant="flat"
-              @click="saveChanges"
-              :loading="saving"
-            >Сохранить</v-btn>
+              variant="tonal"
+              prepend-icon="mdi-crosshairs-gps"
+              @click="locate(details)"
+            >
+              На карте
+            </v-btn>
+            <v-btn
+              v-if="mutationsEnabled && details"
+              color="primary"
+              variant="tonal"
+              @click="startEdit"
+            >
+              Редактировать
+            </v-btn>
+            <v-btn
+              variant="text"
+              @click="detailVisible = false"
+            >
+              Закрыть
+            </v-btn>
           </template>
         </v-card-actions>
-      </template>
-    </v-card>
-  </v-dialog>
+      </v-card>
+    </v-dialog>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
+import AppSelect from '~/components/AppSelect.vue'
+import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
+import HintTip from '~/components/HintTip.vue'
+import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
+import KpiTile from '~/components/KpiTile.vue'
+import SearchField from '~/components/SearchField.vue'
 import StateView from '~/components/StateView.vue'
-import { formatApiError } from '~/utils/apiError'
-import { computed, defineComponent, h, ref, type PropType } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
+import { useJournalEdit, type JournalEditSource } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
 import { useMutationsEnabled } from '~/composables/useMutationsEnabled'
-import { useEquipmentSaveError } from '~/composables/useEquipmentSaveError'
 import { beginEquipmentEdit, saveEquipmentEdit } from '~/services/equipmentEditService'
+import { useNotificationStore } from '~/stores/notificationStore'
+import { formatApiError } from '~/utils/apiError'
+import { hasLonLat } from '~/utils/journalFields'
 import {
   fastApiService,
   type NetworkDiaphragmDetails,
   type NetworkDiaphragmDiameterMode,
-  type NetworkDiaphragmFilters,
   type NetworkDiaphragmLookups,
   type NetworkDiaphragmQualityStatus,
   type NetworkDiaphragmSummary
 } from '~/services/fastApiService'
 
-const DetailValue = defineComponent({
-  props: { label: { type: String, required: true }, value: { type: [String, Number] as PropType<string | number | null | undefined>, default: null } },
-  setup: props => () => h('div', { class: 'detail-value' }, [h('span', { class: 'detail-label' }, props.label), h('strong', String(props.value ?? '—'))])
-})
+/**
+ * Диафрагмы — журнал оборудования (docs/ui-modernization-progress.md, этап 5): `DataTable` с серверной
+ * пагинацией, плитки качества и режима диаметра из справочника (плитка — фильтр), `SearchField` / `AppSelect`,
+ * `StateView`. Паспорт — `JournalDetailFields`; правка пяти колонок `diaphragms` через `equipmentEditService`
+ * (версия строки → 409, только изменённые поля) на общем `useJournalEdit` (черновик, «изменено», отмена с
+ * подтверждением). Ключи формы — колонки таблицы, не ключи карточки (`toForm`).
+ */
+export interface NetworkDiaphragmJournalScope {
+  diaphragmId?: number
+  lineId?: number
+}
 
 const emit = defineEmits<{
   'locate-diaphragm': [payload: { longitude: number; latitude: number; id: number; lineId: number | null; label: string }]
 }>()
 const { isMobile } = useMobile()
 const mutationsEnabled = useMutationsEnabled('network')
+const notifications = useNotificationStore()
 const { saveError, clearSaveError, reportSaveError } = useEquipmentSaveError()
-const emptyLookups = (): NetworkDiaphragmLookups => ({ states: [], external_signs: [], locations: [], entry_marks: [], fragments: [], counts: {}, calculation_count: 0, result_count: 0 })
 const visible = ref(false)
-const detailVisible = ref(false)
 const loading = ref(false)
-const detailLoading = ref(false)
-const lookupsLoaded = ref(false)
 const error = ref('')
-const page = ref(1)
-const pages = ref(0)
 const items = ref<NetworkDiaphragmSummary[]>([])
-const details = ref<NetworkDiaphragmDetails | null>(null)
-const lookups = ref<NetworkDiaphragmLookups>(emptyLookups())
-const filters = ref<NetworkDiaphragmFilters>({})
-const isEditing = ref(false)
-const saving = ref(false)
-const editFields = ref<Record<string, any>>({})
+const total = ref(0)
+const pages = ref(0)
+const page = ref(1)
+const pageSize = 50
+const search = ref('')
+const qualityStatus = ref<NetworkDiaphragmQualityStatus | undefined>()
+const diameterMode = ref<NetworkDiaphragmDiameterMode | undefined>()
+const installationPlace = ref<string | undefined>()
+const stateId = ref<number | undefined>()
+const externalSignId = ref<number | undefined>()
+const scope = reactive<NetworkDiaphragmJournalScope>({})
+const lookups = reactive<NetworkDiaphragmLookups>({
+  states: [], external_signs: [], locations: [], entry_marks: [], fragments: [], counts: {}, calculation_count: 0, result_count: 0
+})
+const lookupsLoaded = ref(false)
 
-const buildFields = () => {
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const detailError = ref('')
+const details = ref<NetworkDiaphragmDetails | null>(null)
+
+const qualityMetrics: Array<{ value: NetworkDiaphragmQualityStatus; label: string; status?: 'good' | 'warning' | 'serious' | 'critical' }> = [
+  { value: 'ready', label: 'Готовы', status: 'good' },
+  { value: 'line_missing', label: 'Нет линии', status: 'critical' },
+  { value: 'line_removed', label: 'Линия удалена' },
+  { value: 'topology_missing', label: 'Нет топологии', status: 'serious' },
+  { value: 'state_missing', label: 'Нет состояния', status: 'warning' },
+  { value: 'count_invalid', label: 'Количество', status: 'warning' },
+  { value: 'diameter_unresolved', label: 'Диаметр', status: 'warning' }
+]
+const qualityOptions = qualityMetrics.map(metric => ({ title: metric.label, value: metric.value }))
+const diameterMetrics: Array<{ value: NetworkDiaphragmDiameterMode; label: string; countKey: string }> = [
+  { value: 'available', label: 'Диаметр записан', countKey: 'diameter_available' },
+  { value: 'pending_calculation', label: 'Ожидает расчёт', countKey: 'diameter_pending_calculation' },
+  { value: 'unresolved', label: 'Диаметр недоступен', countKey: 'diameter_unavailable' }
+]
+const diameterOptions = diameterMetrics.map(mode => ({ title: mode.label, value: mode.value }))
+
+const scopeTitle = computed(() => (scope.lineId ? `диафрагмы линии ${scope.lineId}` : 'вся тепловая сеть'))
+const filtersActive = computed(() => Boolean(
+  search.value.trim() || qualityStatus.value || diameterMode.value || installationPlace.value || stateId.value || externalSignId.value
+))
+
+const tableColumns: DataTableColumn[] = [
+  { key: 'id', title: 'ID', type: 'number', width: 90, sortable: false },
+  { key: 'installation_place', title: 'Место установки', width: 180, sortable: false },
+  { key: 'line_id', title: 'Линия / узлы', sortable: false },
+  { key: 'internal_diameter', title: 'Диаметр', type: 'number', width: 150, sortable: false },
+  { key: 'installed_count', title: 'Кол-во', type: 'number', width: 80, sortable: false },
+  { key: 'entry_mark', title: 'Запись расчёта', width: 130, sortable: false },
+  { key: 'external_sign_line_name', title: 'Признак линии', width: 130, sortable: false },
+  { key: 'state_name', title: 'Состояние', width: 110, sortable: false },
+  { key: 'quality_status', title: 'Качество', width: 130, sortable: false },
+  { key: 'actions', title: '', type: 'actions', width: 88, sortable: false },
+]
+
+const QUALITY_LABEL: Record<NetworkDiaphragmQualityStatus, string> = {
+  ready: 'готово', line_missing: 'нет линии', line_removed: 'линия удалена', topology_missing: 'нет топологии',
+  state_missing: 'нет состояния', count_invalid: 'количество', diameter_unresolved: 'нет диаметра'
+}
+const QUALITY_COLOR: Record<NetworkDiaphragmQualityStatus, string> = {
+  ready: 'success', line_missing: 'error', line_removed: 'grey', topology_missing: 'warning',
+  state_missing: 'purple', count_invalid: 'brown', diameter_unresolved: 'warning'
+}
+const QUALITY_DESCRIPTION: Record<NetworkDiaphragmQualityStatus, string> = {
+  ready: '',
+  line_missing: 'Связанная линия отсутствует в текущей таблице linesobj.',
+  line_removed: 'Связанная линия помечена удалённой.',
+  topology_missing: 'Старая линия не содержит начальный и конечный узлы, поэтому сетевой контекст и координата недоступны.',
+  state_missing: 'Ссылка stateID не соответствует справочнику states.',
+  count_invalid: 'Количество последовательно установленных диафрагм должно быть больше нуля.',
+  diameter_unresolved: 'Диаметр не задан, а разрешение записать подобранное расчётом значение отсутствует.'
+}
+const DIAMETER_MODE_LABEL: Record<NetworkDiaphragmDiameterMode, string> = {
+  available: 'диаметр записан', pending_calculation: 'ожидает подбор расчётом', unresolved: 'не определён'
+}
+const qualityLabel = (status: NetworkDiaphragmQualityStatus) => QUALITY_LABEL[status] || String(status || '—')
+const qualityColor = (status: NetworkDiaphragmQualityStatus) => QUALITY_COLOR[status] || 'grey'
+const qualityDescription = (status: NetworkDiaphragmQualityStatus) => QUALITY_DESCRIPTION[status] || ''
+const diameterModeLabel = (mode: NetworkDiaphragmDiameterMode) => DIAMETER_MODE_LABEL[mode] || '—'
+
+const hasCoordinates = (item: Record<string, unknown>) => hasLonLat(item)
+const nodeLabel = (code: unknown, name: unknown, id: unknown) =>
+  [code, name].filter(Boolean).join(' ') || (id ? `№${id}` : '—')
+const formatNumber = (value: unknown, digits = 3) =>
+  value === null || value === undefined || value === '' || !Number.isFinite(Number(value))
+    ? '—'
+    : Number(value).toLocaleString('ru-RU', { maximumFractionDigits: digits })
+const formatUnit = (value: unknown, unit: string) => (formatNumber(value) === '—' ? '—' : `${formatNumber(value)} ${unit}`)
+const formatDate = (value: unknown) => (value ? new Date(String(value)).toLocaleDateString('ru-RU') : '—')
+const formatAttribute = (value: unknown) => (typeof value === 'number' ? formatNumber(value, 8) : String(value ?? '—'))
+const diameterLabel = (item: Record<string, unknown>) =>
+  item.internal_diameter !== null && Number(item.internal_diameter) > 0 ? `${formatNumber(item.internal_diameter, 6)} мм` : '—'
+
+/** Правятся пять колонок таблицы diaphragms (allow-list equipment_edit); ключи формы — имена колонок */
+const EDIT_COLUMNS: Record<string, { label: string; from: string; type: string }> = {
+  throtdiaphloc: { label: 'Место установки', from: 'installation_place', type: 'text' },
+  stateid: { label: 'Состояние', from: 'state_id', type: 'select' },
+  diameterinternal: { label: 'Внутренний диаметр', from: 'internal_diameter', type: 'number' },
+  consinstdiaphcount: { label: 'Количество последовательно', from: 'installed_count', type: 'number' },
+  entrymark: { label: 'Разрешение записи расчёта', from: 'entry_mark', type: 'text' }
+}
+const editSource: JournalEditSource = {
+  schema: computed(() => ({ fields: EDIT_COLUMNS as Record<string, unknown> })),
+  isWritable: (key?: string | null) => Boolean(key && key in EDIT_COLUMNS),
+  // схема известна заранее — загрузки нет, но useJournalEdit ждёт признак «есть»
+  loadSchema: async () => true
+}
+const {
+  isEditing, saving, editFields, flashId, isDirty, isFieldDirty, editable, setEditField,
+  beginEdit, resetEdit, cancel, closeKeepingDraft, markSaved
+} = useJournalEdit('diaphragms', editSource, details, {
+  toForm: record => Object.fromEntries(Object.entries(EDIT_COLUMNS).map(([column, def]) => [column, record[def.from] ?? null]))
+})
+
+/** Поля паспорта: только заполненные (в правке — все записываемые), значение — строка */
+const buildFields = (entries: Array<[string, unknown, string?, string?, unknown[]?]>): JournalDetailField[] => entries
+  .filter(([, value, key]) => (isEditing.value && key) || (value !== null && value !== undefined && value !== '' && value !== '—'))
+  .map(([label, value, key, type, items]) => ({ label, value: String(value ?? '—'), rawValue: value, key, type: type || 'text', items }))
+
+const detailGroups = computed((): JournalDetailGroup[] => {
+  const item = details.value
+  if (!item) return []
+  const output = item.latest_output as Record<string, unknown> | null | undefined
+  const outputValue = (key: string) => output?.[key]
+  const attributes = Object.entries(item.attributes || {}).filter(([, value]) => value !== null && value !== '')
   return [
-    { label: 'Место установки', key: 'throtdiaphloc', type: 'text', value: details.value?.installation_place },
-    { label: 'Состояние', key: 'stateid', type: 'select', items: lookups.value.states, value: details.value?.state_id },
-    { label: 'Внутренний диаметр', key: 'diameterinternal', type: 'number', value: details.value?.internal_diameter },
-    { label: 'Количество последовательно', key: 'consinstdiaphcount', type: 'number', value: details.value?.installed_count },
-    { label: 'Разрешение записи расчёта', key: 'entrymark', type: 'text', value: details.value?.entry_mark }
-  ]
+    { title: 'Сетевая привязка', fields: buildFields([
+      ['Диафрагма / ID', item.id], ['Линия', item.line_id],
+      ['Начальный узел', nodeLabel(item.node_code_1, item.node_name_1, item.node_id_1)],
+      ['Конечный узел', nodeLabel(item.node_code_2, item.node_name_2, item.node_id_2)],
+      ['Внутренний потребитель', nodeLabel(item.internal_node_code, item.internal_node_name, item.internal_node_id)],
+      ['Фрагмент', item.fragment_name || item.fragment_id], ['Признак линии', item.external_sign_line_name],
+      ['Сопротивление линии', formatNumber(item.line_hydraulic_resistance, 8)]
+    ]) },
+    { title: 'Паспорт диафрагмы', fields: buildFields([
+      ['Место установки', item.installation_place, 'throtdiaphloc', 'text'],
+      ['Состояние', item.state_name, 'stateid', 'select', lookups.states],
+      ['Внутренний диаметр', diameterLabel(item), 'diameterinternal', 'number'],
+      ['Режим диаметра', diameterModeLabel(item.diameter_mode)],
+      ['Количество последовательно', item.installed_count, 'consinstdiaphcount', 'number'],
+      ['Разрешение записи расчёта', item.entry_mark || 'не разрешена', 'entrymark', 'text']
+    ]) },
+    { title: 'Архивные реквизиты линии', fields: buildFields([
+      ['Регистрационный номер', item.registration_number], ['Ввод в эксплуатацию', formatDate(item.commissioned_at)],
+      ['Последний ремонт', formatDate(item.last_maintenance_at)], ['Владелец', item.organization_name], ['Оператор', item.operator_name]
+    ]) },
+    { title: 'Расчётный режим DRO_OUT', fields: output
+      ? buildFields([
+        ['Расход через диафрагму', formatUnit(outputValue('flow'), 'т/ч')], ['Потери напора', formatUnit(outputValue('head_loss'), 'м')],
+        ['Полное гидравлическое сопротивление', formatNumber(outputValue('total_hydraulic_resistance'), 8)],
+        ['Располагаемый напор в конечном узле', formatUnit(outputValue('available_head_end'), 'м')],
+        ['Пьезометрический напор', formatUnit(outputValue('piezometric_head_end'), 'м')],
+        ['Геодезическая отметка', formatUnit(outputValue('geodetic_mark_end'), 'м')],
+        ['Полный напор', formatUnit(outputValue('total_head_end'), 'м')],
+        ['Источник тепла', outputValue('heat_source_name') || outputValue('heat_source_id')]
+      ])
+      : buildFields([['Результат', 'расчётный результат для этой диафрагмы отсутствует']]) },
+    { title: 'Исходные поля diaphragms', fields: buildFields(
+      attributes.map(([key, value]) => [key, formatAttribute(value)] as [string, unknown])
+    ) }
+  ].filter(group => group.fields.length)
+})
+
+const loadLookups = async () => {
+  if (lookupsLoaded.value) return
+  Object.assign(lookups, await fastApiService.getNetworkDiaphragmLookups())
+  lookupsLoaded.value = true
 }
 
-const startEdit = () => {
-  isEditing.value = true
-  clearSaveError()
-  beginEquipmentEdit('diaphragms', details.value?.id)
-  editFields.value = {}
-  for (const field of buildFields()) {
-    if (field.key) editFields.value[field.key] = field.value ?? null
+/** Номер последнего запроса списка: ответ более раннего запроса не перекрывает поздний */
+let listRequest = 0
+const loadItems = async () => {
+  const request = ++listRequest
+  loading.value = true
+  error.value = ''
+  try {
+    const response = await fastApiService.getNetworkDiaphragms({
+      page: page.value, page_size: pageSize, search: search.value.trim() || undefined,
+      quality_status: qualityStatus.value, diameter_mode: diameterMode.value, installation_place: installationPlace.value,
+      state_id: stateId.value, external_sign_line_id: externalSignId.value, line_id: scope.lineId
+    })
+    if (request !== listRequest) return
+    items.value = response.items
+    total.value = response.total
+    pages.value = response.pages
+  } catch (loadError: any) {
+    if (request !== listRequest) return
+    error.value = formatApiError(loadError, 'Не удалось загрузить диафрагмы')
+  } finally {
+    if (request === listRequest) loading.value = false
   }
 }
 
-const cancelEdit = () => {
-  isEditing.value = false
-  clearSaveError()
-  editFields.value = {}
+watch([qualityStatus, diameterMode, installationPlace, stateId, externalSignId], () => {
+  if (!visible.value) return
+  page.value = 1
+  void loadItems()
+})
+watch(page, () => { if (visible.value) void loadItems() })
+
+const onSearch = () => {
+  if (!visible.value) return
+  page.value = 1
+  void loadItems()
+}
+const toggleQuality = (status: NetworkDiaphragmQualityStatus) => {
+  qualityStatus.value = qualityStatus.value === status ? undefined : status
+}
+const toggleDiameterMode = (mode: NetworkDiaphragmDiameterMode) => {
+  diameterMode.value = diameterMode.value === mode ? undefined : mode
+}
+const resetFilters = () => {
+  search.value = ''
+  qualityStatus.value = undefined
+  diameterMode.value = undefined
+  installationPlace.value = undefined
+  stateId.value = undefined
+  externalSignId.value = undefined
+  page.value = 1
+  void loadItems()
+}
+const clearScope = () => {
+  scope.lineId = undefined
+  page.value = 1
+  void loadItems()
 }
 
+/** Номер последнего запроса паспорта: ответ более раннего запроса не перекрывает поздний */
+let detailRequest = 0
+const openDetails = async (diaphragmId: number) => {
+  // открытие другой записи во время правки — черновик текущей остаётся, паспорт на просмотр
+  closeKeepingDraft()
+  resetEdit()
+  clearSaveError()
+  const request = ++detailRequest
+  detailVisible.value = true
+  detailLoading.value = true
+  detailError.value = ''
+  details.value = null
+  try {
+    const record = await fastApiService.getNetworkDiaphragm(diaphragmId)
+    if (request !== detailRequest) return
+    details.value = record
+  } catch (loadError: any) {
+    if (request !== detailRequest) return
+    detailError.value = formatApiError(loadError, 'Не удалось открыть паспорт диафрагмы')
+  } finally {
+    if (request === detailRequest) detailLoading.value = false
+  }
+}
+
+const openDialog = async (nextScope: NetworkDiaphragmJournalScope = {}) => {
+  Object.assign(scope, { lineId: undefined, diaphragmId: undefined }, nextScope)
+  page.value = 1
+  visible.value = true
+  // список сам показывает свою ошибку; сбой справочника не должен прятать список
+  const [lookupsResult] = await Promise.allSettled([loadLookups(), loadItems()])
+  if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — плитки и фильтры могут быть неполными'))
+  if (nextScope.diaphragmId) await openDetails(nextScope.diaphragmId)
+}
+
+const startEdit = async () => {
+  clearSaveError()
+  if (!(await beginEdit())) return
+  // версия строки для 409 и отправки только изменений
+  beginEquipmentEdit('diaphragms', details.value?.id)
+}
+
+const cancelEdit = async () => {
+  const { closed } = await cancel()
+  if (closed) clearSaveError()
+}
+
+// Паспорт закрыт крестиком или Esc во время правки — черновик остаётся до следующего открытия
+watch(detailVisible, (open) => {
+  if (!open) closeKeepingDraft()
+})
+
 const saveChanges = async () => {
-  if (!details.value) return
-  const current = details.value
+  const id = details.value?.id
+  if (!id) return
   saving.value = true
   clearSaveError()
   try {
-    const processedFields: Record<string, any> = {}
-    for (const key in editFields.value) {
-      if (editFields.value[key] === '') processedFields[key] = null
-      else processedFields[key] = editFields.value[key]
-    }
-    
-    await saveEquipmentEdit('diaphragms', details.value.id, processedFields)
-    
-    await openDetails(details.value.id)
-    isEditing.value = false
-    await loadItems()
+    await saveEquipmentEdit('diaphragms', id, editFields.value)
+    markSaved(id)
+    await Promise.all([loadItems(), openDetails(id)])
   } catch (cause) {
-    reportSaveError(cause, () => openDetails(current.id))
+    // текст — в паспорте; конфликт версий (409) ещё и уведомлением с перезагрузкой
+    reportSaveError(cause, () => openDetails(id))
   } finally {
     saving.value = false
   }
 }
 
-const qualityOptions = [
-  { title: 'Готово', value: 'ready' }, { title: 'Нет линии', value: 'line_missing' },
-  { title: 'Линия удалена', value: 'line_removed' }, { title: 'Нет топологии', value: 'topology_missing' },
-  { title: 'Нет состояния', value: 'state_missing' }, { title: 'Некорректное количество', value: 'count_invalid' },
-  { title: 'Диаметр не определён', value: 'diameter_unresolved' }
-]
-const diameterOptions = [
-  { title: 'Диаметр записан', value: 'available' },
-  { title: 'Ожидает расчёт', value: 'pending_calculation' },
-  { title: 'Не определён', value: 'unresolved' }
-]
-const qualityMetrics: Array<{ value: NetworkDiaphragmQualityStatus; label: string; color: string }> = [
-  { value: 'ready', label: 'Готовы', color: 'green' }, { value: 'line_missing', label: 'Нет линии', color: 'red' },
-  { value: 'line_removed', label: 'Удалённая линия', color: 'grey' }, { value: 'topology_missing', label: 'Нет топологии', color: 'orange' },
-  { value: 'state_missing', label: 'Нет состояния', color: 'purple' }, { value: 'count_invalid', label: 'Количество', color: 'brown' },
-  { value: 'diameter_unresolved', label: 'Диаметр', color: 'amber-darken-3' }
-]
-const attributeEntries = computed(() => Object.entries(details.value?.attributes || {}).filter(([, value]) => value !== null && value !== ''))
-
-const loadLookups = async () => {
-  if (!lookupsLoaded.value) { lookups.value = await fastApiService.getNetworkDiaphragmLookups(); lookupsLoaded.value = true }
+const locate = (item: Record<string, unknown>) => {
+  emit('locate-diaphragm', {
+    longitude: Number(item.longitude), latitude: Number(item.latitude), id: Number(item.id),
+    lineId: item.line_id == null ? null : Number(item.line_id),
+    label: String(item.display_name || `Диафрагма №${item.id}`)
+  })
+  detailVisible.value = false
+  visible.value = false
 }
-const loadItems = async () => {
-  loading.value = true; error.value = ''
-  try { const response = await fastApiService.getNetworkDiaphragms({ ...filters.value, page: page.value, page_size: 50 }); items.value = response.items; pages.value = response.pages }
-  catch (reason) { error.value = formatApiError(reason, 'Не удалось загрузить диафрагмы') } finally { loading.value = false }
-}
-const reload = () => { page.value = 1; void loadItems() }
-const resetFilters = () => { filters.value = {}; reload() }
-const setQualityStatus = (status: NetworkDiaphragmQualityStatus) => { filters.value.quality_status = filters.value.quality_status === status ? undefined : status; reload() }
-const openDetails = async (diaphragmId: number) => {
-  detailVisible.value = true; detailLoading.value = true; details.value = null; isEditing.value = false
-  try { details.value = await fastApiService.getNetworkDiaphragm(diaphragmId) }
-  catch (reason) { error.value = formatApiError(reason, 'Не удалось открыть карточку диафрагмы'); detailVisible.value = false }
-  finally { detailLoading.value = false }
-}
-const openDialog = async (scope: { diaphragmId?: number; lineId?: number } = {}) => {
-  // loading — до показа и справочников: иначе первый кадр — «не найдены» или прошлый список
-  loading.value = true; items.value = []; error.value = ''
-  visible.value = true; await loadLookups(); filters.value = { line_id: scope.lineId }; page.value = 1; await loadItems()
-  if (scope.diaphragmId) await openDetails(scope.diaphragmId)
-}
-
-const hasCoordinates = (item: NetworkDiaphragmSummary) => item.longitude !== null && item.latitude !== null && Number.isFinite(Number(item.longitude)) && Number.isFinite(Number(item.latitude))
-const locate = (item: NetworkDiaphragmSummary) => emit('locate-diaphragm', { longitude: Number(item.longitude), latitude: Number(item.latitude), id: item.id, lineId: item.line_id, label: item.display_name || `Диафрагма №${item.id}` })
-const qualityLabel = (status: NetworkDiaphragmQualityStatus) => ({ ready: 'готово', line_missing: 'нет линии', line_removed: 'линия удалена', topology_missing: 'нет топологии', state_missing: 'нет состояния', count_invalid: 'количество', diameter_unresolved: 'нет диаметра' })[status]
-const qualityColor = (status: NetworkDiaphragmQualityStatus) => ({ ready: 'green', line_missing: 'red', line_removed: 'grey', topology_missing: 'orange', state_missing: 'purple', count_invalid: 'brown', diameter_unresolved: 'amber-darken-3' })[status]
-const qualityDescription = (status: NetworkDiaphragmQualityStatus) => ({ ready: '', line_missing: 'Связанная линия отсутствует в текущей таблице linesobj.', line_removed: 'Связанная линия помечена удалённой.', topology_missing: 'Старая линия не содержит начальный и конечный узлы, поэтому сетевой контекст и координата недоступны.', state_missing: 'Ссылка stateID не соответствует справочнику states.', count_invalid: 'Количество последовательно установленных диафрагм должно быть больше нуля.', diameter_unresolved: 'Диаметр не задан, а разрешение записать подобранное расчётом значение отсутствует.' })[status]
-const diameterModeLabel = (mode: NetworkDiaphragmDiameterMode) => ({ available: 'диаметр записан', pending_calculation: 'ожидает подбор расчётом', unresolved: 'не определён' })[mode]
-const diameterLabel = (item: NetworkDiaphragmSummary) => item.internal_diameter !== null && item.internal_diameter > 0 ? `${formatNumber(item.internal_diameter, 6)} мм` : '—'
-const nodeLabel = (code: string | null, name: string | null, id: number | null) => [code, name].filter(Boolean).join(' ') || (id ? `№${id}` : '—')
-const formatNumber = (value: unknown, digits = 3) => value === null || value === undefined || value === '' || !Number.isFinite(Number(value)) ? '—' : Number(value).toLocaleString('ru-RU', { maximumFractionDigits: digits })
-const formatUnit = (value: unknown, unit: string) => value === null || value === undefined || value === '' || !Number.isFinite(Number(value)) ? '—' : `${formatNumber(value)} ${unit}`
-const formatDate = (value: string | null) => value ? new Date(value).toLocaleDateString('ru-RU') : '—'
-const formatAttribute = (value: unknown) => typeof value === 'number' ? formatNumber(value, 8) : String(value ?? '—')
-const outputValue = (key: string) => details.value?.latest_output?.[key] as string | number | null | undefined
 
 defineExpose({ openDialog })
 </script>
 
 <style scoped>
-.alerts{display:grid;gap:8px}.metric-row,.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.filters>*{min-width:180px;flex:1}.filters .v-btn{flex:0 0 auto}.table-wrap{overflow:auto;min-height:380px}.journal-table{width:100%;border-collapse:collapse;font-size:13px}.journal-table th,.journal-table td{padding:9px 10px;border-bottom:1px solid #e0e0e0;text-align:left;white-space:nowrap}.journal-table th{position:sticky;top:0;background:#e0f2f1;z-index:1}.journal-table tbody tr{cursor:pointer}.journal-table tbody tr:hover{background:#f1fbfa}.muted{font-size:11px;color:#757575}.empty{text-align:center;color:#757575;padding:48px 32px}.journal-error{margin:0 12px 12px;padding:10px 12px;border-radius:4px;background:#ffebee;color:#b71c1c}.detail-grid,.attribute-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}:deep(.detail-value){display:flex;flex-direction:column;min-width:0}:deep(.detail-label){font-size:11px;color:#757575}:deep(.detail-value strong){overflow-wrap:anywhere}
-@media(max-width:960px){.filters{display:grid;grid-template-columns:1fr}.filters>*{width:100%}.detail-grid,.attribute-grid{grid-template-columns:1fr}}
+.diaphragm-journal { height: min(90vh, 920px); display: flex; flex-direction: column; }
+.diaphragm-alerts { display: grid; gap: var(--space-2); }
+.diaphragm-kpi { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.diaphragm-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
+.diaphragm-table-wrap { min-height: 280px; overflow: auto; flex: 1; }
+.diaphragm-table { min-width: 1240px; }
+@media (max-width: 600px) { .diaphragm-journal { height: 100dvh; } }
 </style>

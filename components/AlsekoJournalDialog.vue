@@ -1,458 +1,851 @@
 <template>
-  <v-dialog
-    v-model="visible"
-    :fullscreen="isMobile"
-    max-width="1720"
-    scrollable
-  >
-    <v-card
-      class="alseko-journal"
-      :rounded="isMobile ? 0 : 'lg'"
+  <Teleport to="body">
+    <v-dialog
+      v-model="visible"
+      :fullscreen="isMobile"
+      max-width="1600"
+      scrollable
     >
-      <v-toolbar
-        color="indigo-darken-2"
-        density="comfortable"
+      <v-card
+        class="alseko-journal"
+        :rounded="isMobile ? 0 : 'lg'"
       >
-        <v-icon class="ml-3">mdi-office-building-marker</v-icon>
-        <v-toolbar-title>АЛСЕКО — договорные нагрузки</v-toolbar-title>
-        <v-chip
-          v-if="counts"
-          class="mr-2"
-          size="small"
-        >{{ counts.total.toLocaleString('ru-RU') }} объектов</v-chip>
-        <v-btn
-          icon="mdi-close"
-          aria-label="Закрыть"
-          @click="visible = false"
-        />
-      </v-toolbar>
-
-      <v-tabs
-        v-model="mode"
-        color="indigo-darken-2"
-        @update:model-value="changeMode"
-      >
-        <v-tab value="loads">Договорные объекты</v-tab>
-        <v-tab value="buildings">Здания без потребителя</v-tab>
-        <v-tab value="reconciliation">Сверка и привязка</v-tab>
-      </v-tabs>
-
-      <v-card-text
-        v-if="mode === 'reconciliation'"
-        class="pa-0 alseko-table-wrap"
-      >
-        <AlsekoReconciliationPanel
-          :building-id="bindBuildingId"
-          @open-building="openBuilding"
-          @open-load="openLoad"
-        />
-      </v-card-text>
-
-      <div
-        v-show="mode !== 'reconciliation'"
-        class="pa-3 alseko-filters"
-      >
-        <v-row dense>
-          <v-col
-            cols="12"
-            md="3"
+        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
+          <v-avatar
+            color="indigo-lighten-5"
+            size="40"
           >
-            <v-text-field
-              v-model="filters.search"
-              label="Адрес, договор, владелец, объект"
-              density="compact"
-              clearable
-              hide-details
-              prepend-inner-icon="mdi-magnify"
-              @keyup.enter="reload"
-            />
-          </v-col>
-          <template v-if="mode === 'loads'">
-            <v-col
-              cols="6"
-              md="2"
-            ><v-select
-              v-model="filters.match_status"
-              :items="matchStatuses"
-              label="Связь со зданием"
-              density="compact"
-              clearable
-              hide-details
-            /></v-col>
-            <v-col
-              cols="6"
-              md="2"
-            ><v-select
-              v-model="filters.customer_group"
-              :items="customerGroups"
-              label="Группа"
-              density="compact"
-              clearable
-              hide-details
-            /></v-col>
-            <v-col
-              cols="6"
-              md="2"
-            ><v-select
-              v-model="filters.operation_district"
-              :items="lookups.operation_districts"
-              item-title="name"
-              item-value="name"
-              label="Район эксплуатации"
-              density="compact"
-              clearable
-              hide-details
-            /></v-col>
-            <v-col
-              cols="6"
-              md="2"
-            ><v-select
-              v-model="filters.administrative_district"
-              :items="lookups.administrative_districts"
-              item-title="name"
-              item-value="name"
-              label="Административный район"
-              density="compact"
-              clearable
-              hide-details
-            /></v-col>
-            <v-col
-              cols="6"
-              md="2"
-            ><v-select
-              v-model="filters.heat_source"
-              :items="lookups.heat_sources"
-              item-title="name"
-              item-value="name"
-              label="Источник"
-              density="compact"
-              clearable
-              hide-details
-            /></v-col>
-            <v-col
-              cols="6"
-              md="2"
-            ><v-select
-              v-model="filters.temperature_graph"
-              :items="lookups.temperature_graphs"
-              item-title="name"
-              item-value="name"
-              label="Температурный график"
-              density="compact"
-              clearable
-              hide-details
-            /></v-col>
-          </template>
-          <v-col
-            cols="12"
-            md="2"
-            class="d-flex ga-2"
+            <v-icon color="indigo-darken-2">mdi-office-building-marker</v-icon>
+          </v-avatar>
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
           >
-            <v-btn
-              color="indigo-darken-2"
-              prepend-icon="mdi-filter"
-              @click="reload"
-            >Применить</v-btn>
-            <v-btn
-              variant="text"
-              icon="mdi-filter-remove"
-              title="Сбросить"
-              aria-label="Сбросить"
-              @click="resetFilters"
-            />
-          </v-col>
-        </v-row>
-        <div
-          v-if="counts && mode === 'loads'"
-          class="d-flex flex-wrap ga-2 mt-3"
+            <div class="text-subtitle-1 font-weight-bold">АЛСЕКО — договорные нагрузки</div>
+            <div class="text-caption text-medium-emphasis text-truncate">
+              {{ modeTitle }}{{ mode === 'reconciliation' ? '' : ` · найдено ${total.toLocaleString('ru-RU')}` }}
+            </div>
+          </div>
+          <SegmentedToggle
+            v-model="mode"
+            :items="modeItems"
+            aria-label="Режим журнала АЛСЕКО"
+            class="mr-2"
+          />
+          <HintTip
+            text="Закрыть журнал"
+            hotkey="Esc"
+            location="bottom"
+          >
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon
+                variant="text"
+                aria-label="Закрыть журнал"
+                @click="visible = false"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </HintTip>
+        </v-card-title>
+
+        <v-divider />
+
+        <v-card-text
+          v-if="mode === 'reconciliation'"
+          class="pa-0 alseko-table-wrap"
         >
-          <v-chip
-            size="small"
-            color="green"
-          >Найдено по адресу: {{ counts.matched.toLocaleString('ru-RU') }}</v-chip>
-          <v-chip
-            size="small"
-            color="orange-darken-2"
-          >Не найдено: {{ counts.unmatched.toLocaleString('ru-RU') }}</v-chip>
-          <v-chip size="small">МЖД: {{ counts.apartment.toLocaleString('ru-RU') }}</v-chip>
-          <v-chip size="small">Прочие: {{ counts.other.toLocaleString('ru-RU') }}</v-chip>
-        </div>
-      </div>
-
-      <v-progress-linear
-        v-if="loading"
-        indeterminate
-        color="indigo"
-      />
-      <v-alert
-        v-if="error"
-        type="error"
-        variant="tonal"
-        class="ma-3"
-      >{{ error }}</v-alert>
-
-      <v-card-text
-        v-show="mode !== 'reconciliation'"
-        class="pa-0 alseko-table-wrap"
-      >
-        <div
-          v-if="!loading && !items.length"
-          class="alseko-empty"
-        >
-          <v-icon
-            size="58"
-            color="grey-lighten-1"
-          >mdi-database-search</v-icon>
-          <div class="text-h6 mt-3">Записи не найдены</div>
-          <div class="text-body-2 text-medium-emphasis">Измените фильтры или строку поиска.</div>
-        </div>
-
-        <table
-          v-else-if="mode === 'loads'"
-          class="alseko-table"
-        >
-          <thead><tr><th>ID</th><th>Адрес</th><th>Объект</th><th>Договор / реестр</th><th>Район</th><th>Источник</th><th>Отопление, ккал/ч</th><th>ГВС, ккал/ч</th><th>Вентиляция, ккал/ч</th><th>Пар, ккал/ч</th><th>Здания</th></tr></thead>
-          <tbody>
-            <tr
-              v-for="item in loadItems"
-              :key="item.id"
-              @click="openLoad(item.id)"
-            >
-              <td>{{ item.id }}</td><td>{{ displayAddress(item) }}</td><td>{{ item.customer_type || '—' }}<div class="subtle">{{ item.owner || '' }}</div></td>
-              <td>{{ item.contract_number || '—' }}<div class="subtle">{{ item.registry_number || '' }}</div></td><td>{{ item.operation_district || '—' }}</td><td>{{ item.heat_source || '—' }}</td>
-              <td>{{ loadValue(item.heating_load) }}</td><td>{{ loadValue(item.hot_water_load) }}</td><td>{{ loadValue(item.ventilation_load) }}</td><td>{{ loadValue(item.steam_load) }}</td>
-              <td><v-chip
-                size="x-small"
-                :color="item.building_match_count ? 'green' : 'orange-darken-2'"
-              >{{ item.building_match_count }}</v-chip></td>
-            </tr>
-          </tbody>
-        </table>
-
-        <table
-          v-else
-          class="alseko-table building-table"
-        >
-          <thead><tr><th>ID</th><th>Адрес</th><th>Отопление, Гкал/ч</th><th>ГВС, Гкал/ч</th><th>Вентиляция, Гкал/ч</th><th>Пар, Гкал/ч</th><th>Схема отопления</th><th>Схема ГВС</th><th>Карта</th></tr></thead>
-          <tbody>
-            <tr
-              v-for="item in buildingItems"
-              :key="item.id"
-              @click="openBuilding(item.id)"
-            >
-              <td>{{ item.id }}</td><td>{{ displayAddress(item) }}</td><td>{{ gcalValue(item.heating_load) }}</td><td>{{ gcalValue(item.hot_water_load) }}</td><td>{{ gcalValue(item.ventilation_load) }}</td><td>{{ gcalValue(item.steam_load) }}</td><td>{{ item.heating_scheme_id ?? '—' }}</td><td>{{ item.hot_water_scheme_id ?? '—' }}</td>
-              <td><v-icon :color="hasCoordinates(item) ? 'indigo' : 'grey'">mdi-map-marker</v-icon></td>
-            </tr>
-          </tbody>
-        </table>
-      </v-card-text>
-
-      <v-card-actions
-        v-show="mode !== 'reconciliation'"
-        class="justify-center border-t-sm"
-      >
-        <v-pagination
-          v-model="page"
-          :length="pages || 1"
-          :total-visible="isMobile ? 4 : 8"
-          density="comfortable"
-          @update:model-value="loadItemsPage"
-        />
-        <span class="text-caption text-medium-emphasis ml-3">Всего: {{ total.toLocaleString('ru-RU') }}</span>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
-
-  <v-dialog
-    v-model="detailsVisible"
-    :fullscreen="isMobile"
-    max-width="1050"
-    scrollable
-  >
-    <v-card
-      v-if="selected"
-      :rounded="isMobile ? 0 : 'lg'"
-    >
-      <v-toolbar
-        color="indigo-darken-2"
-        density="comfortable"
-      >
-        <v-toolbar-title>{{ selectedKind === 'load' ? `Объект АЛСЕКО ${selected.id}` : `Здание АЛСЕКО ${selected.id}` }}</v-toolbar-title>
-        <v-btn
-          v-if="selectedKind === 'building'"
-          icon="mdi-link-variant"
-          title="Привязка к адресу АЛСЕКО"
-          aria-label="Привязка к адресу АЛСЕКО"
-          @click="bindSelectedBuilding"
-        />
-        <v-btn
-          v-if="hasCoordinates(selected)"
-          icon="mdi-crosshairs-gps"
-          title="Показать на карте"
-          aria-label="Показать на карте"
-          @click="locateSelected"
-        />
-        <v-btn
-          icon="mdi-close"
-          aria-label="Закрыть"
-          @click="detailsVisible = false"
-        />
-      </v-toolbar>
-      <v-progress-linear
-        v-if="detailsLoading"
-        indeterminate
-      />
-      <v-card-text>
-        <template v-if="selectedKind === 'load'">
-          <v-alert
-            v-if="Number(selected.building_match_count) > 1"
-            type="warning"
-            variant="tonal"
-            class="mb-4"
-          >По адресу найдено несколько зданий: {{ selected.building_match_count }}. Связь неоднозначна и требует ручной проверки.</v-alert>
-          <DetailGrid
-            title="Договорный объект"
-            :items="loadMainDetails"
+          <AlsekoReconciliationPanel
+            :building-id="bindBuildingId"
+            @open-building="openBuilding"
+            @open-load="openLoad"
           />
-          <DetailGrid
-            title="Нагрузки, ккал/ч"
-            :items="loadBreakdown"
-          />
-          <DetailGrid
-            title="Эксплуатационная привязка"
-            :items="loadNetworkDetails"
-          />
-          <RelationTable
-            title="Здания по адресу"
-            :rows="loadRelations.matched_buildings"
-            @open="openRelatedBuilding"
-          />
-          <RelationTable
-            title="Договоры по этому адресу"
-            :rows="loadRelations.address_loads"
-            @open="openRelatedLoad"
-          />
-        </template>
+        </v-card-text>
+
         <template v-else>
-          <DetailGrid
-            title="Здание"
-            :items="buildingMainDetails"
-          />
-          <DetailGrid
-            title="Нагрузки, Гкал/ч"
-            :items="buildingBreakdown"
-          />
-          <RelationTable
-            title="Договорные объекты по адресу"
-            :rows="buildingRelations.matched_loads"
-            @open="openRelatedLoad"
-          />
+          <!-- Плитки из справочника (вся база): связь со зданием и группа — фильтры договорных объектов -->
+          <div
+            v-if="counts && mode === 'loads'"
+            class="alseko-kpi px-3 px-md-4 pt-3"
+          >
+            <KpiTile
+              label="Объектов"
+              :value="counts.total"
+              :compact="false"
+            />
+            <KpiTile
+              label="Найдено по адресу"
+              :value="counts.matched"
+              :compact="false"
+              status="good"
+              selectable
+              :active="matchStatus === 'matched'"
+              @select="toggleFilter('matchStatus', 'matched')"
+            />
+            <KpiTile
+              label="Не найдено"
+              :value="counts.unmatched"
+              :compact="false"
+              :status="counts.unmatched > 0 ? 'warning' : 'good'"
+              selectable
+              :active="matchStatus === 'unmatched'"
+              @select="toggleFilter('matchStatus', 'unmatched')"
+            />
+            <KpiTile
+              label="МЖД"
+              :value="counts.apartment"
+              :compact="false"
+              selectable
+              :active="customerGroup === 'apartment'"
+              @select="toggleFilter('customerGroup', 'apartment')"
+            />
+            <KpiTile
+              label="Прочие"
+              :value="counts.other"
+              :compact="false"
+              selectable
+              :active="customerGroup === 'other'"
+              @select="toggleFilter('customerGroup', 'other')"
+            />
+          </div>
+
+          <div class="pa-3 pa-md-4 alseko-filters">
+            <v-row dense>
+              <v-col
+                cols="12"
+                md="4"
+              >
+                <SearchField
+                  :model-value="search"
+                  label="Адрес, договор, владелец, объект"
+                  :debounce="350"
+                  :loading="loading"
+                  @update:model-value="search = $event"
+                  @search="onSearch"
+                />
+              </v-col>
+              <template v-if="mode === 'loads'">
+                <v-col
+                  cols="12"
+                  sm="6"
+                  md="2"
+                >
+                  <AppSelect
+                    v-model="matchStatus"
+                    :items="matchStatuses"
+                    item-title="title"
+                    item-value="value"
+                    label="Связь со зданием"
+                  />
+                </v-col>
+                <v-col
+                  cols="12"
+                  sm="6"
+                  md="2"
+                >
+                  <AppSelect
+                    v-model="customerGroup"
+                    :items="customerGroups"
+                    item-title="title"
+                    item-value="value"
+                    label="Группа"
+                  />
+                </v-col>
+                <v-col
+                  cols="12"
+                  sm="6"
+                  md="2"
+                >
+                  <AppSelect
+                    v-model="operationDistrict"
+                    :items="lookups.operation_districts"
+                    item-title="name"
+                    item-value="name"
+                    label="Район эксплуатации"
+                  />
+                </v-col>
+                <v-col
+                  cols="12"
+                  sm="6"
+                  md="2"
+                >
+                  <AppSelect
+                    v-model="administrativeDistrict"
+                    :items="lookups.administrative_districts"
+                    item-title="name"
+                    item-value="name"
+                    label="Административный район"
+                  />
+                </v-col>
+                <v-col
+                  cols="12"
+                  sm="6"
+                  md="2"
+                >
+                  <AppSelect
+                    v-model="heatSource"
+                    :items="lookups.heat_sources"
+                    item-title="name"
+                    item-value="name"
+                    label="Источник"
+                  />
+                </v-col>
+                <v-col
+                  cols="12"
+                  sm="6"
+                  md="2"
+                >
+                  <AppSelect
+                    v-model="temperatureGraph"
+                    :items="lookups.temperature_graphs"
+                    item-title="name"
+                    item-value="name"
+                    label="Температурный график"
+                  />
+                </v-col>
+              </template>
+            </v-row>
+
+            <div class="d-flex align-center flex-wrap ga-2 mt-3">
+              <v-chip
+                v-if="scope.buildingId && mode === 'loads'"
+                size="small"
+                color="primary"
+                closable
+                @click:close="clearScope"
+              >
+                Здание {{ scope.buildingId }}
+              </v-chip>
+              <v-spacer />
+              <v-btn
+                variant="text"
+                prepend-icon="mdi-filter-remove-outline"
+                :disabled="!filtersActive"
+                @click="resetFilters"
+              >
+                Сбросить
+              </v-btn>
+              <v-btn
+                color="primary"
+                prepend-icon="mdi-refresh"
+                :loading="loading"
+                @click="loadItemsPage"
+              >
+                Обновить
+              </v-btn>
+            </div>
+          </div>
+
+          <v-divider />
+
+          <v-card-text class="pa-0 alseko-table-wrap">
+            <StateView
+              variant="table"
+              :rows="10"
+              :loading="loading && !items.length"
+              :error="error"
+              :empty="!loading && !items.length"
+              empty-title="Записи не найдены"
+              :empty-text="filtersActive ? 'Измените фильтры или строку поиска' : 'В базе нет записей АЛСЕКО'"
+              empty-icon="mdi-database-search"
+              :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
+              :retrying="loading"
+              @retry="loadItemsPage"
+              @action="resetFilters"
+            >
+              <v-progress-linear
+                v-if="loading"
+                indeterminate
+                color="primary"
+              />
+              <DataTable
+                v-if="mode === 'loads'"
+                :columns="loadColumns"
+                :items="(loadItems as Record<string, unknown>[])"
+                item-key="id"
+                selectable
+                density="compact"
+                class="alseko-table"
+                @select="openLoad(Number($event.id))"
+              >
+                <template #[`item.address`]="{ item }">
+                  <div class="text-truncate">
+                    {{ displayAddress(item) }}
+                  </div>
+                </template>
+                <template #[`item.customer_type`]="{ item }">
+                  <div class="text-truncate">
+                    {{ item.customer_type || '—' }}
+                  </div>
+                  <div
+                    v-if="item.owner"
+                    class="text-caption text-medium-emphasis text-truncate"
+                  >
+                    {{ item.owner }}
+                  </div>
+                </template>
+                <template #[`item.contract_number`]="{ item }">
+                  {{ item.contract_number || '—' }}
+                  <div
+                    v-if="item.registry_number"
+                    class="text-caption text-medium-emphasis"
+                  >
+                    {{ item.registry_number }}
+                  </div>
+                </template>
+                <template #[`item.operation_district`]="{ item }">
+                  {{ item.operation_district || '—' }}
+                </template>
+                <template #[`item.heat_source`]="{ item }">
+                  {{ item.heat_source || '—' }}
+                </template>
+                <template #[`item.heating_load`]="{ item }">
+                  {{ loadValue(item.heating_load) }}
+                </template>
+                <template #[`item.hot_water_load`]="{ item }">
+                  {{ loadValue(item.hot_water_load) }}
+                </template>
+                <template #[`item.ventilation_load`]="{ item }">
+                  {{ loadValue(item.ventilation_load) }}
+                </template>
+                <template #[`item.steam_load`]="{ item }">
+                  {{ loadValue(item.steam_load) }}
+                </template>
+                <template #[`item.building_match_count`]="{ item }">
+                  <v-chip
+                    size="x-small"
+                    variant="tonal"
+                    class="num"
+                    :color="item.building_match_count ? 'success' : 'warning'"
+                  >
+                    {{ item.building_match_count }}
+                  </v-chip>
+                </template>
+              </DataTable>
+              <DataTable
+                v-else
+                :columns="buildingColumns"
+                :items="(buildingItems as Record<string, unknown>[])"
+                item-key="id"
+                selectable
+                density="compact"
+                class="alseko-table alseko-table--buildings"
+                @select="openBuilding(Number($event.id))"
+              >
+                <template #[`item.address`]="{ item }">
+                  <div class="text-truncate">
+                    {{ displayAddress(item) }}
+                  </div>
+                </template>
+                <template #[`item.heating_load`]="{ item }">
+                  {{ gcalValue(item.heating_load) }}
+                </template>
+                <template #[`item.hot_water_load`]="{ item }">
+                  {{ gcalValue(item.hot_water_load) }}
+                </template>
+                <template #[`item.ventilation_load`]="{ item }">
+                  {{ gcalValue(item.ventilation_load) }}
+                </template>
+                <template #[`item.steam_load`]="{ item }">
+                  {{ gcalValue(item.steam_load) }}
+                </template>
+                <template #[`item.heating_scheme_id`]="{ item }">
+                  {{ item.heating_scheme_id ?? '—' }}
+                </template>
+                <template #[`item.hot_water_scheme_id`]="{ item }">
+                  {{ item.hot_water_scheme_id ?? '—' }}
+                </template>
+                <template #[`item.actions`]="{ item }">
+                  <HintTip
+                    v-if="hasCoordinates(item)"
+                    text="Показать здание на карте"
+                    hint="Журнал закроется, маркер останется"
+                  >
+                    <template #default="{ props: tip }">
+                      <v-btn
+                        v-bind="tip"
+                        icon="mdi-crosshairs-gps"
+                        size="x-small"
+                        variant="text"
+                        color="primary"
+                        aria-label="Показать здание на карте"
+                        @click.stop="locate(item, 'building')"
+                      />
+                    </template>
+                  </HintTip>
+                  <HintTip
+                    v-else
+                    text="Карта недоступна"
+                    hint="У здания нет координат"
+                  >
+                    <template #default="{ props: tip }">
+                      <v-btn
+                        v-bind="tip"
+                        icon="mdi-map-marker-off"
+                        size="x-small"
+                        variant="text"
+                        aria-disabled="true"
+                        aria-label="У здания нет координат"
+                        @click.stop
+                      />
+                    </template>
+                  </HintTip>
+                </template>
+              </DataTable>
+            </StateView>
+          </v-card-text>
+
+          <v-divider />
+          <v-card-actions class="px-4 py-2">
+            <span class="text-caption text-medium-emphasis">Страница {{ page }}{{ pages ? ` из ${pages}` : '' }}</span>
+            <v-spacer />
+            <v-pagination
+              v-if="pages > 1"
+              v-model="page"
+              :length="pages"
+              :total-visible="isMobile ? 3 : 7"
+              density="compact"
+            />
+          </v-card-actions>
         </template>
-      </v-card-text>
-    </v-card>
-  </v-dialog>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog
+      v-model="detailsVisible"
+      :fullscreen="isMobile"
+      max-width="980"
+      scrollable
+    >
+      <v-card :rounded="isMobile ? 0 : 'lg'">
+        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
+          <v-icon color="indigo-darken-2">{{ selectedKind === 'load' ? 'mdi-file-document-outline' : 'mdi-office-building-outline' }}</v-icon>
+          <div
+            class="flex-grow-1"
+            style="min-width: 0"
+          >
+            <div class="text-subtitle-1 font-weight-bold text-truncate">
+              {{ selected ? (selectedKind === 'load' ? `Объект АЛСЕКО ${selected.id}` : `Здание АЛСЕКО ${selected.id}`) : 'Карточка' }}
+            </div>
+            <div class="text-caption text-medium-emphasis text-truncate">
+              {{ selected ? displayAddress(selected) : '' }}
+            </div>
+          </div>
+          <v-btn
+            icon
+            variant="text"
+            aria-label="Закрыть карточку"
+            @click="detailsVisible = false"
+          >
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-card-title>
+        <v-divider />
+
+        <v-card-text class="pa-4">
+          <StateView
+            variant="form"
+            :rows="8"
+            :loading="detailsLoading"
+            :error="detailsError"
+            :empty="!detailsLoading && !detailsError && !selected"
+            empty-title="Карточка не выбрана"
+            :retry="false"
+          >
+            <template v-if="selected">
+              <v-alert
+                v-if="selectedKind === 'load' && Number(selected.building_match_count) > 1"
+                type="warning"
+                variant="tonal"
+                density="compact"
+                class="mb-3"
+              >
+                По адресу найдено несколько зданий: {{ selected.building_match_count }}. Связь неоднозначна и требует ручной проверки.
+              </v-alert>
+              <JournalDetailFields
+                :groups="detailGroups"
+                :model="EMPTY_MODEL"
+                :editable="notEditable"
+                :is-field-dirty="notEditable"
+                :open-panels="[0, 1, 2]"
+              >
+                <v-expansion-panel
+                  v-for="relation in relationPanels"
+                  :key="relation.title"
+                  :value="relation.panelIndex"
+                >
+                  <v-expansion-panel-title>{{ relation.title }} ({{ relation.rows.length }})</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-list
+                      density="compact"
+                      lines="two"
+                    >
+                      <v-list-item
+                        v-for="row in relation.rows"
+                        :key="Number(row.id)"
+                        :prepend-icon="relation.kind === 'load' ? 'mdi-file-document-outline' : 'mdi-office-building-outline'"
+                        :title="`ID ${row.id} · ${relationTitle(row)}`"
+                        :subtitle="String(row.contract_number || row.registry_number || '')"
+                        @click="relation.kind === 'load' ? openLoad(Number(row.id)) : openBuilding(Number(row.id))"
+                      />
+                    </v-list>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+              </JournalDetailFields>
+            </template>
+          </StateView>
+        </v-card-text>
+
+        <v-divider />
+        <v-card-actions class="px-4 py-3">
+          <v-spacer />
+          <v-btn
+            v-if="selected && selectedKind === 'building'"
+            variant="tonal"
+            prepend-icon="mdi-link-variant"
+            @click="bindSelectedBuilding"
+          >
+            Привязка к адресу
+          </v-btn>
+          <v-btn
+            v-if="selected && hasCoordinates(selected)"
+            color="primary"
+            variant="tonal"
+            prepend-icon="mdi-crosshairs-gps"
+            @click="locate(selected, selectedKind)"
+          >
+            На карте
+          </v-btn>
+          <v-btn
+            variant="text"
+            @click="detailsVisible = false"
+          >
+            Закрыть
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { formatApiError } from '~/utils/apiError'
-import { computed, defineComponent, h, ref } from 'vue'
-import { useMobile } from '~/composables/useMobile'
 import AlsekoReconciliationPanel from '~/components/AlsekoReconciliationPanel.vue'
-import { fastApiService, type AlsekoBuildingDetails, type AlsekoBuildingSummary, type AlsekoLoadDetails, type AlsekoLoadSummary, type AlsekoLookups } from '~/services/fastApiService'
+import AppSelect from '~/components/AppSelect.vue'
+import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
+import HintTip from '~/components/HintTip.vue'
+import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
+import KpiTile from '~/components/KpiTile.vue'
+import SearchField from '~/components/SearchField.vue'
+import SegmentedToggle from '~/components/SegmentedToggle.vue'
+import StateView from '~/components/StateView.vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { useMobile } from '~/composables/useMobile'
+import { useNotificationStore } from '~/stores/notificationStore'
+import { formatApiError } from '~/utils/apiError'
+import { hasLonLat } from '~/utils/journalFields'
+import {
+  fastApiService,
+  type AlsekoBuildingDetails,
+  type AlsekoBuildingSummary,
+  type AlsekoLoadDetails,
+  type AlsekoLoadSummary,
+  type AlsekoLookups
+} from '~/services/fastApiService'
 
+/**
+ * АЛСЕКО — договорные нагрузки (docs/ui-modernization-progress.md, этап 5): три режима на `SegmentedToggle`
+ * (договорные объекты, здания без потребителя, сверка и привязка), `DataTable` с серверной пагинацией, плитки
+ * из справочника (плитка — фильтр), `SearchField` / `AppSelect`, `StateView`. Карточка объекта или здания —
+ * `JournalDetailFields` только для чтения с перекрёстными ссылками «здания по адресу» / «договоры по адресу».
+ * Правки здесь нет: привязка живёт в панели сверки (предпросмотр → применить).
+ */
 export interface AlsekoJournalScope { loadId?: number; buildingId?: number }
 
-const DetailGrid = defineComponent({
-  props: { title: { type: String, required: true }, items: { type: Array as () => Array<[string, unknown]>, required: true } },
-  setup: props => () => h('section', { class: 'mb-5' }, [h('div', { class: 'text-subtitle-1 font-weight-bold mb-2' }, props.title), h('div', { class: 'detail-grid' }, props.items.map(([label, value]) => h('div', { class: 'detail-cell' }, [h('div', { class: 'detail-label' }, label), h('div', {}, formatValue(value))])))])
-})
+type AlsekoMode = 'loads' | 'buildings' | 'reconciliation'
+type AlsekoKind = 'load' | 'building'
 
-const RelationTable = defineComponent({
-  props: { title: { type: String, required: true }, rows: { type: Array as () => object[], required: true } },
-  emits: ['open'],
-  setup: (props, { emit }) => () => props.rows.length ? h('section', { class: 'mb-5' }, [h('div', { class: 'text-subtitle-1 font-weight-bold mb-2' }, `${props.title} (${props.rows.length})`), h('div', { class: 'relation-list' }, props.rows.map(item => { const row = item as Record<string, unknown>; return h('button', { type: 'button', class: 'relation-row', onClick: () => emit('open', row) }, [h('strong', {}, `ID ${row.id}`), h('span', {}, String(row.customer_type || row.consumer || [row.microdistrict, row.street, row.house].filter(Boolean).join(', ') || 'без наименования')), h('span', { class: 'subtle' }, String(row.contract_number || row.registry_number || ''))]) }))]) : null
-})
-
-const emit = defineEmits<{ 'locate-alseko': [payload: { longitude: number; latitude: number; id: number; kind: 'load' | 'building'; label: string }] }>()
+const emit = defineEmits<{
+  'locate-alseko': [payload: { longitude: number; latitude: number; id: number; kind: AlsekoKind; label: string }]
+}>()
 const { isMobile } = useMobile()
-const visible = ref(false), detailsVisible = ref(false), loading = ref(false), detailsLoading = ref(false)
-const error = ref(''), mode = ref<'loads' | 'buildings' | 'reconciliation'>('loads'), page = ref(1), pages = ref(0), total = ref(0)
-const loadItems = ref<AlsekoLoadSummary[]>([]), buildingItems = ref<AlsekoBuildingSummary[]>([])
-const items = computed(() => mode.value === 'loads' ? loadItems.value : buildingItems.value)
-const selected = ref<AlsekoLoadDetails | AlsekoBuildingDetails | null>(null), selectedKind = ref<'load' | 'building'>('load')
-const selectedLoad = computed(() => selectedKind.value === 'load' ? selected.value as AlsekoLoadDetails | null : null)
-const selectedBuilding = computed(() => selectedKind.value === 'building' ? selected.value as AlsekoBuildingDetails | null : null)
-const lookups = ref<AlsekoLookups>({ operation_districts: [], administrative_districts: [], heat_sources: [], temperature_graphs: [], counts: [] })
-const counts = computed(() => lookups.value.counts[0] || null)
-const filters = ref({ search: '', match_status: undefined as 'matched' | 'unmatched' | undefined, customer_group: undefined as 'apartment' | 'other' | undefined, operation_district: '', administrative_district: '', heat_source: '', temperature_graph: '', building_id: undefined as number | undefined })
+const notifications = useNotificationStore()
+const visible = ref(false)
+const mode = ref<AlsekoMode>('loads')
+const modeItems = [
+  { value: 'loads', label: 'Договорные объекты', icon: 'mdi-file-document-outline' },
+  { value: 'buildings', label: 'Здания без потребителя', icon: 'mdi-office-building-outline' },
+  { value: 'reconciliation', label: 'Сверка и привязка', icon: 'mdi-compare-horizontal' }
+]
+const modeTitle = computed(() => modeItems.find(item => item.value === mode.value)?.label || '')
+
+const loading = ref(false)
+const error = ref('')
+const loadItems = ref<AlsekoLoadSummary[]>([])
+const buildingItems = ref<AlsekoBuildingSummary[]>([])
+const items = computed(() => (mode.value === 'loads' ? loadItems.value : buildingItems.value))
+const total = ref(0)
+const pages = ref(0)
+const page = ref(1)
+const pageSize = 50
+const search = ref('')
+const matchStatus = ref<'matched' | 'unmatched' | undefined>()
+const customerGroup = ref<'apartment' | 'other' | undefined>()
+const operationDistrict = ref<string | undefined>()
+const administrativeDistrict = ref<string | undefined>()
+const heatSource = ref<string | undefined>()
+const temperatureGraph = ref<string | undefined>()
+const scope = reactive<AlsekoJournalScope>({})
+const lookups = reactive<AlsekoLookups>({ operation_districts: [], administrative_districts: [], heat_sources: [], temperature_graphs: [], counts: [] })
+let lookupsLoaded = false
+const counts = computed(() => (lookups.counts[0] as Record<string, number> | undefined) || null)
 const matchStatuses = [{ title: 'Найдено', value: 'matched' }, { title: 'Не найдено', value: 'unmatched' }]
 const customerGroups = [{ title: 'МЖД', value: 'apartment' }, { title: 'Прочие', value: 'other' }]
 
-const loadRelations = computed(() => selectedKind.value === 'load' ? (selected.value as AlsekoLoadDetails)?.relations || { matched_buildings: [], address_loads: [] } : { matched_buildings: [], address_loads: [] })
-const buildingRelations = computed(() => selectedKind.value === 'building' ? (selected.value as AlsekoBuildingDetails)?.relations || { matched_loads: [] } : { matched_loads: [] })
-const loadMainDetails = computed<Array<[string, unknown]>>(() => selectedLoad.value ? [['Адрес', displayAddress(selectedLoad.value)], ['Адрес источника', selectedLoad.value.source_address], ['Вид объекта', selectedLoad.value.customer_type], ['Владелец', selectedLoad.value.owner], ['Договор', selectedLoad.value.contract_number], ['Номер в реестре', selectedLoad.value.registry_number], ['Совпавших зданий', selectedLoad.value.building_match_count], ['Назначенных зданий', selectedLoad.value.assigned_building_count]] : [])
-const loadBreakdown = computed<Array<[string, unknown]>>(() => selectedLoad.value ? [['Отопление', loadValue(selectedLoad.value.heating_load)], ['ГВС', loadValue(selectedLoad.value.hot_water_load)], ['Вентиляция', loadValue(selectedLoad.value.ventilation_load)], ['Пар', loadValue(selectedLoad.value.steam_load)], ['Всего', loadValue(selectedLoad.value.total_load)]] : [])
-const loadNetworkDetails = computed<Array<[string, unknown]>>(() => selectedLoad.value ? [['Административный район', selectedLoad.value.administrative_district], ['Район эксплуатации', selectedLoad.value.operation_district], ['Участок', selectedLoad.value.operation_site], ['Источник', selectedLoad.value.heat_source], ['Температурный график', selectedLoad.value.temperature_graph]] : [])
-const buildingMainDetails = computed<Array<[string, unknown]>>(() => selectedBuilding.value ? [['Адрес', displayAddress(selectedBuilding.value)], ['Потребитель', selectedBuilding.value.consumer], ['Этажность', selectedBuilding.value.floor], ['Год постройки', selectedBuilding.value.construction_year], ['Схема отопления', selectedBuilding.value.heating_scheme_id], ['Схема ГВС', selectedBuilding.value.hot_water_scheme_id]] : [])
-const buildingBreakdown = computed<Array<[string, unknown]>>(() => selectedBuilding.value ? [['Отопление', gcalValue(selectedBuilding.value.heating_load)], ['ГВС', gcalValue(selectedBuilding.value.hot_water_load)], ['Вентиляция', gcalValue(selectedBuilding.value.ventilation_load)], ['Пар', gcalValue(selectedBuilding.value.steam_load)], ['Всего', gcalValue(selectedBuilding.value.total_load)]] : [])
-
-function formatValue(value: unknown) { return value === null || value === undefined || value === '' ? '—' : String(value) }
-// nagruzki (договоры АЛСЕКО) — ккал/ч, zdaniya_2 (здания) — Гкал/ч (сверка делит nagruzki на 1e6)
-function gcalValue(value: unknown) { return value === null || value === undefined || value === '' ? '—' : Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 4 }) }
-function loadValue(value: unknown) { return value === null || value === undefined || value === '' ? '—' : Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) }
-function displayAddress(item: object) { const row = item as Record<string, unknown>; return [row.microdistrict, row.street, row.house].filter(Boolean).join(', ') || String(row.source_address || '—') }
-function hasCoordinates(item: object) { const row = item as Record<string, unknown>; return Number.isFinite(Number(row.longitude)) && Number.isFinite(Number(row.latitude)) }
-
-async function loadLookups() { if (!lookups.value.counts.length) lookups.value = await fastApiService.getAlsekoLookups() }
+const detailsVisible = ref(false)
+const detailsLoading = ref(false)
+const detailsError = ref('')
+const selected = ref<AlsekoLoadDetails | AlsekoBuildingDetails | null>(null)
+const selectedKind = ref<AlsekoKind>('load')
 const bindBuildingId = ref<number | null>(null)
-function bindSelectedBuilding() { if (!selected.value) return; bindBuildingId.value = Number(selected.value.id); detailsVisible.value = false; mode.value = 'reconciliation' }
-async function loadItemsPage() {
+
+/** Карточка только для чтения: `JournalDetailFields` без правки */
+const EMPTY_MODEL: Record<string, never> = {}
+const notEditable = () => false
+
+const filtersActive = computed(() => Boolean(
+  search.value.trim() || (mode.value === 'loads' && (
+    matchStatus.value || customerGroup.value || operationDistrict.value || administrativeDistrict.value || heatSource.value || temperatureGraph.value
+  ))
+))
+
+const loadColumns: DataTableColumn[] = [
+  { key: 'id', title: 'ID', type: 'number', width: 90, sortable: false },
+  { key: 'address', title: 'Адрес', sortable: false },
+  { key: 'customer_type', title: 'Объект', width: 200, sortable: false },
+  { key: 'contract_number', title: 'Договор / реестр', width: 150, sortable: false },
+  { key: 'operation_district', title: 'Район', width: 130, sortable: false },
+  { key: 'heat_source', title: 'Источник', width: 130, sortable: false },
+  { key: 'heating_load', title: 'Отопление, ккал/ч', type: 'number', width: 140, sortable: false },
+  { key: 'hot_water_load', title: 'ГВС, ккал/ч', type: 'number', width: 120, sortable: false },
+  { key: 'ventilation_load', title: 'Вентиляция, ккал/ч', type: 'number', width: 150, sortable: false },
+  { key: 'steam_load', title: 'Пар, ккал/ч', type: 'number', width: 120, sortable: false },
+  { key: 'building_match_count', title: 'Здания', type: 'number', width: 90, sortable: false },
+]
+const buildingColumns: DataTableColumn[] = [
+  { key: 'id', title: 'ID', type: 'number', width: 90, sortable: false },
+  { key: 'address', title: 'Адрес', sortable: false },
+  { key: 'heating_load', title: 'Отопление, Гкал/ч', type: 'number', width: 150, sortable: false },
+  { key: 'hot_water_load', title: 'ГВС, Гкал/ч', type: 'number', width: 130, sortable: false },
+  { key: 'ventilation_load', title: 'Вентиляция, Гкал/ч', type: 'number', width: 160, sortable: false },
+  { key: 'steam_load', title: 'Пар, Гкал/ч', type: 'number', width: 130, sortable: false },
+  { key: 'heating_scheme_id', title: 'Схема отопления', type: 'number', width: 140, sortable: false },
+  { key: 'hot_water_scheme_id', title: 'Схема ГВС', type: 'number', width: 110, sortable: false },
+  { key: 'actions', title: '', type: 'actions', width: 56, sortable: false },
+]
+
+// nagruzki (договоры АЛСЕКО) — ккал/ч, zdaniya_2 (здания) — Гкал/ч (сверка делит nagruzki на 1e6)
+const gcalValue = (value: unknown) =>
+  value === null || value === undefined || value === '' ? '—' : Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 4 })
+const loadValue = (value: unknown) =>
+  value === null || value === undefined || value === '' ? '—' : Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 2 })
+const displayAddress = (row: Record<string, unknown>) =>
+  [row.microdistrict, row.street, row.house].filter(Boolean).join(', ') || String(row.source_address || '—')
+const hasCoordinates = (row: Record<string, unknown>) => hasLonLat(row)
+const relationTitle = (row: Record<string, unknown>) =>
+  String(row.customer_type || row.consumer || [row.microdistrict, row.street, row.house].filter(Boolean).join(', ') || 'без наименования')
+
+/** Поля карточки: только заполненные, тип всегда text (правки нет) */
+const buildFields = (entries: Array<[string, unknown]>): JournalDetailField[] => entries
+  .filter(([, value]) => value !== null && value !== undefined && value !== '' && value !== '—')
+  .map(([label, value]) => ({ label, value: String(value), rawValue: value, type: 'text' }))
+
+const detailGroups = computed((): JournalDetailGroup[] => {
+  const item = selected.value as Record<string, unknown> | null
+  if (!item) return []
+  if (selectedKind.value === 'load') {
+    return [
+      { title: 'Договорный объект', fields: buildFields([
+        ['Адрес', displayAddress(item)], ['Адрес источника', item.source_address], ['Вид объекта', item.customer_type],
+        ['Владелец', item.owner], ['Договор', item.contract_number], ['Номер в реестре', item.registry_number],
+        ['Совпавших зданий', item.building_match_count], ['Назначенных зданий', item.assigned_building_count]
+      ]) },
+      { title: 'Нагрузки, ккал/ч', fields: buildFields([
+        ['Отопление', loadValue(item.heating_load)], ['ГВС', loadValue(item.hot_water_load)], ['Вентиляция', loadValue(item.ventilation_load)],
+        ['Пар', loadValue(item.steam_load)], ['Всего', loadValue(item.total_load)]
+      ]) },
+      { title: 'Эксплуатационная привязка', fields: buildFields([
+        ['Административный район', item.administrative_district], ['Район эксплуатации', item.operation_district],
+        ['Участок', item.operation_site], ['Источник', item.heat_source], ['Температурный график', item.temperature_graph]
+      ]) }
+    ].filter(group => group.fields.length)
+  }
+  return [
+    { title: 'Здание', fields: buildFields([
+      ['Адрес', displayAddress(item)], ['Потребитель', item.consumer], ['Этажность', item.floor], ['Год постройки', item.construction_year],
+      ['Схема отопления', item.heating_scheme_id], ['Схема ГВС', item.hot_water_scheme_id]
+    ]) },
+    { title: 'Нагрузки, Гкал/ч', fields: buildFields([
+      ['Отопление', gcalValue(item.heating_load)], ['ГВС', gcalValue(item.hot_water_load)], ['Вентиляция', gcalValue(item.ventilation_load)],
+      ['Пар', gcalValue(item.steam_load)], ['Всего', gcalValue(item.total_load)]
+    ]) }
+  ].filter(group => group.fields.length)
+})
+
+/** Перекрёстные ссылки карточки: здания по адресу договора, договоры по адресу здания */
+const relationPanels = computed(() => {
+  const relations = (selected.value?.relations || {}) as Record<string, Array<Record<string, unknown>>>
+  const base = detailGroups.value.length
+  const panels = selectedKind.value === 'load'
+    ? [
+      { title: 'Здания по адресу', kind: 'building' as AlsekoKind, rows: relations.matched_buildings || [] },
+      { title: 'Договоры по этому адресу', kind: 'load' as AlsekoKind, rows: relations.address_loads || [] }
+    ]
+    : [{ title: 'Договорные объекты по адресу', kind: 'load' as AlsekoKind, rows: relations.matched_loads || [] }]
+  return panels.filter(panel => panel.rows.length).map((panel, index) => ({ ...panel, panelIndex: base + index }))
+})
+
+const loadLookups = async () => {
+  if (lookupsLoaded) return
+  Object.assign(lookups, await fastApiService.getAlsekoLookups())
+  lookupsLoaded = true
+}
+
+/** Номер последнего запроса списка: ответ более раннего запроса не перекрывает поздний */
+let listRequest = 0
+const loadItemsPage = async () => {
   if (mode.value === 'reconciliation') return
-  loading.value = true; error.value = ''
+  const request = ++listRequest
+  loading.value = true
+  error.value = ''
   try {
     if (mode.value === 'loads') {
-      const response = await fastApiService.getAlsekoLoads({ page: page.value, page_size: 50, ...filters.value })
-      loadItems.value = response.items; total.value = response.total; pages.value = response.pages
+      const response = await fastApiService.getAlsekoLoads({
+        page: page.value, page_size: pageSize, search: search.value.trim() || undefined,
+        match_status: matchStatus.value, customer_group: customerGroup.value, operation_district: operationDistrict.value,
+        administrative_district: administrativeDistrict.value, heat_source: heatSource.value, temperature_graph: temperatureGraph.value,
+        building_id: scope.buildingId
+      })
+      if (request !== listRequest) return
+      loadItems.value = response.items
+      total.value = response.total
+      pages.value = response.pages
     } else {
-      const response = await fastApiService.getUnassignedAlsekoBuildings({ page: page.value, page_size: 50, search: filters.value.search })
-      buildingItems.value = response.items; total.value = response.total; pages.value = response.pages
+      const response = await fastApiService.getUnassignedAlsekoBuildings({ page: page.value, page_size: pageSize, search: search.value.trim() || undefined })
+      if (request !== listRequest) return
+      buildingItems.value = response.items
+      total.value = response.total
+      pages.value = response.pages
     }
-  } catch (cause) { error.value = formatApiError(cause, 'Не удалось загрузить АЛСЕКО') } finally { loading.value = false }
+  } catch (loadError: any) {
+    if (request !== listRequest) return
+    error.value = formatApiError(loadError, 'Не удалось загрузить АЛСЕКО')
+  } finally {
+    if (request === listRequest) loading.value = false
+  }
 }
-async function reload() { page.value = 1; await loadItemsPage() }
-async function changeMode() { page.value = 1; await loadItemsPage() }
-async function resetFilters() { filters.value = { search: '', match_status: undefined, customer_group: undefined, operation_district: '', administrative_district: '', heat_source: '', temperature_graph: '', building_id: undefined }; await reload() }
-async function openLoad(id: number) { detailsLoading.value = true; detailsVisible.value = true; selectedKind.value = 'load'; try { selected.value = await fastApiService.getAlsekoLoad(id) } finally { detailsLoading.value = false } }
-async function openBuilding(id: number) { detailsLoading.value = true; detailsVisible.value = true; selectedKind.value = 'building'; try { selected.value = await fastApiService.getAlsekoBuilding(id) } finally { detailsLoading.value = false } }
-function openRelatedLoad(row: Record<string, unknown>) { if (Number(row.id)) void openLoad(Number(row.id)) }
-function openRelatedBuilding(row: Record<string, unknown>) { if (Number(row.id)) void openBuilding(Number(row.id)) }
-function locateSelected() { if (!selected.value || !hasCoordinates(selected.value)) return; emit('locate-alseko', { longitude: Number(selected.value.longitude), latitude: Number(selected.value.latitude), id: selected.value.id, kind: selectedKind.value, label: `${selectedKind.value === 'load' ? 'АЛСЕКО' : 'Здание АЛСЕКО'} ${selected.value.id}` }); visible.value = false; detailsVisible.value = false }
 
-async function openDialog(scope: AlsekoJournalScope = {}) {
-  visible.value = true; await loadLookups()
-  if (scope.buildingId) { mode.value = 'buildings'; await loadItemsPage(); await openBuilding(scope.buildingId); return }
-  mode.value = 'loads'; filters.value.building_id = scope.buildingId; await loadItemsPage()
-  if (scope.loadId) await openLoad(scope.loadId)
+watch([matchStatus, customerGroup, operationDistrict, administrativeDistrict, heatSource, temperatureGraph], () => {
+  if (!visible.value || mode.value !== 'loads') return
+  page.value = 1
+  void loadItemsPage()
+})
+watch(page, () => { if (visible.value) void loadItemsPage() })
+watch(mode, () => {
+  if (!visible.value) return
+  page.value = 1
+  void loadItemsPage()
+})
+
+const onSearch = () => {
+  if (!visible.value) return
+  page.value = 1
+  void loadItemsPage()
+}
+const toggleFilter = (key: 'matchStatus' | 'customerGroup', value: string) => {
+  if (key === 'matchStatus') matchStatus.value = matchStatus.value === value ? undefined : value as 'matched' | 'unmatched'
+  else customerGroup.value = customerGroup.value === value ? undefined : value as 'apartment' | 'other'
+}
+const resetFilters = () => {
+  search.value = ''
+  matchStatus.value = undefined
+  customerGroup.value = undefined
+  operationDistrict.value = undefined
+  administrativeDistrict.value = undefined
+  heatSource.value = undefined
+  temperatureGraph.value = undefined
+  page.value = 1
+  void loadItemsPage()
+}
+const clearScope = () => {
+  scope.buildingId = undefined
+  page.value = 1
+  void loadItemsPage()
+}
+
+/** Номер последнего запроса карточки: ответ более раннего запроса не перекрывает поздний */
+let detailsRequest = 0
+const openRecord = async (kind: AlsekoKind, id: number) => {
+  const request = ++detailsRequest
+  selectedKind.value = kind
+  detailsVisible.value = true
+  detailsLoading.value = true
+  detailsError.value = ''
+  selected.value = null
+  try {
+    const record = kind === 'load' ? await fastApiService.getAlsekoLoad(id) : await fastApiService.getAlsekoBuilding(id)
+    if (request !== detailsRequest) return
+    selected.value = record
+  } catch (loadError: any) {
+    if (request !== detailsRequest) return
+    detailsError.value = formatApiError(loadError, kind === 'load' ? 'Не удалось открыть объект АЛСЕКО' : 'Не удалось открыть здание АЛСЕКО')
+  } finally {
+    if (request === detailsRequest) detailsLoading.value = false
+  }
+}
+const openLoad = (id: number) => openRecord('load', id)
+const openBuilding = (id: number) => openRecord('building', id)
+
+const bindSelectedBuilding = () => {
+  if (!selected.value) return
+  bindBuildingId.value = Number(selected.value.id)
+  detailsVisible.value = false
+  mode.value = 'reconciliation'
+}
+
+const locate = (row: Record<string, unknown>, kind: AlsekoKind) => {
+  emit('locate-alseko', {
+    longitude: Number(row.longitude), latitude: Number(row.latitude), id: Number(row.id), kind,
+    label: `${kind === 'load' ? 'АЛСЕКО' : 'Здание АЛСЕКО'} ${row.id}`
+  })
+  detailsVisible.value = false
+  visible.value = false
+}
+
+const openDialog = async (nextScope: AlsekoJournalScope = {}) => {
+  Object.assign(scope, { loadId: undefined, buildingId: undefined }, nextScope)
+  page.value = 1
+  visible.value = true
+  // mode через watch перезагрузил бы список — ставим режим до загрузки и грузим один раз сами
+  const nextMode: AlsekoMode = nextScope.buildingId ? 'buildings' : 'loads'
+  const modeChanged = mode.value !== nextMode
+  mode.value = nextMode
+  // список сам показывает свою ошибку; сбой справочника не должен прятать список
+  const [lookupsResult] = await Promise.allSettled([loadLookups(), modeChanged ? Promise.resolve() : loadItemsPage()])
+  if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — плитки и фильтры могут быть неполными'))
+  if (nextScope.buildingId) await openBuilding(nextScope.buildingId)
+  else if (nextScope.loadId) await openLoad(nextScope.loadId)
 }
 defineExpose({ openDialog })
 </script>
 
 <style scoped>
 .alseko-journal { height: min(92vh, 940px); display: flex; flex-direction: column; }
-.alseko-filters { flex-shrink: 0; background: #fafafa; }
+.alseko-kpi { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.alseko-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
 .alseko-table-wrap { min-height: 300px; overflow: auto; flex: 1; }
-.alseko-table { width: 100%; min-width: 1450px; border-collapse: collapse; font-size: .82rem; }
-.building-table { min-width: 1080px; }
-.alseko-table th { position: sticky; top: 0; z-index: 1; background: #e8eaf6; color: #3949ab; text-align: left; padding: 10px 12px; }
-.alseko-table td { padding: 9px 12px; border-bottom: 1px solid #eceff1; vertical-align: top; }
-.alseko-table tbody tr { cursor: pointer; }.alseko-table tbody tr:hover { background: #e8eaf6; }
-.subtle { color: #78909c; font-size: .76rem; margin-top: 2px; }
-.alseko-empty { min-height: 330px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-:deep(.detail-grid) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: #e0e0e0; border: 1px solid #e0e0e0; }
-:deep(.detail-cell) { background: white; padding: 10px 12px; overflow-wrap: anywhere; }
-:deep(.detail-label) { color: #607d8b; font-size: .75rem; margin-bottom: 2px; }
-:deep(.relation-list) { border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; }
-:deep(.relation-row) { width: 100%; border: 0; border-bottom: 1px solid #eceff1; background: white; display: grid; grid-template-columns: 90px 1fr 220px; gap: 12px; padding: 10px 12px; text-align: left; cursor: pointer; }
-:deep(.relation-row:hover) { background: #e8eaf6; }
-@media (max-width: 600px) { .alseko-journal { height: 100dvh; } :deep(.detail-grid) { grid-template-columns: 1fr; } :deep(.relation-row) { grid-template-columns: 70px 1fr; } }
+.alseko-table { min-width: 1500px; }
+.alseko-table--buildings { min-width: 1100px; }
+@media (max-width: 600px) { .alseko-journal { height: 100dvh; } }
 </style>
