@@ -363,6 +363,7 @@
 
     <v-dialog
       v-model="detailsVisible"
+      :persistent="saving"
       :fullscreen="isMobile"
       max-width="1040"
       scrollable
@@ -442,7 +443,7 @@
                 :editable="editable"
                 :is-field-dirty="isFieldDirty"
                 :required-keys="['name']"
-                @update:model="editFields = $event"
+                @update:field="setEditField"
               >
                 <template v-if="!isEditing">
                   <v-expansion-panel
@@ -658,6 +659,7 @@ import StateView from '~/components/StateView.vue'
 import { hasLonLat } from '~/utils/journalFields'
 import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
+import { useNotificationStore } from '~/stores/notificationStore'
 import { computed, reactive, ref, watch } from 'vue'
 import { useJournalEdit } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
@@ -702,7 +704,7 @@ const exportingWord = ref(false)
 const scopeTitle = computed(() => scope.lineId ? `опрессовки трубопровода ${scope.lineId}` : scope.nodeId ? `опрессовки у узла ${scope.nodeId}` : 'вся тепловая сеть')
 const filtersActive = computed(() => Boolean(
   search.value.trim() || stateId.value || testTypeId.value || heatSourceId.value || responsibleId.value
-  || approved.value !== undefined || dateFrom.value || dateTo.value,
+  || approved.value != null || dateFrom.value || dateTo.value,
 ))
 
 const tableColumns: DataTableColumn[] = [
@@ -750,17 +752,21 @@ const nodeRange = (line: Record<string, unknown>) => [line.start_node_name, line
 const lineSummary = (line: Record<string, unknown>) => [line.diameter && `DN ${line.diameter}`, line.length && `длина ${line.length} м`, line.tubing_type_name].filter(Boolean).join(' · ') || 'Параметры участка не заполнены'
 
 const loadLookups = async () => { if (!lookups.states.length) Object.assign(lookups, await fastApiService.getPressureTestLookups()) }
+/** Номер последнего запроса списка */
+let listRequest = 0
 const loadTests = async () => {
+  const request = ++listRequest
   loading.value = true; error.value = ''
   try {
     const response = await fastApiService.getPressureTests({ page: page.value, page_size: pageSize, state_id: stateId.value,
       test_type_id: testTypeId.value, heat_source_id: heatSourceId.value, responsible_id: responsibleId.value,
       approved: approved.value, date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined,
       line_id: scope.lineId, node_id: scope.nodeId, search: search.value.trim() || undefined })
+    if (request !== listRequest) return
     items.value = response.items; total.value = response.total; pages.value = response.pages
     stateCounts.value = Array.isArray(response.state_counts) ? response.state_counts : null
-  } catch (loadError: any) { error.value = loadError?.data?.detail || loadError?.message || 'Не удалось загрузить журнал опрессовок' }
-  finally { loading.value = false }
+  } catch (loadError: any) { if (request !== listRequest) return; error.value = loadError?.data?.detail || loadError?.message || 'Не удалось загрузить журнал опрессовок' }
+  finally { if (request === listRequest) loading.value = false }
 }
 /** Текст после паузы ввода (SearchField) */
 const onSearch = () => {
@@ -768,17 +774,25 @@ const onSearch = () => {
   page.value = 1
   void loadTests()
 }
+/** Номер последнего запроса карточки: ответ более раннего запроса не перекрывает поздний */
+let detailsRequest = 0
 const openDetails = async (id: number) => {
+  // открытие другой записи во время правки — черновик текущей остаётся, карточка на просмотр
+  closeKeepingDraft(); resetEdit()
+  const request = ++detailsRequest
   detailsVisible.value = true; detailsLoading.value = true; detailsError.value = ''; selected.value = null
-  try { selected.value = await fastApiService.getPressureTest(id) }
-  catch (loadError: any) { detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку опрессовки' }
-  finally { detailsLoading.value = false }
+  try { const record = await fastApiService.getPressureTest(id); if (request !== detailsRequest) return; selected.value = record }
+  catch (loadError: any) { if (request !== detailsRequest) return; detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку опрессовки' }
+  finally { if (request === detailsRequest) detailsLoading.value = false }
 }
+const notifications = useNotificationStore()
 const openDialog = async (nextScope: PressureTestJournalScope = {}) => {
   Object.assign(scope, { lineId: undefined, nodeId: undefined, testId: undefined }, nextScope)
   page.value = 1; visible.value = true
-  try { await Promise.all([loadLookups(), loadTests(), recordForm.loadSchema()]); if (nextScope.testId) await openDetails(nextScope.testId) }
-  catch (loadError: any) { error.value = loadError?.message || 'Не удалось открыть журнал опрессовок' }
+  // список и схема сами показывают свои ошибки; сбой справочников не должен прятать список
+  const [lookupsResult] = await Promise.allSettled([loadLookups(), loadTests(), recordForm.loadSchema()])
+  if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — фильтры и выбор значений могут быть неполными'))
+  if (nextScope.testId) await openDetails(nextScope.testId)
 }
 const clearScope = () => { scope.lineId = undefined; scope.nodeId = undefined; page.value = 1; void loadTests() }
 const resetFilters = () => {
@@ -845,15 +859,15 @@ const documents = computed(() => selected.value?.relations?.documents || [])
 const recordForm = useJournalRecordForm('pressure-tests')
 const batchApprovalRef = ref<{ open: () => Promise<void> } | null>(null)
 const {
-  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable,
-  beginCreate, beginEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
+  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable, setEditField,
+  beginCreate, beginEdit, resetEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
 } = useJournalEdit('pressure-tests', recordForm, selected)
 
 const startEdit = () => beginEdit()
 
 const cancelEdit = async () => {
-  if (!(await cancel())) return
-  if (isNew.value) detailsVisible.value = false
+  const { closed, wasNew } = await cancel()
+  if (closed && wasNew) detailsVisible.value = false
 }
 
 // Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
@@ -863,8 +877,7 @@ watch(detailsVisible, (open) => {
 
 const createPressureTest = async () => {
   creating.value = true
-  await loadLookups()
-  creating.value = false
+  try { await loadLookups() } finally { creating.value = false }
   selected.value = null
   detailsError.value = ''
   detailsVisible.value = true
@@ -904,8 +917,14 @@ const deletePressureTest = async (id: number) => {
 }
 
 const refreshSelected = async () => {
-  if (!selected.value) return
-  try { selected.value = await fastApiService.getPressureTest(selected.value.id) } catch { /* остаётся прежняя */ }
+  const id = selected.value?.id
+  if (!id) return
+  try {
+    const record = await fastApiService.getPressureTest(id)
+    if (selected.value?.id === id) selected.value = record
+  } catch (e: any) {
+    notifications.showWarning(formatApiError(e, 'Карточка не обновилась — показаны прежние данные'))
+  }
   void loadTests()
 }
 

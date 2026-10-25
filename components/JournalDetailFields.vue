@@ -19,7 +19,7 @@
             :readonly="!editable(field.key)"
             :dirty="editable(field.key) && isFieldDirty(field.key)"
             :span="field.type === 'textarea'"
-            :required="Boolean(field.key) && requiredKeys.includes(field.key!)"
+            :required="editable(field.key) && requiredKeys.includes(field.key!)"
             :units="field.units"
             :hint="field.hint"
           >
@@ -115,7 +115,7 @@ export interface JournalDetailGroup {
  */
 const props = withDefaults(defineProps<{
   groups: readonly JournalDetailGroup[];
-  /** Значения формы (в правке); читается по ключу поля */
+  /** Значения формы (в правке); читается по ключу поля, меняется родителем по `update:field` */
   model: Record<string, any>;
   editable: (key?: string | null) => boolean;
   isFieldDirty: (key?: string | null) => boolean;
@@ -129,10 +129,11 @@ const props = withDefaults(defineProps<{
   minWidth: 220,
 });
 
-const emit = defineEmits<{ 'update:model': [value: Record<string, any>] }>();
+/** Одно поле изменилось: родитель сам обновляет свою модель (несколько событий в одном тике не теряются) */
+const emit = defineEmits<{ 'update:field': [key: string, value: unknown] }>();
 
 const setField = (key: string, value: unknown) => {
-  emit('update:model', { ...props.model, [key]: value });
+  emit('update:field', key, value);
 };
 
 const openPanels = computed(() => [...props.openPanels]);

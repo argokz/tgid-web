@@ -367,6 +367,7 @@
 
     <v-dialog
       v-model="detailsVisible"
+      :persistent="saving"
       :fullscreen="isMobile"
       max-width="1040"
       scrollable
@@ -451,7 +452,7 @@
                 :editable="editable"
                 :is-field-dirty="isFieldDirty"
                 :required-keys="['name']"
-                @update:model="editFields = $event"
+                @update:field="setEditField"
               >
                 <v-expansion-panel
                   v-if="repairLines.length && !isEditing"
@@ -659,6 +660,7 @@ import StateView from '~/components/StateView.vue'
 import { hasLonLat } from '~/utils/journalFields'
 import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
+import { useNotificationStore } from '~/stores/notificationStore'
 import { computed, reactive, ref, watch } from 'vue'
 import { useJournalEdit } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
@@ -722,7 +724,7 @@ const scopeTitle = computed(() => scope.lineId ? `ремонты трубопр�
   : scope.nodeId ? `ремонты прилегающих трубопроводов узла ${scope.nodeId}` : 'вся тепловая сеть')
 const filtersActive = computed(() => Boolean(
   search.value.trim() || stateId.value || repairTypeId.value || categoryId.value || responsibleId.value
-  || approved.value !== undefined || dateFrom.value || dateTo.value,
+  || approved.value != null || dateFrom.value || dateTo.value,
 ))
 
 const tableColumns: DataTableColumn[] = [
@@ -779,18 +781,23 @@ const loadLookups = async () => {
   if (lookups.states.length) return
   Object.assign(lookups, await fastApiService.getRepairLookups())
 }
+/** Номер последнего запроса списка */
+let listRequest = 0
 const loadRepairs = async () => {
+  const request = ++listRequest
   loading.value = true; error.value = ''
   try {
     const response = await fastApiService.getRepairs({ page: page.value, page_size: pageSize, state_id: stateId.value,
       repair_type_id: repairTypeId.value, category_id: categoryId.value, responsible_id: responsibleId.value,
       approved: approved.value, date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined,
       line_id: scope.lineId, node_id: scope.nodeId, search: search.value.trim() || undefined })
+    if (request !== listRequest) return
     items.value = response.items; total.value = response.total; pages.value = response.pages
     stateCounts.value = Array.isArray(response.state_counts) ? response.state_counts : null
   } catch (loadError: any) {
+    if (request !== listRequest) return
     error.value = loadError?.data?.detail || loadError?.message || 'Не удалось загрузить журнал ремонтов'
-  } finally { loading.value = false }
+  } finally { if (request === listRequest) loading.value = false }
 }
 /** Текст после паузы ввода (SearchField) */
 const onSearch = () => {
@@ -798,27 +805,33 @@ const onSearch = () => {
   page.value = 1
   void loadRepairs()
 }
+/** Номер последнего запроса карточки: ответ более раннего запроса не перекрывает поздний */
+let detailsRequest = 0
 const openDetails = async (id: number) => {
+  // открытие другой записи во время правки — черновик текущей остаётся, карточка на просмотр
+  closeKeepingDraft(); resetEdit()
+  const request = ++detailsRequest
   detailsVisible.value = true; detailsLoading.value = true; detailsError.value = ''; selected.value = null
-  try { selected.value = await fastApiService.getRepair(id) }
-  catch (loadError: any) { detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку ремонта' }
-  finally { detailsLoading.value = false }
+  try { const record = await fastApiService.getRepair(id); if (request !== detailsRequest) return; selected.value = record }
+  catch (loadError: any) { if (request !== detailsRequest) return; detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку ремонта' }
+  finally { if (request === detailsRequest) detailsLoading.value = false }
 }
+const notifications = useNotificationStore()
 const openDialog = async (nextScope: RepairJournalScope = {}) => {
   Object.assign(scope, { lineId: undefined, nodeId: undefined, repairId: undefined }, nextScope)
   page.value = 1; visible.value = true
-  try {
-    await Promise.all([loadLookups(), loadRepairs(), recordForm.loadSchema()])
-    if (nextScope.repairId) await openDetails(nextScope.repairId)
-  } catch (loadError: any) { error.value = loadError?.message || 'Не удалось открыть журнал ремонтов' }
+  // список и схема сами показывают свои ошибки; сбой справочников не должен прятать список
+  const [lookupsResult] = await Promise.allSettled([loadLookups(), loadRepairs(), recordForm.loadSchema()])
+  if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — фильтры и выбор значений могут быть неполными'))
+  if (nextScope.repairId) await openDetails(nextScope.repairId)
 }
 const clearScope = () => { scope.lineId = undefined; scope.nodeId = undefined; page.value = 1; void loadRepairs() }
 
 const recordForm = useJournalRecordForm('repairs')
 const batchApprovalRef = ref<{ open: () => Promise<void> } | null>(null)
 const {
-  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable,
-  beginCreate, beginEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
+  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable, setEditField,
+  beginCreate, beginEdit, resetEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
 } = useJournalEdit('repairs', recordForm, selected)
 const createMode = ref<'plan' | 'current'>('plan')
 const createModeItems: SegmentedToggleItem<'plan' | 'current'>[] = [
@@ -838,8 +851,8 @@ const createRepair = async () => {
 const startEdit = () => beginEdit()
 
 const cancelEdit = async () => {
-  if (!(await cancel())) return
-  if (isNew.value) detailsVisible.value = false
+  const { closed, wasNew } = await cancel()
+  if (closed && wasNew) detailsVisible.value = false
 }
 
 // Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
@@ -880,8 +893,14 @@ const deleteRepair = async (id: number) => {
 
 /** Перечитать карточку после утверждения/контура, не закрывая её */
 const refreshSelected = async () => {
-  if (!selected.value) return
-  try { selected.value = await fastApiService.getRepair(selected.value.id) } catch { /* карточка останется прежней */ }
+  const id = selected.value?.id
+  if (!id) return
+  try {
+    const record = await fastApiService.getRepair(id)
+    if (selected.value?.id === id) selected.value = record
+  } catch (e: any) {
+    notifications.showWarning(formatApiError(e, 'Карточка не обновилась — показаны прежние данные'))
+  }
   void loadRepairs()
 }
 

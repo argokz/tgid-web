@@ -324,6 +324,7 @@
 
     <v-dialog
       v-model="detailsVisible"
+      :persistent="saving"
       :fullscreen="isMobile"
       max-width="920"
       scrollable
@@ -400,7 +401,7 @@
                 :editable="editable"
                 :is-field-dirty="isFieldDirty"
                 :required-keys="['detected_at']"
-                @update:model="editFields = $event"
+                @update:field="setEditField"
               >
                 <v-expansion-panel
                   v-if="relationGroups.length && !isEditing"
@@ -524,6 +525,7 @@ import StateView from '~/components/StateView.vue'
 import { hasLonLat, localToday } from '~/utils/journalFields'
 import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
+import { useNotificationStore } from '~/stores/notificationStore'
 import { computed, reactive, ref, watch } from 'vue'
 import { useJournalEdit } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
@@ -660,7 +662,10 @@ const loadLookups = async () => {
   Object.assign(lookups, result)
 }
 
+/** Номер последнего запроса списка */
+let listRequest = 0
 const loadDefects = async () => {
+  const request = ++listRequest
   loading.value = true
   error.value = ''
   try {
@@ -676,14 +681,16 @@ const loadDefects = async () => {
       node_id: scope.nodeId,
       search: (search.value || '').trim() || undefined
     })
+    if (request !== listRequest) return
     items.value = result.items
     total.value = result.total
     pages.value = result.pages
     stateCounts.value = Array.isArray(result.state_counts) ? result.state_counts : null
   } catch (loadError: any) {
+    if (request !== listRequest) return
     error.value = loadError?.data?.detail || loadError?.message || 'Не удалось загрузить журнал нарушений'
   } finally {
-    loading.value = false
+    if (request === listRequest) loading.value = false
   }
 }
 
@@ -694,30 +701,38 @@ const onSearch = () => {
   void loadDefects()
 }
 
+/** Номер последнего запроса карточки: ответ более раннего запроса не перекрывает поздний */
+let detailsRequest = 0
 const openDetails = async (defectId: number) => {
+  // открытие другой записи во время правки — черновик текущей остаётся, карточка на просмотр
+  closeKeepingDraft()
+  resetEdit()
+  const request = ++detailsRequest
   detailsVisible.value = true
   detailsLoading.value = true
   detailsError.value = ''
   selected.value = null
   try {
-    selected.value = await fastApiService.getDefect(defectId)
+    const record = await fastApiService.getDefect(defectId)
+    if (request !== detailsRequest) return
+    selected.value = record
   } catch (loadError: any) {
+    if (request !== detailsRequest) return
     detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку нарушения'
   } finally {
-    detailsLoading.value = false
+    if (request === detailsRequest) detailsLoading.value = false
   }
 }
 
+const notifications = useNotificationStore()
 const openDialog = async (nextScope: DefectJournalScope = {}) => {
   Object.assign(scope, { lineId: undefined, nodeId: undefined, defectId: undefined }, nextScope)
   page.value = 1
   visible.value = true
-  try {
-    await Promise.all([loadLookups(), loadDefects(), recordForm.loadSchema()])
-    if (nextScope.defectId) await openDetails(nextScope.defectId)
-  } catch (loadError: any) {
-    error.value = loadError?.message || 'Не удалось открыть журнал нарушений'
-  }
+  // список и схема сами показывают свои ошибки; сбой справочников не должен прятать список
+  const [lookupsResult] = await Promise.allSettled([loadLookups(), loadDefects(), recordForm.loadSchema()])
+  if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — фильтры и выбор значений могут быть неполными'))
+  if (nextScope.defectId) await openDetails(nextScope.defectId)
 }
 
 const clearScope = () => {
@@ -730,8 +745,8 @@ const clearScope = () => {
 const recordForm = useJournalRecordForm('defects')
 // data_osmotra — timestamp ('2024-05-01T00:00:00'), поле type="date" его не показывает (QA F80)
 const {
-  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable,
-  beginCreate, beginEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
+  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable, setEditField,
+  beginCreate, beginEdit, resetEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
 } = useJournalEdit('defects', recordForm, selected, { dateKeys: ['detected_at', 'repair_started_on', 'repair_finished_on'] })
 
 const createDefect = async () => {
@@ -745,8 +760,8 @@ const createDefect = async () => {
 const startEdit = () => beginEdit()
 
 const cancelEdit = async () => {
-  if (!(await cancel())) return
-  if (isNew.value) detailsVisible.value = false
+  const { closed, wasNew } = await cancel()
+  if (closed && wasNew) detailsVisible.value = false
 }
 
 // Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
@@ -786,8 +801,14 @@ const deleteDefect = async (id: number) => {
 }
 
 const refreshSelected = async () => {
-  if (!selected.value) return
-  try { selected.value = await fastApiService.getDefect(selected.value.id) } catch { /* остаётся прежняя */ }
+  const id = selected.value?.id
+  if (!id) return
+  try {
+    const record = await fastApiService.getDefect(id)
+    if (selected.value?.id === id) selected.value = record
+  } catch (e: any) {
+    notifications.showWarning(formatApiError(e, 'Карточка не обновилась — показаны прежние данные'))
+  }
 }
 
 const resetFilters = () => {

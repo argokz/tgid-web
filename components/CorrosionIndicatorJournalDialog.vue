@@ -335,6 +335,7 @@
 
     <v-dialog
       v-model="detailsVisible"
+      :persistent="saving"
       :fullscreen="isMobile"
       max-width="980"
       scrollable
@@ -395,7 +396,7 @@
                 :model="editFields"
                 :editable="editable"
                 :is-field-dirty="isFieldDirty"
-                @update:model="editFields = $event"
+                @update:field="setEditField"
               >
                 <v-expansion-panel
                   v-if="history.length && !isEditing"
@@ -618,7 +619,10 @@ const buildFields = (entries: Array<[string, unknown, string?, string?, any[]?]>
 }
 
 const loadLookups = async () => { if (!lookups.phases.length) Object.assign(lookups, await fastApiService.getCorrosionIndicatorLookups()) }
+/** Номер последнего запроса списка */
+let listRequest = 0
 const loadIndicators = async () => {
+  const request = ++listRequest
   loading.value = true; error.value = ''
   try {
     const response = await fastApiService.getCorrosionIndicators({
@@ -627,11 +631,13 @@ const loadIndicators = async () => {
       season_year: seasonYear.value, date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined,
       line_id: scope.lineId, node_id: scope.nodeId, search: search.value.trim() || undefined
     })
+    if (request !== listRequest) return
     items.value = response.items; total.value = response.total; pages.value = response.pages
     stateCounts.value = Array.isArray(response.state_counts) ? response.state_counts : null
   } catch (loadError: any) {
+    if (request !== listRequest) return
     error.value = loadError?.data?.detail || loadError?.message || 'Не удалось загрузить журнал индикаторов коррозии'
-  } finally { loading.value = false }
+  } finally { if (request === listRequest) loading.value = false }
 }
 /** Текст после паузы ввода (SearchField) */
 const onSearch = () => {
@@ -639,20 +645,25 @@ const onSearch = () => {
   page.value = 1
   void loadIndicators()
 }
+/** Номер последнего запроса карточки: ответ более раннего запроса не перекрывает поздний */
+let detailsRequest = 0
 const openDetails = async (id: number) => {
   // карточка существующей записи всегда открывается на просмотр (QA F46: после неудачного
   // создания флаги isNew/isEditing оставались, и сохранение слало POST create — дубль)
-  isEditing.value = false; isNew.value = false
+  closeKeepingDraft(); resetEdit()
+  const request = ++detailsRequest
   detailsVisible.value = true; detailsLoading.value = true; detailsError.value = ''; selected.value = null
-  try { selected.value = await fastApiService.getCorrosionIndicator(id) }
-  catch (loadError: any) { detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку индикатора' }
-  finally { detailsLoading.value = false }
+  try { const record = await fastApiService.getCorrosionIndicator(id); if (request !== detailsRequest) return; selected.value = record }
+  catch (loadError: any) { if (request !== detailsRequest) return; detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку индикатора' }
+  finally { if (request === detailsRequest) detailsLoading.value = false }
 }
 const openDialog = async (nextScope: CorrosionIndicatorJournalScope = {}) => {
   Object.assign(scope, { lineId: undefined, nodeId: undefined, indicatorId: undefined }, nextScope)
   page.value = 1; visible.value = true
-  try { await Promise.all([loadLookups(), loadIndicators()]); if (nextScope.indicatorId) await openDetails(nextScope.indicatorId) }
-  catch (loadError: any) { error.value = loadError?.message || 'Не удалось открыть журнал индикаторов коррозии' }
+  // список сам показывает свою ошибку; сбой справочников не должен прятать список
+  const [lookupsResult] = await Promise.allSettled([loadLookups(), loadIndicators()])
+  if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — фильтры и выбор значений могут быть неполными'))
+  if (nextScope.indicatorId) await openDetails(nextScope.indicatorId)
 }
 const clearScope = () => { scope.lineId = undefined; scope.nodeId = undefined; page.value = 1; void loadIndicators() }
 const resetFilters = () => {
@@ -676,11 +687,12 @@ const editKey = (key: string) => isNew.value
 const editSource = {
   schema: computed(() => ({ fields: CORROSION_COLUMN_BY_KEY as Record<string, unknown> })),
   isWritable: (key?: string | null) => Boolean(key && editKey(key)),
-  loadSchema: async () => null,
+  // схема реестра известна заранее — загрузки нет, но useJournalEdit ждёт признак «есть»
+  loadSchema: async () => true,
 }
 const {
-  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable,
-  beginCreate, beginEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
+  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable, setEditField,
+  beginCreate, beginEdit, resetEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
 } = useJournalEdit('corrosion-indicators', editSource, selected)
 
 const detailGroups = computed((): JournalDetailGroup[] => {
@@ -719,8 +731,8 @@ const history = computed(() => selected.value?.relations?.history || [])
 const startEdit = () => beginEdit()
 
 const cancelEdit = async () => {
-  if (!(await cancel())) return
-  if (isNew.value) detailsVisible.value = false
+  const { closed, wasNew } = await cancel()
+  if (closed && wasNew) detailsVisible.value = false
 }
 
 // Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
@@ -730,8 +742,7 @@ watch(detailsVisible, (open) => {
 
 const createIndicator = async () => {
   creating.value = true
-  await loadLookups()
-  creating.value = false
+  try { await loadLookups() } finally { creating.value = false }
   selected.value = null
   detailsError.value = ''
   detailsVisible.value = true
@@ -755,7 +766,8 @@ const saveChanges = async () => {
         return
       }
       const result = await fastApiService.createObject('indikator_korrozii', fields)
-      if (result?.id) {
+      if (!result?.id) throw new Error('Сервер не вернул идентификатор созданной записи')
+      {
         notifications.showSuccess(`Индикатор ${result.id} создан`)
         markSaved(Number(result.id))
         await loadIndicators()
@@ -765,8 +777,7 @@ const saveChanges = async () => {
       const id = selected.value.id
       const changes = changedColumns(selected.value, editFields.value, editableColumns())
       if (!Object.keys(changes).length) {
-        notifications.showInfo('Изменений нет')
-        markSaved(null)
+        notifications.showInfo('Изменений нет — сохранять нечего')
         return
       }
       await fastApiService.updateObjectAttributes('indikator_korrozii', String(id), changes)

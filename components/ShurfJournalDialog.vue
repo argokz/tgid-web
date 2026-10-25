@@ -334,6 +334,7 @@
 
     <v-dialog
       v-model="detailsVisible"
+      :persistent="saving"
       :fullscreen="isMobile"
       max-width="940"
       scrollable
@@ -418,7 +419,7 @@
                 :editable="editable"
                 :is-field-dirty="isFieldDirty"
                 :required-keys="createMode === 'plan' ? ['planned_start', 'planned_finish'] : []"
-                @update:model="editFields = $event"
+                @update:field="setEditField"
               >
                 <v-expansion-panel
                   v-if="inspectedElements.length && !isEditing"
@@ -612,6 +613,7 @@ import StateView from '~/components/StateView.vue'
 import { hasLonLat } from '~/utils/journalFields'
 import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
+import { useNotificationStore } from '~/stores/notificationStore'
 import { computed, reactive, ref, watch } from 'vue'
 import { useJournalEdit } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
@@ -682,7 +684,7 @@ const scopeTitle = computed(() => {
 })
 
 const filtersActive = computed(() => Boolean(
-  search.value.trim() || purposeId.value || stateId.value || approvalFilter.value !== undefined || dateFrom.value || dateTo.value,
+  search.value.trim() || purposeId.value || stateId.value || approvalFilter.value != null || dateFrom.value || dateTo.value,
 ))
 
 const tableColumns: DataTableColumn[] = [
@@ -744,7 +746,10 @@ const loadLookups = async () => {
   if (lookups.purposes.length) return
   Object.assign(lookups, await fastApiService.getShurfLookups())
 }
+/** Номер последнего запроса списка */
+let listRequest = 0
 const loadShurfs = async () => {
+  const request = ++listRequest
   loading.value = true
   error.value = ''
   try {
@@ -760,14 +765,16 @@ const loadShurfs = async () => {
       node_id: scope.nodeId,
       search: (search.value || '').trim() || undefined
     })
+    if (request !== listRequest) return
     items.value = response.items
     total.value = response.total
     pages.value = response.pages
     stateCounts.value = Array.isArray(response.state_counts) ? response.state_counts : null
   } catch (loadError: any) {
+    if (request !== listRequest) return
     error.value = loadError?.data?.detail || loadError?.message || 'Не удалось загрузить журнал шурфовок'
   } finally {
-    loading.value = false
+    if (request === listRequest) loading.value = false
   }
 }
 /** Текст после паузы ввода (SearchField) */
@@ -776,29 +783,37 @@ const onSearch = () => {
   page.value = 1
   void loadShurfs()
 }
+/** Номер последнего запроса карточки: ответ более раннего запроса не перекрывает поздний */
+let detailsRequest = 0
 const openDetails = async (id: number) => {
+  // открытие другой записи во время правки — черновик текущей остаётся, карточка на просмотр
+  closeKeepingDraft()
+  resetEdit()
+  const request = ++detailsRequest
   detailsVisible.value = true
   detailsLoading.value = true
   detailsError.value = ''
   selected.value = null
   try {
-    selected.value = await fastApiService.getShurf(id)
+    const record = await fastApiService.getShurf(id)
+    if (request !== detailsRequest) return
+    selected.value = record
   } catch (loadError: any) {
+    if (request !== detailsRequest) return
     detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку шурфа'
   } finally {
-    detailsLoading.value = false
+    if (request === detailsRequest) detailsLoading.value = false
   }
 }
+const notifications = useNotificationStore()
 const openDialog = async (nextScope: ShurfJournalScope = {}) => {
   Object.assign(scope, { lineId: undefined, nodeId: undefined, shurfId: undefined }, nextScope)
   page.value = 1
   visible.value = true
-  try {
-    await Promise.all([loadLookups(), loadShurfs(), recordForm.loadSchema()])
-    if (nextScope.shurfId) await openDetails(nextScope.shurfId)
-  } catch (loadError: any) {
-    error.value = loadError?.message || 'Не удалось открыть журнал шурфовок'
-  }
+  // список и схема сами показывают свои ошибки; сбой справочников не должен прятать список
+  const [lookupsResult] = await Promise.allSettled([loadLookups(), loadShurfs(), recordForm.loadSchema()])
+  if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — фильтры и выбор значений могут быть неполными'))
+  if (nextScope.shurfId) await openDetails(nextScope.shurfId)
 }
 const clearScope = () => {
   scope.lineId = undefined
@@ -810,8 +825,8 @@ const clearScope = () => {
 const recordForm = useJournalRecordForm('shurfs')
 const batchApprovalRef = ref<{ open: () => Promise<void> } | null>(null)
 const {
-  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable,
-  beginCreate, beginEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
+  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable, setEditField,
+  beginCreate, beginEdit, resetEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
 } = useJournalEdit('shurfs', recordForm, selected)
 const createMode = ref<'plan' | 'unplanned'>('plan')
 const createModeItems: SegmentedToggleItem<'plan' | 'unplanned'>[] = [
@@ -830,8 +845,8 @@ const createShurf = async () => {
 const startEdit = () => beginEdit()
 
 const cancelEdit = async () => {
-  if (!(await cancel())) return
-  if (isNew.value) detailsVisible.value = false
+  const { closed, wasNew } = await cancel()
+  if (closed && wasNew) detailsVisible.value = false
 }
 
 // Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
@@ -871,8 +886,14 @@ const deleteShurf = async (id: number) => {
 }
 
 const refreshSelected = async () => {
-  if (!selected.value) return
-  try { selected.value = await fastApiService.getShurf(selected.value.id) } catch { /* остаётся прежняя */ }
+  const id = selected.value?.id
+  if (!id) return
+  try {
+    const record = await fastApiService.getShurf(id)
+    if (selected.value?.id === id) selected.value = record
+  } catch (e: any) {
+    notifications.showWarning(formatApiError(e, 'Карточка не обновилась — показаны прежние данные'))
+  }
   void loadShurfs()
 }
 

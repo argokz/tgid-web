@@ -21,8 +21,10 @@ interface StorageLike {
 
 export const DRAFT_INDEX_KEY = 'journalDrafts.index';
 export const DRAFT_LIMIT = 20;
+/** Черновик создаваемой записи не привязан к снимку — живёт ограниченно */
+export const NEW_DRAFT_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
-export const draftKey = (user: string, journal: string, recordId: number | 'new'): string =>
+export const journalDraftKey = (user: string, journal: string, recordId: number | 'new'): string =>
   `journalDraft:${user || 'anon'}:${journal}:${recordId}`;
 
 /** Снимок исходной записи по ключам формы: порядок ключей фиксирован, null и undefined равны */
@@ -59,8 +61,16 @@ export const loadDraft = (storage: StorageLike, key: string): JournalDraft | nul
   }
 };
 
-/** Сохранить черновик и поднять его в начало очереди; лишние (старше DRAFT_LIMIT) удаляются */
-export const saveDraft = (storage: StorageLike, key: string, draft: Omit<JournalDraft, 'savedAt'>): void => {
+/**
+ * Сохранить черновик и поднять его в начало очереди; лишние (старше DRAFT_LIMIT) удаляются только после
+ * успешной записи. false — хранилище недоступно (квота, приватный режим): вызывающий код предупреждает.
+ */
+export const saveDraft = (storage: StorageLike, key: string, draft: Omit<JournalDraft, 'savedAt'>): boolean => {
+  try {
+    storage.setItem(key, JSON.stringify({ ...draft, savedAt: new Date().toISOString() }));
+  } catch {
+    return false;
+  }
   const index = [key, ...readIndex(storage).filter((k) => k !== key)];
   for (const stale of index.splice(DRAFT_LIMIT)) {
     try {
@@ -69,12 +79,15 @@ export const saveDraft = (storage: StorageLike, key: string, draft: Omit<Journal
       // уже нет
     }
   }
-  try {
-    storage.setItem(key, JSON.stringify({ ...draft, savedAt: new Date().toISOString() }));
-  } catch {
-    return;
-  }
   writeIndex(storage, index);
+  return true;
+};
+
+/** Черновик создаваемой записи старше NEW_DRAFT_TTL_MS — не предлагать */
+export const isDraftExpired = (draft: JournalDraft, now: number = Date.now()): boolean => {
+  if (draft.snapshot !== 'new') return false;
+  const saved = Date.parse(draft.savedAt);
+  return !Number.isFinite(saved) || now - saved > NEW_DRAFT_TTL_MS;
 };
 
 export const clearDraft = (storage: StorageLike, key: string): void => {

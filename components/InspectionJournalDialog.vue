@@ -338,6 +338,7 @@
 
     <v-dialog
       v-model="detailsVisible"
+      :persistent="saving"
       :fullscreen="isMobile"
       max-width="980"
       scrollable
@@ -414,7 +415,7 @@
                 :editable="editable"
                 :is-field-dirty="isFieldDirty"
                 :required-keys="['name', 'inspected_on']"
-                @update:model="editFields = $event"
+                @update:field="setEditField"
               >
                 <v-expansion-panel
                   v-if="inspectionLines.length && !isEditing"
@@ -598,6 +599,7 @@ import StateView from '~/components/StateView.vue'
 import { hasLonLat, localToday } from '~/utils/journalFields'
 import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
+import { useNotificationStore } from '~/stores/notificationStore'
 import { computed, reactive, ref, watch } from 'vue'
 import { useJournalEdit } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
@@ -673,7 +675,7 @@ const scopeTitle = computed(() => {
   return 'вся тепловая сеть'
 })
 const filtersActive = computed(() => Boolean(
-  search.value.trim() || responsibleId.value || coverageFilter.value !== undefined || defectFilter.value !== undefined
+  search.value.trim() || responsibleId.value || coverageFilter.value != null || defectFilter.value != null
   || dateFrom.value || dateTo.value,
 ))
 
@@ -728,7 +730,10 @@ const loadLookups = async () => {
   if (lookups.responsible_people.length) return
   Object.assign(lookups, await fastApiService.getInspectionLookups())
 }
+/** Номер последнего запроса списка */
+let listRequest = 0
 const loadInspections = async () => {
+  const request = ++listRequest
   loading.value = true
   error.value = ''
   try {
@@ -744,14 +749,16 @@ const loadInspections = async () => {
       node_id: scope.nodeId,
       search: (search.value || '').trim() || undefined
     })
+    if (request !== listRequest) return
     items.value = response.items
     total.value = response.total
     pages.value = response.pages
     facets.value = response.facet_counts && typeof response.facet_counts === 'object' ? response.facet_counts : null
   } catch (loadError: any) {
+    if (request !== listRequest) return
     error.value = loadError?.data?.detail || loadError?.message || 'Не удалось загрузить журнал осмотров'
   } finally {
-    loading.value = false
+    if (request === listRequest) loading.value = false
   }
 }
 /** Текст после паузы ввода (SearchField) */
@@ -760,29 +767,37 @@ const onSearch = () => {
   page.value = 1
   void loadInspections()
 }
+/** Номер последнего запроса карточки: ответ более раннего запроса не перекрывает поздний */
+let detailsRequest = 0
 const openDetails = async (id: number) => {
+  // открытие другой записи во время правки — черновик текущей остаётся, карточка на просмотр
+  closeKeepingDraft()
+  resetEdit()
+  const request = ++detailsRequest
   detailsVisible.value = true
   detailsLoading.value = true
   detailsError.value = ''
   selected.value = null
   try {
-    selected.value = await fastApiService.getInspection(id)
+    const record = await fastApiService.getInspection(id)
+    if (request !== detailsRequest) return
+    selected.value = record
   } catch (loadError: any) {
+    if (request !== detailsRequest) return
     detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку осмотра'
   } finally {
-    detailsLoading.value = false
+    if (request === detailsRequest) detailsLoading.value = false
   }
 }
+const notifications = useNotificationStore()
 const openDialog = async (nextScope: InspectionJournalScope = {}) => {
   Object.assign(scope, { lineId: undefined, nodeId: undefined, inspectionId: undefined }, nextScope)
   page.value = 1
   visible.value = true
-  try {
-    await Promise.all([loadLookups(), loadInspections(), recordForm.loadSchema()])
-    if (nextScope.inspectionId) await openDetails(nextScope.inspectionId)
-  } catch (loadError: any) {
-    error.value = loadError?.message || 'Не удалось открыть журнал осмотров'
-  }
+  // список и схема сами показывают свои ошибки; сбой справочников не должен прятать список
+  const [lookupsResult] = await Promise.allSettled([loadLookups(), loadInspections(), recordForm.loadSchema()])
+  if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — фильтры и выбор значений могут быть неполными'))
+  if (nextScope.inspectionId) await openDetails(nextScope.inspectionId)
 }
 const clearScope = () => {
   scope.lineId = undefined
@@ -795,8 +810,8 @@ const recordForm = useJournalRecordForm('inspections')
 const positions = computed(() => recordForm.schema.value?.positions || [])
 const subdivisions = computed(() => recordForm.schema.value?.subdivisions || [])
 const {
-  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable,
-  beginCreate, beginEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
+  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable, setEditField,
+  beginCreate, beginEdit, resetEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
 } = useJournalEdit('inspections', recordForm, selected)
 
 const createInspection = async () => {
@@ -810,8 +825,8 @@ const createInspection = async () => {
 const startEdit = () => beginEdit()
 
 const cancelEdit = async () => {
-  if (!(await cancel())) return
-  if (isNew.value) detailsVisible.value = false
+  const { closed, wasNew } = await cancel()
+  if (closed && wasNew) detailsVisible.value = false
 }
 
 // Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
@@ -851,8 +866,14 @@ const deleteInspection = async (id: number) => {
 }
 
 const refreshSelected = async () => {
-  if (!selected.value) return
-  try { selected.value = await fastApiService.getInspection(selected.value.id) } catch { /* остаётся прежняя */ }
+  const id = selected.value?.id
+  if (!id) return
+  try {
+    const record = await fastApiService.getInspection(id)
+    if (selected.value?.id === id) selected.value = record
+  } catch (e: any) {
+    notifications.showWarning(formatApiError(e, 'Карточка не обновилась — показаны прежние данные'))
+  }
   void loadInspections()
 }
 

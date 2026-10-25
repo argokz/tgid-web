@@ -388,6 +388,7 @@
 
     <v-dialog
       v-model="detailsVisible"
+      :persistent="saving"
       :fullscreen="isMobile"
       max-width="980"
       scrollable
@@ -456,7 +457,7 @@
                 :model="editFields"
                 :editable="editable"
                 :is-field-dirty="isFieldDirty"
-                @update:model="editFields = $event"
+                @update:field="setEditField"
               >
                 <template v-if="!isEditing">
                   <v-expansion-panel
@@ -661,7 +662,7 @@ const scopeTitle = computed(() => scope.buildingId ? `ТУ здания ${scope.
 const selectedTitle = computed(() => selected.value?.number ? `ТУ № ${selected.value.number}` : `Технические условия ${selected.value?.id || ''}`)
 const filtersActive = computed(() => Boolean(
   search.value.trim() || stateId.value || issueYear.value || heatSource.value || district.value
-  || linked.value !== undefined || dateFrom.value || dateTo.value,
+  || linked.value != null || dateFrom.value || dateTo.value,
 ))
 
 const tableColumns: DataTableColumn[] = [
@@ -711,7 +712,10 @@ const buildFields = (entries: Array<[string, unknown, string?, string?, any[]?]>
 }
 
 const loadLookups = async () => { if (!lookups.states.length) Object.assign(lookups, await fastApiService.getTechnicalConditionLookups()) }
+/** Номер последнего запроса списка */
+let listRequest = 0
 const loadConditions = async () => {
+  const request = ++listRequest
   loading.value = true; error.value = ''
   try {
     const response = await fastApiService.getTechnicalConditions({
@@ -720,11 +724,13 @@ const loadConditions = async () => {
       date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined,
       building_id: scope.buildingId, pipe_id: scope.pipeId, search: search.value.trim() || undefined
     })
+    if (request !== listRequest) return
     items.value = response.items; total.value = response.total; pages.value = response.pages
     stateCounts.value = Array.isArray(response.state_counts) ? response.state_counts : null
   } catch (loadError: any) {
+    if (request !== listRequest) return
     error.value = loadError?.data?.detail || loadError?.message || 'Не удалось загрузить реестр технических условий'
-  } finally { loading.value = false }
+  } finally { if (request === listRequest) loading.value = false }
 }
 /** Текст после паузы ввода (SearchField) */
 const onSearch = () => {
@@ -732,20 +738,25 @@ const onSearch = () => {
   page.value = 1
   void loadConditions()
 }
+/** Номер последнего запроса карточки: ответ более раннего запроса не перекрывает поздний */
+let detailsRequest = 0
 const openDetails = async (id: number) => {
   // карточка существующей записи всегда открывается на просмотр (после неудачного создания
   // флаги isNew/isEditing не должны превращать сохранение в повторный POST)
-  isEditing.value = false; isNew.value = false
+  closeKeepingDraft(); resetEdit()
+  const request = ++detailsRequest
   detailsVisible.value = true; detailsLoading.value = true; detailsError.value = ''; selected.value = null
-  try { selected.value = await fastApiService.getTechnicalCondition(id) }
-  catch (loadError: any) { detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку технических условий' }
-  finally { detailsLoading.value = false }
+  try { const record = await fastApiService.getTechnicalCondition(id); if (request !== detailsRequest) return; selected.value = record }
+  catch (loadError: any) { if (request !== detailsRequest) return; detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку технических условий' }
+  finally { if (request === detailsRequest) detailsLoading.value = false }
 }
 const openDialog = async (nextScope: TechnicalConditionJournalScope = {}) => {
   Object.assign(scope, { buildingId: undefined, pipeId: undefined, conditionId: undefined }, nextScope)
   page.value = 1; visible.value = true
-  try { await Promise.all([loadLookups(), loadConditions()]); if (nextScope.conditionId) await openDetails(nextScope.conditionId) }
-  catch (loadError: any) { error.value = loadError?.message || 'Не удалось открыть реестр технических условий' }
+  // список сам показывает свою ошибку; сбой справочников не должен прятать список
+  const [lookupsResult] = await Promise.allSettled([loadLookups(), loadConditions()])
+  if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — фильтры и выбор значений могут быть неполными'))
+  if (nextScope.conditionId) await openDetails(nextScope.conditionId)
 }
 const clearScope = () => { scope.buildingId = undefined; scope.pipeId = undefined; page.value = 1; void loadConditions() }
 const resetFilters = () => {
@@ -775,11 +786,12 @@ const EDITABLE_COLUMNS = identityColumns([...EDITABLE_KEYS])
 const editSource = {
   schema: computed(() => ({ fields: EDITABLE_COLUMNS as Record<string, unknown> })),
   isWritable: (key?: string | null) => Boolean(key && key in EDITABLE_COLUMNS),
-  loadSchema: async () => null,
+  // схема реестра известна заранее — загрузки нет, но useJournalEdit ждёт признак «есть»
+  loadSchema: async () => true,
 }
 const {
-  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable,
-  beginCreate, beginEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
+  isEditing, isNew, saving, editFields, flashId, isDirty, isFieldDirty, editable, setEditField,
+  beginCreate, beginEdit, resetEdit, cancel, closeKeepingDraft, markSaved, forgetDraft,
 } = useJournalEdit('technical-conditions', editSource, selected)
 
 /** Справочник названий (источник, район) для AppSelect с item-value="id" */
@@ -825,8 +837,8 @@ const connections = computed(() => selected.value?.relations?.connections || [])
 const startEdit = () => beginEdit()
 
 const cancelEdit = async () => {
-  if (!(await cancel())) return
-  if (isNew.value) detailsVisible.value = false
+  const { closed, wasNew } = await cancel()
+  if (closed && wasNew) detailsVisible.value = false
 }
 
 // Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
@@ -836,8 +848,7 @@ watch(detailsVisible, (open) => {
 
 const createTechnicalCondition = async () => {
   creating.value = true
-  await loadLookups()
-  creating.value = false
+  try { await loadLookups() } finally { creating.value = false }
   selected.value = null
   detailsError.value = ''
   detailsVisible.value = true
@@ -856,7 +867,8 @@ const saveChanges = async () => {
         return
       }
       const result = await fastApiService.createTechnicalCondition(fields)
-      if (result?.id) {
+      if (!result?.id) throw new Error('Сервер не вернул идентификатор созданной записи')
+      {
         notifications.showSuccess(`ТУ ${result.id} созданы`)
         markSaved(Number(result.id))
         await loadConditions()
@@ -866,8 +878,7 @@ const saveChanges = async () => {
       const id = selected.value.id
       const changes = changedColumns(selected.value, editFields.value, EDITABLE_COLUMNS)
       if (!Object.keys(changes).length) {
-        notifications.showInfo('Изменений нет')
-        markSaved(null)
+        notifications.showInfo('Изменений нет — сохранять нечего')
         return
       }
       await fastApiService.updateTechnicalCondition(id, changes)

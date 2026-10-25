@@ -25,7 +25,7 @@ describe('JournalDetailFields', () => {
     expect(w.findAll('input')).toHaveLength(0);
   });
 
-  it('правка: записываемые поля становятся полями ввода, изменение уходит через update:model, точка «изменено»', async () => {
+  it('правка: записываемые поля становятся полями ввода, изменение уходит через update:field, точка «изменено»', async () => {
     const model = { name: 'ТК-1', state_id: 1, note: '' };
     const w = mountWithVuetify(JournalDetailFields, {
       props: {
@@ -39,12 +39,14 @@ describe('JournalDetailFields', () => {
     const cells = w.findAll('.field-cell');
     expect(cells[0].classes()).toContain('field-cell--dirty');
     expect(cells[0].find('.field-cell__required').exists()).toBe(true);
+    // звёздочка только у записываемого поля в правке
+    expect(cells[2].find('.field-cell__required').exists()).toBe(false);
     expect(cells[2].classes()).toContain('field-cell--readonly');
     expect(cells[3].classes()).toContain('field-cell--span');
     const input = cells[0].find('input');
     expect(input.attributes('id')).toBe(cells[0].find('label').attributes('for'));
     await input.setValue('ТК-2');
-    expect(w.emitted('update:model')?.at(-1)).toEqual([{ name: 'ТК-2', state_id: 1, note: '' }]);
+    expect(w.emitted('update:field')?.at(-1)).toEqual(['name', 'ТК-2']);
     expect(w.find('textarea').exists()).toBe(true);
   });
 });
