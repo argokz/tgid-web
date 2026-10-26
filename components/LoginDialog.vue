@@ -29,10 +29,10 @@
 
       <div class="login-head">
         <div class="login-logo">
-          <v-icon
+          <AppLogo
             size="30"
-            color="primary"
-          >mdi-layers</v-icon>
+            class="text-primary"
+          />
         </div>
         <div class="login-brand">
           ITwin <span class="login-brand-sub">Map</span>
@@ -127,6 +127,7 @@
 </template>
 
 <script setup lang="ts">
+import AppLogo from '~/components/AppLogo.vue'
 import AppSelect from '~/components/AppSelect.vue'
 import { fastApiService } from '~/services/fastApiService'
 import { formatApiError } from '~/utils/apiError'

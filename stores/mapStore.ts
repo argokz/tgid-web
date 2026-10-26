@@ -77,6 +77,8 @@ let pendingFeatureChoice: ((index: number | null) => void) | null = null;
 export const useMapStore = defineStore('map', {
   state: () => ({
     map: null as any,
+    /** Карта показала первый кадр (событие load) — экран загрузки уходит; при пересоздании карты не сбрасывается */
+    firstFrameShown: false,
     highlightedFeature: null as string | null,
     _attributePanelShow: null as ((properties: Record<string, any>, options?: { anchor?: [number, number] | null }) => void | Promise<void>) | null,
     // Diagnostics Fault Layers
@@ -264,6 +266,7 @@ export const useMapStore = defineStore('map', {
 
       this.map.on('load', async () => {
         if (import.meta.dev) console.debug('Map loaded event triggered');
+        this.firstFrameShown = true;
         this.loadSelectedBaseLayer();
         useLayerStore().loadVisibleContextLayers();
         await this.addBaseLayer();

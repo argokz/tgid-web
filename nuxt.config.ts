@@ -140,7 +140,10 @@ export default defineNuxtConfig({
         // viewport-fit=cover — карта под вырезами экрана, края отступают на --safe-* (assets/styles/_device.scss)
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
         { name: 'description', content: 'Геоинформационная система ITwin Map для визуализации и управления пространственными данными.' },
-        { name: 'format-detection', content: 'telephone=no' }
+        { name: 'format-detection', content: 'telephone=no' },
+        // цвет панели браузера и окна установленного приложения — как шапка (светлая тема)
+        { name: 'theme-color', content: '#ffffff' },
+        { name: 'apple-mobile-web-app-title', content: 'ITwin Map' }
       ],
       link: [
         { rel: 'dns-prefetch', href: '//itwin.kz' },

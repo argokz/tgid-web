@@ -32,11 +32,10 @@
         class="app-brand d-flex align-center"
         :class="navCollapsed ? 'ms-1 me-2' : 'ms-3 me-4'"
       >
-        <v-icon
+        <AppLogo
           size="26"
-          color="primary"
-          class="brand-icon"
-        >mdi-layers</v-icon>
+          class="brand-icon text-primary"
+        />
         <span class="brand-title ms-2">ITwin</span>
         <span class="brand-subtitle">Map</span>
       </div>
@@ -330,12 +329,9 @@
         v-else
         class="login-required-backdrop"
       >
-        <v-progress-circular
+        <AppSplash
           v-if="!authStore.loginRequired"
-          indeterminate
-          color="primary"
-          size="32"
-          width="3"
+          label="Проверка входа…"
         />
       </div>
     </v-main>
@@ -375,6 +371,7 @@
     <FirstRunHints
       v-if="isHydrated && (authStore.isAuthenticated || authStore.authDisabled)"
       ref="firstRunHints"
+      :ready="route.path !== '/' || mapStore.firstFrameShown"
     />
 
     <!-- Модальное окно расчёта -->
@@ -458,6 +455,9 @@ import type CalculationProtocol from '~/components/CalculationProtocol.vue';
 import ConfirmDialogHost from '~/components/ConfirmDialogHost.vue';
 import HintTip from '~/components/HintTip.vue';
 import FirstRunHints from '~/components/FirstRunHints.vue';
+import AppLogo from '~/components/AppLogo.vue';
+import AppSplash from '~/components/AppSplash.vue';
+import { useMapStore } from '~/stores/mapStore';
 import { formatApiErrorWith } from '~/utils/apiError';
 import { ROLE_LABELS, type Role } from '~/utils/permissions';
 import { deviceClass } from '~/utils/breakpoints';
@@ -474,6 +474,7 @@ const isHydrated = ref(false);
 const navCollapsed = computed(() => isHydrated.value && isHeaderNavCollapsed(screenWidth.value));
 const route = useRoute();
 const authStore = useAuthStore();
+const mapStore = useMapStore();
 const notificationStore = useNotificationStore();
 const uiStore = useUiStore();
 const fragmentStore = useFragmentStore();
@@ -861,6 +862,9 @@ const downloadExcel = async (docType: string) => {
 .app-main {
   min-height: calc(100vh - 56px);
   min-height: calc(100dvh - 56px);
+  /* Шапка (56 px) есть всегда, а Vuetify считает --v-layout-top только после монтирования: в серверном HTML
+     он 0, и экран загрузки уходил под шапку с полосой снизу */
+  padding-top: max(var(--v-layout-top, 0px), 56px);
 }
 .login-required-backdrop {
   min-height: calc(100vh - 56px);

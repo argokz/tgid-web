@@ -69,6 +69,20 @@ describe('FirstRunHints', () => {
     w.unmount();
   });
 
+  it('экран не готов (карта под экраном загрузки) — ждёт, потом показывает', async () => {
+    vi.useFakeTimers();
+    zone('nav-links');
+    const w = mountWithVuetify(FirstRunHints, { props: { delayMs: 10, ready: false } });
+    vi.advanceTimersByTime(100);
+    await flush();
+    expect(card()).toBeNull();
+    await w.setProps({ ready: true });
+    vi.advanceTimersByTime(10);
+    await flush();
+    expect(card()?.textContent).toContain('Разделы');
+    w.unmount();
+  });
+
   it('ни одной зоны на экране — ничего не показывает и не помечает', async () => {
     const w = mountWithVuetify(FirstRunHints, { props: { auto: false } });
     await (w.vm as any).start();

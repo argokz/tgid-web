@@ -48,8 +48,8 @@ export const FIRST_RUN_STEPS: FirstRunStep[] = [
   },
 ];
 
-export interface Rect { left: number; top: number; width: number; height: number }
-export interface Size { w: number; h: number }
+export interface HintRect { left: number; top: number; width: number; height: number }
+export interface HintSize { w: number; h: number }
 
 /** Отступ карточки от якоря и от краёв окна */
 export const HINT_GAP_PX = 12;
@@ -58,7 +58,7 @@ export const HINT_GAP_PX = 12;
  * Положение карточки у якоря: со своей стороны, а если не помещается — с противоположной (или снизу/сверху);
  * затем прижать к окну. Возвращает левый верхний угол.
  */
-export function placeHintCard(anchor: Rect, card: Size, view: Size, side: HintSide): { x: number; y: number } {
+export function placeHintCard(anchor: HintRect, card: HintSize, view: HintSize, side: HintSide): { x: number; y: number } {
   const g = HINT_GAP_PX;
   const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
   const centerX = anchor.left + anchor.width / 2 - card.w / 2;

@@ -73,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue';
 import HintTip from '~/components/HintTip.vue';
 import { useEscapeClose } from '~/composables/useEscape';
 import { appStorage } from '~/utils/appStorage';
@@ -83,7 +83,7 @@ import {
   FIRST_RUN_VERSION,
   placeHintCard,
   type FirstRunStep,
-  type Rect,
+  type HintRect,
 } from '~/utils/firstRunHints';
 
 /**
@@ -96,14 +96,17 @@ const props = withDefaults(defineProps<{
   delayMs?: number;
   /** Показать при первом входе; false — только по start() */
   auto?: boolean;
+  /** Экран готов (карта показала первый кадр): до этого зоны закрыты экраном загрузки */
+  ready?: boolean;
 }>(), {
   delayMs: 1500,
   auto: true,
+  ready: true,
 });
 
 const steps = ref<FirstRunStep[]>([]);
 const index = ref(-1);
-const anchorRect = ref<Rect | null>(null);
+const anchorRect = ref<HintRect | null>(null);
 const cardEl = ref<HTMLElement | null>(null);
 const nextBtn = ref<{ $el?: HTMLElement } | null>(null);
 const cardSize = ref({ w: 300, h: 160 });
@@ -214,7 +217,20 @@ const onResize = () => {
 
 onMounted(() => {
   window.addEventListener('resize', onResize);
-  if (props.auto && !readDone()) startTimer = setTimeout(() => void start(), props.delayMs);
+  if (!props.auto || readDone()) return;
+  // один раз: когда экран готов, через паузу
+  const schedule = () => {
+    startTimer = setTimeout(() => void start(), props.delayMs);
+  };
+  if (props.ready) {
+    schedule();
+    return;
+  }
+  const stop = watch(() => props.ready, (ready) => {
+    if (!ready) return;
+    stop();
+    schedule();
+  });
 });
 
 onBeforeUnmount(() => {
