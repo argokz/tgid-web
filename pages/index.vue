@@ -21,6 +21,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AppSplash from '~/components/AppSplash.vue';
 import { useMapStore } from '~/stores/mapStore';
 import type { LayerConfig } from '~/types';
+import { preloadJournalPrimitives } from '~/utils/journalPreload';
 import { markPerf, measurePerf } from '~/utils/perf';
 
 markPerf('page:index:asyncData:start');
@@ -45,6 +46,11 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (splashTimer) clearTimeout(splashTimer);
 });
+
+// после первого кадра карты — в простое подгрузить общие примитивы журналов (первое открытие журнала, S3b)
+watch(() => mapStore.firstFrameShown, (shown) => {
+  if (shown) void preloadJournalPrimitives();
+}, { immediate: true });
 
 watch(pending, (isPending: boolean) => {
   if (!isPending) {

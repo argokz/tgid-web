@@ -1,6 +1,9 @@
 <template>
+  <slot :props="activatorProps" />
   <v-tooltip
+    v-if="activator"
     v-model="open"
+    :activator="activator"
     :location="location"
     :disabled="disabled || !text"
     :open-delay="openDelay"
@@ -9,9 +12,6 @@
     content-class="hint-tip"
     :aria-label="ariaText || undefined"
   >
-    <template #activator="{ props: activatorProps }">
-      <slot :props="withLongPress(activatorProps)" />
-    </template>
     <div class="hint-tip__title">
       <span>{{ text }}</span>
       <kbd
@@ -27,13 +27,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, mergeProps, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, shallowRef } from 'vue';
 
 /**
  * HintTip — обёртка над v-tooltip с единым содержимым для всех иконочных кнопок (docs/ui-primitives.md):
  * название действия в повелительном наклонении («Построить пьезометр»), хоткей, одна строка пояснения.
  * aria-label у самой кнопки остаётся — подсказка её не заменяет. Палец: наведения нет — подсказка по долгому
  * нажатию (полсекунды), держится 2,5 с; отпускание после долгого нажатия не нажимает кнопку.
+ * v-tooltip создаётся только при первом наведении, фокусе с клавиатуры или долгом нажатии и цепляется к кнопке
+ * как внешний активатор: экземпляр VOverlay на каждую кнопку дорог, а в строках журнала их по сотне на страницу.
  */
 const props = withDefaults(defineProps<{
   /** Название действия */
@@ -57,6 +59,47 @@ const props = withDefaults(defineProps<{
 const HOVER_BRIDGE_MS = 80;
 
 const open = ref(false);
+
+/** Кнопка, к которой привязан v-tooltip; до первого наведения/фокуса/долгого нажатия его нет */
+const activator = shallowRef<HTMLElement | null>(null);
+/** Первое наведение: подсказка ждёт openDelay, как у v-tooltip, и только потом создаётся */
+let armTimer: ReturnType<typeof setTimeout> | null = null;
+
+const cancelArm = () => {
+  if (armTimer) clearTimeout(armTimer);
+  armTimer = null;
+};
+/** Создать подсказку у кнопки и открыть; дальше наведение и фокус ведёт сам v-tooltip */
+const arm = (el: HTMLElement) => {
+  cancelArm();
+  activator.value = el;
+  open.value = true;
+};
+/** Пока подсказки нет — ловим первое наведение и фокус; потом только следим, что кнопка та же (перерисовка слота) */
+const lazyHandlers = {
+  onMouseenter: (e: MouseEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    if (activator.value) {
+      if (activator.value !== el) activator.value = el;
+      return;
+    }
+    if (props.disabled || !props.text) return;
+    cancelArm();
+    armTimer = setTimeout(() => arm(el), props.openDelay);
+  },
+  onMouseleave: cancelArm,
+  onFocus: (e: FocusEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    if (activator.value) {
+      if (activator.value !== el) activator.value = el;
+      return;
+    }
+    if (props.disabled || !props.text || !el.matches(':focus-visible')) return;
+    cancelArm();
+    armTimer = setTimeout(() => arm(el), props.openDelay);
+  },
+  onBlur: cancelArm,
+};
 
 /** Долгое нажатие пальцем: через сколько показать подсказку, сколько держать, какой сдвиг — уже прокрутка */
 const LONG_PRESS_MS = 500;
@@ -97,9 +140,11 @@ const touchHandlers = {
     if (e.pointerType !== 'touch' || props.disabled || !props.text) return;
     cancelPress();
     pressStart = { x: e.clientX, y: e.clientY };
+    const el = e.currentTarget as HTMLElement;
     pressTimer = setTimeout(() => {
       pressTimer = null;
       swallowClick = true;
+      if (!activator.value) activator.value = el;
       open.value = true;
       if (hideTimer) clearTimeout(hideTimer);
       hideTimer = setTimeout(() => { open.value = false; }, TOUCH_HINT_MS);
@@ -124,9 +169,10 @@ const touchHandlers = {
   },
 };
 
-const withLongPress = (activatorProps: Record<string, unknown>) => mergeProps(activatorProps, touchHandlers);
+const activatorProps = { ...lazyHandlers, ...touchHandlers };
 
 onBeforeUnmount(() => {
+  cancelArm();
   cancelPress();
   resetSwallow();
   if (hideTimer) clearTimeout(hideTimer);

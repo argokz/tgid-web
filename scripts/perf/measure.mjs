@@ -8,7 +8,7 @@
  * Браузер — системный Chrome (channel: 'chrome'), окно 1440×900, CPU-троттлинг через CDP.
  */
 import { chromium } from '@playwright/test';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 
 const args = Object.fromEntries(
   process.argv.slice(2).map((a) => {
@@ -24,6 +24,8 @@ let FRAGMENT = Number(args.fragment || 74);
 /** --context-off=terrain3d,buildings — выключить слои контекста перед сценариями (A/B рельефа и зданий) */
 const CONTEXT_OFF = args['context-off'] ? String(args['context-off']).split(',') : [];
 const OUT = args.out || `scripts/perf/results-${new Date().toISOString().slice(0, 10)}.json`;
+/** --profile=папка — CPU-профиль каждого замера (.cpuprofile, открывается в DevTools → Performance) */
+const PROFILE = args.profile ? String(args.profile) : '';
 
 const PINIA = "document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$pinia._s";
 const MAP = `${PINIA}.get('map').map`;
@@ -106,12 +108,18 @@ const diff = (a, b) => Object.fromEntries(Object.keys(a).map((k) => [k, +(b[k] -
 
 async function measure(page, cdp, name, fn) {
   const before = await cdpMetrics(cdp);
+  if (PROFILE) await cdp.send('Profiler.start');
   await page.evaluate('window.__perf.start()');
   const t0 = Date.now();
   let extra = {};
   try { extra = (await fn()) || {}; } catch (e) { extra = { error: String(e.message || e).slice(0, 200) }; }
   const wall = Date.now() - t0;
   const frames = await page.evaluate('window.__perf.stop()');
+  if (PROFILE) {
+    const { profile } = await cdp.send('Profiler.stop');
+    mkdirSync(PROFILE, { recursive: true });
+    writeFileSync(`${PROFILE}/${name.split(' ')[0]}-${Date.now()}.cpuprofile`, JSON.stringify(profile));
+  }
   const after = await cdpMetrics(cdp);
   const d = diff(before, after);
   const r = { name, wallMs: wall, ...frames, cdp: { ...d, nodes: after.nodes, heapMb: after.heapMb.toFixed(1) }, ...extra };
@@ -452,6 +460,7 @@ page.on('pageerror', (e) => errors.push(e.message.slice(0, 200)));
 page.on('console', (m) => { if (m.type() === 'error' || /hydration/i.test(m.text())) errors.push(`[${m.type()}] ${m.text().slice(0, 200)}`); });
 const cdp = await context.newCDPSession(page);
 await cdp.send('Performance.enable');
+if (PROFILE) await cdp.send('Profiler.enable');
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU });
 
 const all = { base: BASE, cpu: CPU, runs: RUNS, contextOff: CONTEXT_OFF, date: new Date().toISOString(), results: [] };
