@@ -64,6 +64,24 @@ async function toolsVisible(page: Page, labels: string[]) {
 const ADMIN_TOOLS = ['Групповые установщики', 'Справочники', 'Пользователи', 'Журнал действий'];
 
 test.describe('Права в интерфейсе', () => {
+  // Положительный контроль: у admin с записью все кнопки и пункты, которых ждём отсутствующими ниже, есть.
+  // Без него переименование кнопки сделало бы проверки «нет» у viewer и при выключенной записи пустыми.
+  test('admin с записью (контроль): все пункты администрирования и кнопки записи на месте', async ({ page }) => {
+    await withAuth(page, { mutations_enabled: true, topology_mutations_enabled: true });
+    await openMap(page);
+    expect(await toolsVisible(page, ADMIN_TOOLS)).toEqual({
+      'Групповые установщики': true, 'Справочники': true, 'Пользователи': true, 'Журнал действий': true,
+    });
+    const dialog = await openDefects(page);
+    await expect(dialog.getByRole('button', { name: 'Создать' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await openTool(page, 'Шурфовки');
+    const shurfs = journal(page, 'Журнал шурфовок');
+    await expect(shurfs.locator('.state-view--loading')).toHaveCount(0, { timeout: 60_000 });
+    await expect(shurfs.getByRole('button', { name: 'Создать' })).toBeVisible();
+    await expect(shurfs.getByRole('button', { name: 'Утвердить план' })).toBeVisible();
+  });
+
   test('viewer: журналы только для чтения, правки и администрирования нет', async ({ page }) => {
     await withAuth(page, { role: 'viewer', caps: [], permissions: null });
     await openMap(page);

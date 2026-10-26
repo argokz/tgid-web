@@ -100,7 +100,8 @@ export default defineNuxtConfig({
       storagePrefix: process.env.NUXT_PUBLIC_STORAGE_PREFIX || env.NUXT_PUBLIC_STORAGE_PREFIX || '',
       // Индексация поисковиками (utils/siteIndexing.ts): только прод с NUXT_PUBLIC_SITE_INDEXABLE=true, стенды — noindex.
       // siteUrl — канонический адрес прода (https://itwin.kz/itwin-map/), пусто — без canonical
-      siteIndexable: (process.env.NUXT_PUBLIC_SITE_INDEXABLE || env.NUXT_PUBLIC_SITE_INDEXABLE || '') === 'true',
+      // строка как есть: строго разбирает utils/siteIndexing parseIndexable, неизвестное значение — предупреждение при запуске
+      siteIndexable: process.env.NUXT_PUBLIC_SITE_INDEXABLE || env.NUXT_PUBLIC_SITE_INDEXABLE || '',
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL || env.NUXT_PUBLIC_SITE_URL || '',
       // Фрагменты, видимые при открытии карты: "2-46,48,3179" (utils/cityConfig.ts); пусто — все
       defaultFragments: process.env.NUXT_PUBLIC_DEFAULT_FRAGMENTS || env.NUXT_PUBLIC_DEFAULT_FRAGMENTS || '',

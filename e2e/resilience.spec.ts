@@ -6,6 +6,9 @@ import { mapEval, openMap, openTool } from './helpers';
  * доходят — база не меняется. Проверяется: карта живёт, видна причина и «Повторить», черновик формы не теряется.
  */
 
+/** Только список нарушений (`/api/defects?page=…`), не `/api/defects/lookups` и не карточка записи */
+const DEFECTS_LIST = (url: URL) => url.pathname.endsWith('/api/defects');
+
 /** Карта продолжает отвечать: камера двигается, участки на месте */
 async function expectMapAlive(page: Page) {
   const moved = await mapEval<boolean>(
@@ -26,7 +29,7 @@ test.describe('Сбои API и сети', () => {
   });
 
   test('API 500 на список журнала: причина и «Повторить», после восстановления — данные', async ({ page }) => {
-    await page.route('**/api/defects?**', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"boom"}' }));
+    await page.route(DEFECTS_LIST, (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"boom"}' }));
     await openTool(page, 'Нарушения');
     const dialog = journalDialog(page, 'Журнал нарушений');
     const retry = dialog.getByRole('button', { name: 'Повторить' });
@@ -34,20 +37,20 @@ test.describe('Сбои API и сети', () => {
     await expect(dialog.locator('.state-view--error')).toBeVisible();
     await expectMapAlive(page);
 
-    await page.unroute('**/api/defects?**');
+    await page.unroute(DEFECTS_LIST);
     await retry.click();
     await expect(dialog.locator('.state-view--error')).toHaveCount(0);
     await expect(dialog.locator('.state-view--loading')).toHaveCount(0, { timeout: 60_000 });
   });
 
   test('таймаут и обрыв сети на списке: сообщение без зависания', async ({ page }) => {
-    await page.route('**/api/defects?**', (route) => route.abort('timedout'));
+    await page.route(DEFECTS_LIST, (route) => route.abort('timedout'));
     await openTool(page, 'Нарушения');
     const dialog = journalDialog(page, 'Журнал нарушений');
     await expect(dialog.locator('.state-view--error')).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Повторить' })).toBeVisible();
 
-    await page.route('**/api/defects?**', (route) => route.abort('internetdisconnected'));
+    await page.route(DEFECTS_LIST, (route) => route.abort('internetdisconnected'));
     await dialog.getByRole('button', { name: 'Повторить' }).click();
     await expect(dialog.locator('.state-view--error')).toBeVisible();
     await expectMapAlive(page);
@@ -58,13 +61,15 @@ test.describe('Сбои API и сети', () => {
     const dialog = journalDialog(page, 'Журнал шурфовок');
     const firstRow = dialog.locator('tbody tr').first();
     await expect(dialog.locator('.state-view--loading')).toHaveCount(0, { timeout: 60_000 });
-    test.skip(await dialog.locator('.state-view--empty').isVisible(), 'в журнале нет записей для правки');
+    // стенд обязан давать запись и права: пустой журнал или нет «Редактировать» — падение, а не пропуск
+    // (на стенде только для чтения — E2E_READONLY=1)
+    test.skip(Boolean(process.env.E2E_READONLY), 'стенд только для чтения (E2E_READONLY)');
+    await expect(dialog.locator('.state-view--empty'), 'в журнале шурфовок нет записей для правки').toHaveCount(0);
     await firstRow.click();
     // карточка записи — своё окно поверх списка
     const record = page.locator('.v-dialog.v-overlay--active').last();
     const edit = record.getByRole('button', { name: 'Редактировать' });
-    const canEdit = await edit.waitFor({ timeout: 15_000 }).then(() => true, () => false);
-    test.skip(!canEdit, 'правка выключена (роль или MUTATIONS_ENABLED=false)');
+    await expect(edit, 'нет «Редактировать» — правка выключена или сломана').toBeVisible({ timeout: 15_000 });
     await edit.click();
 
     const field = record.getByRole('textbox', { name: 'Номер дома' });
@@ -85,7 +90,9 @@ test.describe('Сбои API и сети', () => {
     });
     await record.getByRole('button', { name: 'Сохранить' }).click();
     await expect.poll(() => writes).toBeGreaterThan(0);
-    await expect(page.locator('.v-snackbar, [role="alert"]').filter({ hasText: /недоступ|подключ|ошибк|сохран/i }).first()).toBeVisible();
+    // текст ошибки сети (utils/apiError), не «сохранено»
+    await expect(page.locator('.v-snackbar').filter({ hasText: /недоступен|подключение к сети/i }).first()).toBeVisible();
+    await expect(page.locator('.v-snackbar').filter({ hasText: /сохранен/i })).toHaveCount(0);
     await expect(field).toHaveValue(new RegExp(`${marker.trim()}$`));
     await expect(record.getByRole('button', { name: 'Сохранить' })).toBeEnabled();
 

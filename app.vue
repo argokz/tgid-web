@@ -7,7 +7,7 @@ import robotoLatin from '~/assets/fonts/roboto-latin-wght-normal.woff2?url'
 const config = useRuntimeConfig()
 const base = config.app.baseURL.replace(/\/?$/, '/')
 // Стенды закрыты от поисковиков, у прода — канонический адрес (utils/siteIndexing.ts)
-const site = { indexable: Boolean(config.public.siteIndexable), siteUrl: String(config.public.siteUrl || '') }
+const site = { indexable: parseIndexable(config.public.siteIndexable), siteUrl: String(config.public.siteUrl || '') }
 const robots = robotsMetaContent(site)
 const canonical = canonicalUrl(site)
 

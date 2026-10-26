@@ -37,6 +37,14 @@ const url = String(args.url || process.env.LIGHTHOUSE_URL || config.url);
 const runs = Number(args.runs || config.runs);
 const formFactors = args.form ? String(args.form).split(',') : config.formFactors;
 if (!Number.isInteger(runs) || runs < 1) throw new Error(`--runs: ожидалось целое ≥ 1, получено ${args.runs}`);
+if (!/^https?:\/\//.test(url)) throw new Error(`--url: ожидался http(s)-адрес, получено ${url}`);
+// без порога категория прошла бы молча (score < undefined === false)
+for (const c of CATEGORIES) {
+  if (!Number.isFinite(config.thresholds?.[c])) throw new Error(`lighthouse.config.json: нет порога для «${c}»`);
+}
+for (const form of formFactors) {
+  if (!['desktop', 'mobile'].includes(form)) throw new Error(`--form: desktop или mobile, получено ${form}`);
+}
 
 const median = (values) => {
   const s = [...values].sort((a, b) => a - b);

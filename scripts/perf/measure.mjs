@@ -481,3 +481,9 @@ writeFileSync(OUT, JSON.stringify(all, null, 2));
 log(`\nошибки консоли: ${all.consoleErrors.length}`, all.consoleErrors.slice(0, 10));
 log(`результаты: ${OUT}`);
 await browser.close();
+// упавший сценарий записан как { error } — код выхода не должен говорить «всё замерено»
+const failed = all.results.filter((r) => r.error).map((r) => `${r.name} (прогон ${r.run})`);
+if (failed.length) {
+  log(`сценарии с ошибкой: ${failed.join(', ')}`);
+  process.exitCode = 1;
+}
