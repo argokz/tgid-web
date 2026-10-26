@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Иконки приложения из знака ITwin Map (docs/brand/logo-a-network-m.svg, этап 8): favicon.ico 16/32,
+// Иконки приложения из знака ITwin Map (docs/brand/itwin-map-mark.svg, этап 8): favicon.ico 16/32,
 // apple-touch-icon 180, иконки manifest 192/512 (и maskable 512). Растр — через браузер Playwright (Edge/Chrome
 // системы, отдельный Chromium не нужен), ICO собирается из PNG-кадров. Запуск после правки знака:
 //   node scripts/brand/render-icons.mjs
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -11,39 +11,36 @@ import { chromium } from 'playwright';
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PUBLIC = join(ROOT, 'public');
 
-const PRIMARY = '#1565c0';
-const ACCENT = '#d97706';
-/** На синей плашке акцент светлее — контраст с primary */
-const ACCENT_ON_PRIMARY = '#fbbf24';
-
-/** Знак на сетке 24: трасса M, четыре узла, источник в центре */
-const mark = (line, accent) => `
-  <path d="M4 20V6l8 8 8-8v14" stroke="${line}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <g fill="${line}"><circle cx="4" cy="20" r="2.25"/><circle cx="4" cy="6" r="2.25"/><circle cx="20" cy="6" r="2.25"/><circle cx="20" cy="20" r="2.25"/></g>
-  <circle cx="12" cy="14" r="3" fill="${accent}"/>`;
+/** Знак — слои ГИС (docs/brand/itwin-map-mark.svg, вырезан из docs/brand/itwin-map-logo.svg без надписи) */
+const MARK = readFileSync(join(ROOT, 'docs/brand/itwin-map-mark.svg'), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+const MARK_VIEWBOX = MARK.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
+const markInner = MARK.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
 
 /** Прозрачный фон: favicon */
-const bare = () => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${mark(PRIMARY, ACCENT)}</svg>`;
+const bare = () => MARK;
 
 /**
- * Плашка primary со знаком: scale — доля знака от стороны; rounded — скругление (иконка «any»), без него —
- * квадрат на всю площадь (apple-touch: iOS скругляет сам; maskable: знак в безопасной зоне 80 %)
+ * Белая плашка со знаком (знак цветной, с градиентами — на primary не читается): scale — доля ширины знака от
+ * стороны; rounded — скругление (иконка «any»), без него — квадрат на всю площадь (apple-touch: iOS скругляет сам;
+ * maskable: знак в безопасной зоне 80 %)
  */
 const plate = (scale, rounded) => {
-  const size = 24 / scale;
-  const off = (size - 24) / 2;
-  const rx = rounded ? size * 0.22 : 0;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-off} ${-off} ${size} ${size}">
-    <rect x="${-off}" y="${-off}" width="${size}" height="${size}" rx="${rx}" fill="${PRIMARY}"/>${mark('#ffffff', ACCENT_ON_PRIMARY)}</svg>`;
+  const [vx, vy, vw, vh] = MARK_VIEWBOX;
+  const side = vw / scale;
+  const x0 = vx - (side - vw) / 2;
+  const y0 = vy - (side - vh) / 2;
+  const rx = rounded ? side * 0.22 : 0;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${y0} ${side} ${side}">
+    <rect x="${x0}" y="${y0}" width="${side}" height="${side}" rx="${rx}" fill="#ffffff"/>${markInner}</svg>`;
 };
 
 const targets = [
   { file: 'favicon-16.png', svg: bare(), px: 16, ico: true },
   { file: 'favicon-32.png', svg: bare(), px: 32, ico: true },
-  { file: 'apple-touch-icon.png', svg: plate(0.62, false), px: 180 },
-  { file: 'icon-192.png', svg: plate(0.6, true), px: 192 },
-  { file: 'icon-512.png', svg: plate(0.6, true), px: 512 },
-  { file: 'icon-maskable-512.png', svg: plate(0.5, false), px: 512 },
+  { file: 'apple-touch-icon.png', svg: plate(0.78, false), px: 180 },
+  { file: 'icon-192.png', svg: plate(0.8, true), px: 192 },
+  { file: 'icon-512.png', svg: plate(0.8, true), px: 512 },
+  { file: 'icon-maskable-512.png', svg: plate(0.66, false), px: 512 },
 ];
 
 /** ICO из PNG-кадров (Vista+ читает PNG внутри ICO) */

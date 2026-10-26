@@ -3,62 +3,10 @@
     class="app-splash"
     role="status"
   >
-    <svg
+    <AppLogo
       class="app-splash__mark"
-      viewBox="0 0 24 24"
-      width="56"
-      height="56"
-      fill="none"
-      aria-hidden="true"
-    >
-      <g
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path
-          class="app-splash__trace"
-          d="M4 20V6l8 8 8-8v14"
-        />
-        <path
-          class="app-splash__flow"
-          d="M4 20V6l8 8 8-8v14"
-          pathLength="1"
-        />
-      </g>
-      <g
-        class="app-splash__nodes"
-        fill="currentColor"
-      >
-        <circle
-          cx="4"
-          cy="20"
-          r="2.25"
-        />
-        <circle
-          cx="4"
-          cy="6"
-          r="2.25"
-        />
-        <circle
-          cx="20"
-          cy="6"
-          r="2.25"
-        />
-        <circle
-          cx="20"
-          cy="20"
-          r="2.25"
-        />
-      </g>
-      <circle
-        class="app-splash__source"
-        cx="12"
-        cy="14"
-        r="3"
-      />
-    </svg>
+      size="72"
+    />
     <!-- live-область объявляет содержимое, а не aria-label -->
     <span class="app-splash__sr">{{ label }}</span>
     <div class="app-splash__brand">
@@ -68,8 +16,10 @@
 </template>
 
 <script setup lang="ts">
+import AppLogo from '~/components/AppLogo.vue';
+
 /**
- * Экран загрузки (этап 8): знак ITwin Map, по трассе M бежит поток, источник «дышит». Только CSS — виден из
+ * Экран загрузки (этап 8): знак ITwin Map, слои данных «складываются» под карту. Только CSS — виден из
  * серверного HTML до загрузки скриптов (медленная сеть); prefers-reduced-motion — статичный знак. Убирает его
  * страница карты по первому кадру (mapStore.firstFrameShown).
  */
@@ -86,20 +36,13 @@ withDefaults(defineProps<{ label?: string }>(), { label: 'Загрузка ка�
   color: rgb(var(--v-theme-primary));
 }
 
-/* Трасса бледная, по ней бежит поток — штрих в треть пути от левого нижнего узла к правому */
-.app-splash__trace {
-  opacity: 0.3;
+/* Слои данных «складываются» под карту: нижний и средний слой подъезжают к верхнему и возвращаются */
+.app-splash__mark :deep(.app-logo__lower) {
+  animation: app-splash-stack 1.8s var(--ease-out, ease-out) infinite alternate;
 }
 
-.app-splash__flow {
-  stroke-dasharray: 0.3 0.7;
-  animation: app-splash-flow 1.6s linear infinite;
-}
-
-.app-splash__source {
-  fill: var(--logo-accent, var(--accent, #d97706));
-  transform-origin: 12px 14px;
-  animation: app-splash-pulse 1.6s ease-in-out infinite;
+.app-splash__mark :deep(.app-logo__middle) {
+  animation: app-splash-stack-mid 1.8s var(--ease-out, ease-out) infinite alternate;
 }
 
 .app-splash__sr {
@@ -123,25 +66,19 @@ withDefaults(defineProps<{ label?: string }>(), { label: 'Загрузка ка�
   opacity: 0.7;
 }
 
-@keyframes app-splash-flow {
-  from { stroke-dashoffset: 1; }
-  to { stroke-dashoffset: 0; }
+@keyframes app-splash-stack {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(-70px); opacity: 0.55; }
 }
 
-@keyframes app-splash-pulse {
-  50% { transform: scale(0.8); opacity: 0.6; }
+@keyframes app-splash-stack-mid {
+  from { transform: translateY(0); }
+  to { transform: translateY(-36px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .app-splash__trace {
-    opacity: 1;
-  }
-
-  .app-splash__flow {
-    display: none;
-  }
-
-  .app-splash__source {
+  .app-splash__mark :deep(.app-logo__lower),
+  .app-splash__mark :deep(.app-logo__middle) {
     animation: none;
   }
 }
