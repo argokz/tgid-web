@@ -1,0 +1,498 @@
+{
+  "base": "http://127.0.0.1:3040/itwin-map/",
+  "cpu": 4,
+  "runs": 2,
+  "contextOff": [],
+  "date": "2026-10-26T16:31:36.470Z",
+  "results": [
+    {
+      "run": 1,
+      "name": "load",
+      "wallMs": 16247
+    },
+    {
+      "run": 1,
+      "name": "S3a открыть карточку участка (клик → сводка → «Карточка»)",
+      "wallMs": 4392,
+      "ms": 4400,
+      "frames": 39,
+      "fps": 8.9,
+      "frameP50": 59,
+      "frameP95": 542.1,
+      "frameMax": 1326.2,
+      "longTasks": 18,
+      "longTaskMs": 3315,
+      "longTaskMax": 1172,
+      "counters": {
+        "map.setFilter": 0,
+        "map.setLayoutProperty": 0,
+        "map.setPaintProperty": 0,
+        "map.addLayer": 5,
+        "map.removeLayer": 0,
+        "map.addSource": 2,
+        "map.removeSource": 0,
+        "map.easeTo": 0,
+        "map.jumpTo": 0,
+        "map.flyTo": 0,
+        "map.setPadding": 0,
+        "map.resize": 0,
+        "map.triggerRepaint": 68,
+        "map.setFeatureState": 0,
+        "map.queryRenderedFeatures": 4,
+        "geojson.setData": 3,
+        "map.render": 22
+      },
+      "repaintStacks": [
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.<anonymous> (B6Z0M1oK.js:577:195084) < Rp.L.Map.fire (B6Z0M1oK.js:1:10302) < kn.fire (B6Z0M1oK.js:1:10606)",
+          38
+        ],
+        [
+          "Rp.L.Map._render (B6Z0M1oK.js:577:213888) < B6Z0M1oK.js:577:215280",
+          20
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.addLayer (B6Z0M1oK.js:577:207994) < Rp.L.Map.w [as addLayer] (<anonymous>:35:95) < l (B-szCuss.js:2:186932)",
+          5
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.addSource (B6Z0M1oK.js:577:203492) < Rp.L.Map.w [as addSource] (<anonymous>:35:95) < l (B-szCuss.js:2:186834)",
+          2
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.moveLayer (B6Z0M1oK.js:577:208059) < l (B-szCuss.js:2:186914) < Object.i [as show] (B-szCuss.js:2:187060)",
+          2
+        ]
+      ],
+      "cdp": {
+        "recalcStyle": 39,
+        "recalcStyleMs": 202,
+        "layout": 18,
+        "layoutMs": 286,
+        "scriptMs": 310,
+        "taskMs": 4383,
+        "nodes": 10742,
+        "heapMb": "63.1"
+      },
+      "chunks": [
+        {
+          "file": "BUlKpOaS.js",
+          "kb": 22.3
+        },
+        {
+          "file": "BendResistanceDialog.BA-azpx3.css",
+          "kb": 0.1
+        },
+        {
+          "file": "SearchField._jaTRhLr.css",
+          "kb": 0.3
+        },
+        {
+          "file": "BottomSheet.DmuJeJdk.css",
+          "kb": 1.2
+        },
+        {
+          "file": "AttributePanel.CbMjm7q5.css",
+          "kb": 11.7
+        },
+        {
+          "file": "NB0BxmjS.js",
+          "kb": 6.1
+        },
+        {
+          "file": "03_oB0xP.js",
+          "kb": 100.3
+        },
+        {
+          "file": "DOGqVtAk.js",
+          "kb": 8
+        },
+        {
+          "file": "_iEQnKmt.js",
+          "kb": 11.7
+        },
+        {
+          "file": "C3C-orlQ.js",
+          "kb": 6
+        },
+        {
+          "file": "Cknb5hSZ.js",
+          "kb": 3.3
+        },
+        {
+          "file": "DR4DrF9k.js",
+          "kb": 1.2
+        },
+        {
+          "file": "CuCZZrmc.js",
+          "kb": 2.2
+        },
+        {
+          "file": "BfDOTx0C.js",
+          "kb": 33.3
+        },
+        {
+          "file": "DataTable.D30flv1F.css",
+          "kb": 0.7
+        },
+        {
+          "file": "StateView.gtxd2yVp.css",
+          "kb": 1.9
+        },
+        {
+          "file": "KpiTile.CNxohcDa.css",
+          "kb": 2.5
+        },
+        {
+          "file": "JournalDetailFields.C19wVr-a.css",
+          "kb": 2.6
+        },
+        {
+          "file": "SegmentedToggle.B2s7JlPf.css",
+          "kb": 0.4
+        },
+        {
+          "file": "BfVx-0EC.js",
+          "kb": 5.1
+        },
+        {
+          "file": "D30BNrC6.js",
+          "kb": 1.4
+        },
+        {
+          "file": "BAJ_tDR2.js",
+          "kb": 2.6
+        },
+        {
+          "file": "D1G8uWIk.js",
+          "kb": 5
+        },
+        {
+          "file": "CYIH9xQa.js",
+          "kb": 5
+        }
+      ],
+      "chunksKb": 234.9
+    },
+    {
+      "run": 1,
+      "name": "S3b открыть журнал «Диафрагмы» (первый раз)",
+      "wallMs": 9286,
+      "ms": 9289,
+      "frames": 43,
+      "fps": 4.6,
+      "frameP50": 30.8,
+      "frameP95": 447.2,
+      "frameMax": 4366.7,
+      "longTasks": 15,
+      "longTaskMs": 7793,
+      "longTaskMax": 3095,
+      "counters": {
+        "map.setFilter": 0,
+        "map.setLayoutProperty": 0,
+        "map.setPaintProperty": 0,
+        "map.addLayer": 0,
+        "map.removeLayer": 0,
+        "map.addSource": 0,
+        "map.removeSource": 0,
+        "map.easeTo": 0,
+        "map.jumpTo": 0,
+        "map.flyTo": 0,
+        "map.setPadding": 0,
+        "map.resize": 0,
+        "map.triggerRepaint": 0,
+        "map.setFeatureState": 0,
+        "map.queryRenderedFeatures": 0,
+        "geojson.setData": 0,
+        "map.render": 1
+      },
+      "repaintStacks": [],
+      "cdp": {
+        "recalcStyle": 46,
+        "recalcStyleMs": 850,
+        "layout": 19,
+        "layoutMs": 967,
+        "scriptMs": 71,
+        "taskMs": 8944,
+        "nodes": 20424,
+        "heapMb": "89.8"
+      },
+      "chunks": [
+        {
+          "file": "ToolsPanel.ZvmTATRV.css",
+          "kb": 0.4
+        },
+        {
+          "file": "DgMikjys.js",
+          "kb": 3.7
+        },
+        {
+          "file": "NetworkDiaphragmJournalDialog.tVWrPgUn.css",
+          "kb": 0.5
+        },
+        {
+          "file": "DBjnVJDy.js",
+          "kb": 22.7
+        },
+        {
+          "file": "CZC7pqz-.js",
+          "kb": 1.7
+        },
+        {
+          "file": "BPj6NL49.js",
+          "kb": 4.4
+        },
+        {
+          "file": "BBibRZc2.js",
+          "kb": 0.5
+        }
+      ],
+      "chunksKb": 33.9
+    },
+    {
+      "run": 2,
+      "name": "load",
+      "wallMs": 17627
+    },
+    {
+      "run": 2,
+      "name": "S3a открыть карточку участка (клик → сводка → «Карточка»)",
+      "wallMs": 3277,
+      "ms": 3206,
+      "frames": 37,
+      "fps": 11.5,
+      "frameP50": 32.8,
+      "frameP95": 332.2,
+      "frameMax": 1034.6,
+      "longTasks": 14,
+      "longTaskMs": 2433,
+      "longTaskMax": 831,
+      "counters": {
+        "map.setFilter": 0,
+        "map.setLayoutProperty": 0,
+        "map.setPaintProperty": 0,
+        "map.addLayer": 5,
+        "map.removeLayer": 0,
+        "map.addSource": 2,
+        "map.removeSource": 0,
+        "map.easeTo": 0,
+        "map.jumpTo": 0,
+        "map.flyTo": 0,
+        "map.setPadding": 0,
+        "map.resize": 0,
+        "map.triggerRepaint": 75,
+        "map.setFeatureState": 0,
+        "map.queryRenderedFeatures": 4,
+        "geojson.setData": 3,
+        "map.render": 17
+      },
+      "repaintStacks": [
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.<anonymous> (B6Z0M1oK.js:577:195084) < Rp.L.Map.fire (B6Z0M1oK.js:1:10302) < kn.fire (B6Z0M1oK.js:1:10606)",
+          50
+        ],
+        [
+          "Rp.L.Map._render (B6Z0M1oK.js:577:213888) < B6Z0M1oK.js:577:215280",
+          15
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.addLayer (B6Z0M1oK.js:577:207994) < Rp.L.Map.w [as addLayer] (<anonymous>:35:95) < l (B-szCuss.js:2:186932)",
+          5
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.addSource (B6Z0M1oK.js:577:203492) < Rp.L.Map.w [as addSource] (<anonymous>:35:95) < l (B-szCuss.js:2:186834)",
+          2
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.moveLayer (B6Z0M1oK.js:577:208059) < l (B-szCuss.js:2:186914) < Object.i [as show] (B-szCuss.js:2:187060)",
+          2
+        ]
+      ],
+      "cdp": {
+        "recalcStyle": 41,
+        "recalcStyleMs": 121,
+        "layout": 17,
+        "layoutMs": 77,
+        "scriptMs": 142,
+        "taskMs": 3335,
+        "nodes": 10598,
+        "heapMb": "68.4"
+      },
+      "chunks": [
+        {
+          "file": "BUlKpOaS.js",
+          "kb": 22.3
+        },
+        {
+          "file": "03_oB0xP.js",
+          "kb": 100.3
+        },
+        {
+          "file": "NB0BxmjS.js",
+          "kb": 6.1
+        },
+        {
+          "file": "DOGqVtAk.js",
+          "kb": 8
+        },
+        {
+          "file": "_iEQnKmt.js",
+          "kb": 11.7
+        },
+        {
+          "file": "BendResistanceDialog.BA-azpx3.css",
+          "kb": 0.1
+        },
+        {
+          "file": "C3C-orlQ.js",
+          "kb": 6
+        },
+        {
+          "file": "Cknb5hSZ.js",
+          "kb": 3.3
+        },
+        {
+          "file": "BottomSheet.DmuJeJdk.css",
+          "kb": 1.2
+        },
+        {
+          "file": "DR4DrF9k.js",
+          "kb": 1.2
+        },
+        {
+          "file": "AttributePanel.CbMjm7q5.css",
+          "kb": 11.7
+        },
+        {
+          "file": "SearchField._jaTRhLr.css",
+          "kb": 0.3
+        },
+        {
+          "file": "CuCZZrmc.js",
+          "kb": 2.2
+        },
+        {
+          "file": "BfDOTx0C.js",
+          "kb": 33.3
+        },
+        {
+          "file": "BfVx-0EC.js",
+          "kb": 5.1
+        },
+        {
+          "file": "JournalDetailFields.C19wVr-a.css",
+          "kb": 2.6
+        },
+        {
+          "file": "D30BNrC6.js",
+          "kb": 1.4
+        },
+        {
+          "file": "SegmentedToggle.B2s7JlPf.css",
+          "kb": 0.4
+        },
+        {
+          "file": "DataTable.D30flv1F.css",
+          "kb": 0.7
+        },
+        {
+          "file": "StateView.gtxd2yVp.css",
+          "kb": 1.9
+        },
+        {
+          "file": "KpiTile.CNxohcDa.css",
+          "kb": 2.5
+        },
+        {
+          "file": "BAJ_tDR2.js",
+          "kb": 2.6
+        },
+        {
+          "file": "D1G8uWIk.js",
+          "kb": 5
+        },
+        {
+          "file": "CYIH9xQa.js",
+          "kb": 5
+        }
+      ],
+      "chunksKb": 234.9
+    },
+    {
+      "run": 2,
+      "name": "S3b открыть журнал «Диафрагмы» (первый раз)",
+      "wallMs": 8939,
+      "ms": 8954,
+      "frames": 36,
+      "fps": 4,
+      "frameP50": 47.4,
+      "frameP95": 1192.5,
+      "frameMax": 3287,
+      "longTasks": 20,
+      "longTaskMs": 7878,
+      "longTaskMax": 2493,
+      "counters": {
+        "map.setFilter": 0,
+        "map.setLayoutProperty": 0,
+        "map.setPaintProperty": 0,
+        "map.addLayer": 0,
+        "map.removeLayer": 0,
+        "map.addSource": 0,
+        "map.removeSource": 0,
+        "map.easeTo": 0,
+        "map.jumpTo": 0,
+        "map.flyTo": 0,
+        "map.setPadding": 0,
+        "map.resize": 0,
+        "map.triggerRepaint": 0,
+        "map.setFeatureState": 0,
+        "map.queryRenderedFeatures": 0,
+        "geojson.setData": 0,
+        "map.render": 0
+      },
+      "repaintStacks": [],
+      "cdp": {
+        "recalcStyle": 46,
+        "recalcStyleMs": 1617,
+        "layout": 20,
+        "layoutMs": 474,
+        "scriptMs": 69,
+        "taskMs": 8876,
+        "nodes": 20270,
+        "heapMb": "55.7"
+      },
+      "chunks": [
+        {
+          "file": "DgMikjys.js",
+          "kb": 3.7
+        },
+        {
+          "file": "ToolsPanel.ZvmTATRV.css",
+          "kb": 0.4
+        },
+        {
+          "file": "DBjnVJDy.js",
+          "kb": 22.7
+        },
+        {
+          "file": "CZC7pqz-.js",
+          "kb": 1.7
+        },
+        {
+          "file": "BPj6NL49.js",
+          "kb": 4.4
+        },
+        {
+          "file": "BBibRZc2.js",
+          "kb": 0.5
+        },
+        {
+          "file": "NetworkDiaphragmJournalDialog.tVWrPgUn.css",
+          "kb": 0.5
+        }
+      ],
+      "chunksKb": 33.9
+    }
+  ],
+  "consoleErrors": []
+}
