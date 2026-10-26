@@ -14,14 +14,13 @@
             <v-btn
               v-bind="tp"
               icon
-              size="large"
-              elevation="3"
               color="surface"
+              rounded="lg"
               class="sidebar-toggle"
               aria-label="Открыть панель слоёв"
               @click="openPanel"
             >
-              <v-icon color="primary">mdi-layers</v-icon>
+              <v-icon size="20">mdi-layers</v-icon>
             </v-btn>
           </template>
         </v-tooltip>
@@ -53,17 +52,14 @@
       />
     </v-navigation-drawer>
 
-    <!-- ДЕСКТОП: фиксированная боковая панель (первый кадр без slide-enter — иначе CLS в .map-container) -->
+    <!-- ДЕСКТОП: плавающая карточка над картой (первый кадр без slide-enter — иначе CLS в .map-container) -->
     <transition :name="sidebarMotionEnabled ? 'slide' : 'sidebar-static'">
       <div
         v-if="!mobile && !desktopCollapsed"
+        ref="sidebarEl"
         class="desktop-sidebar"
       >
-        <v-card
-          elevation="2"
-          rounded="0"
-          class="sidebar-card"
-        >
+        <v-card class="sidebar-card">
           <MapSidebarPanel
             :layer-opacities="layerOpacities"
             :fragments-loading="fragmentsLoading"
@@ -108,6 +104,7 @@ import { useFragmentStore } from '~/stores/fragmentStore'
 import { useMapStore }      from '~/stores/mapStore'
 import { useUiStore }       from '~/stores/uiStore'
 import { setMapSubLayerOpacity } from '~/utils/mapLayerOpacity'
+import { readCssPx } from '~/utils/shellMetrics'
 import MapSidebarPanel from './MapSidebarPanel.vue'
 
 const { mobile } = useDisplay()
@@ -231,12 +228,27 @@ onMounted(() => {
 
 watch([desktopCollapsed, mobileOpen, activeTab], saveSidebarState, { deep: false })
 
-/** Ширина открытой панели на десктопе — в uiStore: легенда и панель графиков встают правее (docs/ui-zones.md) */
-const SIDEBAR_WIDTH_PX = 340
+/**
+ * Ширина карточки слоёв на десктопе (= width в .desktop-sidebar). В uiStore уходит вместе с отступом от края
+ * (--shell-inset): легенда и панель графиков встают правее карточки (docs/ui-zones.md)
+ */
+const SIDEBAR_WIDTH_PX = 320
+const SHELL_INSET_FALLBACK_PX = 12
 const ui = useUiStore()
-watch([mobile, desktopCollapsed], ([isMobile, collapsed]) => {
-  ui.setLeftInset(!isMobile && !collapsed ? SIDEBAR_WIDTH_PX : 0)
-}, { immediate: true })
+const sidebarEl = ref<HTMLElement | null>(null)
+/**
+ * Правый край карточки: offsetLeft + offsetWidth не зависят от transform анимации входа и учитывают
+ * --safe-left (env() из CSS-переменной не прочитать). До монтирования и на сервере — отступ + ширина
+ */
+watch([mobile, desktopCollapsed, sidebarEl], ([isMobile, collapsed, el]) => {
+  if (isMobile || collapsed) {
+    ui.setLeftInset(0)
+    return
+  }
+  ui.setLeftInset(el
+    ? el.offsetLeft + el.offsetWidth
+    : readCssPx('--shell-inset', SHELL_INSET_FALLBACK_PX) + SIDEBAR_WIDTH_PX)
+}, { immediate: true, flush: 'post' })
 onBeforeUnmount(() => ui.setLeftInset(0))
 </script>
 
@@ -245,19 +257,31 @@ onBeforeUnmount(() => ui.setLeftInset(0))
   position: fixed;
   top: calc(var(--shell-top) + var(--shell-inset));
   left: calc(var(--shell-inset) + var(--safe-left, 0px));
-  z-index: 200;
+  z-index: var(--z-controls);
 }
 
-/* Десктопная панель */
+/* Кнопка как у контролов карты: белый квадрат 40 (на тач-экране 44), тень вместо рамки */
+.sidebar-toggle-wrap .sidebar-toggle {
+  width: 40px;
+  height: 40px;
+  box-shadow: var(--shadow-2);
+}
+
+@media (pointer: coarse) {
+  .sidebar-toggle-wrap .sidebar-toggle {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Десктопная панель: плавающая карточка на общих линиях каркаса (верх — под шапкой, отступ от краёв) */
 .desktop-sidebar {
   position: fixed;
-  top: var(--shell-top);
-  left: 0;
-  z-index: 199;
-  height: calc(100vh - var(--shell-top));
-  /* адресная строка мобильного браузера: видимая высота, а не высота без панелей */
-  height: calc(100dvh - var(--shell-top));
-  width: 340px;
+  top: calc(var(--shell-top) + var(--shell-inset));
+  bottom: var(--shell-inset);
+  left: calc(var(--shell-inset) + var(--safe-left, 0px));
+  z-index: calc(var(--z-controls) - 1);
+  width: 320px;
   pointer-events: all;
 }
 
@@ -265,7 +289,9 @@ onBeforeUnmount(() => ui.setLeftInset(0))
   height: 100%;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)) !important;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-3);
 }
 
 /* Первый показ панели: без анимации входа (см. sidebarMotionEnabled) */
@@ -293,7 +319,7 @@ onBeforeUnmount(() => ui.setLeftInset(0))
 
 .slide-enter-from,
 .slide-leave-to {
-  transform: translateX(-100%);
+  transform: translateX(calc(-100% - var(--shell-inset)));
   opacity: 0;
 }
 

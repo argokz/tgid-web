@@ -2,23 +2,9 @@
   <div class="sidebar-inner">
     <!-- Шапка -->
     <div class="sidebar-header">
-      <div
-        class="d-flex align-center"
-        style="gap: 12px;"
-      >
-        <v-avatar
-          size="34"
-          color="primary"
-        >
-          <v-icon
-            color="white"
-            size="18"
-          >{{ sidebarIcon }}</v-icon>
-        </v-avatar>
-        <div>
-          <div class="text-subtitle-2 font-weight-semibold">{{ sidebarTitle }}</div>
-          <div class="text-caption text-medium-emphasis">{{ tabSubtitle }}</div>
-        </div>
+      <div class="sidebar-heading">
+        <div class="sidebar-title">{{ sidebarTitle }}</div>
+        <div class="sidebar-subtitle">{{ tabSubtitle }}</div>
       </div>
       <HintTip
         text="Закрыть панель"
@@ -40,30 +26,26 @@
     </div>
 
     <!-- Табы -->
+    <!-- Вкладки — только подписи: иконки повторяли текст (Рамс), а ширина карточки 320 -->
     <v-tabs
       v-model="activeTabLocal"
       bg-color="surface"
       color="primary"
       density="compact"
+      grow
       class="sidebar-tabs"
     >
       <v-tab
         value="layers"
         density="compact"
       >
-        <v-icon
-          class="me-1"
-          size="16"
-        >mdi-layers</v-icon>Слои
+        Слои
       </v-tab>
       <v-tab
         value="fragments"
         density="compact"
       >
-        <v-icon
-          class="me-1"
-          size="16"
-        >mdi-map-marker-multiple</v-icon>Фрагменты
+        Фрагменты
         <v-chip
           v-if="pendingFragments.length > 0"
           size="x-small"
@@ -77,10 +59,7 @@
         value="labels"
         density="compact"
       >
-        <v-icon
-          class="me-1"
-          size="16"
-        >mdi-label-multiple</v-icon>Подписи
+        Подписи
         <v-chip
           v-if="pendingLabels.length > 0"
           size="x-small"
@@ -94,15 +73,16 @@
         value="pts"
         density="compact"
       >
-        <!-- жёлтая иконка — на карте есть подсветка участков -->
-        <v-icon
-          class="me-1"
-          size="16"
-          :color="layerStore.ptsHighlight ? 'amber-darken-3' : undefined"
-        >mdi-account-tie</v-icon>ПТС
+        ПТС
+        <!-- точка акцента — на карте есть подсветка участков -->
+        <span
+          v-if="layerStore.ptsHighlight"
+          class="tab-dot"
+          role="img"
+          aria-label="подсветка включена"
+        />
       </v-tab>
     </v-tabs>
-    <v-divider />
 
     <v-window
       v-model="activeTabLocal"
@@ -113,7 +93,7 @@
       <v-window-item value="layers">
         <div class="tab-content">
           <div class="content-area">
-            <div class="group-header px-3 py-2 mt-1">
+            <div class="group-header px-3 py-1">
               <v-icon
                 size="13"
                 class="me-1"
@@ -175,7 +155,9 @@
                 v-for="row in contextLayerRows"
                 :key="row.key"
                 class="layer-item compact-layer-item"
-                :class="{ active: isPendingContextLayerVisible(row.key) }"
+                :class="{ 'row-hit': mapTilerReady }"
+                :link="false"
+                @click="mapTilerReady && togglePendingContextLayer(row.key)"
               >
                 <template #prepend>
                   <v-checkbox-btn
@@ -186,16 +168,17 @@
                     @click.stop="togglePendingContextLayer(row.key)"
                   />
                 </template>
-                <v-list-item-title class="text-body-2">
+                <v-list-item-title class="layer-name">
                   {{ row.title }}
                 </v-list-item-title>
-                <v-list-item-subtitle class="text-caption text-grey compact-subtitle">
+                <v-list-item-subtitle class="compact-subtitle">
                   {{ row.subtitle }}
                 </v-list-item-subtitle>
                 <!-- Легенда цвета зданий по назначению -->
                 <div
                   v-if="row.key === 'buildings' && isPendingContextLayerVisible('buildings')"
                   class="building-legend"
+                  @click.stop
                 >
                   <span
                     v-for="item in buildingLegend"
@@ -220,7 +203,6 @@
               <v-card
                 v-if="planetStyleTarget"
                 density="compact"
-                class="planet-style-card"
               >
                 <v-card-title class="text-subtitle-2 py-2 px-3 d-flex align-center">
                   <span class="text-truncate">{{ planetStyleTarget.label }}</span>
@@ -327,7 +309,7 @@
 
             <!-- ── Planet V4 слои ── -->
             <template v-if="mapStore.selectedBaseLayer === 'planet-v4'">
-              <div class="group-header px-3 py-2 mt-1">
+              <div class="group-header px-3 py-1">
                 <v-icon
                   size="13"
                   class="me-1"
@@ -362,10 +344,7 @@
                   :key="pg.group"
                   class="mb-0"
                 >
-                  <div
-                    class="group-header px-3 py-1"
-                    style="background: transparent;"
-                  >
+                  <div class="group-header group-header--sub px-3 py-1">
                     <v-icon
                       size="12"
                       class="me-1"
@@ -421,8 +400,9 @@
                     <v-list-item
                       v-for="pl in pg.layers"
                       :key="pl.sourceLayer"
-                      class="layer-item compact-layer-item"
-                      style="min-height: 28px;"
+                      class="layer-item compact-layer-item row-hit"
+                      :link="false"
+                      @click="mapStore.setPlanetLayerVisible(pl.sourceLayer, !mapStore.visiblePlanetLayers.includes(pl.sourceLayer))"
                     >
                       <template #prepend>
                         <v-checkbox-btn
@@ -433,10 +413,7 @@
                           @click.stop="mapStore.setPlanetLayerVisible(pl.sourceLayer, !mapStore.visiblePlanetLayers.includes(pl.sourceLayer))"
                         />
                       </template>
-                      <v-list-item-title
-                        class="text-body-2"
-                        style="font-size: 0.8rem !important;"
-                      >
+                      <v-list-item-title class="layer-name">
                         {{ pl.label }}
                       </v-list-item-title>
                       <template #append>
@@ -523,18 +500,17 @@
                 <v-list-item
                   v-for="layer in group.layers"
                   :key="layer.layerId"
-                  class="layer-item compact-layer-item tight-left-item working-layer-item"
-                  :class="{ active: pendingVisible.includes(layer.layerId) }"
+                  class="layer-item compact-layer-item tight-left-item working-layer-item row-hit"
+                  :link="false"
+                  @click="togglePendingLayer(layer.layerId)"
                 >
                   <template #prepend>
                     <div class="d-flex align-center layer-prepend">
-                      <v-chip
-                        size="x-small"
-                        color="grey-lighten-3"
-                        class="me-1 order-chip working-order-chip"
-                      >
-                        {{ getLayerOrder(layer.layerId) }}
-                      </v-chip>
+                      <!-- номер в стеке карты; для чтения с экрана порядок задаёт сам список -->
+                      <span
+                        class="order-num"
+                        aria-hidden="true"
+                      >{{ getLayerOrder(layer.layerId) }}</span>
                       <v-checkbox-btn
                         class="layer-checkbox"
                         density="compact"
@@ -546,10 +522,10 @@
                     </div>
                   </template>
 
-                  <v-list-item-title class="text-body-2 text-truncate layer-name">
+                  <v-list-item-title class="text-truncate layer-name">
                     {{ layer.label || layer.displayName || layer.sourceLayer }}
                   </v-list-item-title>
-                  <v-list-item-subtitle class="text-caption text-grey text-truncate compact-subtitle working-subtitle">
+                  <v-list-item-subtitle class="text-truncate compact-subtitle working-subtitle">
                     {{ layer.workspace }} / {{ layer.sourceLayer }}
                   </v-list-item-subtitle>
 
@@ -583,15 +559,10 @@
 
                   <div
                     v-if="pendingVisible.includes(layer.layerId)"
-                    class="opacity-row mt-1"
+                    class="opacity-row"
                     @click.stop
                   >
-                    <div class="d-flex align-center justify-space-between mb-1">
-                      <span class="text-caption text-medium-emphasis">Прозрачность</span>
-                      <span class="text-caption font-weight-medium">
-                        {{ Math.round((layerOpacities[layer.layerId] ?? 1) * 100) }}%
-                      </span>
-                    </div>
+                    <span class="opacity-label">Прозрачность</span>
                     <v-slider
                       :model-value="layerOpacities[layer.layerId] ?? 1"
                       :min="0"
@@ -601,14 +572,17 @@
                       hide-details
                       density="compact"
                       :name="`Прозрачность: ${layer.label || layer.displayName || layer.sourceLayer}`"
+                      class="opacity-slider"
                       @update:model-value="(v) => $emit('opacity-change', layer.layerId, v)"
                     />
+                    <span class="opacity-value">{{ Math.round((layerOpacities[layer.layerId] ?? 1) * 100) }}%</span>
                   </div>
 
                   <template #append>
+                    <!-- click.stop: клик по неактивной стрелке или между стрелками не должен переключать слой -->
                     <div
-                      class="d-flex flex-column"
-                      style="gap: 2px;"
+                      class="d-flex flex-column reorder-actions"
+                      @click.stop
                     >
                       <HintTip
                         :text="`Переместить слой «${layer.label || layer.displayName || layer.sourceLayer}» вверх`"
@@ -700,7 +674,6 @@
                 v-for="item in filteredFragments"
                 :key="item.id"
                 class="layer-item"
-                :class="{ active: pendingFragments.includes(item.id) }"
                 @click="togglePendingFragment(item.id)"
               >
                 <template #prepend>
@@ -726,11 +699,11 @@
                 color="primary"
                 aria-label="Загрузка списка фрагментов"
               />
-              <div class="text-body-2 text-grey mt-3">Загрузка...</div>
+              <div class="text-body-2 text-medium-emphasis mt-3">Загрузка...</div>
             </div>
             <div
               v-else-if="fragmentStore.fragments.length === 0"
-              class="pa-8 text-center text-grey"
+              class="pa-8 text-center text-medium-emphasis"
             >
               <v-icon
                 size="44"
@@ -748,7 +721,7 @@
             </div>
             <div
               v-else
-              class="pa-8 text-center text-grey"
+              class="pa-8 text-center text-medium-emphasis"
             >
               <v-icon
                 size="44"
@@ -763,7 +736,7 @@
               class="px-3 py-2 d-flex align-center flex-wrap"
               style="gap: 8px;"
             >
-              <span class="text-caption text-grey">
+              <span class="text-caption text-medium-emphasis">
                 В черновике: <strong>{{ pendingFragments.length }}</strong>
                 / {{ fragmentStore.fragments.length }}
               </span>
@@ -821,7 +794,6 @@
                 v-for="item in filteredLabels"
                 :key="item.id"
                 class="layer-item"
-                :class="{ active: pendingLabels.includes(item.id) }"
                 @click="togglePendingLabel(item.id)"
               >
                 <template #prepend>
@@ -852,7 +824,7 @@
             </v-list>
             <div
               v-if="filteredLabels.length === 0 && labelSearchLocal"
-              class="pa-8 text-center text-grey"
+              class="pa-8 text-center text-medium-emphasis"
             >
               <v-icon
                 size="44"
@@ -867,7 +839,7 @@
               class="px-3 py-2 d-flex align-center flex-wrap"
               style="gap: 8px;"
             >
-              <span class="text-caption text-grey">
+              <span class="text-caption text-medium-emphasis">
                 В черновике: <strong>{{ pendingLabels.length }}</strong>
                 / {{ AVAILABLE_LABELS.length }}
               </span>
@@ -1263,16 +1235,15 @@ const AVAILABLE_LABELS = [
   { id: 'NAPOR2', label: 'Полный напор, H, м.вод.ст.',      icon: 'mdi-gauge-full' },
 ]
 
-const tabMeta: Record<string, { title: string; subtitle: string; icon: string }> = {
-  layers:    { title: 'Слои',      subtitle: 'Видимость и порядок',    icon: 'mdi-layers' },
-  fragments: { title: 'Фрагменты', subtitle: 'Фильтрация по участкам', icon: 'mdi-map-marker-multiple' },
-  labels:    { title: 'Подписи',   subtitle: 'Атрибуты на карте',      icon: 'mdi-label-multiple' },
-  pts:       { title: 'Участки ПТС', subtitle: 'Подсветка на карте',   icon: 'mdi-account-tie' },
+const tabMeta: Record<string, { title: string; subtitle: string }> = {
+  layers:    { title: 'Слои',        subtitle: 'Видимость и порядок' },
+  fragments: { title: 'Фрагменты',   subtitle: 'Фильтрация по участкам' },
+  labels:    { title: 'Подписи',     subtitle: 'Атрибуты на карте' },
+  pts:       { title: 'Участки ПТС', subtitle: 'Подсветка на карте' },
 }
 
 const sidebarTitle = computed(() => tabMeta[activeTabLocal.value]?.title    ?? 'Меню')
 const tabSubtitle  = computed(() => tabMeta[activeTabLocal.value]?.subtitle  ?? '')
-const sidebarIcon  = computed(() => tabMeta[activeTabLocal.value]?.icon      ?? 'mdi-menu')
 
 // Layer groups
 interface LayerGroup { name: string; layers: typeof layerStore.geoServerLayers }
@@ -1352,37 +1323,58 @@ const getLabelIconColor = (id: string) => {
   height: 100%;
 }
 
+/* Шапка карточки: заголовок 16/600 и служебная строка 12 — два из трёх стилей текста (docs/ui-felt-audit.md) */
 .sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2) var(--space-1) var(--space-4);
   background: rgb(var(--v-theme-surface));
-  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   flex-shrink: 0;
 }
 
-/* Иконка внутри аватара всегда белая (SVG использует fill:currentColor) */
-.sidebar-header :deep(.v-avatar svg),
-.sidebar-header :deep(.v-avatar path) {
-  fill: white;
-  color: white;
+.sidebar-heading {
+  min-width: 0;
 }
 
+.sidebar-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+  color: var(--text-strong);
+}
+
+.sidebar-subtitle {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-faint);
+}
+
+/* flex: none — у v-tabs--grow свой flex-grow: 1, в колонке он растянул бы вкладки по высоте */
 .sidebar-tabs {
-  flex-shrink: 0;
+  flex: none;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-/* четыре вкладки в ширину панели (340 px) без прокрутки */
+/* четыре вкладки в ширину карточки (320 px) без прокрутки: grow растягивает их, а отступ 4 оставляет запас
+   на два счётчика черновика и точку ПТС (худший случай — 283 px из 320) */
 .sidebar-tabs :deep(.v-tab) {
   min-width: 0 !important; /* у v-tab своё min-width: 90px */
-  padding: 0 5px;
+  padding: 0 var(--space-1);
   text-transform: none;
   letter-spacing: 0;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
 }
-.sidebar-tabs :deep(.v-tab .v-icon.me-1) {
-  margin-inline-end: 2px !important;
+
+.tab-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-inline-start: var(--space-1);
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 .sidebar-window {
@@ -1422,8 +1414,6 @@ const getLabelIconColor = (id: string) => {
 }
 
 .search-section {
-  background: rgb(var(--v-theme-surface-light));
-  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   flex-shrink: 0;
 }
 
@@ -1448,17 +1438,38 @@ const getLabelIconColor = (id: string) => {
   flex-shrink: 0;
 }
 
+/* Заголовок секции: без подложки и линий, отделён воздухом (близость: 8 px до строк, 12 px от прошлой секции) */
 .group-header {
   display: flex;
   align-items: center;
-  background: rgba(0, 0, 0, 0.03);
-  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  min-height: 32px;
+  margin-top: var(--space-3);
 }
 
+.group-header--sub {
+  margin-top: 0;
+}
+
+/* Строка слоя в духе Felt: без разделителей, ховер подложкой; кликабельна вся строка (row-hit) */
 .layer-item {
-  transition: background 0.15s;
-  border-radius: 6px;
-  margin: 1px 6px;
+  transition: background-color var(--duration-fast) var(--ease-out);
+  border-radius: var(--radius-sm);
+  margin: 1px var(--space-2);
+}
+
+.layer-item.row-hit {
+  cursor: pointer;
+}
+
+/* внутренние блоки строки клик не переключают (click.stop) — и курсор у них обычный */
+.row-hit .format-row,
+.row-hit .opacity-row,
+.row-hit .building-legend {
+  cursor: default;
+}
+
+.layer-item.row-hit:hover {
+  background: var(--surface-hover);
 }
 
 .compact-list {
@@ -1466,14 +1477,14 @@ const getLabelIconColor = (id: string) => {
 }
 
 .compact-layer-item {
-  margin: 0 6px;
+  margin: 0 var(--space-2);
   min-height: 32px;
 }
 
 .working-layer-item {
-  padding-top: 1px !important;
-  padding-bottom: 1px !important;
-  min-height: 28px !important;
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+  min-height: 32px !important;
 }
 
 .tight-left-item :deep(.v-list-item__prepend) {
@@ -1482,7 +1493,7 @@ const getLabelIconColor = (id: string) => {
 }
 
 .layer-prepend {
-  gap: 1px;
+  gap: var(--space-1);
 }
 
 .layer-checkbox {
@@ -1490,29 +1501,57 @@ const getLabelIconColor = (id: string) => {
 }
 
 .compact-subtitle {
-  font-size: 0.68rem !important;
-  line-height: 1.15 !important;
-}
-
-.layer-item.active {
-  background: rgba(var(--v-theme-primary), 0.05);
+  font-size: 12px !important;
+  line-height: 16px !important;
+  color: var(--text-faint);
+  opacity: 1;
 }
 
 .layer-name {
-  font-size: 0.78rem !important;
+  font-size: 13px !important;
   font-weight: 500 !important;
-  line-height: 1.1 !important;
+  line-height: 20px !important;
+  color: var(--text-strong);
 }
 
-.order-chip {
-  min-width: 22px;
-  justify-content: center;
-}
-
-.working-order-chip {
+.order-num {
   min-width: 18px;
-  height: 16px;
-  font-size: 0.62rem;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+
+/* Стрелки порядка — вторичное действие: на устройствах с мышью проявляются при наведении на строку
+   или фокусе внутри неё (opacity, а не visibility — кнопки остаются в порядке Tab); на тач-экранах видны всегда */
+.reorder-actions {
+  cursor: default;
+}
+
+/* не меньше 24×24 (WCAG 2.2, 2.5.8); на тач-экране — 32 */
+.reorder-actions :deep(.v-btn) {
+  width: 28px;
+  height: 24px;
+}
+
+@media (pointer: coarse) {
+  .reorder-actions :deep(.v-btn) {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (hover: hover) {
+  .reorder-actions {
+    opacity: 0;
+    transition: opacity var(--duration-fast) var(--ease-out);
+  }
+
+  .working-layer-item:hover .reorder-actions,
+  .working-layer-item:focus-within .reorder-actions {
+    opacity: 1;
+  }
 }
 
 .working-subtitle {
@@ -1539,20 +1578,36 @@ const getLabelIconColor = (id: string) => {
   min-height: 20px;
 }
 
+/* Прозрачность одной строкой: подпись · ползунок · значение (было три строки на каждый включённый слой) */
 .opacity-row {
-  padding: 3px 2px;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 6px;
-  max-width: 190px;
-  margin-top: 2px !important;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-faint);
+}
+
+.opacity-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.opacity-slider :deep(.v-input__control) {
+  min-height: 24px;
+}
+
+.opacity-value {
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
 }
 
 .working-layers-list :deep(.v-list-item__content) {
   overflow: hidden;
-}
-
-.planet-style-card {
-  border-radius: 10px;
 }
 
 .planet-color-input {
