@@ -41,7 +41,7 @@
         >
           <div
             :id="`cp-section-${section.kind}`"
-            class="command-palette__section text-overline text-medium-emphasis px-4 pt-2"
+            class="command-palette__section section-label px-4 pt-3 pb-1"
           >
             {{ section.title }}
           </div>

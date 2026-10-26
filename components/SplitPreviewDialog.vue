@@ -37,7 +37,7 @@
                 color="success"
                 class="me-1"
               >mdi-arrow-right-bold</v-icon>
-              <span class="text-caption font-weight-bold text-uppercase">Перенос на новую половину</span>
+              <span class="section-label">Перенос на новую половину</span>
             </div>
             <template v-if="movedList.length">
               <v-chip
@@ -70,7 +70,7 @@
                 color="warning"
                 class="me-1"
               >mdi-hand-back-right</v-icon>
-              <span class="text-caption font-weight-bold text-uppercase">Выберите половину</span>
+              <span class="section-label">Выберите половину</span>
             </div>
             <v-alert
               type="warning"

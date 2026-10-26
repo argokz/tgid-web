@@ -119,7 +119,7 @@
                 class="me-1"
                 color="secondary"
               >mdi-earth</v-icon>
-              <span class="text-caption font-weight-bold text-medium-emphasis text-uppercase">
+              <span class="section-label">
                 Слои контекста
               </span>
               <v-spacer />
@@ -333,7 +333,7 @@
                   class="me-1"
                   color="secondary"
                 >mdi-earth</v-icon>
-                <span class="text-caption font-weight-bold text-medium-emphasis text-uppercase">
+                <span class="section-label">
                   Слои Planet V4
                 </span>
                 <v-spacer />
@@ -491,7 +491,7 @@
                   class="me-1"
                   color="secondary"
                 >mdi-folder-outline</v-icon>
-                <span class="text-caption font-weight-bold text-medium-emphasis text-uppercase">
+                <span class="section-label">
                   {{ formatGroupName(group.name) }}
                 </span>
                 <v-spacer />

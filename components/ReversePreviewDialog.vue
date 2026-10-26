@@ -117,7 +117,7 @@
                 color="success"
                 class="me-1"
               >mdi-check</v-icon>
-              <span class="text-caption font-weight-bold text-uppercase">Остаётся без изменений</span>
+              <span class="section-label">Остаётся без изменений</span>
             </div>
             <template v-if="neutralList.length">
               <v-chip

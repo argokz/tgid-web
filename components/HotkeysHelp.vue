@@ -37,7 +37,7 @@
           :key="section.area"
           class="hotkeys-section"
         >
-          <div class="text-overline text-medium-emphasis">
+          <div class="section-label mb-1">
             {{ section.title }}
           </div>
           <div class="hotkeys-grid">

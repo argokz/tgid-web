@@ -54,7 +54,7 @@
                 color="success"
                 class="me-1"
               >mdi-arrow-right-bold</v-icon>
-              <span class="text-caption font-weight-bold text-uppercase">Перенос на узел {{ targetId }}</span>
+              <span class="section-label">Перенос на узел {{ targetId }}</span>
             </div>
             <template v-if="transferList.length">
               <v-chip

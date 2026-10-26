@@ -239,7 +239,7 @@ const submit = async () => {
 }
 .login-brand {
   font-size: 1.5rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.2;
 }

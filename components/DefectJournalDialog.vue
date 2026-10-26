@@ -1035,11 +1035,9 @@ defineExpose({ openDialog })
 }
 
 .detail-label {
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
-  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
 }
 
 @media (max-width: 600px) {

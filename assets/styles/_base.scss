@@ -1,0 +1,68 @@
+// Базовая подача элементов Vuetify — этап 10 («в духе Felt», docs/ui-felt-audit.md).
+//
+// Правила здесь, а не правками в сотне шаблонов: регистр, веса, скругления, тени и фокус одинаковы во всём
+// приложении. `:root` в селекторе поднимает специфичность над стилями Vuetify (они подключаются позже и с тем же
+// весом) и работает в окнах и меню — они телепортируются в `body`, вне `.v-application`. Утилиты Vuetify
+// (`rounded-0`, `text-uppercase`, `elevation-*`) по-прежнему сильнее — явное решение в шаблоне выигрывает.
+
+// --- Иерархия текста: без капса и разрядки (у Vuetify кнопки и вкладки капсом по умолчанию) ---
+:root .v-btn {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+// Три веса — 400 / 500 / 600: «жирный» в шаблонах и разметке рисуется полужирным
+:root .font-weight-bold,
+:root .font-weight-black {
+  font-weight: 600 !important;
+}
+
+b,
+strong {
+  font-weight: 600;
+}
+
+// Заголовок окна или карточки — один стиль: 16 / 600
+:root .v-card-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.5;
+}
+
+// --- Поверхности: скругление и мягкая тень вместо материальной высоты ---
+:root .v-card {
+  border-radius: var(--radius-md);
+}
+
+// Окна — самая высокая поверхность; меню и выпадающие списки — средняя
+:root .v-dialog > .v-overlay__content > .v-card,
+:root .v-dialog > .v-overlay__content > form > .v-card {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+}
+
+:root .v-dialog--fullscreen > .v-overlay__content > .v-card {
+  border-radius: 0;
+}
+
+:root .v-menu > .v-overlay__content > .v-card,
+:root .v-menu > .v-overlay__content > .v-list,
+:root .v-menu > .v-overlay__content > .v-sheet {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+}
+
+// --- Обратная связь: видимый фокус с клавиатуры (на стекле и над картой подложка Vuetify почти не видна) ---
+:root .v-btn:focus-visible,
+:root .v-list-item:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+// Отдельным правилом: браузер без :has() отбросил бы весь список селекторов выше
+:root .v-selection-control__input:has(> input:focus-visible) {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: -4px;
+  border-radius: 50%;
+}

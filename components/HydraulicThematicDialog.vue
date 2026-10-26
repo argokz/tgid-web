@@ -79,7 +79,7 @@
           color="indigo"
           class="pa-3 mb-4 rounded-lg"
         >
-          <div class="text-caption font-weight-bold mb-2 text-uppercase">
+          <div class="section-label mb-2">
             Сводка расчёта #{{ summary.calculation_id }}
           </div>
           <v-row dense>

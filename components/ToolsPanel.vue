@@ -62,7 +62,7 @@
             :color="group.color"
             class="me-1"
           >{{ group.icon }}</v-icon>
-          <span class="text-caption font-weight-bold text-uppercase">{{ group.title }}</span>
+          <span class="section-label">{{ group.title }}</span>
           <v-spacer />
           <span class="text-caption text-medium-emphasis">{{ group.items.length }}</span>
         </div>

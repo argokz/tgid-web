@@ -17,6 +17,9 @@ describe('дизайн-токены', () => {
       '--duration-fast', '--duration-base', '--duration-slow', '--ease-out', '--ease-in', '--ease-spring',
       '--accent', '--accent-rgb', '--accent-text', '--accent-soft',
       '--glass-1-bg', '--glass-1-filter', '--glass-solid-bg', '--glass-border',
+      '--surface-hover', '--surface-pressed', '--surface-selected', '--border-subtle',
+      '--text-strong', '--text-muted', '--text-faint',
+      '--shell-top', '--shell-inset', '--shell-gap', '--controls-w', '--measure',
     ]) {
       expect(tokens, name).toMatch(new RegExp(name + ':[ ]*[^;]+;'));
     }
@@ -39,7 +42,7 @@ describe('дизайн-токены', () => {
   });
 
   it('SCSS-зеркало совпадает с CSS-токенами', () => {
-    for (const [name, value] of [['space-2', '8px'], ['radius-md', '10px'], ['duration-slow', '280ms']]) {
+    for (const [name, value] of [['space-2', '8px'], ['radius-md', '8px'], ['radius-lg', '12px'], ['duration-slow', '280ms']]) {
       expect(tokens).toContain(`--${name}: ${value}`);
       expect(variables).toContain(`$${name}: ${value}`);
     }
@@ -51,6 +54,10 @@ describe('дизайн-токены', () => {
       expect(breakpoints, name).toMatch(new RegExp(name + ':[ ]*' + value + '[^0-9]'));
       expect(variables).toContain(`$breakpoint-${name}: ${value}px`);
     }
+  });
+
+  it('мобильный режим Vuetify — с границы телефона приложения', () => {
+    expect(vuetify).toMatch(/mobileBreakpoint:\s*BREAKPOINTS\.md/);
   });
 
   it('тема Vuetify одна — светлая, с тёплым акцентом', () => {

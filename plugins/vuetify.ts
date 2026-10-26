@@ -3,6 +3,7 @@ import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
 import { en, ru } from 'vuetify/locale'
 import { h } from 'vue'
 import { loadLazyMdiSvgPaths, resolveMdiSvgPath } from '~/utils/mdiSvgPaths'
+import { BREAKPOINTS } from '~/utils/breakpoints'
 
 // import { mdiDotsVertical, mdiBook, mdiExitToApp, mdiPencil } from '@mdi/js';
 // aliases['dotsVertical'] = mdiDotsVertical
@@ -21,11 +22,12 @@ export default defineNuxtPlugin((app) => {
             dark: false,
             colors: {
               primary: '#1565C0',
-              secondary: '#546E7A',
+              // нейтральный серый вместо сине-серого: вторичное не спорит с primary (60–30–10, этап 10)
+              secondary: '#52525B',
               // акцент «живой сети»: активный инструмент, выделенный объект, прогресс — и больше нигде
               accent: '#D97706',
               surface: '#FFFFFF',
-              background: '#F5F7FA',
+              background: '#F4F4F5',
             },
             // Подписи полей, подсказки и вторичный текст: при 0,6 по умолчанию — 4,22:1 на #FAFAFA (axe, этап 9),
             // 0,68 даёт ≥ 4,5:1 (WCAG AA)
@@ -66,9 +68,16 @@ export default defineNuxtPlugin((app) => {
       fallback: 'en',
       messages: { ru, en },
     },
+    // Мобильный режим компонентов Vuetify (`useDisplay().mobile`, drawer'ы) — с той же границы, что и у
+    // приложения (utils/breakpoints.ts: телефон < 960), а не с умолчания Vuetify 1280
+    display: {
+      mobileBreakpoint: BREAKPOINTS.md,
+    },
     defaults: {
+      // Без материальной высоты: окна и меню получают тень-токен в assets/styles/_base.scss, карточки внутри
+      // панелей и окон — плоские (иерархия поверхностей, этап 10)
       VCard: {
-        elevation: 5
+        elevation: 0
       },
       // По умолчанию Vuetify прячет стрелки вкладок при ширине < 1280 («мобильный»
       // режим), и мышью до вкладок за краем не добраться: «Бланк» калькулятора
