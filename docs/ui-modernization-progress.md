@@ -812,6 +812,32 @@ vue-reviewer и silent-failure-hunter по 3bb1760..dfd2599: CRITICAL нет. И
 рамка подсказки не следит за сворачиванием колонки (только resize окна); `theme-color` без тёмной темы (тёмной
 темы нет); `crossorigin` у manifest (стенды без basic auth).
 
+## Этап 9 — тесты и приёмка (26.10)
+
+Отчёт с цифрами — `docs/ui-modernization-acceptance.md`. Коммиты `d6e5b3e`..последний этапа 9.
+
+- 9а `d6e5b3e`: `robots.txt` и `meta robots` по окружению (`utils/siteIndexing.ts`, `server/routes/robots.txt.ts`;
+  стенды — noindex, прод — `NUXT_PUBLIC_SITE_INDEXABLE=true` и canonical `NUXT_PUBLIC_SITE_URL`); `npm run lighthouse`
+  (`scripts/lighthouse.mjs`, пороги `lighthouse.config.json`, Lighthouse 13.5.0 и `@axe-core/playwright` 4.13.0 —
+  dev-зависимости).
+- 9б `db5e91b`, `ad1254b`, `5dd04da`, `69cbb1e`: находки axe и Lighthouse — имя у активного поля Vuetify
+  (`_a11y.scss`), контраст подписей (`medium-emphasis-opacity` 0,68), «Открыть» вместо имени у `AppSelect`, кнопки
+  раскрытия в «Истории правок», пустые `role=tooltip` у `HintTip` и координат, `aria-selected` в меню телефона.
+  Lighthouse Accessibility 100 / 100.
+- 9е `3cee711`: `e2e/resilience.spec.ts` — 500, таймаут, обрыв при сохранении, устаревший чанк. Хелперы e2e: клик
+  по середине длины участка, без подсказки первого запуска.
+- 9ж `ae40376`: `e2e/permissions.spec.ts` — viewer, editor, `mutations_enabled=false` (при `auth_disabled` стенд
+  всегда admin — роль подменяется вместе с сессией).
+- Визуальная регрессия `e2e/visual.spec.ts`: 21 эталон, холст карты скрыт `stylePath` (опция `style` у
+  `toHaveScreenshot` молча игнорируется, маска закрывает панели над картой).
+- Паритет: 1 197 подписей интерфейса и 279 вызовов API этапа 0 (`74f6239`) сверены с текущими — 22 подписи
+  переименованы, пропаж нет.
+- Замеры S0–S9 повторены; `measure.mjs` под новый интерфейс. Ловушка: headless Chrome 154 ограничивает кадры
+  30 fps даже на пустой странице — `--disable-gpu-vsync --disable-frame-rate-limit`.
+
+Не достигнуто (причины и планы — в отчёте): Lighthouse Performance 38 / 26, критический JS +13,7 KiB, первое
+открытие журнала S3b +31 %; Firefox/WebKit не прогонялись (браузеры Playwright не скачаны).
+
 ## Следующий шаг
 
 Этап 5 закрыт по составу: все журналы и реестры из согласованного списка на примитивах (5а–5м), граница ошибок,
@@ -820,7 +846,8 @@ vue-reviewer и silent-failure-hunter по 3bb1760..dfd2599: CRITICAL нет. И
 легенда расчёта, диагностики неисправностей, топологии и нагрузок, протокол); ревью закрыто. Этап 7: 7а
 (общее перетаскивание), 7б (движение), 7в (телефон и планшет), 7г (большие мониторы), 7д (ввод) готовы, ревью закрыто. Этап 8: 8а (знак — выбран A), 8б (подсказки
 100 %), 8в (иллюстрации), 8г (первый запуск), 8д (знак в шапке, иконки, manifest, экран загрузки) готовы;
-ревью этапа 8 закрыто; дальше — этап 9 (тесты и приёмка).
+ревью этапа 8 закрыто. Этап 9 (тесты и приёмка) сделан 26.10, отчёт — `docs/ui-modernization-acceptance.md`;
+открыто: Performance, критический JS, S3b, Firefox/WebKit (по согласию на скачивание браузеров), ручные Safari и 200 %.
 Синтетику на копиях не создавали: правки проверены на реальных записях с возвратом исходных значений.
 
 Ранее: этап 5 (поповер, инспектор, журналы, формы): первым шагом — `InspectorPanel` из `ObjectCardShell`, `MapPopover`,

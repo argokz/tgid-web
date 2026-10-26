@@ -139,3 +139,13 @@ inline/eval — уточнить в этапе 1). Доступность: `aria
   `queryRenderedFeatures` по 20 слоям участков; дальше — черновик в отдельном canvas/DOM-оверлее или меньше слоёв сети.
 - Lighthouse не сдвинулся: TBT определяют MapLibre + тайлы рельефа и зданий (4,5 MB при старте) и `vuetify.css` 384 KiB
   render-blocking, а не чанк шапки.
+
+## Этап 9 модернизации UI: приёмка (26.10.2026)
+
+Таблица «было → стало» по S0–S9, Lighthouse и `perf:budget` — в `docs/ui-modernization-acceptance.md`; сырые данные —
+`scripts/perf/results-2026-10-26-stage9.json` и `-stage9-nocontext.json` (без рельефа и зданий).
+
+Изменение методики: headless Chrome 154 ограничивает кадры 30 fps даже на пустой странице, поэтому `measure.mjs`
+запускает Chrome с `--disable-gpu-vsync --disable-frame-rate-limit` (пустая страница — 57 fps, как 23.10). Время
+и long tasks от флагов не зависят. Сценарии обновлены под интерфейс этапов 3–8: карточка открывается через сводку
+у точки, пьезометр — в `ChartDock`, журналы на `DataTable`, без подсказки первого запуска.

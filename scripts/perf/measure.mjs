@@ -265,7 +265,7 @@ const scenarios = {
     await openTool(page, 'Нарушения');
     // .v-dialog: последним активным оверлеем бывает подсказка кнопки
     const dlg = page.locator('.v-dialog.v-overlay--active').last();
-    const field = dlg.getByRole('textbox', { name: /Поиск/ }).first();
+    const field = dlg.getByRole('searchbox').first();
     await field.waitFor({ timeout: 60000 });
     await field.click();
     const r = await measure(page, cdp, 'S2 ввод 20 символов в поле журнала «Нарушения»', async () => {
@@ -441,7 +441,9 @@ const scenarios = {
 };
 
 /* ---------- запуск ---------- */
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
+// Headless Chrome 154 ограничивает кадры 30 fps даже на пустой странице (26.10.2026); флаги возвращают ~60,
+// как при базовых замерах 23.10, иначе FPS разных дат несравнимы
+const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--disable-gpu-vsync', '--disable-frame-rate-limit'] });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, baseURL: BASE, locale: 'ru-RU' });
 await context.addInitScript(INIT_SCRIPT);
 const page = await context.newPage();

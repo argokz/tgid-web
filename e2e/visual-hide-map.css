@@ -1,0 +1,6 @@
+/* e2e/visual.spec.ts: на время снимка скрыть холст карты и подписи масштаба — тайлы меняются от загрузки к загрузке */
+canvas.maplibregl-canvas,
+.maplibregl-ctrl-scale,
+.maplibregl-ctrl-attrib {
+  visibility: hidden !important;
+}
