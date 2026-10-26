@@ -134,7 +134,7 @@
             </v-btn>
             <v-btn
               size="small"
-              variant="outlined"
+              variant="tonal"
               :color="info.flags[f.value] ? 'error' : 'primary'"
               :loading="flagBusy === f.value"
               :disabled="busy"

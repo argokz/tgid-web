@@ -159,7 +159,7 @@
                 Сбросить
               </v-btn>
               <v-btn
-                color="primary"
+                variant="tonal"
                 prepend-icon="mdi-refresh"
                 :loading="loading"
                 @click="loadPage"
@@ -251,7 +251,6 @@
                         icon="mdi-crosshairs-gps"
                         size="x-small"
                         variant="text"
-                        color="primary"
                         aria-label="Показать объект на карте"
                         @click.stop="locate(item)"
                       />
@@ -433,7 +432,6 @@
           <template v-else>
             <v-btn
               v-if="selected && hasCoordinates(selected)"
-              color="primary"
               variant="tonal"
               prepend-icon="mdi-crosshairs-gps"
               @click="locate(selected)"
@@ -442,7 +440,6 @@
             </v-btn>
             <v-btn
               v-if="mutationsEnabled && selected && editableKeys.length"
-              color="primary"
               variant="tonal"
               @click="startEdit"
             >

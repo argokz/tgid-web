@@ -340,7 +340,7 @@
         :class="mobile ? 'flex-column-reverse' : 'justify-end'"
       >
         <v-btn
-          variant="outlined"
+          variant="tonal"
           min-width="100"
           density="comfortable"
           :block="mobile"
@@ -350,7 +350,7 @@
         </v-btn>
         <v-btn
           color="primary"
-          variant="elevated"
+          variant="flat"
           min-width="100"
           density="comfortable"
           :block="mobile"

@@ -207,7 +207,7 @@
               Сбросить
             </v-btn>
             <v-btn
-              color="primary"
+              variant="tonal"
               prepend-icon="mdi-refresh"
               :loading="loading"
               @click="loadItems"
@@ -306,7 +306,6 @@
                       icon="mdi-crosshairs-gps"
                       size="x-small"
                       variant="text"
-                      color="primary"
                       aria-label="Показать диафрагму на карте"
                       @click.stop="locate(item)"
                     />
@@ -483,7 +482,6 @@
           <template v-else>
             <v-btn
               v-if="details && hasCoordinates(details)"
-              color="primary"
               variant="tonal"
               prepend-icon="mdi-crosshairs-gps"
               @click="locate(details)"
@@ -492,7 +490,6 @@
             </v-btn>
             <v-btn
               v-if="mutationsEnabled && details"
-              color="primary"
               variant="tonal"
               @click="startEdit"
             >

@@ -228,7 +228,7 @@
                 Сбросить
               </v-btn>
               <v-btn
-                color="primary"
+                variant="tonal"
                 prepend-icon="mdi-refresh"
                 :loading="loading"
                 @click="loadItemsPage"
@@ -369,7 +369,6 @@
                         icon="mdi-crosshairs-gps"
                         size="x-small"
                         variant="text"
-                        color="primary"
                         aria-label="Показать здание на карте"
                         @click.stop="locate(item, 'building')"
                       />
@@ -518,7 +517,6 @@
           </v-btn>
           <v-btn
             v-if="selected && hasCoordinates(selected)"
-            color="primary"
             variant="tonal"
             prepend-icon="mdi-crosshairs-gps"
             @click="locate(selected, selectedKind)"

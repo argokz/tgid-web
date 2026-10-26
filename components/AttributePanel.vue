@@ -69,7 +69,6 @@
               icon
               variant="text"
               size="small"
-              color="primary"
               :loading="reversingLine"
               aria-label="Развернуть направление линии"
               @click="reverseLineDirection"
@@ -86,7 +85,6 @@
               icon
               variant="text"
               size="small"
-              color="primary"
               aria-label="Тип линии: участок или оборудование"
               @click="lineTypeId = cardLineId"
             >
@@ -102,7 +100,6 @@
               icon
               variant="text"
               size="small"
-              color="primary"
               aria-label="Отводы по трассе → местные сопротивления"
               @click="bendsLineId = cardLineId"
             >
@@ -565,7 +562,6 @@
 
               size="small"
 
-              color="primary"
 
               aria-label="Карта повреждаемости (Word)"
 
@@ -655,7 +651,6 @@
               icon
               variant="text"
               size="small"
-              color="primary"
               aria-label="Тип узла, заданный напор, подпитка"
               @click="nodeTypeOpen = true"
             >
@@ -671,7 +666,6 @@
               icon
               variant="text"
               size="small"
-              color="primary"
               aria-label="Оборудование узла"
               @click="equipmentOpen = true"
             >
@@ -687,7 +681,6 @@
               icon
               variant="text"
               size="small"
-              color="primary"
               aria-label="Редактировать свойства"
               @click="startEditing"
             >
@@ -703,7 +696,6 @@
               icon
               variant="text"
               size="small"
-              color="primary"
               :aria-label="batchLabel"
               @click="startBatchEditing"
             >
@@ -763,7 +755,6 @@
             icon
             variant="text"
             size="small"
-            color="primary"
             :disabled="editDirty"
             aria-label="Тип линии: участок или оборудование"
             @click="lineTypeId = equipTarget.id"

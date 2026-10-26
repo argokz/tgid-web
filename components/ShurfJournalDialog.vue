@@ -199,7 +199,7 @@
               Сбросить
             </v-btn>
             <v-btn
-              color="primary"
+              variant="tonal"
               prepend-icon="mdi-refresh"
               :loading="loading"
               @click="loadShurfs"
@@ -294,7 +294,6 @@
                       icon="mdi-crosshairs-gps"
                       size="x-small"
                       variant="text"
-                      color="primary"
                       aria-label="Показать шурф на карте"
                       @click.stop="locate(item as ShurfSummary)"
                     />
@@ -547,7 +546,6 @@
             v-if="selected && hasCoordinates(selected) && !isEditing"
             prepend-icon="mdi-crosshairs-gps"
             variant="tonal"
-            color="primary"
             @click="locate(selected)"
           >
             На карте
@@ -564,7 +562,7 @@
             <v-btn
               v-if="mutationsEnabled"
               color="primary"
-              variant="elevated"
+              variant="flat"
               :loading="saving"
               :disabled="!isNew && !isDirty"
               @click="saveChanges"
@@ -575,7 +573,6 @@
           <template v-else>
             <v-btn
               v-if="mutationsEnabled"
-              color="primary"
               variant="tonal"
               @click="startEdit"
             >

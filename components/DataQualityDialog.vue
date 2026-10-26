@@ -29,7 +29,6 @@
         <v-btn
           v-if="authStore.canUseAi"
           size="small"
-          color="primary"
           variant="tonal"
           :loading="explaining"
           class="mr-2"

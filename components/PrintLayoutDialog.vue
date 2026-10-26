@@ -195,7 +195,6 @@
         </v-btn>
         <v-spacer />
         <v-btn
-          color="primary"
           variant="tonal"
           prepend-icon="mdi-refresh"
           :loading="rendering"

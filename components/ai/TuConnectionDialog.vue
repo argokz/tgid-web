@@ -155,7 +155,6 @@
           </v-btn>
           <v-btn
             v-if="canUseAi"
-            color="primary"
             variant="tonal"
             :disabled="!point"
             :loading="recommending"

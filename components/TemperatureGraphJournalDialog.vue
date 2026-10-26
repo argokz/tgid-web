@@ -152,7 +152,7 @@
               Сбросить
             </v-btn>
             <v-btn
-              color="primary"
+              variant="tonal"
               prepend-icon="mdi-refresh"
               :loading="loading"
               @click="loadSources"
@@ -244,7 +244,6 @@
                       icon="mdi-crosshairs-gps"
                       size="x-small"
                       variant="text"
-                      color="primary"
                       aria-label="Показать источник на карте"
                       @click.stop="locate(item)"
                     />
@@ -407,7 +406,6 @@
                       class="tg-graph-mode"
                     />
                     <v-btn
-                      color="primary"
                       variant="tonal"
                       prepend-icon="mdi-calculator"
                       :loading="recalculating"
@@ -523,7 +521,6 @@
           <template v-else>
             <v-btn
               v-if="details && hasCoordinates(details)"
-              color="primary"
               variant="tonal"
               prepend-icon="mdi-crosshairs-gps"
               @click="locate(details)"
@@ -532,7 +529,6 @@
             </v-btn>
             <v-btn
               v-if="mutationsEnabled && details"
-              color="primary"
               variant="tonal"
               @click="startEdit"
             >

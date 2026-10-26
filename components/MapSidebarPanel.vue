@@ -739,7 +739,6 @@
               <div class="text-body-2 mt-2">Фрагменты не загружены</div>
               <v-btn
                 size="small"
-                color="primary"
                 variant="tonal"
                 class="mt-3"
                 @click="$emit('load-fragments')"

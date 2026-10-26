@@ -147,7 +147,7 @@
               Сбросить
             </v-btn>
             <v-btn
-              color="primary"
+              variant="tonal"
               prepend-icon="mdi-refresh"
               :loading="loading"
               @click="loadItems"
@@ -235,7 +235,6 @@
                       icon="mdi-crosshairs-gps"
                       size="x-small"
                       variant="text"
-                      color="primary"
                       aria-label="Показать элеватор на карте"
                       @click.stop="locate(item as ElevatorSummary)"
                     />
@@ -347,7 +346,6 @@
           <v-spacer />
           <v-btn
             v-if="details && hasCoordinates(details)"
-            color="primary"
             variant="tonal"
             prepend-icon="mdi-crosshairs-gps"
             @click="locate(details)"

@@ -140,7 +140,7 @@
                 </HintTip>
                 <v-btn
                   v-if="mapStore.activeCalculationId === calc.id"
-                  variant="outlined"
+                  variant="tonal"
                   color="error"
                   size="small"
                   :loading="switchingId === calc.id"
@@ -151,7 +151,6 @@
                 <v-btn
                   v-else
                   variant="tonal"
-                  color="primary"
                   size="small"
                   :loading="switchingId === calc.id"
                   @click.stop="toggleCalculation(calc.id)"
@@ -169,7 +168,6 @@
         <v-spacer />
         <v-btn
           v-if="mapStore.activeCalculationId !== null"
-          color="primary"
           variant="tonal"
           prepend-icon="mdi-map-check-outline"
           @click="keepOnMap"

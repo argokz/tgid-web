@@ -182,7 +182,7 @@
                 Сбросить
               </v-btn>
               <v-btn
-                color="primary"
+                variant="tonal"
                 prepend-icon="mdi-refresh"
                 :loading="loading"
                 @click="loadInventory"
@@ -285,7 +285,6 @@
                         icon="mdi-crosshairs-gps"
                         size="x-small"
                         variant="text"
-                        color="primary"
                         aria-label="Показать байпас на карте"
                         @click.stop="locate(item)"
                       />
@@ -370,7 +369,7 @@
                 class="d-flex justify-end align-center"
               >
                 <v-btn
-                  color="primary"
+                  variant="tonal"
                   prepend-icon="mdi-refresh"
                   :loading="loading"
                   @click="loadTubes"
@@ -580,7 +579,6 @@
           <template v-else>
             <v-btn
               v-if="itemDetails && hasCoordinates(itemDetails)"
-              color="primary"
               variant="tonal"
               prepend-icon="mdi-crosshairs-gps"
               @click="locate(itemDetails)"
@@ -589,7 +587,6 @@
             </v-btn>
             <v-btn
               v-if="mutationsEnabled && itemDetails"
-              color="primary"
               variant="tonal"
               @click="startEdit"
             >

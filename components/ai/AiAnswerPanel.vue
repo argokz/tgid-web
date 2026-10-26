@@ -116,7 +116,6 @@
               v-if="cause.fix"
               size="x-small"
               variant="tonal"
-              color="primary"
               :title="fixHint(cause.fix)"
               @click="emit('fix', cause)"
             >

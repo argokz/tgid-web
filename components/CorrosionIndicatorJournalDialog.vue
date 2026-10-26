@@ -218,7 +218,7 @@
               Сбросить
             </v-btn>
             <v-btn
-              color="primary"
+              variant="tonal"
               prepend-icon="mdi-refresh"
               :loading="loading"
               @click="loadIndicators"
@@ -451,7 +451,6 @@
           <v-btn
             v-if="!isEditing && selected && hasCoordinates(selected)"
             prepend-icon="mdi-crosshairs-gps"
-            color="primary"
             variant="tonal"
             @click="locateSelected"
           >

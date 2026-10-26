@@ -178,7 +178,6 @@
                         icon
                         variant="text"
                         size="small"
-                        color="primary"
                         aria-label="Подробнее"
                       >
                         <v-icon>mdi-chevron-right</v-icon>

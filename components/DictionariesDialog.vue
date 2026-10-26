@@ -96,7 +96,6 @@
             style="flex: 1 1 200px;"
           />
           <v-btn
-            color="primary"
             variant="tonal"
             prepend-icon="mdi-plus"
             :disabled="!info || !canEditData"

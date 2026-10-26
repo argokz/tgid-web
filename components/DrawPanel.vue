@@ -229,7 +229,6 @@
       <v-btn
         size="small"
         variant="tonal"
-        color="primary"
         :disabled="draw.draftPoints.value.length < (draw.isArea.value ? 3 : 2)"
         @click="draw.finishShape()"
       >

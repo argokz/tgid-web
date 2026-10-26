@@ -89,7 +89,6 @@
             @update:model-value="runInspect"
           />
           <v-btn
-            color="primary"
             variant="tonal"
             :loading="busy === 'inspect'"
             :disabled="!files.length"
@@ -250,7 +249,6 @@
               hide-details
             />
             <v-btn
-              color="primary"
               variant="tonal"
               :loading="busy === 'preview'"
               :disabled="!canPreview"

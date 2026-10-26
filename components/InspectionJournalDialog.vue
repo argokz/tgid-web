@@ -201,7 +201,7 @@
               Сбросить
             </v-btn>
             <v-btn
-              color="primary"
+              variant="tonal"
               prepend-icon="mdi-refresh"
               :loading="loading"
               @click="loadInspections"
@@ -298,7 +298,6 @@
                       icon="mdi-crosshairs-gps"
                       size="x-small"
                       variant="text"
-                      color="primary"
                       aria-label="Показать контур осмотра на карте"
                       @click.stop="locate(item as InspectionSummary, String(item.name || `Осмотр ${item.id}`))"
                     />
@@ -546,7 +545,6 @@
             v-if="selected && hasCoordinates(selected) && !isEditing"
             prepend-icon="mdi-crosshairs-gps"
             variant="tonal"
-            color="primary"
             @click="locate(selected, selected.name || `Осмотр ${selected.id}`)"
           >
             На карте
@@ -563,7 +561,7 @@
             <v-btn
               v-if="mutationsEnabled"
               color="primary"
-              variant="elevated"
+              variant="flat"
               :loading="saving"
               :disabled="!isNew && !isDirty"
               @click="saveChanges"
@@ -574,7 +572,6 @@
           <template v-else>
             <v-btn
               v-if="mutationsEnabled"
-              color="primary"
               variant="tonal"
               @click="startEdit"
             >

@@ -31,7 +31,6 @@
         #actions
       >
         <v-btn
-          color="primary"
           variant="tonal"
           prepend-icon="mdi-refresh"
           :loading="retrying"
@@ -61,7 +60,6 @@
         #actions
       >
         <v-btn
-          color="primary"
           variant="tonal"
           @click="$emit('action')"
         >{{ actionLabel }}</v-btn>

@@ -55,7 +55,6 @@
 
         <div class="d-flex flex-wrap ga-2 mb-4">
           <v-btn
-            color="primary"
             variant="tonal"
             :loading="loading === 'volume'"
             @click="run('volume')"
@@ -63,7 +62,6 @@
             Объём (Zap1)
           </v-btn>
           <v-btn
-            color="primary"
             variant="tonal"
             :loading="loading === 'length'"
             @click="run('length')"
@@ -71,7 +69,6 @@
             Длина (Zap2)
           </v-btn>
           <v-btn
-            color="primary"
             variant="tonal"
             :loading="loading === 'diameter'"
             @click="run('diameter')"
@@ -79,7 +76,6 @@
             По диаметрам (Zap7)
           </v-btn>
           <v-btn
-            color="primary"
             variant="tonal"
             :loading="loading === 'laying'"
             @click="run('laying')"
@@ -87,7 +83,6 @@
             Диаметры и прокладка (Zap7_1)
           </v-btn>
           <v-btn
-            color="primary"
             variant="tonal"
             :loading="loading === 'heat'"
             @click="run('heat')"
@@ -95,7 +90,6 @@
             Теплопотребление (Zap3)
           </v-btn>
           <v-btn
-            color="primary"
             variant="tonal"
             :loading="loading === 'heat-closed'"
             @click="run('heat-closed')"
@@ -103,7 +97,6 @@
             Закрытые системы (Zap4)
           </v-btn>
           <v-btn
-            color="primary"
             variant="tonal"
             :loading="loading === 'heat-open'"
             @click="run('heat-open')"
@@ -111,7 +104,6 @@
             Открытые системы (Zap5)
           </v-btn>
           <v-btn
-            color="primary"
             variant="tonal"
             :loading="loading === 'closed-consumers'"
             @click="run('closed-consumers')"

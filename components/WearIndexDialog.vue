@@ -91,7 +91,6 @@
           <v-btn
             v-if="authStore.canUseAi"
             size="small"
-            color="primary"
             variant="tonal"
             :disabled="!calculationId"
             :loading="planning"

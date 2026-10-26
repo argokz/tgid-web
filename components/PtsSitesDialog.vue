@@ -75,7 +75,6 @@
               <v-btn
                 v-if="canEditData"
                 icon="mdi-plus"
-                color="primary"
                 variant="tonal"
                 title="Новый участок"
                 aria-label="Новый участок"

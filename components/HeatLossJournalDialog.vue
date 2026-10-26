@@ -353,7 +353,6 @@
                           icon="mdi-crosshairs-gps"
                           size="x-small"
                           variant="text"
-                          color="primary"
                           aria-label="Показать источник на карте"
                           @click.stop="locateSource(item)"
                         />
@@ -594,7 +593,6 @@
               <template #default="{ props: tip }">
                 <v-btn
                   v-bind="tip"
-                  color="primary"
                   variant="tonal"
                   prepend-icon="mdi-play"
                   :loading="runningHeatLoss"
@@ -606,7 +604,6 @@
             </HintTip>
             <v-btn
               v-if="sourceDetails && hasCoordinates(sourceDetails)"
-              color="primary"
               variant="tonal"
               prepend-icon="mdi-crosshairs-gps"
               @click="locateSource(sourceDetails)"
@@ -615,7 +612,6 @@
             </v-btn>
             <v-btn
               v-if="mutationsEnabled && seasonDetails"
-              color="primary"
               variant="tonal"
               @click="startEdit"
             >

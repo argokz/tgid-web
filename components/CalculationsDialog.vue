@@ -198,7 +198,7 @@
           </v-btn>
           <v-btn
             color="error"
-            variant="elevated"
+            variant="flat"
             :loading="deleting"
             @click="confirmDelete"
           >

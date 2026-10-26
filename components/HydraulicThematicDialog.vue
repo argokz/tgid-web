@@ -216,7 +216,7 @@
       <v-card-actions class="pa-4 d-flex flex-wrap justify-space-between ga-2">
         <v-btn
           color="error"
-          variant="outlined"
+          variant="tonal"
           :disabled="!isApplied"
           @click="clearThematic"
         >
@@ -254,7 +254,6 @@
             Применить на карте
           </v-btn>
           <v-btn
-            color="primary"
             variant="tonal"
             :disabled="!isApplied"
             @click="keepOnMap"

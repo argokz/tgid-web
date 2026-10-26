@@ -255,7 +255,7 @@
               Сбросить
             </v-btn>
             <v-btn
-              color="primary"
+              variant="tonal"
               prepend-icon="mdi-refresh"
               :loading="loading"
               @click="loadConditions"
@@ -547,7 +547,6 @@
             v-if="!isEditing && selected && hasCoordinates(selected)"
             prepend-icon="mdi-crosshairs-gps"
             variant="tonal"
-            color="primary"
             @click="locateSelected"
           >
             На карте

@@ -226,7 +226,7 @@
               Сбросить
             </v-btn>
             <v-btn
-              color="primary"
+              variant="tonal"
               prepend-icon="mdi-refresh"
               :loading="loading"
               @click="loadTests"
@@ -324,7 +324,6 @@
                       icon="mdi-crosshairs-gps"
                       size="x-small"
                       variant="text"
-                      color="primary"
                       aria-label="Показать контур на карте"
                       @click.stop="locate(item as PressureTestSummary, String(item.name || `Опрессовка ${item.id}`))"
                     />
@@ -609,7 +608,6 @@
             v-if="!isEditing && selected && hasCoordinates(selected)"
             prepend-icon="mdi-crosshairs-gps"
             variant="tonal"
-            color="primary"
             @click="locate(selected, selected.name || `Опрессовка ${selected.id}`)"
           >
             На карте

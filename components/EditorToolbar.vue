@@ -149,7 +149,7 @@
         </v-btn>
         <v-btn
           size="small"
-          variant="outlined"
+          variant="tonal"
           icon
           @click="coordPointOpen = true"
         >

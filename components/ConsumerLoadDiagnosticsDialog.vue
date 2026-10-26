@@ -124,8 +124,7 @@
           <template #default="{ props: tip }">
             <v-btn
               v-bind="tip"
-              color="primary"
-              variant="outlined"
+              variant="tonal"
               prepend-icon="mdi-file-delimited-outline"
               :loading="exporting"
               :disabled="!total"
@@ -206,7 +205,6 @@
                     icon="mdi-crosshairs-gps"
                     variant="text"
                     size="small"
-                    color="primary"
                     :disabled="!hasCoordinates(item as unknown as ConsumerLoadSummary)"
                     aria-label="Показать на карте"
                     @click.stop="locateItem(item as unknown as ConsumerLoadSummary)"
@@ -253,7 +251,6 @@
           v-if="details && hasCoordinates(details)"
           prepend-icon="mdi-crosshairs-gps"
           variant="tonal"
-          color="primary"
           @click="locateDetails"
         >
           На карте

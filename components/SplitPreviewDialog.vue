@@ -85,12 +85,12 @@
             <div class="d-flex ga-2 mb-2">
               <v-btn
                 size="x-small"
-                variant="outlined"
+                variant="tonal"
                 @click="setAll('first')"
               >Все на первую</v-btn>
               <v-btn
                 size="x-small"
-                variant="outlined"
+                variant="tonal"
                 @click="setAll('second')"
               >Все на вторую</v-btn>
             </div>

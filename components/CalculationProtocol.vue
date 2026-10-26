@@ -307,7 +307,6 @@
                     v-if="canRecalculate"
                     size="small"
                     variant="tonal"
-                    color="primary"
                     title="Повторить расчёт с теми же установками"
                     @click="emit('recalculate')"
                   >
@@ -413,7 +412,6 @@
                         v-if="e.fix"
                         size="x-small"
                         variant="tonal"
-                        color="primary"
                         :title="fixInfo(e).hint"
                         @click.stop="runFix(e)"
                       >

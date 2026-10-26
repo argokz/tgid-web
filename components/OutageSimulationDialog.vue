@@ -71,7 +71,6 @@
 
             <v-btn
               v-if="result"
-              color="primary"
               variant="tonal"
               prepend-icon="mdi-map-marker-path"
               @click="emitShowOnMap"
@@ -81,7 +80,7 @@
 
             <v-btn
               v-if="result"
-              variant="outlined"
+              variant="tonal"
               prepend-icon="mdi-download"
               @click="exportCsv"
             >
@@ -365,7 +364,6 @@
                             v-bind="tip"
                             size="x-small"
                             variant="text"
-                            color="primary"
                             icon="mdi-crosshairs-gps"
                             aria-label="Показать на карте"
                             @click="focusCoords(c.longitude, c.latitude)"
@@ -446,7 +444,6 @@
         <v-spacer />
         <v-btn
           v-if="overlayShown"
-          color="primary"
           variant="tonal"
           prepend-icon="mdi-map-check-outline"
           @click="keepOnMap"

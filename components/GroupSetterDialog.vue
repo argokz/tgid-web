@@ -236,7 +236,6 @@
           <!-- 3. Предпросмотр -->
           <div class="d-flex flex-wrap ga-2 mt-3">
             <v-btn
-              color="primary"
               variant="tonal"
               prepend-icon="mdi-magnify"
               :loading="previewing"
@@ -353,7 +352,7 @@
           <v-btn
             class="mt-2"
             size="small"
-            variant="outlined"
+            variant="tonal"
             prepend-icon="mdi-undo"
             :loading="undoing"
             :disabled="!canEditData || lastUndone"

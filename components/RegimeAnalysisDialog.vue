@@ -112,7 +112,6 @@
               <v-btn
                 size="small"
                 variant="tonal"
-                color="primary"
                 prepend-icon="mdi-map-marker-multiple"
                 :disabled="!mapPointsCount"
                 @click="showAllOnMap"
