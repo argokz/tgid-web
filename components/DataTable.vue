@@ -1,7 +1,9 @@
 <template>
+  <!-- v-memo: см. комментарий у memoDeps -->
   <component
     :is="virtual ? VDataTableVirtual : VDataTable"
-    v-bind="tableProps"
+    v-memo="memoDeps()"
+    v-bind="{ ...$attrs, ...tableProps }"
     class="data-table num"
     :class="{ 'data-table--selectable': selectable, 'data-table--dense': density === 'compact' }"
     :headers="tableHeaders"
@@ -31,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useAttrs, useSlots, watch } from 'vue';
 import { VDataTable, VDataTableVirtual } from 'vuetify/components/VDataTable';
 
 /**
@@ -93,6 +95,8 @@ const props = withDefaults(defineProps<{
   loadingText: 'Загрузка…',
 });
 
+defineOptions({ inheritAttrs: false });
+
 const emit = defineEmits<{
   select: [item: Record<string, unknown>];
   'update:sortBy': [value: SortItem[]];
@@ -148,6 +152,23 @@ const rowProps = ({ item }: { item: Record<string, unknown> }) => {
     },
   };
 };
+
+/**
+ * Таблица перерисовывается только при смене своих входных данных (S3b). Журналы лежат в слотах v-dialog / v-card —
+ * компонентов на render-функциях, там Vue не видит стабильности слотов и при любой перерисовке родителя (пришёл
+ * справочник, сменился флаг загрузки) заставляет DataTable перерисоваться, а через слоты — все строки: ~1 с на
+ * 50 строк при CPU ×4. Ячейки от этого не устаревают: реактивное состояние, которое читает слот, отслеживает
+ * сама строка, где слот выполняется. Атрибуты родителя передаются явно (inheritAttrs: false) — иначе Vue клонирует
+ * корневой узел и мемо не срабатывает. Функция, а не computed: атрибуты и набор слотов не реактивны, их читаем
+ * при каждой перерисовке DataTable.
+ */
+const attrs = useAttrs();
+const slots = useSlots();
+const memoDeps = () => [
+  virtual.value, tableProps.value, tableHeaders.value, props.items, props.itemKey, props.loading, props.density,
+  props.selectable, props.selectedKey, props.flashKey, internalSort.value, props.noDataText, props.loadingText,
+  Object.keys(slots).join('|'), ...Object.entries(attrs).flat(),
+];
 
 defineExpose({ virtual });
 </script>

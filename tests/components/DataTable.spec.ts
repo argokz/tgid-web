@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { defineComponent, h, nextTick, ref } from 'vue';
 import DataTable from '~/components/DataTable.vue';
 import { mountWithVuetify } from './mountHelper';
 
@@ -65,5 +66,48 @@ describe('DataTable', () => {
     expect(trs[0].classes()).not.toContain('motion-row-flash');
     await w.setProps({ flashKey: null });
     expect(w.findAll('tbody tr')[2].classes()).not.toContain('motion-row-flash');
+  });
+
+  describe('перерисовка родителя (S3b)', () => {
+    /** Родитель на render-функции, как v-dialog / v-card: слоты без признака стабильности — Vue обновляет DataTable */
+    const mountHost = () => {
+      const tick = ref(0);
+      const suffix = ref('');
+      const items = ref(rows(3));
+      let slotCalls = 0;
+      const Host = defineComponent({
+        setup: () => () => h('div', { 'data-tick': tick.value }, [
+          h(DataTable, { columns, items: items.value, class: 'host-table' }, {
+            'item.name': ({ item }: { item: Record<string, unknown> }) => {
+              slotCalls += 1;
+              return `${item.name}${suffix.value}`;
+            },
+          }),
+        ]),
+      });
+      const w = mountWithVuetify(Host);
+      return { w, tick, suffix, items, calls: () => slotCalls };
+    };
+
+    it('строки не перерисовываются, если у таблицы ничего не поменялось', async () => {
+      const { w, tick, calls } = mountHost();
+      const before = calls();
+      expect(before).toBe(3);
+      tick.value += 1;
+      await nextTick();
+      expect(w.find('[data-tick="1"]').exists()).toBe(true);
+      expect(calls()).toBe(before);
+    });
+
+    it('ячейка следит за состоянием, которое читает слот, и за новыми строками; класс родителя — на таблице', async () => {
+      const { w, suffix, items } = mountHost();
+      expect(w.find('.v-table.host-table.data-table').exists()).toBe(true);
+      suffix.value = ' (изм.)';
+      await nextTick();
+      expect(w.findAll('tbody tr')[0].findAll('td')[1].text()).toBe('Запись 1 (изм.)');
+      items.value = rows(5);
+      await nextTick();
+      expect(w.findAll('tbody tr')).toHaveLength(5);
+    });
   });
 });
