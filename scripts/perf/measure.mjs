@@ -31,6 +31,8 @@ const MAP = `${PINIA}.get('map').map`;
 /* ---------- инструментирование страницы ---------- */
 const INIT_SCRIPT = `
 (() => {
+  // подсказка первого запуска (этап 8) не должна попадать в замеры
+  try { localStorage.setItem('firstRunHints', '1'); } catch {}
   const P = (window.__perf = { longTasks: [], frames: [], counters: {}, recording: false, rafId: 0, last: 0 });
   try {
     new PerformanceObserver((list) => {
@@ -252,7 +254,7 @@ const scenarios = {
     const b = await measure(page, cdp, `S1b панорамирование 10 с (${sidebarOpen ? 'панель слоёв не закрылась' : 'только карта'})`, pan);
     if (!sidebarOpen) { await page.locator('[aria-label="Открыть панель слоёв"]').click().catch(() => {}); await sleep(800); }
     await openTool(page, 'Запорная арматура');
-    await page.locator('.v-overlay--active .journal-table tbody tr').first().waitFor({ timeout: 60000 });
+    await page.locator('.v-overlay--active table tbody tr').first().waitFor({ timeout: 60000 });
     await sleep(500);
     const c = await measure(page, cdp, 'S1c панорамирование 10 с (панель слоёв + журнал арматуры)', pan);
     await closeOverlays(page);
@@ -261,8 +263,9 @@ const scenarios = {
 
   async S2(page, cdp) {
     await openTool(page, 'Нарушения');
-    const dlg = page.locator('.v-overlay--active').last();
-    const field = dlg.locator('input[type="text"], input:not([type])').first();
+    // .v-dialog: последним активным оверлеем бывает подсказка кнопки
+    const dlg = page.locator('.v-dialog.v-overlay--active').last();
+    const field = dlg.getByRole('textbox', { name: /Поиск/ }).first();
     await field.waitFor({ timeout: 60000 });
     await field.click();
     const r = await measure(page, cdp, 'S2 ввод 20 символов в поле журнала «Нарушения»', async () => {
@@ -275,14 +278,16 @@ const scenarios = {
   async S3(page, cdp) {
     const pipe = await focusPipe(page);
     const stopA = chunkRecorder(page);
-    const a = await measure(page, cdp, 'S3a открыть карточку участка', async () => {
-      await clickChoose(page, pipe.mid, '.ap-card');
-      await page.locator('.ap-card').waitFor();
+    // с этапа 5 клик открывает сводку у точки, карточка — из неё («Карточка»)
+    const a = await measure(page, cdp, 'S3a открыть карточку участка (клик → сводка → «Карточка»)', async () => {
+      await clickChoose(page, pipe.mid, '.map-popover');
+      await page.locator('.map-popover').getByRole('button', { name: 'Карточка' }).click();
+      await page.locator('.inspector').waitFor();
       await sleep(300);
     });
     a.chunks = stopA();
     a.chunksKb = +a.chunks.reduce((s, c) => s + c.kb, 0).toFixed(1);
-    await page.locator('.ap-card [aria-label="Закрыть"]').first().click().catch(() => {});
+    await page.locator('.inspector [aria-label="Закрыть"]').first().click().catch(() => {});
     await sleep(500);
     const stopB = chunkRecorder(page);
     const b = await measure(page, cdp, 'S3b открыть журнал «Диафрагмы» (первый раз)', async () => {
@@ -297,9 +302,10 @@ const scenarios = {
   },
 
   async S4(page, cdp) {
-    if (!(await page.locator('.ap-card').isVisible().catch(() => false))) {
+    if (!(await page.locator('.inspector').isVisible().catch(() => false))) {
       const pipe = await focusPipe(page);
-      await clickChoose(page, pipe.mid, '.ap-card');
+      await clickChoose(page, pipe.mid, '.map-popover');
+      await page.locator('.map-popover').getByRole('button', { name: 'Карточка' }).click();
     }
     const handle = page.locator('.oc-resize--left');
     await handle.waitFor({ timeout: 10000 });
@@ -323,7 +329,7 @@ const scenarios = {
       await page.mouse.up();
     });
     await page.locator('[aria-label="Закрепить панелью справа"]').click().catch(() => {});
-    await page.locator('.ap-card [aria-label="Закрыть"]').first().click().catch(() => {});
+    await page.locator('.inspector [aria-label="Закрыть"]').first().click().catch(() => {});
     await sleep(300);
     return [a, b];
   },
@@ -337,7 +343,8 @@ const scenarios = {
     await clickChoose(page, pipe.start, '[aria-label="Построение маршрута пьезометра"] .v-chip');
     await clickChoose(page, pipe.end, '[aria-label="Построение маршрута пьезометра"] .v-chip >> nth=1');
     await panel.getByRole('button', { name: 'Построить график' }).click();
-    const canvas = page.locator('.v-overlay--active canvas').first();
+    // с этапа 6 график пьезометра — в ChartDock (не диалог)
+    const canvas = page.locator('.chart-dock canvas').first();
     await canvas.waitFor({ timeout: 60000 });
     await sleep(1000);
     const box = await canvas.boundingBox();
@@ -371,10 +378,10 @@ const scenarios = {
 
   async S7(page, cdp) {
     await openTool(page, 'Запорная арматура');
-    const table = page.locator('.v-overlay--active .journal-table').first();
+    const table = page.locator('.v-overlay--active table').first();
     await table.locator('tbody tr').first().waitFor({ timeout: 60000 });
     const rows = await table.locator('tbody tr').count();
-    const domNodes = await page.locator('.v-overlay--active').last().evaluate((el) => el.querySelectorAll('*').length);
+    const domNodes = await page.locator('.v-dialog.v-overlay--active').last().evaluate((el) => el.querySelectorAll('*').length);
     const wrap = table.locator('xpath=..');
     const box = await wrap.boundingBox();
     const r = await measure(page, cdp, `S7 прокрутка журнала арматуры (страница ${rows} строк, DOM-узлов в окне ${domNodes})`, async () => {
@@ -409,7 +416,7 @@ const scenarios = {
 
   async S9(page, cdp) {
     await openTool(page, 'Опрессовки');
-    const dlg = page.locator('.v-overlay--active').last();
+    const dlg = page.locator('.v-dialog.v-overlay--active').last();
     await dlg.locator('.v-select').first().waitFor({ timeout: 60000 });
     const selects = dlg.locator('.v-select .v-field, .v-autocomplete .v-field');
     const n = await selects.count();

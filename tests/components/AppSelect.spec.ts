@@ -17,6 +17,13 @@ describe('AppSelect', () => {
     expect(long.find('.v-autocomplete').exists()).toBe(true);
   });
 
+  it('имя поля для читалок — подпись, а не «Открыть» от VSelect', () => {
+    const w = mountWithVuetify(AppSelect, { props: { modelValue: null, items: states, itemTitle: 'name', itemValue: 'id', label: 'Состояние' } });
+    const input = w.find('.v-select input');
+    expect(input.attributes('aria-label')).toBe('Состояние');
+    expect(input.attributes('title')).toBe('Состояние');
+  });
+
   it('порог и принудительный режим поиска', () => {
     const w = mountWithVuetify(AppSelect, { props: { modelValue: null, items: states, searchThreshold: 3 } });
     expect((w.vm as any).searchable).toBe(true);

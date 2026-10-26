@@ -1,4 +1,6 @@
 <template>
+  <!-- open-text/close-text: VSelect ставит их в aria-label и title самого поля, и «Открыть» перебивало подпись
+       для читалок экрана (этап 9) — имя поля остаётся его подписью -->
   <component
     :is="hasSearch ? VAutocomplete : VSelect"
     :model-value="modelValue"
@@ -6,6 +8,8 @@
     :item-title="itemTitle"
     :item-value="itemValue"
     :label="label"
+    :open-text="label || '$vuetify.open'"
+    :close-text="label || '$vuetify.close'"
     :placeholder="placeholder"
     :hint="hint"
     :persistent-hint="Boolean(hint)"
