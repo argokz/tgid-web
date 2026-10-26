@@ -35,15 +35,17 @@ strong {
   border-radius: var(--radius-md);
 }
 
-// Окна — самая высокая поверхность; меню и выпадающие списки — средняя
+// Окна — самая высокая поверхность; меню и выпадающие списки — средняя.
+// Радиус окна с !important: у большинства окон в шаблоне `rounded="lg"` (утилита Vuetify, 8 px !important)
 :root .v-dialog > .v-overlay__content > .v-card,
 :root .v-dialog > .v-overlay__content > form > .v-card {
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-lg) !important;
   box-shadow: var(--shadow-3);
 }
 
-:root .v-dialog--fullscreen > .v-overlay__content > .v-card {
-  border-radius: 0;
+:root .v-dialog--fullscreen > .v-overlay__content > .v-card,
+:root .v-dialog--fullscreen > .v-overlay__content > form > .v-card {
+  border-radius: 0 !important;
 }
 
 :root .v-menu > .v-overlay__content > .v-card,
@@ -54,10 +56,15 @@ strong {
 }
 
 // --- Обратная связь: видимый фокус с клавиатуры (на стекле и над картой подложка Vuetify почти не видна) ---
-:root .v-btn:focus-visible,
-:root .v-list-item:focus-visible {
+:root .v-btn:focus-visible {
   outline: 2px solid rgb(var(--v-theme-primary));
   outline-offset: 2px;
+}
+
+// Пункт списка — внутрь: список и меню обрезают всё, что выходит за их край (overflow: auto)
+:root .v-list-item:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: -2px;
 }
 
 // Отдельным правилом: браузер без :has() отбросил бы весь список селекторов выше

@@ -203,11 +203,13 @@
           Сформировать лист
         </v-btn>
         <v-btn
+          variant="tonal"
           :disabled="!result"
           prepend-icon="mdi-download"
           @click="downloadPng"
         >PNG</v-btn>
         <v-btn
+          variant="tonal"
           :disabled="!result"
           prepend-icon="mdi-file-pdf-box"
           @click="downloadPdf"

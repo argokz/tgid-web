@@ -127,6 +127,7 @@
         class="d-flex ga-2"
       >
         <v-btn
+          variant="tonal"
           :loading="searching"
           prepend-icon="mdi-magnify"
           @click="searchAddresses"

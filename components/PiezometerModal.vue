@@ -76,6 +76,7 @@
           </v-list>
         </v-menu>
         <v-btn
+          variant="tonal"
           icon
           size="small"
           aria-label="Выгрузить CSV"
@@ -88,6 +89,7 @@
           >Выгрузить CSV</v-tooltip>
         </v-btn>
         <v-btn
+          variant="tonal"
           icon
           size="small"
           aria-label="Выгрузить в Excel (p_excel)"
