@@ -22,6 +22,13 @@
 | `e2e/resilience.spec.ts` | сбои, подставленные в браузере: 500 и таймаут на список журнала, обрыв сети при сохранении записи (запрос до сервера не доходит), 404 ленивого чанка |
 | `e2e/permissions.spec.ts` | роль и флаги в ответах `/auth/config` и `/auth/me`: viewer, editor, `mutations_enabled=false` |
 | `e2e/visual.spec.ts` | эталонные скриншоты 7 размеров × 3 экрана (`e2e/visual.spec.ts-snapshots/`, порог 0,1 %); холст карты скрыт `e2e/visual-hide-map.css` |
+| `e2e/devices.spec.ts` | только проекты iphone, ipad, pixel: карта без горизонтальной прокрутки, axe, эталонный снимок, меню и панель слоёв пальцем, журнал через палитру |
+
+Проекты (`playwright.config.ts`): chromium, firefox, webkit — настольные наборы; iphone, ipad, pixel —
+`devices.spec.ts`. `npm run e2e` — только chromium, `npm run e2e:all` — все (`npx playwright install firefox webkit`).
+Firefox по умолчанию — установленный в системе, через WebDriver BiDi (`channel: moz-firefox`): сборка Firefox от
+Playwright на Windows этой машины не запускается; `PW_FIREFOX_CHANNEL=` (пусто) — вернуть её. Эталоны снимков —
+отдельные на проект (`*-chromium-win32.png`, `*-firefox-win32.png`, `*-webkit-win32.png`).
 
 На production-сборке стенда по умолчанию виден фрагмент 72, а «Анализ режима» требует расчёта — его тест гонять с
 фрагментом 74: `E2E_FRAGMENT_ID=72` для всего, кроме `-g "Анализ режима"`. Эталоны скриншотов сняты на Windows
