@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -22,6 +22,13 @@ function chromiumExecutable(): string | undefined {
 }
 
 const executablePath = chromiumExecutable();
+/** Chromium — установленный Chromium Playwright или системный Chrome (см. шапку файла) */
+const chromium = {
+  launchOptions: executablePath ? { executablePath } : undefined,
+  channel: executablePath ? undefined : 'chrome',
+};
+/** Сценарии для телефонов и планшетов: настольные наборы рассчитаны на шапку и панели 1600×900 */
+const DEVICE_SPEC = /devices\.spec\.ts/;
 
 export default defineConfig({
   testDir: './e2e',
@@ -38,9 +45,23 @@ export default defineConfig({
     headless: process.env.E2E_HEADED ? false : true,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
-    launchOptions: executablePath ? { executablePath } : undefined,
-    channel: executablePath ? undefined : 'chrome',
   },
+  // Матрица этапа 9 (docs/ui-modernization-prompt.md, раздел 14). npm run e2e — только chromium, как раньше;
+  // npm run e2e:all — все проекты (Firefox и WebKit — браузеры Playwright: npx playwright install firefox webkit)
+  projects: [
+    { name: 'chromium', use: { ...chromium }, testIgnore: DEVICE_SPEC },
+    // Сборка Firefox от Playwright на Windows этой машины не стартует (SxS: mozglue), поэтому по умолчанию —
+    // установленный Firefox через WebDriver BiDi; PW_FIREFOX_CHANNEL= (пусто) — вернуть сборку Playwright
+    {
+      name: 'firefox',
+      use: { browserName: 'firefox', channel: process.env.PW_FIREFOX_CHANNEL ?? 'moz-firefox' },
+      testIgnore: DEVICE_SPEC,
+    },
+    { name: 'webkit', use: { browserName: 'webkit' }, testIgnore: DEVICE_SPEC },
+    { name: 'iphone', use: { ...devices['iPhone 15'] }, testMatch: DEVICE_SPEC },
+    { name: 'ipad', use: { ...devices['iPad Pro 11'] }, testMatch: DEVICE_SPEC },
+    { name: 'pixel', use: { ...devices['Pixel 7'], ...chromium }, testMatch: DEVICE_SPEC },
+  ],
   metadata: { apiUrl: API_URL },
   webServer: {
     // Поднимает dev-сервер, если :3040 ещё не слушает (иначе переиспользует)

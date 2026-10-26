@@ -29,7 +29,13 @@ test.describe('Сбои API и сети', () => {
   });
 
   test('API 500 на список журнала: причина и «Повторить», после восстановления — данные', async ({ page }) => {
-    await page.route(DEFECTS_LIST, (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"boom"}' }));
+    // API на другом порту: WebKit применяет CORS и к подменённому ответу (Chromium и Firefox — нет)
+    await page.route(DEFECTS_LIST, (route) => route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      headers: { 'access-control-allow-origin': '*' },
+      body: '{"detail":"boom"}',
+    }));
     await openTool(page, 'Нарушения');
     const dialog = journalDialog(page, 'Журнал нарушений');
     const retry = dialog.getByRole('button', { name: 'Повторить' });
