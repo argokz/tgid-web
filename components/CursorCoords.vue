@@ -32,9 +32,11 @@
       @click="copy(copyFormatFor(crs))"
     >
       {{ label }}
+      <!-- aria-label: закрытая подсказка остаётся в DOM пустым role=tooltip (Lighthouse aria-tooltip-name) -->
       <v-tooltip
         activator="parent"
         location="top"
+        aria-label="Щелчок или клавиша C над картой — скопировать"
       >
         Щелчок или клавиша C над картой — скопировать
       </v-tooltip>
