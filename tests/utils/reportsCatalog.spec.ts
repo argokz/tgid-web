@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import type { ReportCatalogItem } from '~/services/fastApiService';
 import { TOOL_GROUPS } from '~/utils/toolCatalog';
-import { resolveMdiSvgPath } from '~/utils/mdiSvgPaths';
+import { loadLazyMdiSvgPaths, resolveMdiSvgPath } from '~/utils/mdiSvgPaths';
 import { groupReports, matchesReport, reportNeedsFragment } from '~/utils/reportsCatalog';
 
 const item = (patch: Partial<ReportCatalogItem>): ReportCatalogItem => ({
@@ -28,6 +28,9 @@ const catalog: ReportCatalogItem[] = [
   item({ id: 'hs', title: 'Система теплоснабжения', group: 'Система теплоснабжения',
     desktop: 'excel2/HS_Система теплоснабжения.lst', sheets: [{ title: 'Вх.Организации_владельцы', sql: 'vh_organizacii' }] }),
 ];
+
+// иконки диалогов — в ленивом наборе (utils/mdiSvgPathsLazy.ts)
+beforeAll(() => loadLazyMdiSvgPaths());
 
 describe('каталог Excel-отчётов', () => {
   it('группирует в порядке: результаты, исходные, система, сводные', () => {

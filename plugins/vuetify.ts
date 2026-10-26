@@ -2,7 +2,7 @@ import { createVuetify } from 'vuetify'
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
 import { en, ru } from 'vuetify/locale'
 import { h } from 'vue'
-import { resolveMdiSvgPath } from '~/utils/mdiSvgPaths'
+import { loadLazyMdiSvgPaths, resolveMdiSvgPath } from '~/utils/mdiSvgPaths'
 
 // import { mdiDotsVertical, mdiBook, mdiExitToApp, mdiPencil } from '@mdi/js';
 // aliases['dotsVertical'] = mdiDotsVertical
@@ -81,4 +81,12 @@ export default defineNuxtPlugin((app) => {
   })
   
   app.vueApp.use(vuetify)
+
+  // Иконки диалогов и журналов — после гидратации: сервер и первый рендер клиента видят один набор
+  // (первый экран), предупреждений гидратации нет. Пришёл чанк — иконки дорисовываются (resolveMdiSvgPath реактивен)
+  onNuxtReady(() => {
+    loadLazyMdiSvgPaths().catch((error: unknown) => {
+      console.warn('[icons] не загрузился набор иконок диалогов:', error)
+    })
+  })
 })
