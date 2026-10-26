@@ -98,6 +98,10 @@ export default defineNuxtConfig({
       mapCenter: process.env.NUXT_PUBLIC_MAP_CENTER || env.NUXT_PUBLIC_MAP_CENTER || '',
       // Префикс ключей localStorage (utils/appStorage.ts): города на одном домене не делят настройки
       storagePrefix: process.env.NUXT_PUBLIC_STORAGE_PREFIX || env.NUXT_PUBLIC_STORAGE_PREFIX || '',
+      // Индексация поисковиками (utils/siteIndexing.ts): только прод с NUXT_PUBLIC_SITE_INDEXABLE=true, стенды — noindex.
+      // siteUrl — канонический адрес прода (https://itwin.kz/itwin-map/), пусто — без canonical
+      siteIndexable: (process.env.NUXT_PUBLIC_SITE_INDEXABLE || env.NUXT_PUBLIC_SITE_INDEXABLE || '') === 'true',
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || env.NUXT_PUBLIC_SITE_URL || '',
       // Фрагменты, видимые при открытии карты: "2-46,48,3179" (utils/cityConfig.ts); пусто — все
       defaultFragments: process.env.NUXT_PUBLIC_DEFAULT_FRAGMENTS || env.NUXT_PUBLIC_DEFAULT_FRAGMENTS || '',
       // Охранные расстояния трассы, м (utils/cityConfig.ts cadDefaults): до стены здания и до оси улицы.

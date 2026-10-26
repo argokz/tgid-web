@@ -20,3 +20,4 @@ public/cesium/
 # Playwright e2e (npm run e2e)
 test-results/
 playwright-report/
+lighthouse-results/

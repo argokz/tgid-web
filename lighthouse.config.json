@@ -1,0 +1,12 @@
+{
+  "$comment": "Пороги приёмки этапа 9 (docs/ui-modernization-prompt.md, раздел 14): медиана из runs прогонов production-сборки. npm run lighthouse -- --url=...",
+  "url": "http://127.0.0.1:3045/itwin-map/",
+  "runs": 3,
+  "formFactors": ["desktop", "mobile"],
+  "thresholds": {
+    "performance": 90,
+    "accessibility": 95,
+    "best-practices": 95,
+    "seo": 90
+  }
+}
