@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Каркас в духе Felt</title>
+<style>
+  /* Токены этапа 10 — те же имена, что пойдут в assets/styles/_tokens.scss */
+  :root {
+    --primary: #1565C0;
+    --primary-soft: rgba(21, 101, 192, .08);
+    --accent: #D97706;
+    --accent-text: #B45309;
+    --accent-soft: rgba(217, 119, 6, .12);
+    --bg: #F4F4F5;
+    --surface: #FFFFFF;
+    --surface-hover: #F4F4F5;
+    --surface-pressed: #E4E4E7;
+    --surface-selected: rgba(21, 101, 192, .08);
+    --text-strong: #18181B;
+    --text: #27272A;
+    --text-muted: #52525B;
+    --text-faint: #71717A;
+    --border-subtle: rgba(24, 39, 75, .10);
+    --shadow-1: 0 0 1px rgba(24,39,75,.25), 0 2px 4px -2px rgba(24,39,75,.12), 0 4px 4px -2px rgba(24,39,75,.08);
+    --shadow-2: 0 0 1px rgba(24,39,75,.22), 0 6px 12px -6px rgba(24,39,75,.12), 0 8px 24px -4px rgba(24,39,75,.08);
+    --shadow-3: 0 0 1px rgba(24,39,75,.24), 0 12px 24px -8px rgba(24,39,75,.16), 0 16px 40px -8px rgba(24,39,75,.10);
+    --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px;
+    --shell-top: 48px; --shell-inset: 12px; --shell-gap: 8px;
+    --glass-1-bg: rgba(255,255,255,.8); --glass-1-filter: blur(10px) saturate(160%);
+    font-family: Roboto, "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: var(--text);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); line-height: 1.45; }
+  .page { max-width: 1520px; margin: 0 auto; padding: 32px 16px 64px; }
+  .page h1 { font-size: 24px; font-weight: 600; color: var(--text-strong); margin: 0 0 4px; }
+  .page h2 { font-size: 16px; font-weight: 600; color: var(--text-strong); margin: 40px 0 12px; }
+  .lead { color: var(--text-muted); font-size: 14px; max-width: 75ch; margin: 0 0 16px; }
+  .note { font-size: 13px; color: var(--text-muted); max-width: 75ch; }
+  .tabs { display: inline-flex; gap: 2px; padding: 2px; background: var(--surface-pressed); border-radius: var(--radius-md); }
+  .tabs button { border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 500; color: var(--text-muted); padding: 6px 12px; border-radius: var(--radius-sm); cursor: pointer; }
+  .tabs button[aria-pressed="true"] { background: var(--surface); color: var(--text-strong); box-shadow: var(--shadow-1); }
+
+  /* --- Рамка экрана, масштабируется под ширину страницы --- */
+  .stage { position: relative; width: 100%; }
+  .frame { position: absolute; top: 0; left: 0; transform-origin: 0 0; overflow: hidden; border-radius: 10px; box-shadow: var(--shadow-3); background: #f0ede6; }
+  .frame svg.map { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .row2 { display: grid; grid-template-columns: 1fr 340px; gap: 32px; align-items: start; }
+  @media (max-width: 960px) { .row2 { grid-template-columns: 1fr; } }
+
+  /* --- Иконки и кнопки --- */
+  i[data-i] { display: inline-flex; width: 20px; height: 20px; flex: none; }
+  i[data-i] svg { width: 100%; height: 100%; fill: currentColor; }
+  .ib { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; border-radius: var(--radius-sm); color: var(--text-muted); cursor: pointer; }
+  .ib:hover { background: var(--surface-hover); color: var(--text-strong); }
+  .ib.lg { width: 40px; height: 40px; }
+  .ib.active { background: var(--accent-soft); color: var(--accent-text); }
+  .tb { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; background: transparent; border-radius: var(--radius-sm); font: inherit; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; }
+  .tb i[data-i] { width: 18px; height: 18px; color: var(--text-muted); }
+  .tb:hover { background: var(--surface-hover); }
+  .btn { height: 32px; padding: 0 14px; border-radius: var(--radius-sm); border: 0; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .btn.flat { background: var(--primary); color: #fff; }
+  .btn.text { background: transparent; color: var(--text); }
+  .btn.text:hover { background: var(--surface-hover); }
+  kbd { font: 500 11px/1 Roboto, system-ui, sans-serif; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 3px 5px; }
+
+  /* --- Шапка: стекло 48 px поверх карты --- */
+  .hdr { position: absolute; top: 0; left: 0; right: 0; height: var(--shell-top); display: flex; align-items: center; gap: 4px; padding: 0 12px; background: var(--glass-1-bg); backdrop-filter: var(--glass-1-filter); -webkit-backdrop-filter: var(--glass-1-filter); box-shadow: var(--shadow-1); z-index: 5; }
+  .brand { display: flex; align-items: center; gap: 8px; padding: 0 6px; height: 36px; font-size: 15px; font-weight: 600; color: var(--text-strong); }
+  .brand span { font-weight: 400; color: var(--text-muted); margin-left: -4px; }
+  .ctx { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px 0 6px; border-radius: 13px; background: var(--surface-hover); font-size: 12px; color: var(--text-muted); margin-right: 8px; }
+  .ctx i[data-i] { width: 16px; height: 16px; }
+  .sep { width: 1px; height: 20px; background: var(--border-subtle); margin: 0 6px; }
+  .grow { flex: 1; }
+  .search { width: 280px; height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 6px 0 10px; border-radius: var(--radius-sm); background: rgba(24,39,75,.05); color: var(--text-faint); font-size: 13px; margin-right: 4px; }
+  .search i[data-i] { width: 18px; height: 18px; color: var(--text-muted); }
+  .search .grow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; background: #E4E4E7; color: var(--text); font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; margin-left: 6px; }
+
+  /* --- Плавающие поверхности --- */
+  .card { position: absolute; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-2); display: flex; flex-direction: column; overflow: hidden; z-index: 4; }
+  .pill { position: absolute; background: var(--surface); border-radius: var(--radius-md); box-shadow: var(--shadow-2); display: flex; padding: 2px; z-index: 4; }
+  .pill.v { flex-direction: column; }
+  .pill .ib { color: var(--text-muted); }
+  .pill .gsep { width: 1px; margin: 6px 2px; background: var(--border-subtle); }
+  .pill.v .gsep { width: auto; height: 1px; margin: 2px 6px; }
+  .tool { height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: var(--radius-sm); color: var(--text-muted); font-size: 13px; font-weight: 500; border: 0; background: transparent; cursor: pointer; }
+  .tool:hover { background: var(--surface-hover); color: var(--text-strong); }
+  .tool.active { background: var(--accent-soft); color: var(--accent-text); }
+
+  /* --- Панель слоёв --- */
+  .ph { display: flex; align-items: center; gap: 4px; padding: 10px 8px 6px 16px; }
+  .ph h3 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-strong); flex: 1; }
+  .seg { display: flex; gap: 2px; margin: 4px 12px 8px; padding: 2px; background: var(--surface-hover); border-radius: var(--radius-md); }
+  .seg button { flex: 1; height: 28px; border: 0; background: transparent; border-radius: var(--radius-sm); font: inherit; font-size: 12px; font-weight: 500; color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text-strong); box-shadow: var(--shadow-1); }
+  .seg .cnt { font-size: 11px; color: var(--text-faint); }
+  .scroll { flex: 1; overflow: hidden; padding: 0 8px; }
+  .sec { display: flex; align-items: center; justify-content: space-between; padding: 16px 8px 4px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+  .sec i[data-i] { width: 16px; height: 16px; }
+  .lr { display: flex; align-items: flex-start; gap: 10px; padding: 7px 8px; border-radius: var(--radius-sm); cursor: pointer; }
+  .lr:hover, .lr.hover { background: var(--surface-hover); }
+  .cb { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #A1A1AA; flex: none; margin-top: 2px; display: inline-flex; align-items: center; justify-content: center; background: var(--surface); }
+  .cb.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .cb.on i[data-i] { width: 14px; height: 14px; }
+  .sw { width: 18px; height: 18px; flex: none; margin-top: 1px; display: inline-flex; align-items: center; justify-content: center; }
+  .lt { flex: 1; min-width: 0; }
+  .ln { font-size: 13px; font-weight: 500; color: var(--text-strong); line-height: 20px; }
+  .ls { font-size: 12px; color: var(--text-faint); line-height: 16px; }
+  .chip { font-size: 11px; font-weight: 500; color: var(--text-muted); background: var(--surface-hover); border-radius: 4px; padding: 2px 6px; margin-top: 1px; }
+  .lg { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 4px; }
+  .lg span { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }
+  .lg b { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .pf { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border-subtle); font-size: 12px; color: var(--text-faint); }
+
+  /* --- Карточка объекта --- */
+  .oh { padding: 12px 8px 8px 16px; display: flex; align-items: flex-start; gap: 4px; }
+  .oh .kind { font-size: 12px; font-weight: 500; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+  .oh .kind b { width: 14px; height: 4px; border-radius: 2px; background: var(--accent); display: inline-block; }
+  .oh h3 { margin: 2px 0 0; font-size: 16px; font-weight: 600; color: var(--text-strong); }
+  .oh .sub { font-size: 12px; color: var(--text-faint); }
+  .fg { padding: 4px 16px; display: grid; grid-template-columns: 1fr auto; }
+  .fg .k { font-size: 13px; color: var(--text-muted); padding: 7px 0; border-bottom: 1px solid var(--border-subtle); }
+  .fg .v { padding-left: 12px !important; font-size: 13px; font-weight: 500; color: var(--text-strong); padding: 7px 0; border-bottom: 1px solid var(--border-subtle); text-align: right; font-variant-numeric: tabular-nums; }
+  .fg .v small { font-weight: 400; color: var(--text-faint); font-size: 12px; margin-left: 3px; }
+  .fg .v.edit { color: var(--primary); }
+  .fg .grp { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--text-muted); padding: 16px 0 2px; }
+  .of { margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border-subtle); }
+  .dirty { font-size: 12px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; flex: 1; }
+  .dirty b { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+
+  /* --- Низ --- */
+  .scale { position: absolute; z-index: 3; font-size: 11px; color: var(--text); }
+  .scale .bar { width: 96px; height: 6px; border: 1.5px solid var(--text); border-top: 0; margin-bottom: 2px; }
+  .coords { position: absolute; z-index: 3; height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 6px 0 10px; border-radius: var(--radius-sm); background: rgba(255,255,255,.9); box-shadow: var(--shadow-1); font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .coords b { font-weight: 500; color: var(--text-strong); }
+  .coords i[data-i] { width: 16px; height: 16px; }
+
+  /* --- Телефон --- */
+  .corner { position: absolute; z-index: 5; height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0 10px; border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-2); color: var(--text-strong); }
+  .corner i[data-i] { width: 22px; height: 22px; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; background: var(--surface); border-radius: 14px 14px 0 0; box-shadow: var(--shadow-3); }
+  .sheet .handle { width: 36px; height: 4px; border-radius: 2px; background: #D4D4D8; margin: 8px auto 4px; }
+  .m .ib { width: 44px; height: 44px; }
+  .m .tool { height: 44px; width: 44px; justify-content: center; padding: 0; }
+  .m .pill { border-radius: 10px; }
+
+  /* --- Сноски --- */
+  .co { position: absolute; z-index: 9; width: 22px; height: 22px; border-radius: 50%; background: #18181B; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px rgba(255,255,255,.9); }
+  ol.notes { margin: 0; padding: 0; list-style: none; counter-reset: n; display: grid; gap: 10px; }
+  ol.notes li { counter-increment: n; display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: 13px; color: var(--text); max-width: 65ch; }
+  ol.notes li::before { content: counter(n); width: 22px; height: 22px; border-radius: 50%; background: #18181B; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+  ol.notes li b { color: var(--text-strong); font-weight: 600; }
+  ol.notes li em { font-style: normal; color: var(--text-muted); }
+
+  table.cmp { border-collapse: collapse; font-size: 13px; width: 100%; max-width: 900px; background: var(--surface); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-1); }
+  table.cmp th, table.cmp td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--border-subtle); }
+  table.cmp th { font-size: 12px; font-weight: 600; color: var(--text-muted); background: #FAFAFA; }
+  table.cmp td.n { font-variant-numeric: tabular-nums; }
+  table.cmp td.ok { color: #15803D; font-weight: 500; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 12px; }
+  .swatch { width: 150px; background: var(--surface); border-radius: var(--radius-md); box-shadow: var(--shadow-1); overflow: hidden; font-size: 12px; }
+  .swatch div { height: 44px; }
+  .swatch p { margin: 0; padding: 6px 10px 8px; color: var(--text-muted); }
+  .swatch p b { display: block; color: var(--text-strong); font-weight: 600; }
+  .decide { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-1); padding: 16px 20px; max-width: 900px; }
+  .decide li { font-size: 14px; margin: 6px 0; max-width: 75ch; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>ITwin Map — каркас в духе Felt</h1>
+  <p class="lead">Макет этапа 10 на согласование: карта главная, обвязка тише содержимого, режимы работы собраны в одну группу, лишние входы убраны. Цвета, шрифт и отступы — те токены, что пойдут в код. Карта нарисована схематично; сеть и выделенный участок — условные.</p>
+  <div class="tabs" role="group" aria-label="Размер экрана">
+    <button type="button" aria-pressed="true" data-view="both">Оба</button>
+    <button type="button" aria-pressed="false" data-view="desk">Ноутбук 1440</button>
+    <button type="button" aria-pressed="false" data-view="phone">Телефон 375</button>
+  </div>
+
+  <section id="v-desk">
+    <h2>Ноутбук, 1440 × 900 — выбран участок, открыта карточка</h2>
+    <div class="stage" data-w="1440" data-h="900">
+      <div class="frame" style="width:1440px;height:900px">
+        <svg class="map" data-map="desk" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
+
+        <header class="hdr">
+          <div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 8.5 12 14 2 8.5Z" fill="#0A7AF2"/><path d="M12 14 2 8.5V11L12 16.5 22 11V8.5Z" fill="#0046B8"/><path d="M4.5 13.2 2 14.5 12 20 22 14.5 19.5 13.2 12 17.3Z" fill="#14C7E8" opacity=".75"/></svg>ITwin <span>Map</span></div>
+          <div class="ctx"><i data-i="pin"></i>Астана · Администратор</div>
+          <nav style="display:flex;gap:2px">
+            <button class="tb"><i data-i="calc"></i>Расчёт</button>
+            <button class="tb"><i data-i="protocol"></i>Протокол</button>
+            <button class="tb"><i data-i="export"></i>Выгрузка<i data-i="chev"></i></button>
+          </nav>
+          <div class="grow"></div>
+          <div class="search"><i data-i="search"></i><span class="grow">Узел, адрес, журнал, команда</span><kbd>Ctrl K</kbd></div>
+          <button class="ib lg" title="Инструменты: журналы, реестры, отчёты"><i data-i="tools"></i></button>
+          <div class="avatar">АД</div>
+        </header>
+
+        <!-- Левая колонка: слои -->
+        <aside class="card" style="top:60px;left:12px;bottom:12px;width:320px">
+          <div class="ph"><h3>Слои</h3><button class="ib" title="Найти слой"><i data-i="search"></i></button><button class="ib" title="Свернуть панель"><i data-i="collapse"></i></button></div>
+          <div class="seg">
+            <button aria-pressed="true">Слои</button>
+            <button aria-pressed="false">Фрагменты <span class="cnt">55</span></button>
+            <button aria-pressed="false">Подписи</button>
+            <button aria-pressed="false">ПТС</button>
+          </div>
+          <div class="scroll">
+            <div class="sec">Тепловая сеть<i data-i="chev"></i></div>
+            <div class="lr"><span class="cb on"><i data-i="check"></i></span><span class="sw"><svg width="18" height="18"><path d="M2 7h14" stroke="#E05A47" stroke-width="2.5"/><path d="M2 11h14" stroke="#4A83D6" stroke-width="2.5"/></svg></span><span class="lt"><div class="ln">Участки</div><div class="ls">подающий и обратный</div></span><span class="chip">MVT</span></div>
+            <div class="lr hover"><span class="cb on"><i data-i="check"></i></span><span class="sw"><svg width="18" height="18"><circle cx="9" cy="9" r="5" fill="#fff" stroke="#27272A" stroke-width="2"/></svg></span><span class="lt"><div class="ln">Тепловые камеры и узлы</div><div class="ls">ТК, НО, точки врезки</div></span><span class="chip">MVT</span></div>
+            <div class="lr"><span class="cb on"><i data-i="check"></i></span><span class="sw"><svg width="18" height="18"><rect x="4" y="4" width="10" height="10" rx="2" fill="#7C3AED"/></svg></span><span class="lt"><div class="ln">Потребители</div><div class="ls">ИТП, ЦТП</div></span><span class="chip">MVT</span></div>
+            <div class="lr"><span class="cb"></span><span class="sw"><svg width="18" height="18"><path d="M3 15 9 3l6 12Z" fill="#DC2626"/></svg></span><span class="lt"><div class="ln">Источники</div><div class="ls">ТЭЦ, котельные</div></span><span class="chip">WMS</span></div>
+            <div class="sec">Контекст<i data-i="chev"></i></div>
+            <div class="lr"><span class="cb on"><i data-i="check"></i></span><span class="sw"><svg width="18" height="18"><rect x="3" y="5" width="12" height="9" rx="1.5" fill="#C9C4BA"/></svg></span><span class="lt"><div class="ln">Здания</div><div class="ls">высота и назначение</div>
+              <div class="lg"><span><b style="background:#E9D8A6"></b>Жилое</span><span><b style="background:#F4B183"></b>Коммерческое</span><span><b style="background:#B4A7D6"></b>Производство</span><span><b style="background:#A9D18E"></b>Образование</span></div></span></div>
+            <div class="lr"><span class="cb"></span><span class="sw"><svg width="18" height="18"><path d="M2 12c3-6 5-6 7-2s4 4 7-2" fill="none" stroke="#A1A1AA" stroke-width="1.6"/></svg></span><span class="lt"><div class="ln">Изолинии</div><div class="ls">рельеф, подписи высот</div></span></div>
+            <div class="lr"><span class="cb"></span><span class="sw"><svg width="18" height="18"><path d="M2 15 7 7l3 4 2-3 4 7Z" fill="#D4D4D8"/></svg></span><span class="lt"><div class="ln">Рельеф и 3D</div><div class="ls">Terrain RGB</div></span></div>
+          </div>
+          <div class="pf"><span class="grow">Изменён 1 слой</span><button class="btn text">Сбросить</button><button class="btn flat">Применить</button></div>
+        </aside>
+
+        <!-- Тулбар режимов сверху по центру видимой карты -->
+        <div class="pill" style="top:60px;left:calc(344px + (1440px - 344px - 384px) / 2);transform:translateX(-50%)">
+          <button class="tool active" title="Информация об объекте (I)"><i data-i="info"></i>Информация</button>
+          <span class="gsep"></span>
+          <button class="tool" title="Измерения (M)"><i data-i="ruler"></i></button>
+          <button class="tool" title="Редактировать топологию (E)"><i data-i="topo"></i></button>
+          <button class="tool" title="Пьезометрический график (P)"><i data-i="chart"></i></button>
+        </div>
+
+        <!-- Правая колонка: карточка объекта -->
+        <aside class="card" style="top:60px;right:12px;bottom:12px;width:360px">
+          <div class="oh">
+            <div class="grow"><div class="kind"><b></b>Участок · подземная канальная</div><h3>ТК-12 → ТК-13</h3><div class="sub">Магистраль М-3 · фрагмент 74</div></div>
+            <button class="ib" title="Открыть окном"><i data-i="win"></i></button><button class="ib" title="Закрыть"><i data-i="close"></i></button>
+          </div>
+          <div class="seg"><button aria-pressed="true">Основное</button><button aria-pressed="false">Гидравлика</button><button aria-pressed="false">Журналы</button><button aria-pressed="false">История</button></div>
+          <div class="fg">
+            <div class="grp">Трубопровод</div>
+            <div class="k">Длина</div><div class="v">128,4<small>м</small></div>
+            <div class="k">Диаметр подающего</div><div class="v">325<small>мм</small></div>
+            <div class="k">Диаметр обратного</div><div class="v">325<small>мм</small></div>
+            <div class="k">Год прокладки</div><div class="v edit">1987</div>
+            <div class="k">Изоляция</div><div class="v">ППУ</div>
+            <div class="grp">Режим</div>
+            <div class="k">Давление в начале</div><div class="v">6,42<small>кгс/см²</small></div>
+            <div class="k">Расход</div><div class="v">412,7<small>т/ч</small></div>
+            <div class="k">Скорость</div><div class="v">1,38<small>м/с</small></div>
+          </div>
+          <div class="of"><span class="dirty"><b></b>Есть правка</span><button class="btn text">Отменить</button><button class="btn flat">Сохранить</button></div>
+        </aside>
+
+        <!-- Вид и зум — справа внизу, левее карточки -->
+        <div class="pill v" style="right:384px;bottom:104px">
+          <button class="ib" title="Начальный вид"><i data-i="home"></i></button>
+          <button class="ib" title="Моё местоположение"><i data-i="gps"></i></button>
+          <button class="ib" title="2D / 3D" style="font-size:12px;font-weight:600">3D</button>
+          <button class="ib" title="Подложка"><i data-i="basemap"></i></button>
+        </div>
+        <div class="pill v" style="right:384px;bottom:12px">
+          <button class="ib" title="Приблизить"><i data-i="plus"></i></button>
+          <span class="gsep"></span>
+          <button class="ib" title="Отдалить"><i data-i="minus"></i></button>
+        </div>
+
+        <div class="scale" style="left:348px;bottom:16px"><div class="bar"></div>200 м</div>
+        <div class="coords" style="left:calc(344px + (1440px - 344px - 384px) / 2);transform:translateX(-50%);bottom:12px"><b>WGS84</b><i data-i="chev"></i><span>51,1282° с. ш. · 71,4304° в. д.</span><button class="ib" style="width:24px;height:24px" title="Скопировать"><i data-i="copy"></i></button></div>
+
+        <span class="co" style="top:38px;left:24px">1</span>
+        <span class="co" style="top:38px;left:430px">2</span>
+        <span class="co" style="top:38px;right:200px">3</span>
+        <span class="co" style="top:52px;left:322px">4</span>
+        <span class="co" style="top:52px;left:578px">5</span>
+        <span class="co" style="top:52px;right:6px">6</span>
+        <span class="co" style="bottom:330px;right:430px">7</span>
+        <span class="co" style="bottom:46px;left:330px">8</span>
+      </div>
+    </div>
+    <div class="row2" style="margin-top:20px">
+      <ol class="notes">
+        <li><span><b>Шапка 48 px, стекло поверх карты, без капса.</b> Тень вместо серой линии; на время панорамирования стекло становится плотным. <em>Якоб, Рамс: честность, меньше.</em></span></li>
+        <li><span><b>Три пункта вместо шести.</b> «Карта» убрана (ничего не делала), «Экспорт» и «Ведомости Excel» → «Выгрузка» с двумя подгруппами — до любой выгрузки по-прежнему два клика. <em>Хик, Миллер.</em></span></li>
+        <li><span><b>Один поиск — Ctrl K</b>: узлы, адреса, журналы, команды. Поле выглядит как поле, хоткей виден. Справа — «Инструменты» и пользователь (аватар нейтральный, синий не тратится на декор). <em>Аффорданс, 60–30–10.</em></span></li>
+        <li><span><b>Слои — плавающая карточка</b> с отступом 12. Строка кликабельна целиком, название 13 / 500, источник серым ниже, тип (MVT / WMS) — тихий чип. Свотч показывает, как слой выглядит на карте. <em>Иерархия, Фиттс, близость.</em></span></li>
+        <li><span><b>Режимы работы — одна группа сверху по центру</b> видимой карты. Активный режим — амбер с подписью, остальные — иконки с подсказкой и хоткеем. <em>Хик, Миллер (4 в группе), Фиттс.</em></span></li>
+        <li><span><b>Карточка объекта справа</b>, тоже плавающая. Тип и название — главное, поля — сетка «название · значение · единица», числа моноширинные, правка подсвечена синим. Одна главная кнопка — «Сохранить». <em>Иерархия, обратная связь.</em></span></li>
+        <li><span><b>Вид и зум — внизу справа</b>, как в любой картографической программе: группа вида (4) и пара зума (2). Колонка из 12 круглых кнопок больше не нужна. <em>Якоб, Миллер.</em></span></li>
+        <li><span><b>Масштабная линейка и координаты</b> — тихо, внизу. <em>Якоб.</em></span></li>
+      </ol>
+      <div class="note">
+        <p style="margin-top:0"><b style="color:var(--text-strong)">Цвет 60–30–10.</b> 60 % — карта и нейтральный фон, 30 % — белые панели, 10 % — синий у главного действия и выбранного, амбер — только активный режим и выделенный участок.</p>
+        <p><b style="color:var(--text-strong)">Текст — три стиля.</b> Заголовок 16 / 600, основной 13 / 500 и 13 / 400, служебный 12 / 400 серым.</p>
+        <p><b style="color:var(--text-strong)">Отступы.</b> 12 от краёв экрана, 8 между группами, 16 внутри панели — всё из шкалы 4 px.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="v-phone">
+    <h2>Телефон, 375 × 812 — шапки нет, всё под пальцем</h2>
+    <div class="row2">
+      <div class="stage" data-w="375" data-h="812" style="max-width:375px">
+        <div class="frame m" style="width:375px;height:812px">
+          <svg class="map" data-map="phone" viewBox="0 0 375 812" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
+          <div class="corner" style="top:12px;left:12px"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 8.5 12 14 2 8.5Z" fill="#0A7AF2"/><path d="M12 14 2 8.5V11L12 16.5 22 11V8.5Z" fill="#0046B8"/><path d="M4.5 13.2 2 14.5 12 20 22 14.5 19.5 13.2 12 17.3Z" fill="#14C7E8" opacity=".75"/></svg><span style="font-size:13px;font-weight:500">Астана</span><i data-i="chev" style="width:18px;height:18px;color:var(--text-muted)"></i></div>
+          <div class="corner" style="top:12px;right:64px"><i data-i="search"></i></div>
+          <div class="corner" style="top:12px;right:12px;padding:0"><span class="avatar" style="margin:0">АД</span></div>
+
+          <div class="pill v" style="right:12px;bottom:318px">
+            <button class="ib" title="Начальный вид"><i data-i="home"></i></button>
+            <button class="ib" title="Моё местоположение"><i data-i="gps"></i></button>
+            <button class="ib" title="2D / 3D" style="font-size:12px;font-weight:600">3D</button>
+            <button class="ib" title="Подложка"><i data-i="basemap"></i></button>
+          </div>
+          <div class="pill v" style="right:12px;bottom:212px">
+            <button class="ib"><i data-i="plus"></i></button><span class="gsep"></span><button class="ib"><i data-i="minus"></i></button>
+          </div>
+
+          <div class="pill" style="left:50%;transform:translateX(-50%);bottom:148px">
+            <button class="tool active" title="Информация"><i data-i="info"></i></button>
+            <button class="tool" title="Измерения"><i data-i="ruler"></i></button>
+            <button class="tool" title="Топология"><i data-i="topo"></i></button>
+            <button class="tool" title="Пьезометр"><i data-i="chart"></i></button>
+          </div>
+
+          <div class="sheet" style="height:136px">
+            <div class="handle"></div>
+            <div style="display:flex;align-items:center;padding:4px 12px 4px 16px"><div style="flex:1"><div style="font-size:16px;font-weight:600;color:var(--text-strong)">Слои</div><div style="font-size:12px;color:var(--text-faint)">Включено 5 · фрагмент 74</div></div><button class="ib" title="Инструменты"><i data-i="tools"></i></button></div>
+            <div class="seg" style="margin-top:6px"><button aria-pressed="true">Слои</button><button aria-pressed="false">Фрагменты</button><button aria-pressed="false">Подписи</button><button aria-pressed="false">ПТС</button></div>
+          </div>
+          <span class="co" style="top:6px;left:6px">1</span>
+          <span class="co" style="bottom:330px;right:64px">2</span>
+          <span class="co" style="bottom:178px;left:86px">3</span>
+          <span class="co" style="bottom:110px;left:6px">4</span>
+        </div>
+      </div>
+      <ol class="notes">
+        <li><span><b>Углы вместо шапки.</b> Слева — знак и город (открывает меню разделов), справа — поиск и пользователь. Кнопки 44 × 44. <em>Якоб (так устроен Felt и карты на телефоне), Фиттс.</em></span></li>
+        <li><span><b>Вид и зум</b> — справа, в зоне большого пальца, двумя короткими группами вместо 12 кругов по всему краю. <em>Миллер, Фиттс.</em></span></li>
+        <li><span><b>Режимы работы — внизу по центру</b>, над шторкой: до них дотягивается большой палец. <em>Фиттс.</em></span></li>
+        <li><span><b>Слои — шторка снизу.</b> Потянуть вверх — полный список; карточка объекта на телефоне уже открывается такой же шторкой. <em>Консистентность.</em></span></li>
+      </ol>
+    </div>
+  </section>
+
+  <h2>Было → стало</h2>
+  <table class="cmp">
+    <thead><tr><th>Что</th><th>Было</th><th>Стало</th><th>Принцип</th></tr></thead>
+    <tbody>
+      <tr><td>Кнопок в одной группе справа</td><td class="n">12 (одна колонка)</td><td class="n ok">4 · 4 · 2</td><td>Миллер, Хик</td></tr>
+      <tr><td>Входов в поиск</td><td class="n">3</td><td class="n ok">1 (Ctrl K)</td><td>Рамс, Хик</td></tr>
+      <tr><td>Входов в «Инструменты»</td><td class="n">2</td><td class="n ok">1</td><td>Рамс</td></tr>
+      <tr><td>Пунктов в шапке</td><td class="n">6</td><td class="n ok">3</td><td>Хик</td></tr>
+      <tr><td>Кликов до любой выгрузки</td><td class="n">2</td><td class="n ok">2</td><td>паритет</td></tr>
+      <tr><td>Текст капсом</td><td>все кнопки и 12 заголовков</td><td class="ok">нет</td><td>иерархия</td></tr>
+      <tr><td>Высота шапки</td><td class="n">56 px, сплошная</td><td class="n ok">48 px, стекло; на телефоне 0</td><td>воздух</td></tr>
+      <tr><td>Кнопки карты</td><td>круги 48 px, материальная тень</td><td class="ok">36–44 px в группах, мягкая тень</td><td>консистентность</td></tr>
+      <tr><td>Панели</td><td>прижаты к краям</td><td class="ok">плавают с отступом 12</td><td>воздух, сетка</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Палитра и поверхности</h2>
+  <div class="swatches">
+    <div class="swatch"><div style="background:#F4F4F5"></div><p><b>Фон · 60 %</b>#F4F4F5 и карта</p></div>
+    <div class="swatch"><div style="background:#FFFFFF;border-bottom:1px solid var(--border-subtle)"></div><p><b>Панели · 30 %</b>#FFFFFF</p></div>
+    <div class="swatch"><div style="background:#1565C0"></div><p><b>Primary · 10 %</b>#1565C0, действие и выбор</p></div>
+    <div class="swatch"><div style="background:#D97706"></div><p><b>Акцент</b>#D97706, только активный режим</p></div>
+    <div class="swatch"><div style="background:#18181B"></div><p><b>Текст</b>#18181B · 17,7 : 1</p></div>
+    <div class="swatch"><div style="background:#52525B"></div><p><b>Текст серый</b>#52525B · 7,7 : 1</p></div>
+  </div>
+
+  <h2>Нужно ваше решение</h2>
+  <div class="decide">
+    <ol>
+      <li>Убрать из правой колонки «Поиск адреса» и «Поиск узлов» — оба ищутся через Ctrl K; окно «Поиск узлов» с фильтрами остаётся и открывается из палитры и из «Инструментов».</li>
+      <li>Убрать второй вход «Инструменты» из колонки — остаётся кнопка в шапке.</li>
+      <li>Объединить «Экспорт» и «Ведомости Excel» в «Выгрузку» с подгруппами — число кликов то же.</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+const ICONS = {"search":"M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z","tools":"M20 8H17V6C17 4.9 16.1 4 15 4H9C7.9 4 7 4.9 7 6V8H4C2.9 8 2 8.9 2 10V20H22V10C22 8.9 21.1 8 20 8M9 6H15V8H9V6M20 18H4V15H6V16H8V15H16V16H18V15H20V18M18 13V12H16V13H8V12H6V13H4V10H20V13H18Z","calc":"M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3M13 7.1L14.1 6L15.5 7.4L16.9 6L18 7.1L16.6 8.5L18 9.9L16.9 11L15.5 9.6L14.1 11L13 9.9L14.4 8.5L13 7.1M6.2 7.7H11.2V9.2H6.2V7.7M11.5 16H9.5V18H8V16H6V14.5H8V12.5H9.5V14.5H11.5V16M18 17.2H13V15.7H18V17.2M18 14.8H13V13.3H18V14.8Z","protocol":"M13,19V16H21V19H13M8.5,13L2.47,7H6.71L11.67,11.95C12.25,12.54 12.25,13.5 11.67,14.07L6.74,19H2.5L8.5,13Z","export":"M23,12L19,8V11H10V13H19V16M1,18V6C1,4.89 1.9,4 3,4H15A2,2 0 0,1 17,6V9H15V6H3V18H15V15H17V18A2,2 0 0,1 15,20H3A2,2 0 0,1 1,18Z","chev":"M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z","layers":"M12,18.54L19.37,12.8L21,14.07L12,21.07L3,14.07L4.62,12.81L12,18.54M12,16L3,9L12,2L21,9L12,16M12,4.53L6.26,9L12,13.47L17.74,9L12,4.53Z","info":"M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z","ruler":"M1.39,18.36L3.16,16.6L4.58,18L5.64,16.95L4.22,15.54L5.64,14.12L8.11,16.6L9.17,15.54L6.7,13.06L8.11,11.65L9.53,13.06L10.59,12L9.17,10.59L10.59,9.17L13.06,11.65L14.12,10.59L11.65,8.11L13.06,6.7L14.47,8.11L15.54,7.05L14.12,5.64L15.54,4.22L18,6.7L19.07,5.64L16.6,3.16L18.36,1.39L22.61,5.64L5.64,22.61L1.39,18.36Z","topo":"M2 3V9H4.95L6.95 15H6V21H12V16.41L17.41 11H22V5H16V9.57L10.59 15H9.06L7.06 9H8V3M4 5H6V7H4M18 7H20V9H18M8 17H10V19H8Z","chart":"M16,11.78L20.24,4.45L21.97,5.45L16.74,14.5L10.23,10.75L5.46,19H22V21H2V3H4V17.54L9.5,8L16,11.78Z","home":"M12 5.69L17 10.19V18H15V12H9V18H7V10.19L12 5.69M12 3L2 12H5V20H11V14H13V20H19V12H22","gps":"M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M3.05,13H1V11H3.05C3.5,6.83 6.83,3.5 11,3.05V1H13V3.05C17.17,3.5 20.5,6.83 20.95,11H23V13H20.95C20.5,17.17 17.17,20.5 13,20.95V23H11V20.95C6.83,20.5 3.5,17.17 3.05,13M12,5A7,7 0 0,0 5,12A7,7 0 0,0 12,19A7,7 0 0,0 19,12A7,7 0 0,0 12,5Z","basemap":"M20.5,3L20.34,3.03L15,5.1L9,3L3.36,4.9C3.15,4.97 3,5.15 3,5.38V20.5A0.5,0.5 0 0,0 3.5,21L3.66,20.97L9,18.9L15,21L20.64,19.1C20.85,19.03 21,18.85 21,18.62V3.5A0.5,0.5 0 0,0 20.5,3M10,5.47L14,6.87V18.53L10,17.13V5.47M5,6.46L8,5.45V17.15L5,18.31V6.46M19,17.54L16,18.55V6.86L19,5.7V17.54Z","plus":"M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z","minus":"M19,13H5V11H19V13Z","close":"M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z","win":"M18 18V20H4A2 2 0 0 1 2 18V8H4V18M22 6V14A2 2 0 0 1 20 16H8A2 2 0 0 1 6 14V6A2 2 0 0 1 8 4H20A2 2 0 0 1 22 6M20 6H8V14H20Z","pin":"M12,6.5A2.5,2.5 0 0,1 14.5,9A2.5,2.5 0 0,1 12,11.5A2.5,2.5 0 0,1 9.5,9A2.5,2.5 0 0,1 12,6.5M12,2A7,7 0 0,1 19,9C19,14.25 12,22 12,22C12,22 5,14.25 5,9A7,7 0 0,1 12,2M12,4A5,5 0 0,0 7,9C7,10 7,12 12,18.71C17,12 17,10 17,9A5,5 0 0,0 12,4Z","collapse":"M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z","undo":"M12.5,8C9.85,8 7.45,9 5.6,10.6L2,7V16H11L7.38,12.38C8.77,11.22 10.54,10.5 12.5,10.5C16.04,10.5 19.05,12.81 20.1,16L22.47,15.22C21.08,11.03 17.15,8 12.5,8Z","redo":"M18.4,10.6C16.55,9 14.15,8 11.5,8C6.85,8 2.92,11.03 1.54,15.22L3.9,16C4.95,12.81 7.95,10.5 11.5,10.5C13.45,10.5 15.23,11.22 16.62,12.38L13,16H22V7L18.4,10.6Z","excel":"M14 2H6C4.89 2 4 2.9 4 4V20C4 21.11 4.89 22 6 22H18C19.11 22 20 21.11 20 20V8L14 2M18 20H6V4H13V9H18V20M12.9 14.5L15.8 19H14L12 15.6L10 19H8.2L11.1 14.5L8.2 10H10L12 13.4L14 10H15.8L12.9 14.5Z","check":"M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z","filter":"M6,13H18V11H6M3,6V8H21V6M10,18H14V16H10V18Z","more":"M16,12A2,2 0 0,1 18,10A2,2 0 0,1 20,12A2,2 0 0,1 18,14A2,2 0 0,1 16,12M10,12A2,2 0 0,1 12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12M4,12A2,2 0 0,1 6,10A2,2 0 0,1 8,12A2,2 0 0,1 6,14A2,2 0 0,1 4,12Z","copy":"M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z","cube":"M21,16.5C21,16.88 20.79,17.21 20.47,17.38L12.57,21.82C12.41,21.94 12.21,22 12,22C11.79,22 11.59,21.94 11.43,21.82L3.53,17.38C3.21,17.21 3,16.88 3,16.5V7.5C3,7.12 3.21,6.79 3.53,6.62L11.43,2.18C11.59,2.06 11.79,2 12,2C12.21,2 12.41,2.06 12.57,2.18L20.47,6.62C20.79,6.79 21,7.12 21,7.5V16.5M12,4.15L6.04,7.5L12,10.85L17.96,7.5L12,4.15M5,15.91L11,19.29V12.58L5,9.21V15.91M19,15.91V9.21L13,12.58V19.29L19,15.91Z"};
+document.querySelectorAll('i[data-i]').forEach((el) => {
+  const d = ICONS[el.dataset.i];
+  if (d) el.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + d + '"/></svg>';
+});
+
+// Схематичная карта: кварталы, улицы, река, тепловая сеть и выделенный участок
+function rnd(seed) { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+function drawMap(svg, w, h, seed, sel) {
+  const r = rnd(seed), NS = 'http://www.w3.org/2000/svg';
+  const add = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); svg.appendChild(e); return e; };
+  add('rect', { width: w, height: h, fill: '#f0ede6' });
+  const xs = [], ys = [];
+  for (let x = -40; x < w + 120; x += 110 + Math.floor(r() * 50)) xs.push(x);
+  for (let y = -40; y < h + 120; y += 90 + Math.floor(r() * 40)) ys.push(y);
+  const g = add('g', { transform: 'rotate(-8 ' + w / 2 + ' ' + h / 2 + ')' });
+  const put = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); g.appendChild(e); return e; };
+  for (let i = 0; i < xs.length - 1; i++) for (let j = 0; j < ys.length - 1; j++) {
+    const x0 = xs[i] + 10, y0 = ys[j] + 10, bw = xs[i + 1] - xs[i] - 20, bh = ys[j + 1] - ys[j] - 20;
+    if (r() < 0.12) { put('rect', { x: x0, y: y0, width: bw, height: bh, rx: 4, fill: '#dfe8d3' }); continue; }
+    for (let k = 0; k < 4 + Math.floor(r() * 5); k++) {
+      const bx = x0 + r() * (bw - 30), by = y0 + r() * (bh - 26);
+      put('rect', { x: bx, y: by, width: 14 + r() * 26, height: 10 + r() * 18, rx: 1.5, fill: r() < 0.18 ? '#d9cdb8' : '#d8d5ce', stroke: '#cbc7bf', 'stroke-width': .6 });
+    }
+  }
+  const road = (d, wdt) => { put('path', { d, stroke: '#e3ded4', 'stroke-width': wdt + 3, fill: 'none', 'stroke-linecap': 'round' }); put('path', { d, stroke: '#fff', 'stroke-width': wdt, fill: 'none', 'stroke-linecap': 'round' }); };
+  xs.forEach((x, i) => road('M' + x + ' -200V' + (h + 300), i % 3 === 1 ? 12 : 6));
+  ys.forEach((y, i) => road('M-200 ' + y + 'H' + (w + 300), i % 3 === 2 ? 12 : 6));
+  put('path', { d: 'M' + (-100) + ' ' + h * .78 + ' C ' + w * .25 + ' ' + h * .62 + ', ' + w * .35 + ' ' + h * 1.0 + ', ' + w * .6 + ' ' + h * .82 + ' S ' + w * .95 + ' ' + h * .55 + ', ' + (w + 200) + ' ' + h * .66, stroke: '#a9cdf0', 'stroke-width': w > 600 ? 34 : 26, fill: 'none', 'stroke-linecap': 'round' });
+  // Сеть: подающий (красный) и обратный (синий) вдоль улиц, камеры — кружки
+  const xi = xs.slice(1, -1), yi = ys.slice(1, -2);
+  const path = [];
+  path.push([xi[1], yi[0]]); path.push([xi[1], yi[yi.length - 1]]);
+  const trunk = 'M' + xi[0] + ' ' + yi[1] + ' H ' + xi[xi.length - 1];
+  const branches = xi.slice(0, -1).map((x, i) => 'M' + x + ' ' + yi[1] + ' V ' + yi[(i % (yi.length - 1)) + 1 > yi.length - 1 ? 1 : (i % 2 ? 0 : yi.length - 1)]);
+  [[trunk, 0]].concat(branches.map((b) => [b, 1])).forEach(([d, small]) => {
+    put('path', { d, stroke: '#E05A47', 'stroke-width': small ? 2 : 3, fill: 'none', transform: 'translate(-3 -3)' });
+    put('path', { d, stroke: '#4A83D6', 'stroke-width': small ? 2 : 3, fill: 'none', transform: 'translate(3 3)' });
+  });
+  if (sel) {
+    const d = 'M' + xi[sel] + ' ' + yi[1] + ' H ' + xi[sel + 1];
+    put('path', { d, stroke: 'rgba(217,119,6,.28)', 'stroke-width': 18, fill: 'none', 'stroke-linecap': 'round' });
+    put('path', { d, stroke: '#D97706', 'stroke-width': 5, fill: 'none', 'stroke-linecap': 'round' });
+  }
+  xi.forEach((x) => { put('circle', { cx: x, cy: yi[1], r: 5, fill: '#fff', stroke: '#27272A', 'stroke-width': 2 }); });
+  xi.slice(0, -1).forEach((x, i) => { const y = i % 2 ? yi[0] : yi[yi.length - 1]; if (y !== undefined) put('rect', { x: x - 5, y: y - 5, width: 10, height: 10, rx: 2, fill: '#7C3AED' }); });
+}
+drawMap(document.querySelector('[data-map="desk"]'), 1440, 900, 7, 3);
+drawMap(document.querySelector('[data-map="phone"]'), 375, 812, 11, 1);
+
+// Масштаб рамок под ширину страницы
+function fit() {
+  document.querySelectorAll('.stage').forEach((st) => {
+    const w = +st.dataset.w, h = +st.dataset.h, f = st.querySelector('.frame');
+    const k = Math.min(1, st.clientWidth / w);
+    f.style.transform = 'scale(' + k + ')';
+    st.style.height = Math.round(h * k) + 'px';
+  });
+}
+window.addEventListener('resize', fit);
+document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  const v = b.dataset.view;
+  document.getElementById('v-desk').hidden = v === 'phone';
+  document.getElementById('v-phone').hidden = v === 'desk';
+  fit();
+}));
+fit();
+</script>
+</body>
+</html>
