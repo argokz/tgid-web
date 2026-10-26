@@ -18,6 +18,10 @@ export async function mapEval<T, A = undefined>(page: Page, fn: string, arg?: A)
 
 /** Открыть карту и дождаться, пока участки сети отрисуются */
 export async function openMap(page: Page) {
+  // подсказка первого запуска (FirstRunHints) в e2e не нужна — её проверяют unit-тесты
+  await page.addInitScript(() => {
+    try { localStorage.setItem('firstRunHints', '1'); } catch { /* хранилище недоступно — подсказка просто покажется */ }
+  });
   await page.goto('./', { waitUntil: 'load' });
   await expect(page.locator('canvas.maplibregl-canvas')).toBeVisible({ timeout: 90_000 });
   await expect
@@ -33,7 +37,7 @@ async function waitIdle(page: Page) {
 }
 
 function findPipe(page: Page, fragmentId: number) {
-  return mapEval<{ a: number[]; b: number[]; name: string } | null, number>(
+  return mapEval<{ a: number[]; b: number[]; m: number[]; name: string } | null, number>(
     page,
     `const pipes = map.queryRenderedFeatures().filter(f => f.layer.id.includes('heatpipesections')
        && Number(f.properties.fileid) === arg && f.geometry.type === 'LineString');
@@ -43,7 +47,14 @@ function findPipe(page: Page, fragmentId: number) {
      const f = pipes[0];
      if (!f) return null;
      const c = f.geometry.coordinates;
-     return { a: c[0], b: c[c.length - 1], name: String(f.properties.name || '') };`,
+     // точка на середине длины самой линии: середина между концами у изогнутого участка лежит мимо трубы
+     const seg = c.slice(1).map((p, i) => Math.hypot(p[0] - c[i][0], p[1] - c[i][1]));
+     let rest = seg.reduce((s, d) => s + d, 0) / 2, m = c[0];
+     for (let i = 0; i < seg.length; i++) {
+       if (rest <= seg[i]) { const t = seg[i] ? rest / seg[i] : 0; m = [c[i][0] + (c[i + 1][0] - c[i][0]) * t, c[i][1] + (c[i + 1][1] - c[i][1]) * t]; break; }
+       rest -= seg[i];
+     }
+     return { a: c[0], b: c[c.length - 1], m, name: String(f.properties.name || '') };`,
     fragmentId,
   );
 }
@@ -61,27 +72,27 @@ export interface PipeOnScreen {
  */
 export async function focusFragmentPipe(page: Page, fragmentId = FRAGMENT_ID): Promise<PipeOnScreen> {
   // тайлы грузятся не сразу — ждём, пока участки фрагмента появятся в видимой области
-  let target: { a: number[]; b: number[]; name: string } | null = null;
+  let target: { a: number[]; b: number[]; m: number[]; name: string } | null = null;
   await expect
     .poll(async () => (target = await findPipe(page, fragmentId)) !== null, {
       timeout: 90_000,
       message: `на карте нет участков фрагмента ${fragmentId}`,
     })
     .toBe(true);
-  const { a, b } = target!;
+  const { a, b, m } = target!;
   await mapEval<boolean, { a: number[]; b: number[] }>(page, 'map.jumpTo({ center: [(arg.a[0] + arg.b[0]) / 2, (arg.a[1] + arg.b[1]) / 2], zoom: 17 }); return true;', { a, b });
   await waitIdle(page);
-  const px = await mapEval<{ s: { x: number; y: number }; e: { x: number; y: number } }, { a: number[]; b: number[] }>(
+  const px = await mapEval<{ s: { x: number; y: number }; e: { x: number; y: number }; m: { x: number; y: number } }, { a: number[]; b: number[]; m: number[] }>(
     page,
-    'const s = map.project(arg.a), e = map.project(arg.b); return { s: { x: s.x, y: s.y }, e: { x: e.x, y: e.y } };',
-    { a, b },
+    'const s = map.project(arg.a), e = map.project(arg.b), m = map.project(arg.m); return { s: { x: s.x, y: s.y }, e: { x: e.x, y: e.y }, m: { x: m.x, y: m.y } };',
+    { a, b, m },
   );
   const box = (await page.locator('canvas.maplibregl-canvas').boundingBox())!;
   const abs = (p: { x: number; y: number }) => ({ x: box.x + p.x, y: box.y + p.y });
   return {
     start: abs(px.s),
     end: abs(px.e),
-    mid: abs({ x: (px.s.x + px.e.x) / 2, y: (px.s.y + px.e.y) / 2 }),
+    mid: abs(px.m),
     name: target!.name,
   };
 }

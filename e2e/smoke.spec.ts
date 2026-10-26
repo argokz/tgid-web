@@ -48,6 +48,8 @@ test.describe('ITwin Map smoke', () => {
     await expect(dialog).toBeVisible();
     const fragmentInput = dialog.getByRole('combobox').first();
     await fragmentInput.click();
+    // поле уже заполнено текущим фрагментом — ввод заменяет текст, а не дописывается
+    await page.keyboard.press('Control+a');
     await page.keyboard.type(String(FRAGMENT_ID));
     await page.locator('.v-overlay--active .v-list-item').filter({ hasText: `#${FRAGMENT_ID}` }).first().click();
     const response = page.waitForResponse((r) => r.url().includes('/api/analysis/regime/') && r.request().method() === 'GET');
