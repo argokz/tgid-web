@@ -1719,13 +1719,16 @@ watch(
   width: 100%;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  /* Обрезка как у overflow: hidden, но сверху — на высоту шапки больше: холст карты уходит под её стекло (этап 10,
+     как у Felt). Полосы, тулбары и подсказки по-прежнему отсчитываются от верха контейнера — ниже шапки */
+  overflow: visible;
+  clip-path: inset(calc(-1 * var(--shell-top)) 0 0 0);
   isolation: isolate;
 }
 
 .map-canvas-host {
   position: absolute;
-  inset: 0;
+  inset: calc(-1 * var(--shell-top)) 0 0 0;
   width: auto;
   height: auto;
   min-height: 0;
@@ -1768,7 +1771,7 @@ watch(
 
 .map-error-alert {
   position: absolute;
-  top: 68px;
+  top: calc(var(--shell-inset) + 56px); /* под первой кнопкой правой колонки */
   right: 12px;
   z-index: 20;
   max-width: 420px;

@@ -23,7 +23,7 @@ export const FIRST_RUN_STEPS: FirstRunStep[] = [
     anchors: ['.nav-links'],
     side: 'bottom',
     title: 'Разделы',
-    text: 'Карта, расчёт, протокол, инструменты и выгрузки переключаются здесь.',
+    text: 'Расчёт, протокол и выгрузки — здесь. Справа — поиск по всему (Ctrl+K), инструменты и ваш профиль.',
   },
   {
     id: 'layers',

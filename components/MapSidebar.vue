@@ -243,20 +243,20 @@ onBeforeUnmount(() => ui.setLeftInset(0))
 <style scoped>
 .sidebar-toggle-wrap {
   position: fixed;
-  top: 68px;
-  left: calc(12px + var(--safe-left, 0px));
+  top: calc(var(--shell-top) + var(--shell-inset));
+  left: calc(var(--shell-inset) + var(--safe-left, 0px));
   z-index: 200;
 }
 
 /* Десктопная панель */
 .desktop-sidebar {
   position: fixed;
-  top: 56px;
+  top: var(--shell-top);
   left: 0;
   z-index: 199;
-  height: calc(100vh - 56px);
+  height: calc(100vh - var(--shell-top));
   /* адресная строка мобильного браузера: видимая высота, а не высота без панелей */
-  height: calc(100dvh - 56px);
+  height: calc(100dvh - var(--shell-top));
   width: 340px;
   pointer-events: all;
 }

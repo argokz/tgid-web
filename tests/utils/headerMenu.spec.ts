@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { computePermissions, type PermissionInput } from '~/utils/permissions'
 import {
   buildHeaderMenu,
+  groupMenuChildren,
   HEADER_NAV_MIN_WIDTH,
   isHeaderNavCollapsed,
   type HeaderMenuItem,
 } from '~/utils/headerMenu'
+import { BREAKPOINTS } from '~/utils/breakpoints'
 
 const base: PermissionInput = {
   role: '',
@@ -26,9 +28,9 @@ describe('isHeaderNavCollapsed: порог гамбургера (QA F1, F57)', (
     expect(isHeaderNavCollapsed(HEADER_NAV_MIN_WIDTH - 1)).toBe(true)
   })
 
-  it('планшет в альбомной ориентации и десктоп — кнопки в шапке', () => {
+  it('ноутбук и десктоп — кнопки в шапке', () => {
     expect(isHeaderNavCollapsed(HEADER_NAV_MIN_WIDTH)).toBe(false)
-    expect(isHeaderNavCollapsed(1024)).toBe(false)
+    expect(isHeaderNavCollapsed(1280)).toBe(false)
     expect(isHeaderNavCollapsed(1600)).toBe(false)
   })
 
@@ -36,23 +38,30 @@ describe('isHeaderNavCollapsed: порог гамбургера (QA F1, F57)', (
     expect(isHeaderNavCollapsed(0)).toBe(false)
   })
 
-  it('порог не ниже фактической ширины шапки: брендинг 133 + пункты 765 + аватар 56', () => {
-    expect(HEADER_NAV_MIN_WIDTH).toBeGreaterThanOrEqual(133 + 765 + 56)
-    expect(HEADER_NAV_MIN_WIDTH).toBeLessThanOrEqual(1024)
+  it('порог не ниже фактической ширины шапки и совпадает с границей телефона', () => {
+    // навигация до 615 px + «Скрыть протокол» 40 + справа лупа и две иконки 130 (замер этапа 10в)
+    expect(HEADER_NAV_MIN_WIDTH).toBeGreaterThanOrEqual(615 + 40 + 130)
+    expect(HEADER_NAV_MIN_WIDTH).toBe(BREAKPOINTS.md)
   })
 })
 
 describe('buildHeaderMenu: состав меню по правам', () => {
   it('без входа и viewer — всё, кроме «Расчёт»', () => {
     for (const role of ['', 'viewer']) {
-      expect(ids(menuFor(role))).toEqual(['map', 'protocol', 'tools', 'export', 'excel'])
+      expect(ids(menuFor(role))).toEqual(['protocol', 'export', 'tools'])
     }
   })
 
-  it('calculator, editor, admin — с «Расчёт» сразу после «Карты»', () => {
+  it('calculator, editor, admin — «Расчёт» первым', () => {
     for (const role of ['calculator', 'editor', 'admin']) {
-      expect(ids(menuFor(role))).toEqual(['map', 'calculation', 'protocol', 'tools', 'export', 'excel'])
+      expect(ids(menuFor(role))).toEqual(['calculation', 'protocol', 'export', 'tools'])
     }
+  })
+
+  it('«Карты» нет — страница одна; «Инструменты» — иконкой справа, остальное — в навигации', () => {
+    const menu = menuFor('admin')
+    expect(ids(menu)).not.toContain('map')
+    expect(menu.filter((i) => i.placement === 'end').map((i) => i.id)).toEqual(['tools'])
   })
 
   it('AUTH_DISABLED — сервер считает всех admin, «Расчёт» есть', () => {
@@ -63,19 +72,21 @@ describe('buildHeaderMenu: состав меню по правам', () => {
     expect(ids(menuFor('calculator', { mutationsEnabled: false }))).toContain('calculation')
   })
 
-  it('экспорт и ведомости — подменю со всеми форматами, как в шапке', () => {
-    const menu = menuFor('viewer')
-    const exportItem = menu.find((i) => i.id === 'export')!
-    const excelItem = menu.find((i) => i.id === 'excel')!
-    expect(exportItem.children!.map((c) => c.action)).toEqual([
+  it('«Выгрузка» — одно подменю со всеми форматами и ведомостями, по подгруппам', () => {
+    const exportItem = menuFor('viewer').find((i) => i.id === 'export')!
+    expect(exportItem.title).toBe('Выгрузка')
+    const geo = exportItem.children!.filter((c) => c.group === 'Геоданные')
+    const excel = exportItem.children!.filter((c) => c.group === 'Ведомости Excel')
+    expect(geo.map((c) => c.action)).toEqual([
       { kind: 'export', format: 'shp' },
       { kind: 'export', format: 'dxf' },
       { kind: 'export', format: 'geojson' },
       { kind: 'export', format: 'geojson-attrs' },
     ])
-    expect(excelItem.children!.map((c) => c.action)).toEqual(
+    expect(excel.map((c) => c.action)).toEqual(
       ['ut', 'zd', 'bp', 'ns', 'pt', 'tu'].map((docType) => ({ kind: 'excel', docType })),
     )
+    expect(geo.length + excel.length).toBe(exportItem.children!.length)
   })
 
   it('подпись протокола зависит от того, открыт ли он', () => {
@@ -83,5 +94,18 @@ describe('buildHeaderMenu: состав меню по правам', () => {
     expect(buildHeaderMenu(p).find((i) => i.id === 'protocol')!.title).toBe('Протокол')
     expect(buildHeaderMenu(p, { protocolOpen: true }).find((i) => i.id === 'protocol')!.title)
       .toBe('Скрыть протокол')
+  })
+})
+
+describe('groupMenuChildren: подгруппы подменю', () => {
+  it('«Выгрузка» — две подгруппы по порядку', () => {
+    const exportItem = buildHeaderMenu({ canCalculate: false }).find((i) => i.id === 'export')!
+    const groups = groupMenuChildren(exportItem.children!)
+    expect(groups.map((g) => [g.title, g.items.length])).toEqual([['Геоданные', 4], ['Ведомости Excel', 6]])
+  })
+
+  it('пункты без группы — одна группа без заголовка', () => {
+    const items = [{ id: 'a', title: 'A', icon: 'x' }, { id: 'b', title: 'B', icon: 'x' }]
+    expect(groupMenuChildren(items)).toEqual([{ title: undefined, items }])
   })
 })

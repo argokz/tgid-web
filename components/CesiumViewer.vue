@@ -166,12 +166,14 @@ onMounted(async () => {
   position: absolute;
   top: 0;
   left: 0;
-  overflow: hidden;
+  /* Как у 2D-карты: холст 3D уходит под стекло шапки, подписи и кнопки — ниже неё (MapViewer.vue .map-container) */
+  overflow: visible;
+  clip-path: inset(calc(-1 * var(--shell-top)) 0 0 0);
 }
 
 .cesium-canvas {
   position: absolute;
-  inset: 0;
+  inset: calc(-1 * var(--shell-top)) 0 0 0;
 }
 
 .cesium-status,

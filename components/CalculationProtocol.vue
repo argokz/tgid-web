@@ -578,6 +578,7 @@ import StateView from '~/components/StateView.vue';
 import { aiService, type AiObjectRef, type ExplainProtocolResult, type RootCause } from '~/services/aiService';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { formatApiErrorWith } from '~/utils/apiError';
+import { shellTopPx } from '~/utils/shellMetrics';
 import { sanitizeProtocolHtml } from '~/utils/protocolHtml';
 import {
   FIX_HINTS,
@@ -645,14 +646,15 @@ watch(() => props.show, (newValue) => {
   }
 });
 
-/** Пределы высоты протокола: свёрнут — 40 px, сверху — не выше шапки */
+/** Пределы высоты протокола: свёрнут — 40 px, сверху — не выше шапки (её высота — токен --shell-top) плюс зазор */
 const PROTOCOL_MIN_HEIGHT_PX = 40;
-const PROTOCOL_TOP_GAP_PX = 64;
+const PROTOCOL_TOP_GAP_PX = 8;
+const protocolMaxHeight = () => window.innerHeight - shellTopPx() - PROTOCOL_TOP_GAP_PX;
 const RESIZE_KEY_STEP_PX = 24;
 const RESIZE_KEY_STEP_LARGE_PX = 120;
 
 const setProtocolHeight = (height: number) => {
-  protocolHeight.value = Math.max(PROTOCOL_MIN_HEIGHT_PX, Math.min(window.innerHeight - PROTOCOL_TOP_GAP_PX, height));
+  protocolHeight.value = Math.max(PROTOCOL_MIN_HEIGHT_PX, Math.min(protocolMaxHeight(), height));
   if (protocolHeight.value > PROTOCOL_MIN_HEIGHT_PX) {
     isMinimized.value = false;
   }
@@ -724,7 +726,7 @@ const close = () => {
 const toggleFullscreen = () => {
   isFullscreen.value = !isFullscreen.value;
   if (isFullscreen.value) {
-    protocolHeight.value = window.innerHeight - 64; // 40px для заголовка
+    protocolHeight.value = protocolMaxHeight();
   } else {
     protocolHeight.value = 300;
   }

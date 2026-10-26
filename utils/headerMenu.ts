@@ -6,11 +6,12 @@
 import type { Permissions } from '~/utils/permissions'
 
 /**
- * Шапка с кнопками занимает ~900 px: брендинг 133 + пункты ~760 («Скрыть протокол»
- * длиннее «Протокол») + аватар 56. Уже 1000 px пункты прячутся в меню, чтобы
- * шапка не обрезалась на планшете (768–1024) и при другом шрифте (QA F1, F57).
+ * Шапка с кнопками (этап 10, без капса, замер 27.10 на Астане): навигация кончается на 615 px («Скрыть протокол»
+ * длиннее «Протокол» ещё на ~40), справа — лупа и две иконки ~130 (поле поиска 280 px — только от 1280).
+ * Итого ≈ 800 px: пункты помещаются с 960 — границы телефонной подачи (utils/breakpoints.ts). Уже порога пункты
+ * прячутся в меню, чтобы шапка не обрезалась (QA F1, F57).
  */
-export const HEADER_NAV_MIN_WIDTH = 1000
+export const HEADER_NAV_MIN_WIDTH = 960
 
 export function isHeaderNavCollapsed(viewportWidth: number): boolean {
   return viewportWidth > 0 && viewportWidth < HEADER_NAV_MIN_WIDTH
@@ -33,6 +34,10 @@ export interface HeaderMenuItem {
   icon: string
   action?: HeaderAction
   children?: HeaderMenuItem[]
+  /** Подгруппа внутри подменю — заголовок перед первым пунктом группы */
+  group?: string
+  /** Где пункт в шапке: в навигации слева (по умолчанию) или иконкой справа; в выдвижном меню — все */
+  placement?: 'nav' | 'end'
 }
 
 const EXPORT_ITEMS: HeaderMenuItem[] = [
@@ -61,13 +66,16 @@ export interface HeaderMenuState {
   protocolOpen?: boolean
 }
 
+/**
+ * Пункты шапки (этап 10, docs/ui-felt-audit.md): «Карта» убрана — страница одна, пункт ничего не делал;
+ * «Экспорт» и «Ведомости Excel» — одна «Выгрузка» с подгруппами (до любого формата по-прежнему два клика);
+ * «Инструменты» — иконкой справа (второй вход в колонке у карты убран).
+ */
 export function buildHeaderMenu(
   permissions: Pick<Permissions, 'canCalculate'>,
   state: HeaderMenuState = {},
 ): HeaderMenuItem[] {
-  const items: HeaderMenuItem[] = [
-    { id: 'map', title: 'Карта', icon: 'mdi-map', action: { kind: 'route', to: '/' } },
-  ]
+  const items: HeaderMenuItem[] = []
   if (permissions.canCalculate) {
     items.push({ id: 'calculation', title: 'Расчёт', icon: 'mdi-calculator-variant', action: { kind: 'calculation' } })
   }
@@ -78,9 +86,33 @@ export function buildHeaderMenu(
       icon: 'mdi-console-line',
       action: { kind: 'protocol' },
     },
-    { id: 'tools', title: 'Инструменты', icon: 'mdi-toolbox-outline', action: { kind: 'tools' } },
-    { id: 'export', title: 'Экспорт', icon: 'mdi-export', children: EXPORT_ITEMS },
-    { id: 'excel', title: 'Ведомости Excel', icon: 'mdi-file-excel', children: EXCEL_ITEMS },
+    {
+      id: 'export',
+      title: 'Выгрузка',
+      icon: 'mdi-export',
+      children: [
+        ...EXPORT_ITEMS.map((item) => ({ ...item, group: 'Геоданные' })),
+        ...EXCEL_ITEMS.map((item) => ({ ...item, group: 'Ведомости Excel' })),
+      ],
+    },
+    { id: 'tools', title: 'Инструменты', icon: 'mdi-toolbox-outline', action: { kind: 'tools' }, placement: 'end' },
   )
   return items
+}
+
+export interface HeaderMenuGroup {
+  /** Заголовок подгруппы; у пунктов без группы — пусто */
+  title?: string
+  items: HeaderMenuItem[]
+}
+
+/** Пункты подменю по подгруппам, в исходном порядке: соседние пункты одной группы — вместе */
+export function groupMenuChildren(children: HeaderMenuItem[]): HeaderMenuGroup[] {
+  const groups: HeaderMenuGroup[] = []
+  for (const child of children) {
+    const last = groups[groups.length - 1]
+    if (last && last.title === child.group) last.items.push(child)
+    else groups.push({ title: child.group, items: [child] })
+  }
+  return groups
 }

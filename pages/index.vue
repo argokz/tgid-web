@@ -65,9 +65,10 @@ watch(pending, (isPending: boolean) => {
   position: relative;
   width: 100%;
   box-sizing: border-box;
-  min-height: calc(100svh - 56px);
-  /* Явная высота — дочерний MapViewer (height: 100%) с первого кадра без «схлопывания» */
-  height: calc(100svh - 56px);
+  min-height: calc(100svh - var(--shell-top));
+  /* Явная высота — дочерний MapViewer (height: 100%) с первого кадра без «схлопывания». Под шапкой: сама карта
+     продлевается под её стекло (MapViewer.vue .map-canvas-host), а полосы и панели остаются ниже шапки */
+  height: calc(100svh - var(--shell-top));
 }
 .index-page__splash {
   position: absolute;

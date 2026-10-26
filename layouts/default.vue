@@ -1,12 +1,12 @@
 ﻿<template>
   <v-app>
+    <!-- Шапка в духе Felt (этап 10): 48 px стекла поверх карты, тень вместо границы; высота = токен --shell-top -->
     <v-app-bar
       app
-      color="surface"
-      elevation="0"
-      height="56"
-      border="b"
+      flat
+      height="48"
       tag="header"
+      class="app-header"
     >
       <HintTip
         v-if="navCollapsed"
@@ -30,10 +30,10 @@
       <!-- Брендинг -->
       <div
         class="app-brand d-flex align-center"
-        :class="navCollapsed ? 'ms-1 me-2' : 'ms-3 me-4'"
+        :class="navCollapsed ? 'ms-1 me-2' : 'ms-2 me-2'"
       >
         <AppLogo
-          size="26"
+          size="22"
           class="brand-icon text-primary"
         />
         <span class="brand-title ms-2">ITwin</span>
@@ -59,49 +59,62 @@
       <nav
         v-if="!navCollapsed"
         class="nav-links d-flex align-center"
+        aria-label="Разделы"
       >
         <template
-          v-for="(item, index) in menuItems"
+          v-for="item in navItems"
           :key="item.id"
         >
           <v-menu
             v-if="item.children"
-            offset-y
+            location="bottom start"
           >
             <template #activator="{ props }">
               <v-btn
                 v-bind="props"
                 :prepend-icon="item.icon"
-                :class="['nav-btn', { 'ms-1': index > 0 }]"
+                append-icon="mdi-chevron-down"
+                class="nav-btn"
                 variant="text"
-                rounded="lg"
-                size="small"
+                height="32"
                 :loading="isItemBusy(item)"
               >
                 {{ item.title }}
               </v-btn>
             </template>
-            <v-list density="compact">
-              <v-list-item
-                v-for="child in item.children"
-                :key="child.id"
-                :title="child.title"
-                :subtitle="childSubtitle(child)"
-                :prepend-icon="child.icon"
-                :disabled="isChildBusy(child)"
-                @click="runMenuAction(child)"
-              />
+            <v-list
+              density="compact"
+              class="nav-submenu"
+            >
+              <template
+                v-for="(group, gi) in groupMenuChildren(item.children)"
+                :key="group.title ?? gi"
+              >
+                <v-list-subheader
+                  v-if="group.title"
+                  class="section-label"
+                >
+                  {{ group.title }}
+                </v-list-subheader>
+                <v-list-item
+                  v-for="child in group.items"
+                  :key="child.id"
+                  :title="child.title"
+                  :subtitle="childSubtitle(child)"
+                  :prepend-icon="child.icon"
+                  :disabled="isChildBusy(child)"
+                  @click="runMenuAction(child)"
+                />
+              </template>
             </v-list>
           </v-menu>
           <v-btn
             v-else
-            :to="routeOf(item)"
             :prepend-icon="item.icon"
-            :color="isItemActive(item) ? 'primary' : undefined"
-            :class="['nav-btn', { 'ms-1': index > 0, 'active-link': isItemActive(item) }]"
+            :active="isItemActive(item)"
+            :class="['nav-btn', { 'active-link': isItemActive(item) }]"
             variant="text"
-            rounded="lg"
-            size="small"
+            height="32"
             @click="runMenuAction(item)"
           >
             {{ item.title }}
@@ -111,7 +124,7 @@
 
       <v-spacer />
 
-      <!-- Палитра команд: журналы, инструменты, узлы, адреса (после входа: поиск узлов идёт в GeoServer) -->
+      <!-- Палитра команд — единственный поиск: журналы, инструменты, узлы, адреса. Выглядит как поле, хоткей виден -->
       <HintTip
         v-if="paletteAvailable"
         text="Команды и поиск"
@@ -120,18 +133,43 @@
         location="bottom"
       >
         <template #default="{ props: tip }">
-          <v-btn
+          <button
             v-bind="tip"
-            icon
-            variant="text"
-            size="small"
-            class="me-1"
+            type="button"
+            class="header-search me-1"
             data-first-run="palette"
             aria-label="Команды и поиск (Ctrl+K)"
             @click="paletteOpen = true"
           >
-            <v-icon size="22">mdi-magnify</v-icon>
-          </v-btn>
+            <v-icon
+              size="18"
+              aria-hidden="true"
+            >mdi-magnify</v-icon>
+            <span class="header-search__text">Узел, адрес, журнал, команда</span>
+            <kbd class="header-search__kbd">Ctrl K</kbd>
+          </button>
+        </template>
+      </HintTip>
+
+      <!-- Пункты справа иконками: «Инструменты» (журналы, реестры, отчёты) -->
+      <HintTip
+        v-for="item in endItems"
+        :key="item.id"
+        :text="item.title"
+        hint="Журналы, реестры, отчёты"
+        location="bottom"
+      >
+        <template #default="{ props: tip }">
+          <v-btn
+            v-bind="tip"
+            :icon="item.icon"
+            :active="isItemActive(item)"
+            variant="text"
+            class="header-icon-btn"
+            :aria-label="item.title"
+            :aria-pressed="isItemActive(item)"
+            @click="runMenuAction(item)"
+          />
         </template>
       </HintTip>
 
@@ -148,27 +186,27 @@
                 v-bind="mergeProps(menuProps, tip)"
                 icon
                 variant="text"
-                class="user-avatar-btn me-2"
+                class="header-icon-btn user-avatar-btn me-1"
                 aria-label="Меню пользователя"
               >
                 <v-avatar
-                  size="34"
-                  color="primary"
+                  size="28"
+                  class="user-avatar"
                 >
+                  <span
+                    v-if="userInitials"
+                    class="user-avatar__initials"
+                  >{{ userInitials }}</span>
                   <v-icon
-                    color="white"
-                    size="20"
+                    v-else
+                    size="18"
                   >mdi-account</v-icon>
                 </v-avatar>
               </v-btn>
             </template>
           </HintTip>
         </template>
-        <v-card
-          min-width="240"
-          rounded="lg"
-          elevation="4"
-        >
+        <v-card min-width="240">
           <v-list
             density="compact"
             class="py-1"
@@ -279,19 +317,29 @@
                 </template>
               </v-list-item>
             </template>
-            <v-list-item
-              v-for="child in item.children"
-              :key="child.id"
-              :title="child.title"
-              :subtitle="childSubtitle(child)"
-              :prepend-icon="child.icon"
-              :disabled="isChildBusy(child)"
-              @click="onDrawerItem(child)"
-            />
+            <template
+              v-for="(group, gi) in groupMenuChildren(item.children)"
+              :key="group.title ?? gi"
+            >
+              <v-list-subheader
+                v-if="group.title"
+                class="section-label"
+              >
+                {{ group.title }}
+              </v-list-subheader>
+              <v-list-item
+                v-for="child in group.items"
+                :key="child.id"
+                :title="child.title"
+                :subtitle="childSubtitle(child)"
+                :prepend-icon="child.icon"
+                :disabled="isChildBusy(child)"
+                @click="onDrawerItem(child)"
+              />
+            </template>
           </v-list-group>
           <v-list-item
             v-else
-            :to="routeOf(item)"
             :prepend-icon="item.icon"
             :title="item.title"
             :active="isItemActive(item)"
@@ -466,7 +514,7 @@ import { formatApiErrorWith } from '~/utils/apiError';
 import { ROLE_LABELS, type Role } from '~/utils/permissions';
 import { deviceClass } from '~/utils/breakpoints';
 import { buildPageTitle } from '~/utils/pageTitle';
-import { buildHeaderMenu, isHeaderNavCollapsed, type HeaderMenuItem } from '~/utils/headerMenu';
+import { buildHeaderMenu, groupMenuChildren, isHeaderNavCollapsed, type HeaderMenuItem } from '~/utils/headerMenu';
 
 const { screenWidth } = useMobile();
 // SSR не знает ширину окна и рендерит десктопную шапку; до монтирования клиент
@@ -631,7 +679,19 @@ const menuItems = computed(() => buildHeaderMenu(
   { protocolOpen: showProtocol.value },
 ));
 
-const routeOf = (item: HeaderMenuItem) => (item.action?.kind === 'route' ? item.action.to : undefined);
+// Навигация слева — пункты без placement, справа иконками — `placement: 'end'`; в выдвижном меню — все
+const navItems = computed(() => menuItems.value.filter((item) => item.placement !== 'end'));
+const endItems = computed(() => menuItems.value.filter((item) => item.placement === 'end'));
+
+// Инициалы в аватаре: «Анна Демидова» → «АД», «admin» → «AD»; без входа — значок
+const userInitials = computed(() => {
+  if (!isHydrated.value || !authStore.isAuthenticated) return '';
+  const name = String(authStore.displayName || authStore.username || '').trim();
+  const words = name.split(/[\s._-]+/).filter(Boolean);
+  if (!words.length) return '';
+  const letters = words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2);
+  return letters.toUpperCase();
+});
 
 const isItemActive = (item: HeaderMenuItem): boolean => {
   switch (item.action?.kind) {
@@ -815,9 +875,91 @@ const downloadExcel = async (docType: string) => {
 </script>
 
 <style scoped>
+/* Стекло уровня 1 поверх карты: на время движения карты .map-moving делает его плотным (_tokens.scss) */
+.app-header {
+  background: var(--glass-1-bg) !important;
+  -webkit-backdrop-filter: var(--glass-1-filter);
+  backdrop-filter: var(--glass-1-filter);
+  box-shadow: var(--shadow-1) !important;
+}
+
+/* Поле-кнопка поиска: выглядит как поле ввода (аффорданс), хоткей виден сразу */
+.header-search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 280px;
+  height: 32px;
+  padding: 0 6px 0 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(var(--shadow-ink), 0.05);
+  color: var(--text-faint);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+.header-search:hover {
+  background: rgba(var(--shadow-ink), 0.09);
+}
+.header-search:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+.header-search .v-icon {
+  color: var(--text-muted);
+}
+.header-search__text {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.header-search__kbd {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--text-muted);
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 3px 5px;
+}
+/* Узкая шапка: от поля остаётся лупа */
+@media (max-width: 1279px) {
+  .header-search {
+    width: 40px;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+  }
+  .header-search__text,
+  .header-search__kbd {
+    display: none;
+  }
+}
+
+/* Иконки справа — 40 × 40, без подложки, серые; активная — подложка */
+.header-icon-btn {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--text-muted);
+}
+.user-avatar {
+  background: var(--surface-pressed);
+  color: var(--text-strong);
+}
+.user-avatar__initials {
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .api-health-alert {
   position: fixed;
-  top: 60px;
+  top: calc(var(--shell-top) + var(--shell-gap));
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--z-popover); /* над картой и карточкой, под диалогами */
@@ -830,8 +972,12 @@ const downloadExcel = async (docType: string) => {
 }
 .app-context {
   flex: 0 0 auto; /* не сжимается: иначе flex прятал город, оставляя одну роль */
+  height: 26px;
+  padding: 0 10px 0 6px;
+  border-radius: 13px;
+  background: var(--surface-hover);
   font-size: var(--text-xs);
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  color: var(--text-muted);
   white-space: nowrap;
 }
 .app-context__city {
@@ -844,35 +990,45 @@ const downloadExcel = async (docType: string) => {
 }
 .brand-title {
   font-weight: 600;
-  font-size: 1.1rem;
-  letter-spacing: -0.02em;
+  font-size: 15px;
+  color: var(--text-strong);
 }
 .brand-subtitle {
   font-weight: 400;
-  font-size: 0.85rem;
-  opacity: 0.7;
-  margin-left: 3px;
+  font-size: 15px;
+  color: var(--text-muted);
+  margin-left: 4px;
 }
 .nav-links {
-  gap: 4px;
+  gap: 2px;
 }
 .nav-btn {
+  padding: 0 10px;
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.01em;
+  color: var(--text-strong);
 }
-.active-link {
-  font-weight: 600;
+.nav-btn :deep(.v-btn__prepend),
+.nav-btn :deep(.v-btn__append) {
+  color: var(--text-muted);
+}
+.nav-btn :deep(.v-icon) {
+  font-size: 18px;
+}
+.active-link :deep(.v-btn__prepend) {
+  color: rgb(var(--v-theme-primary));
 }
 .app-main {
-  min-height: calc(100vh - 56px);
-  min-height: calc(100dvh - 56px);
-  /* Шапка (56 px) есть всегда, а Vuetify считает --v-layout-top только после монтирования: в серверном HTML
-     он 0, и экран загрузки уходил под шапку с полосой снизу */
-  padding-top: max(var(--v-layout-top, 0px), 56px);
+  min-height: calc(100vh - var(--shell-top));
+  min-height: calc(100dvh - var(--shell-top));
+  /* Шапка есть всегда, а Vuetify считает --v-layout-top только после монтирования: в серверном HTML он 0, и экран
+     загрузки уходил под шапку с полосой снизу. Высота шапки — токен --shell-top (карта продлевается под стекло сама,
+     MapViewer.vue .map-canvas-host) */
+  padding-top: max(var(--v-layout-top, 0px), var(--shell-top));
 }
 .login-required-backdrop {
-  min-height: calc(100vh - 56px);
-  min-height: calc(100dvh - 56px);
+  min-height: calc(100vh - var(--shell-top));
+  min-height: calc(100dvh - var(--shell-top));
   display: flex;
   align-items: center;
   justify-content: center;

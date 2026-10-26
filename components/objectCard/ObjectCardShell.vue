@@ -211,7 +211,7 @@ const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
 }
 .oc-shell--panel {
-  top: 56px;
+  top: var(--shell-top);
   right: 0;
   bottom: 0;
   border-left: 1px solid rgba(0, 0, 0, 0.1);
