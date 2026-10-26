@@ -72,6 +72,12 @@ describe('каталог инструментов: предметные прав
       .toContain('open-network-import')
     expect(toolEvents(usersdb('editor'))).toContain('open-group-setters')
   })
+
+  it('экспорт/импорт/слияние фрагментов — только с правом импорта', () => {
+    expect(toolEvents(pg('calculator', ['network']))).not.toContain('open-fragment-transfer')
+    expect(toolEvents({ ...pg('viewer', ['network', 'network_struct']), permissions: { matrix: {}, general: ['import'] } }))
+      .toContain('open-fragment-transfer')
+  })
 })
 
 describe('территория', () => {

@@ -1,8 +1,7 @@
 <template>
   <v-dialog
-    :model-value="modelValue"
+    v-model="visible"
     max-width="720"
-    @update:model-value="$emit('update:modelValue', $event)"
   >
     <v-card>
       <v-toolbar
@@ -20,7 +19,7 @@
               icon
               size="small"
               aria-label="Закрыть"
-              @click="$emit('update:modelValue', false)"
+              @click="visible = false"
             >
               <v-icon>mdi-close</v-icon>
             </v-btn>
@@ -263,8 +262,8 @@ import { useAuthStore } from '~/stores/authStore';
 import { useNotificationStore } from '~/stores/notificationStore';
 import HintTip from '~/components/HintTip.vue';
 
-const props = defineProps<{ modelValue: boolean }>();
-const emit = defineEmits<{ 'update:modelValue': [boolean]; changed: [] }>();
+const emit = defineEmits<{ changed: [] }>();
+const visible = ref(false);
 
 const authStore = useAuthStore();
 const notify = useNotificationStore();
@@ -306,7 +305,7 @@ const loadFragments = async () => {
   }
 };
 
-watch(() => props.modelValue, (open) => { if (open) loadFragments(); }, { immediate: true });
+watch(visible, (open) => { if (open) loadFragments(); });
 watch(tab, () => { report.value = null; error.value = null; });
 
 const run = async (fn: () => Promise<void>) => {
@@ -373,4 +372,11 @@ const doUndo = () => run(async () => {
   emit('changed');
   loadFragments();
 });
+
+/** Открытие из меню (ленивый диалог MapViewer) */
+const openDialog = () => {
+  visible.value = true;
+};
+
+defineExpose({ openDialog });
 </script>

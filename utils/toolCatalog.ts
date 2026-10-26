@@ -46,6 +46,7 @@ export type ToolEvent =
   | 'open-dictionaries'
   | 'open-print-layout'
   | 'open-network-import'
+  | 'open-fragment-transfer'
 
 /** Ключ диалога инструмента: MapViewer монтирует диалог лениво при первом открытии */
 export type ToolDialogKey =
@@ -88,6 +89,7 @@ export type ToolDialogKey =
   | 'dictionaries'
   | 'printLayout'
   | 'networkImport'
+  | 'fragmentTransfer'
 
 export interface ToolDescriptor {
   label: string
@@ -181,6 +183,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     items: [
       { label: 'Групповые установщики', hint: 'Поле = значение для фрагмента, выделения или фильтра (aSet*)', icon: 'mdi-select-group', color: 'deep-orange-darken-2', event: 'open-group-setters', dialog: 'groupSetters', requiresPerm: 'edit' },
       { label: 'Импорт SHP / Excel / координат', hint: 'Узлы, участки из SHP, координаты узлов: сопоставление полей, превью, отмена', icon: 'mdi-database-import', color: 'indigo-darken-2', event: 'open-network-import', dialog: 'networkImport', requiresPerm: 'import' },
+      { label: 'Фрагменты: экспорт, импорт, слияние', hint: 'Файл .tgid десктопа: выгрузить фрагмент, загрузить с проверкой, слить несколько фрагментов в один', icon: 'mdi-swap-horizontal', color: 'indigo-darken-2', event: 'open-fragment-transfer', dialog: 'fragmentTransfer', requiresPerm: 'import' },
       { label: 'Качество данных', hint: 'Проверки нагрузок, фрагментов, отметок, длин, диаметров, источников; объяснение ИИ', icon: 'mdi-database-search', color: 'teal-darken-3', event: 'open-data-quality', dialog: 'dataQuality' },
       { label: 'Справочники', hint: 'Удельные расходы, Kv, температуры, ГВС, организации, районы', icon: 'mdi-book-open-page-variant-outline', color: 'teal-darken-3', event: 'open-dictionaries', dialog: 'dictionaries', requiresPerm: 'refs' },
     ],

@@ -1504,6 +1504,8 @@ const toolDialogs: ToolDialogEntry[] = [
   // Этап 10: печать карты в макет (PNG/PDF), импорт SHP / Excel / координат узлов
   { key: 'printLayout', component: lazyDialog(() => import('./PrintLayoutDialog.vue')) },
   { key: 'networkImport', component: lazyDialog(() => import('./NetworkImportDialog.vue')) },
+  // экспорт / импорт / слияние фрагментов .tgid: после импорта и слияния — новый список фрагментов
+  { key: 'fragmentTransfer', component: lazyDialog(() => import('./FragmentTransferDialog.vue')), on: { changed: () => fragmentStore.loadFragments() } },
 ];
 
 /** Стабильная сигнатура каталога слоёв (порядок в ответе API не должен вызывать повторный init) */
