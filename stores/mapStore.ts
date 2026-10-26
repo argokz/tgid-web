@@ -54,6 +54,11 @@ import {
 } from '~/utils/planetV4Layers';
 import { isMapMeasureActive } from '~/composables/useMapDraw';
 import { contextHoverSummary } from '~/utils/buildingStyle';
+import { bindMapMovingClass } from '~/utils/mapMoving';
+import { shellTopPx } from '~/utils/shellMetrics';
+
+/** Подписка на resize для отступа карты под шапкой — одна на приложение, даже если карту пересоздают */
+let headerPaddingListener: (() => void) | null = null;
 
 interface LayerStyle {
   color: string;
@@ -267,6 +272,15 @@ export const useMapStore = defineStore('map', {
           return { url };
         }
       }));
+      // Пока карта движется — стекло шапки и тулбаров плотное, без blur над холстом (utils/mapMoving.ts)
+      bindMapMovingClass(this.map);
+      // Холст уходит под стекло шапки (этап 10): центр карты, перелёты и fitBounds (он складывает свой padding
+      // с этим) — по видимой части, ниже шапки. Высота шапки — токен --shell-top, на телефоне 0
+      const syncHeaderPadding = () => this.map?.setPadding({ top: shellTopPx(), right: 0, bottom: 0, left: 0 });
+      syncHeaderPadding();
+      if (headerPaddingListener) window.removeEventListener('resize', headerPaddingListener);
+      headerPaddingListener = syncHeaderPadding;
+      window.addEventListener('resize', headerPaddingListener);
 
       this.map.on('load', async () => {
         if (import.meta.dev) console.debug('Map loaded event triggered');

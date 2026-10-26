@@ -75,6 +75,7 @@ import type { CSSProperties } from 'vue'
 import { registerHotkeys } from '~/composables/useHotkeys'
 import { holdsEscape } from '~/utils/escapeKey'
 import HintTip from '~/components/HintTip.vue'
+import { shellTopPx } from '~/utils/shellMetrics'
 
 /** То, что поповеру нужно от карты MapLibre: проекция точки, контейнер, события перемещения */
 export interface MapPopoverMap {
@@ -109,12 +110,14 @@ const ANCHOR_GAP = 12
 const VIEWPORT_MARGIN = 8
 
 const rootRef = ref<HTMLElement | null>(null)
+// Верхняя граница свободного места — низ шапки: холст карты уходит под её стекло, но поповер туда не прячется
+const shellTop = ref(0)
 const anchor = ref({ x: 0, y: 0 })
 const size = ref({ width: 0, height: 0 })
 const inView = ref(true)
 
 const placement = computed<'top' | 'bottom'>(() =>
-  anchor.value.y - size.value.height - ANCHOR_GAP < VIEWPORT_MARGIN ? 'bottom' : 'top')
+  anchor.value.y - size.value.height - ANCHOR_GAP < shellTop.value + VIEWPORT_MARGIN ? 'bottom' : 'top')
 
 const positionStyle = computed<CSSProperties>(() => {
   const { width, height } = size.value
@@ -132,7 +135,7 @@ const update = () => {
   const container = props.map.getContainer()
   const rect = container.getBoundingClientRect()
   const point = props.map.project(props.lngLat)
-  inView.value = point.x >= 0 && point.y >= 0 && point.x <= rect.width && point.y <= rect.height
+  inView.value = point.x >= 0 && rect.top + point.y >= shellTop.value && point.x <= rect.width && point.y <= rect.height
   anchor.value = { x: rect.left + point.x, y: rect.top + point.y }
   const el = rootRef.value
   if (el) size.value = { width: el.offsetWidth, height: el.offsetHeight }
@@ -142,10 +145,16 @@ const scheduleUpdate = () => {
 }
 
 let focusBefore: HTMLElement | null = null
+const onWindowResize = () => {
+  shellTop.value = shellTopPx()
+  scheduleUpdate()
+}
+
 onMounted(async () => {
+  shellTop.value = shellTopPx()
   props.map.on('move', scheduleUpdate)
   props.map.on('resize', scheduleUpdate)
-  window.addEventListener('resize', scheduleUpdate)
+  window.addEventListener('resize', onWindowResize)
   update()
   await nextTick()
   update() // размер известен только после отрисовки содержимого
@@ -172,7 +181,7 @@ onBeforeUnmount(() => {
   if (frame) cancelAnimationFrame(frame)
   props.map.off('move', scheduleUpdate)
   props.map.off('resize', scheduleUpdate)
-  window.removeEventListener('resize', scheduleUpdate)
+  window.removeEventListener('resize', onWindowResize)
   if (focusBefore?.isConnected) focusBefore.focus({ preventScroll: true })
 })
 

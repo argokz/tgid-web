@@ -66,11 +66,14 @@ describe('InspectorPanel', () => {
     layout.mode = 'float';
     Object.assign(layout.float, { x: 600, y: 100, w: 560, h: 640 });
     Object.assign(window, { innerWidth: 500, innerHeight: 400 });
+    // шапка 48 px (--shell-top): окно держится ниже неё — сверху 48 + 8, высота — в оставшиеся 400 − 56 − 8
+    document.documentElement.style.setProperty('--shell-top', '48px');
     const w = mountPanel();
     window.dispatchEvent(new Event('resize'));
     await w.vm.$nextTick();
     const style = (w.find('.oc-shell').element as HTMLElement).style;
-    expect([style.left, style.top, style.width, style.height]).toEqual(['8px', '8px', '484px', '384px']);
+    expect([style.left, style.top, style.width, style.height]).toEqual(['8px', '56px', '484px', '336px']);
+    document.documentElement.style.removeProperty('--shell-top');
     expect(layout.float).toEqual({ x: 600, y: 100, w: 560, h: 640 });
     Object.assign(window, { innerWidth: 1280, innerHeight: 800 });
     window.dispatchEvent(new Event('resize'));

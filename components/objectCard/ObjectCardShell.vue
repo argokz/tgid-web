@@ -46,6 +46,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
 import { clampFloat, clampPanelWidth, useObjectCardLayout, type ObjectCardLayout } from '~/composables/useObjectCardLayout';
+import { shellTopPx } from '~/utils/shellMetrics';
 import { useUiStore } from '~/stores/uiStore';
 import { useFloatingDrag } from '~/composables/useFloatingDrag';
 import type { PanelPos } from '~/utils/floatingPanel';
@@ -63,7 +64,8 @@ const layout = useObjectCardLayout();
 const ui = useUiStore();
 const root = ref<HTMLElement | null>(null);
 const resizing = ref(false);
-const viewport = ref({ w: 1280, h: 800 });
+// top — высота шапки (--shell-top): плавающее окно держится ниже неё
+const viewport = ref({ w: 1280, h: 800, top: 0 });
 /** Положение нижнего листа; каждое открытие — с половины экрана */
 const sheetSnap = ref<SheetSnap>('half');
 /**
@@ -83,7 +85,7 @@ watch(() => props.mobile, (mobile) => {
 // Окно браузера уменьшили — карточка показывается в его пределах (shellStyle), а сохранённое размещение не
 // переписывается: раньше временное сужение окна навсегда ужимало окно карточки до 320×240 в углу
 const updateViewport = () => {
-  viewport.value = { w: window.innerWidth, h: window.innerHeight };
+  viewport.value = { w: window.innerWidth, h: window.innerHeight, top: shellTopPx() };
 };
 
 onMounted(() => {
@@ -109,7 +111,7 @@ onBeforeUnmount(() => {
 const shellStyle = computed(() => {
   if (sheet.value) return {};
   if (layout.mode === 'panel') return { width: `${clampPanelWidth(layout.panelWidth, viewport.value.w)}px` };
-  const f = clampFloat(layout.float, viewport.value.w, viewport.value.h);
+  const f = clampFloat(layout.float, viewport.value.w, viewport.value.h, viewport.value.top);
   return { left: `${f.x}px`, top: `${f.y}px`, width: `${f.w}px`, height: `${f.h}px` };
 });
 
@@ -130,7 +132,7 @@ const { dragging: moving, onPointerDown: onDragDown } = useFloatingDrag({
   enabled: () => !sheet.value && layout.mode === 'float',
   keepInView: false,
   clamp: (p, _panel, box) => {
-    const f = clampFloat({ ...layout.float, x: p.x, y: p.y }, box.w, box.h);
+    const f = clampFloat({ ...layout.float, x: p.x, y: p.y }, box.w, box.h, viewport.value.top);
     return { x: f.x, y: f.y };
   },
 });
@@ -184,7 +186,7 @@ const listenPointer = (handler: (e: PointerEvent) => void) => {
 
 const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
   // от показанных размеров (в пределах окна), а не от сохранённых — иначе первый шаг дёргал бы рамку
-  const shown = clampFloat(layout.float, viewport.value.w, viewport.value.h);
+  const shown = clampFloat(layout.float, viewport.value.w, viewport.value.h, viewport.value.top);
   const start = { x: e.clientX, y: e.clientY, w: clampPanelWidth(layout.panelWidth, viewport.value.w), fw: shown.w, fh: shown.h };
   resizing.value = true;
   listenPointer((ev: PointerEvent) => {
@@ -193,7 +195,7 @@ const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
     } else {
       const f = clampFloat(
         { ...shown, w: start.fw + ev.clientX - start.x, h: start.fh + ev.clientY - start.y },
-        viewport.value.w, viewport.value.h,
+        viewport.value.w, viewport.value.h, viewport.value.top,
       );
       scheduleGeometry({ x: f.x, y: f.y, w: f.w, h: f.h });
     }

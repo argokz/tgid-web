@@ -138,7 +138,8 @@
             type="button"
             class="header-search me-1"
             data-first-run="palette"
-            aria-label="Команды и поиск (Ctrl+K)"
+            aria-label="Поиск: узел, адрес, журнал, команда"
+            aria-keyshortcuts="Control+K"
             @click="paletteOpen = true"
           >
             <v-icon
@@ -738,7 +739,7 @@ const runMenuAction = (item: HeaderMenuItem) => {
   const action = item.action;
   if (!action) return;
   switch (action.kind) {
-    case 'route': return; // переход делает :to
+    case 'route': return; // пунктов-переходов в шапке нет (страница одна); вид действия оставлен для меню
     case 'calculation': showCalculationModal.value = true; return;
     case 'protocol': showProtocol.value = !showProtocol.value; return;
     case 'tools': uiStore.toggleToolsPanel(); return;
@@ -893,7 +894,8 @@ const downloadExcel = async (docType: string) => {
   padding: 0 6px 0 10px;
   border-radius: var(--radius-sm);
   background: rgba(var(--shadow-ink), 0.05);
-  color: var(--text-faint);
+  /* не --text-faint: шапка полупрозрачная, над тёмной подложкой контраст faint падает ниже 4,5:1 */
+  color: var(--text-muted);
   font-size: 13px;
   cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease-out);
@@ -926,6 +928,17 @@ const downloadExcel = async (docType: string) => {
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
   padding: 3px 5px;
+}
+/* Палец: зона нажатия не меньше --touch-target (у v-btn это делает _device.scss, здесь — нативная кнопка) */
+@media (pointer: coarse) {
+  .header-search {
+    position: relative;
+  }
+  .header-search::before {
+    content: '';
+    position: absolute;
+    inset: calc((32px - var(--touch-target, 44px)) / 2) 0;
+  }
 }
 /* Узкая шапка: от поля остаётся лупа */
 @media (max-width: 1279px) {

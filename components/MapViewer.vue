@@ -446,7 +446,7 @@
 
         <TraceHud
           v-if="isEditTopologyMode && isChainMode && !isVertexMode && !isMergeMode && !chainPreviewOpen"
-          :position="trace.cursorPx.value"
+          :position="traceHudPosition"
           :snap="trace.snap.value"
           :drawing="trace.active.value"
           :lengths="trace.lengths.value"
@@ -559,6 +559,7 @@ import type { PickCandidate } from '~/utils/networkFeature';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 import HintTip from '~/components/HintTip.vue';
+import { shellTopPx } from '~/utils/shellMetrics';
 
 const props = defineProps<{
   initialLayers: LayerConfig[];
@@ -1406,6 +1407,16 @@ const {
   onDeleteFeature,
 } = topologyEditor;
 
+// Холст карты продлён под стекло шапки (.map-canvas-host): `e.point` и `map.project` отсчитываются от его верха,
+// а оверлеи внутри .map-container — от верха контейнера, ниже на высоту шапки (--shell-top). Сдвиг читается из
+// токена при монтировании и смене размера окна, а не на каждое движение курсора
+const mapHostOffsetY = ref(0);
+const syncMapHostOffset = () => { mapHostOffsetY.value = shellTopPx(); };
+const traceHudPosition = computed(() => {
+  const p = trace.cursorPx.value;
+  return p ? { x: p.x, y: p.y - mapHostOffsetY.value } : null;
+});
+
 // === Контуры журналов (этап 9): слой контура и выбор участков кликом ===
 const journalContourLayer = useJournalContourLayer(() => mapStore.map, {
   fragmentIds: () => fragmentStore.activeFragmentIds,
@@ -1626,6 +1637,8 @@ onMounted(() => {
         savedPageState.value = null;
       }
     }
+    syncMapHostOffset();
+    window.addEventListener('resize', syncMapHostOffset);
     initMap();
     // Выбор фрагментов: сохранённый без удалённых, иначе фрагмент по умолчанию
     void fragmentStore.initVisibleFragments();
@@ -1657,6 +1670,7 @@ onBeforeUnmount(() => {
   if (process.client) {
     window.removeEventListener('pagehide', onPageHideBfCache);
     window.removeEventListener('pageshow', onPageShowBfCache);
+    window.removeEventListener('resize', syncMapHostOffset);
   }
   if (layerSyncDeferTimer) clearTimeout(layerSyncDeferTimer);
   mapStore.map?.off('moveend', saveMapViewportState);
@@ -1719,10 +1733,11 @@ watch(
   width: 100%;
   height: 100%;
   min-height: 0;
-  /* Обрезка как у overflow: hidden, но сверху — на высоту шапки больше: холст карты уходит под её стекло (этап 10,
-     как у Felt). Полосы, тулбары и подсказки по-прежнему отсчитываются от верха контейнера — ниже шапки */
+  /* Без обрезки: холст карты уходит вверх под стекло шапки (этап 10, как у Felt), а слева, справа и снизу края
+     контейнера и так совпадают с краями окна (у html — overflow-x: hidden). clip-path не годится: он обрезал бы и
+     закреплённые (position: fixed) потомки — шторку и карточку на телефоне, где 100svh меньше видимой высоты.
+     Полосы, тулбары и подсказки по-прежнему отсчитываются от верха контейнера — ниже шапки */
   overflow: visible;
-  clip-path: inset(calc(-1 * var(--shell-top)) 0 0 0);
   isolation: isolate;
 }
 

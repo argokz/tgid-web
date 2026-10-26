@@ -128,6 +128,9 @@ describe('objectCard', () => {
     expect(clampPanelWidth(2000, 1600)).toBe(900)
     expect(clampPanelWidth(800, 700)).toBe(580)
     expect(clampFloat({ x: -50, y: 2000, w: 5000, h: 300 }, 1280, 800)).toEqual({ x: 8, y: 492, w: 1264, h: 300 })
+    // ниже шапки: окно не заходит под её стекло (48 px), высота — в оставшееся место
+    expect(clampFloat({ x: 100, y: 0, w: 400, h: 300 }, 1280, 800, 48)).toEqual({ x: 100, y: 56, w: 400, h: 300 })
+    expect(clampFloat({ x: 100, y: 0, w: 400, h: 2000 }, 1280, 800, 48).h).toBe(800 - 56 - 8)
   })
 
   it('applyFieldValues: помощник заполняет поля своей колонки, только правимые', () => {

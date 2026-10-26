@@ -80,10 +80,13 @@ export function clampPanelWidth(width: number, viewport: number): number {
 /** Плавающее окно целиком в окне браузера (после смены размеров экрана) */
 export function clampFloat(
   f: { x: number; y: number; w: number; h: number }, vw: number, vh: number,
+  /** Сверху занято шапкой (--shell-top): окно не уходит под её стекло — там шапка забирает клики */
+  top = 0,
 ): { x: number; y: number; w: number; h: number } {
+  const minY = top + 8;
   const w = Math.min(Math.max(320, f.w), Math.max(320, vw - 16));
-  const h = Math.min(Math.max(240, f.h), Math.max(240, vh - 16));
+  const h = Math.min(Math.max(240, f.h), Math.max(240, vh - minY - 8));
   const x = Math.min(Math.max(8, f.x), Math.max(8, vw - w - 8));
-  const y = Math.min(Math.max(8, f.y), Math.max(8, vh - h - 8));
+  const y = Math.min(Math.max(minY, f.y), Math.max(minY, vh - h - 8));
   return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
 }
