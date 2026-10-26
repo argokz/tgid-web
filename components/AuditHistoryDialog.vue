@@ -174,6 +174,21 @@
           <template #[`item.changes`]="{ item }">
             <span class="text-caption">{{ summarize(item.changes) }}</span>
           </template>
+          <template #[`item.data-table-expand`]="{ internalItem, isExpanded, toggleExpand }">
+            <HintTip :text="isExpanded(internalItem) ? 'Свернуть изменения' : 'Показать изменения'">
+              <template #default="{ props: tip }">
+                <v-btn
+                  v-bind="tip"
+                  :icon="isExpanded(internalItem) ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+                  variant="text"
+                  size="small"
+                  :aria-label="isExpanded(internalItem) ? 'Свернуть изменения' : 'Показать изменения'"
+                  :aria-expanded="isExpanded(internalItem)"
+                  @click="toggleExpand(internalItem)"
+                />
+              </template>
+            </HintTip>
+          </template>
           <template #expanded-row="{ columns, item }">
             <tr>
               <td

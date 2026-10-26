@@ -27,6 +27,11 @@ export default defineNuxtPlugin((app) => {
               surface: '#FFFFFF',
               background: '#F5F7FA',
             },
+            // Подписи полей, подсказки и вторичный текст: при 0,6 по умолчанию — 4,22:1 на #FAFAFA (axe, этап 9),
+            // 0,68 даёт ≥ 4,5:1 (WCAG AA)
+            variables: {
+              'medium-emphasis-opacity': 0.68,
+            },
           },
         },
       },
