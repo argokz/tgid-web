@@ -2,7 +2,6 @@
   <div
     class="app-splash"
     role="status"
-    :aria-label="label"
   >
     <svg
       class="app-splash__mark"
@@ -60,6 +59,8 @@
         r="3"
       />
     </svg>
+    <!-- live-область объявляет содержимое, а не aria-label -->
+    <span class="app-splash__sr">{{ label }}</span>
     <div class="app-splash__brand">
       ITwin <span>Map</span>
     </div>
@@ -99,6 +100,15 @@ withDefaults(defineProps<{ label?: string }>(), { label: 'Загрузка ка�
   fill: var(--logo-accent, var(--accent, #d97706));
   transform-origin: 12px 14px;
   animation: app-splash-pulse 1.6s ease-in-out infinite;
+}
+
+.app-splash__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .app-splash__brand {

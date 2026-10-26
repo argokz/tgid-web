@@ -18,6 +18,7 @@ import { useGeoServer } from '~/composables/useGeoServer';
 import { useLayerStore } from '~/stores/layerStore';
 import { useLabelStore, TECHNICAL_LABELS } from '~/stores/labelStore';
 import { useFragmentStore } from '~/stores/fragmentStore';
+import { useNotificationStore } from '~/stores/notificationStore';
 import { escapeHtml } from '~/utils/escapeHtml';
 import { nearestGroup, queryRenderedNear } from '~/utils/mapPick';
 import { getCityConfig } from '~/utils/cityConfig';
@@ -77,8 +78,11 @@ let pendingFeatureChoice: ((index: number | null) => void) | null = null;
 export const useMapStore = defineStore('map', {
   state: () => ({
     map: null as any,
-    /** Карта показала первый кадр (событие load) — экран загрузки уходит; при пересоздании карты не сбрасывается */
+    /** Карта показала первый кадр с подложкой (первый idle после неё) — экран загрузки уходит; при пересоздании
+     *  карты не сбрасывается */
     firstFrameShown: false,
+    /** Инициализация карты упала (MapViewer.initMap) — экран загрузки не должен закрывать ошибку */
+    initFailed: false,
     highlightedFeature: null as string | null,
     _attributePanelShow: null as ((properties: Record<string, any>, options?: { anchor?: [number, number] | null }) => void | Promise<void>) | null,
     // Diagnostics Fault Layers
@@ -218,7 +222,7 @@ export const useMapStore = defineStore('map', {
 
       const maplibregl = await getMaplibreDefault();
 
-      return new Promise<void>((resolve) => {
+      return new Promise<void>((resolve, reject) => {
       this.map = markRaw(new maplibregl.Map({
         container: containerId,
         /** Компактная атрибуция — меньше переносов текста и CLS от блока © MapLibre/OSM */
@@ -266,18 +270,29 @@ export const useMapStore = defineStore('map', {
 
       this.map.on('load', async () => {
         if (import.meta.dev) console.debug('Map loaded event triggered');
-        this.firstFrameShown = true;
-        this.loadSelectedBaseLayer();
-        useLayerStore().loadVisibleContextLayers();
-        await this.addBaseLayer();
-        this.loadLayerStyles();
+        try {
+          this.loadSelectedBaseLayer();
+          useLayerStore().loadVisibleContextLayers();
+          try {
+            await this.addBaseLayer();
+          } catch (err) {
+            // подложка недоступна (ключ, сеть) — карта сети работает и без неё
+            console.error('Base layer error:', err);
+            useNotificationStore().showWarning('Подложка карты не загрузилась — сеть показана без неё');
+          }
+          // первый кадр уже с подложкой: load пустого стиля наступает раньше, чем на карте что-то есть
+          this.map?.once('idle', () => { this.firstFrameShown = true; });
+          this.loadLayerStyles();
 
-        this.setupEventListeners();
+          this.setupEventListeners();
 
-        // Initialize other stores
-        const labelStore = useLabelStore();
-        labelStore.loadLayerLabels();
-        resolve();
+          // Initialize other stores
+          const labelStore = useLabelStore();
+          labelStore.loadLayerLabels();
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
       });
       });
     },

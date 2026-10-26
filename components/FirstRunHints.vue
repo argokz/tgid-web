@@ -35,18 +35,21 @@
             </template>
           </HintTip>
         </header>
-        <h2
-          :id="titleId"
-          class="first-run__title"
-        >
-          {{ current.title }}
-        </h2>
-        <p
-          :id="textId"
-          class="first-run__text"
-        >
-          {{ current.text }}
-        </p>
+        <!-- фокус остаётся на «Далее» — новый шаг читалке экрана объявляет live-область -->
+        <div aria-live="polite">
+          <h2
+            :id="titleId"
+            class="first-run__title"
+          >
+            {{ current.title }}
+          </h2>
+          <p
+            :id="textId"
+            class="first-run__text"
+          >
+            {{ current.text }}
+          </p>
+        </div>
         <footer class="first-run__actions">
           <v-btn
             v-if="index > 0"
@@ -76,6 +79,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue';
 import HintTip from '~/components/HintTip.vue';
 import { useEscapeClose } from '~/composables/useEscape';
+import { useNotificationStore } from '~/stores/notificationStore';
 import { appStorage } from '~/utils/appStorage';
 import {
   FIRST_RUN_STEPS,
@@ -98,7 +102,10 @@ const props = withDefaults(defineProps<{
   auto?: boolean;
   /** Экран готов (карта показала первый кадр): до этого зоны закрыты экраном загрузки */
   ready?: boolean;
+  /** Куда вернуть фокус, если элемент, с которого запустили, уже снят (пункт закрывшегося меню) */
+  focusFallback?: string;
 }>(), {
+  focusFallback: '[aria-label="Меню пользователя"]',
   delayMs: 1500,
   auto: true,
   ready: true,
@@ -118,12 +125,16 @@ let startTimer: ReturnType<typeof setTimeout> | null = null;
 
 const current = computed(() => (index.value >= 0 ? steps.value[index.value] ?? null : null));
 
+const isOnScreen = (el: HTMLElement) => {
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight;
+};
+
+/** Первый видимый элемент зоны (у одной зоны бывают скрытые двойники — телефон и десктоп) */
 const visibleAnchor = (step: FirstRunStep): HTMLElement | null => {
   for (const selector of step.anchors) {
-    const el = document.querySelector<HTMLElement>(selector);
-    if (!el) continue;
-    const r = el.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight) return el;
+    const el = Array.from(document.querySelectorAll<HTMLElement>(selector)).find(isOnScreen);
+    if (el) return el;
   }
   return null;
 };
@@ -186,12 +197,21 @@ const show = async (i: number) => {
   measure();
 };
 
-const start = async () => {
+/** manual — из меню: без зон на экране сказать об этом, а не молчать */
+const start = async (manual = true) => {
   steps.value = FIRST_RUN_STEPS.filter((s) => visibleAnchor(s));
-  if (!steps.value.length) return;
-  returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  if (!steps.value.length) {
+    if (manual) useNotificationStore().showInfo('На этом экране подсказок по зонам нет — откройте карту');
+    return;
+  }
+  // повторный запуск поверх открытой подсказки — фокус возвращать туда же, куда и раньше
+  if (index.value < 0) {
+    const active = document.activeElement;
+    returnFocus = active instanceof HTMLElement && !cardEl.value?.contains(active) ? active : null;
+  }
   await show(0);
-  nextBtn.value?.$el?.focus({ preventScroll: true });
+  // сама (первый вход) — фокус не перехватывать; из меню — на «Далее»
+  if (manual) nextBtn.value?.$el?.focus({ preventScroll: true });
 };
 
 const go = (delta: number) => {
@@ -205,11 +225,22 @@ const finish = () => {
   index.value = -1;
   anchorRect.value = null;
   markDone();
-  returnFocus?.focus({ preventScroll: true });
+  // пункт меню, с которого запустили, к этому времени уже снят — тогда на кнопку меню пользователя
+  const target = returnFocus?.isConnected && returnFocus.offsetParent !== null
+    ? returnFocus
+    : document.querySelector<HTMLElement>(props.focusFallback);
+  target?.focus({ preventScroll: true });
   returnFocus = null;
 };
 
 useEscapeClose({ open: () => index.value >= 0, close: finish });
+
+/** Фокус в поле ввода или открыт диалог/меню — автоподсказка не перехватывает фокус */
+const isUserBusy = (): boolean => {
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName))) return true;
+  return Boolean(document.querySelector('.v-overlay--active'));
+};
 
 const onResize = () => {
   if (index.value >= 0) measure();
@@ -218,9 +249,12 @@ const onResize = () => {
 onMounted(() => {
   window.addEventListener('resize', onResize);
   if (!props.auto || readDone()) return;
-  // один раз: когда экран готов, через паузу
+  // один раз: когда экран готов, через паузу; пользователь печатает или открыт диалог — позже
   const schedule = () => {
-    startTimer = setTimeout(() => void start(), props.delayMs);
+    startTimer = setTimeout(() => {
+      if (isUserBusy()) schedule();
+      else void start(false);
+    }, props.delayMs);
   };
   if (props.ready) {
     schedule();

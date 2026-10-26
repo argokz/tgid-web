@@ -5,9 +5,10 @@
 //   node scripts/brand/render-icons.mjs
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
-const ROOT = new URL('../..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PUBLIC = join(ROOT, 'public');
 
 const PRIMARY = '#1565c0';

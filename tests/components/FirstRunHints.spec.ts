@@ -3,6 +3,7 @@ import { nextTick } from 'vue';
 import FirstRunHints from '~/components/FirstRunHints.vue';
 import { FIRST_RUN_STORAGE_KEY, FIRST_RUN_VERSION } from '~/utils/firstRunHints';
 import { useUiStore } from '~/stores/uiStore';
+import { useNotificationStore } from '~/stores/notificationStore';
 import { mountWithVuetify } from './mountHelper';
 
 /** Зона на экране: элемент с размером (happy-dom сам не раскладывает) */
@@ -83,12 +84,32 @@ describe('FirstRunHints', () => {
     w.unmount();
   });
 
-  it('ни одной зоны на экране — ничего не показывает и не помечает', async () => {
+  it('ни одной зоны на экране — ничего не показывает и не помечает; из меню — сообщение', async () => {
     const w = mountWithVuetify(FirstRunHints, { props: { auto: false } });
+    const info = vi.spyOn(useNotificationStore(), 'showInfo');
     await (w.vm as any).start();
     await flush();
     expect(card()).toBeNull();
     expect(localStorage.getItem(FIRST_RUN_STORAGE_KEY)).toBeNull();
+    expect(info).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
+  it('автозапуск: открыт диалог — ждёт; потом показывает, фокус не перехватывает', async () => {
+    vi.useFakeTimers();
+    zone('nav-links');
+    const overlay = document.createElement('div');
+    overlay.className = 'v-overlay--active';
+    document.body.appendChild(overlay);
+    const w = mountWithVuetify(FirstRunHints, { props: { delayMs: 10 } });
+    vi.advanceTimersByTime(50);
+    await flush();
+    expect(card()).toBeNull();
+    overlay.remove();
+    vi.advanceTimersByTime(10);
+    await flush();
+    expect(card()?.textContent).toContain('Разделы');
+    expect(card()?.contains(document.activeElement)).toBe(false);
     w.unmount();
   });
 });

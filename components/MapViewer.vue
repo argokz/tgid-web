@@ -1566,6 +1566,7 @@ const initMap = async () => {
   } catch (error) {
     console.error('Map init error:', error);
     mapInitError.value = true;
+    mapStore.initFailed = true;
     useNotificationStore().showError('Ошибка при инициализации карты');
   } finally {
     mapInitLoading.value = false;
@@ -1576,6 +1577,7 @@ const initMap = async () => {
 
 const retryMapInit = () => {
   mapInitError.value = false;
+  mapStore.initFailed = false;
   initMap();
 };
 

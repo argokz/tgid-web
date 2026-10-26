@@ -14,7 +14,7 @@ export const STATE_ILLUSTRATION_ICONS: Record<StateIllustrationKind, string> = {
 // Тексты utils/apiError.ts: 401/403 — «Требуется вход», «Недостаточно прав», «Сессия истекла»;
 // сеть — «Сервер API недоступен», «Сервер не ответил вовремя»
 const NO_ACCESS = /нет (прав|доступа)|доступ запрещ|недостаточно прав|требуется вход|сессия истекла|forbidden/i;
-const OFFLINE = /нет связи|недоступен|не ответил|не отвечает|подключени|тайм-?аут|timeout|failed to fetch|network ?error|offline/i;
+const OFFLINE = /нет связи|сервер api недоступен|подключение к сети|не ответил вовремя|сервер не отвечает|тайм-?аут|timeout|failed to fetch|network ?error|offline/i;
 
 /** Вид иллюстрации ошибки по её тексту: нет прав, нет связи или прочая ошибка */
 export function illustrationForError(message: string | null | undefined): StateIllustrationKind {

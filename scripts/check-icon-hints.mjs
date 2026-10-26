@@ -5,8 +5,9 @@
 // Запуск: node scripts/check-icon-hints.mjs [--list] — без подсказки выход с кодом 1.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DIRS = ['components', 'pages', 'layouts', 'app.vue'];
 const HINT_WRAPPERS = new Set(['hinttip', 'hint-tip', 'v-tooltip', 'vtooltip']);
 const BUTTONS = new Set(['v-btn', 'vbtn']);
@@ -110,4 +111,6 @@ const covered = total - missing.length;
 const pct = total ? Math.round((covered / total) * 1000) / 10 : 100;
 if (process.argv.includes('--list')) for (const m of missing) process.stdout.write(`${m}\n`);
 process.stdout.write(`Кнопки-иконки: ${total}, с подсказкой ${covered} (${pct} %), без подсказки ${missing.length}\n`);
-process.exit(missing.length ? 1 : 0);
+// ни одной кнопки — проверка смотрит не туда (путь, разбор шаблонов), а не «всё в порядке»
+if (!total) process.stderr.write('Кнопки-иконки не найдены — проверьте путь и разбор шаблонов\n');
+process.exit(missing.length || !total ? 1 : 0);

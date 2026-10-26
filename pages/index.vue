@@ -36,7 +36,8 @@ const layers = computed<LayerConfig[]>(() => layersData.value ?? []);
 const SPLASH_MAX_MS = 20000;
 const mapStore = useMapStore();
 const splashTimedOut = ref(false);
-const splashVisible = computed(() => !mapStore.firstFrameShown && !splashTimedOut.value);
+// ошибка карты или слоёв — экран загрузки уходит сразу: под ним сообщение и «Повторить»
+const splashVisible = computed(() => !mapStore.firstFrameShown && !mapStore.initFailed && !error.value && !splashTimedOut.value);
 let splashTimer: ReturnType<typeof setTimeout> | null = null;
 onMounted(() => {
   if (!mapStore.firstFrameShown) splashTimer = setTimeout(() => { splashTimedOut.value = true; }, SPLASH_MAX_MS);
