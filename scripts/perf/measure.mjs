@@ -26,6 +26,8 @@ const CONTEXT_OFF = args['context-off'] ? String(args['context-off']).split(',')
 const OUT = args.out || `scripts/perf/results-${new Date().toISOString().slice(0, 10)}.json`;
 /** --profile=папка — CPU-профиль каждого замера (.cpuprofile, открывается в DevTools → Performance) */
 const PROFILE = args.profile ? String(args.profile) : '';
+/** --css='…' — стиль поверх страницы для A/B (например, холст карты не под шапкой: '.map-canvas-host{inset:0!important}') */
+const EXTRA_CSS = args.css ? String(args.css) : '';
 
 const PINIA = "document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$pinia._s";
 const MAP = `${PINIA}.get('map').map`;
@@ -454,6 +456,15 @@ const scenarios = {
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--disable-gpu-vsync', '--disable-frame-rate-limit'] });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, baseURL: BASE, locale: 'ru-RU' });
 await context.addInitScript(INIT_SCRIPT);
+if (EXTRA_CSS) {
+  await context.addInitScript((css) => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const s = document.createElement('style');
+      s.textContent = css;
+      document.head.appendChild(s);
+    });
+  }, EXTRA_CSS);
+}
 const page = await context.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message.slice(0, 200)));
@@ -463,7 +474,7 @@ await cdp.send('Performance.enable');
 if (PROFILE) await cdp.send('Profiler.enable');
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU });
 
-const all = { base: BASE, cpu: CPU, runs: RUNS, contextOff: CONTEXT_OFF, date: new Date().toISOString(), results: [] };
+const all = { base: BASE, cpu: CPU, runs: RUNS, contextOff: CONTEXT_OFF, css: EXTRA_CSS, date: new Date().toISOString(), results: [] };
 for (let run = 1; run <= RUNS; run++) {
   log(`\n=== прогон ${run}/${RUNS}, CPU ×${CPU} ===`);
   const loadMs = await openMap(page);
