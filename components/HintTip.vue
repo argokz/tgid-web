@@ -7,6 +7,7 @@
     :close-delay="HOVER_BRIDGE_MS"
     open-on-focus
     content-class="hint-tip"
+    :aria-label="ariaText || undefined"
   >
     <template #activator="{ props: activatorProps }">
       <slot :props="withLongPress(activatorProps)" />

@@ -256,11 +256,15 @@
             v-if="item.children"
             :value="item.id"
           >
-            <template #activator="{ props }">
+            <template #activator="{ props, isOpen }">
+              <!-- заголовок группы — раскрывашка: без роли Vuetify ставит ему недопустимый aria-selected -->
               <v-list-item
                 v-bind="props"
                 :prepend-icon="item.icon"
                 :title="item.title"
+                role="button"
+                :aria-expanded="isOpen"
+                :aria-selected="undefined"
               >
                 <template
                   v-if="isItemBusy(item)"
