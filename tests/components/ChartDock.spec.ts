@@ -32,7 +32,8 @@ describe('ChartDock', () => {
     const ui = useUiStore();
     ui.setRightInset(400);
     await w.vm.$nextTick();
-    expect((w.find('.chart-dock--desktop').element as HTMLElement).style.right).toBe('484px');
+    // ширина карточки — в переменную, колонку контролов (--controls-w) прибавляет стиль
+    expect((w.find('.chart-dock--desktop').element as HTMLElement).style.getPropertyValue('--dock-right')).toBe('400px');
     await w.find('button[aria-label="Закрыть"]').trigger('click');
     expect(w.emitted('update:modelValue')?.at(-1)).toEqual([false]);
     expect(ui.handleEscape()).toBe(true);

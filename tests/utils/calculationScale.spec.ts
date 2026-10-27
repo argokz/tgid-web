@@ -34,9 +34,10 @@ describe('calculationScale', () => {
   it('MapLegend: правее открытой панели слоёв', async () => {
     const scale = calculationScale('pressure_drop');
     const w = mount(MapLegend, { props: { title: scale.title, stops: scale.stops } });
-    expect(w.attributes('style')).toContain('left: 16px');
-    useUiStore().setLeftInset(340);
+    // отступ каркаса (--shell-inset) от края карты или от правого края карточки слоёв
+    expect(w.attributes('style')).toContain('--legend-left: 0px');
+    useUiStore().setLeftInset(332);
     await w.vm.$nextTick();
-    expect(w.attributes('style')).toContain('left: 356px');
+    expect(w.attributes('style')).toContain('--legend-left: 332px');
   });
 });

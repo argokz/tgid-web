@@ -62,9 +62,8 @@ const props = withDefaults(defineProps<{
 })
 
 const ui = useUiStore()
-/** Левее — открытая панель слоёв: легенда встаёт правее неё */
-const LEGEND_SIDE_GAP_PX = 16
-const legendStyle = computed(() => ({ left: `${ui.leftInset + LEGEND_SIDE_GAP_PX}px` }))
+/** Левее — открытая панель слоёв: легенда встаёт правее неё с отступом каркаса */
+const legendStyle = computed(() => ({ '--legend-left': `${ui.leftInset}px` }))
 
 const max = computed(() => props.stops[props.stops.length - 1]?.[0] || 1)
 const gradient = computed(() => `linear-gradient(to right, ${props.stops
@@ -79,6 +78,7 @@ const ticks = computed(() => props.stops.map(([value], index) => {
 <style scoped>
 .map-legend {
   position: absolute;
+  left: calc(var(--legend-left, 0px) + var(--shell-inset));
   bottom: calc(40px + var(--safe-bottom, 0px));
   z-index: var(--z-hud);
   width: 248px;

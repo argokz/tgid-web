@@ -155,8 +155,8 @@ onMounted(async () => {
 
 .cesium-photo-toggle {
   position: absolute;
-  top: 12px;
-  right: 88px;
+  top: var(--shell-inset);
+  right: var(--controls-w); /* левее колонки контролов карты */
   z-index: 2;
 }
 

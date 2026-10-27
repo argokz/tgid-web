@@ -30,10 +30,21 @@
   }
 }
 
-// Атрибуция и масштаб MapLibre у нижних углов — над полосой «домой» и не под вырезом
+// Атрибуция и масштаб MapLibre у нижних углов — над полосой «домой» и не под вырезом. Левый угол — правее
+// открытой карточки слоёв (--map-left-inset ставит MapViewer), отступ — каркасный. Префикс .maplibregl-map —
+// maplibre-gl.css подключается позже и с той же специфичностью перебил бы left и margin
 .maplibregl-ctrl-bottom-left {
-  padding-left: var(--safe-left);
+  /* правый край карточки слоёв уже учитывает вырез — без двойного сдвига */
+  padding-left: max(0px, calc(var(--safe-left) - var(--map-left-inset, 0px)));
   padding-bottom: var(--safe-bottom);
+}
+
+.maplibregl-map .maplibregl-ctrl-bottom-left {
+  left: var(--map-left-inset, 0px);
+}
+
+.maplibregl-map .maplibregl-ctrl-bottom-left .maplibregl-ctrl {
+  margin: 0 0 var(--shell-inset) var(--shell-inset);
 }
 
 .maplibregl-ctrl-bottom-right {

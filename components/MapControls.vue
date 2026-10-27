@@ -1,1251 +1,496 @@
 <template>
-
+  <!--
+    Контролы карты (этап 10е, docs/ui-felt-audit.md): группы-«таблетки» по закону Хика — не больше четырёх кнопок.
+    Сверху — режимы работы с картой (в 10ж переезжают в тулбар сверху по центру), внизу справа — вид и зум, как
+    в Felt и любой веб-ГИС. Поиск адреса и узлов — палитра Ctrl+K в шапке, «Инструменты» — иконка в шапке.
+  -->
   <div class="map-controls">
-
-    <!-- Address Search -->
-
-    <div
-      class="search-wrapper"
-      :class="{ 'expanded': searchExpanded }"
+    <GlassSurface
+      level="solid"
+      rounded="md"
+      class="control-group"
+      role="toolbar"
+      aria-label="Инструменты карты"
+      aria-orientation="vertical"
     >
-
       <HintTip
-        v-if="!searchExpanded"
-        text="Открыть поиск адреса на карте"
+        text="Измерения: расстояние и площадь"
+        location="left"
       >
         <template #default="{ props: tip }">
           <v-btn
             v-bind="tip"
             icon
-            size="default"
-            elevation="4"
-            color="surface"
+            variant="text"
             class="control-btn"
-            aria-label="Открыть поиск адреса на карте"
-            @click="expandSearch"
+            :class="{ 'control-btn--active': uiStore.drawPanelOpen }"
+            :aria-pressed="uiStore.drawPanelOpen"
+            aria-label="Измерения"
+            @click="uiStore.toggleDrawPanel()"
           >
-
-            <v-icon color="primary">mdi-magnify</v-icon>
-
+            <v-icon size="20">mdi-ruler</v-icon>
           </v-btn>
         </template>
       </HintTip>
 
-
-      <v-card
-        v-if="searchExpanded"
-        class="search-panel-expanded"
-        elevation="8"
-        rounded="lg"
-      >
-
-        <div class="pa-2 search-input-wrapper">
-
-          <v-text-field
-
-            ref="searchInput"
-
-            v-model="searchQuery"
-
-            placeholder="Поиск адреса на карте..."
-
-            variant="solo"
-
-            density="comfortable"
-
-            hide-details
-
-            single-line
-
-            autofocus
-
-            @input="onSearchInput"
-
-            @keyup.enter="performSearch"
-
-            @keyup.esc="collapseSearch"
-          >
-
-            <template #prepend-inner>
-
-              <v-icon color="primary">mdi-magnify</v-icon>
-
-            </template>
-
-            <template #append-inner>
-
-              <HintTip
-                text="Закрыть поиск адреса"
-              >
-                <template #default="{ props: tip }">
-                  <v-btn
-                    v-bind="tip"
-                    icon
-                    size="small"
-                    variant="text"
-                    aria-label="Закрыть поиск адреса"
-                    @click="collapseSearch"
-                  >
-
-                    <v-icon size="small">mdi-close</v-icon>
-
-                  </v-btn>
-                </template>
-              </HintTip>
-
-            </template>
-
-          </v-text-field>
-
-        </div>
-
-
-        <div
-          v-if="searchResults.length > 0 || searching"
-          class="search-results-wrapper"
-        >
-
-          <v-divider />
-
-          <v-list
-            v-if="searchResults.length > 0"
-            class="search-results"
-            density="compact"
-          >
-
-            <v-list-item
-
-              v-for="result in searchResults"
-
-              :key="result.place_id"
-
-              @click="selectResult(result)"
-
-              class="search-result-item"
-            >
-
-              <template #prepend>
-
-                <v-avatar
-                  size="36"
-                  color="blue-lighten-5"
-                >
-
-                  <v-icon
-                    color="primary"
-                    size="small"
-                  >mdi-map-marker</v-icon>
-
-                </v-avatar>
-
-              </template>
-
-              <v-list-item-title class="text-body-2 font-weight-medium">
-
-                {{ getMainAddress(result.display_name) }}
-
-              </v-list-item-title>
-
-              <v-list-item-subtitle class="text-caption">
-
-                {{ getSecondaryAddress(result.display_name) }}
-
-              </v-list-item-subtitle>
-
-            </v-list-item>
-
-          </v-list>
-
-          <div
-            v-if="searching"
-            class="pa-4 text-center"
-          >
-
-            <v-progress-circular
-
-              indeterminate
-
-              size="32"
-
-              color="primary"
-
-              aria-label="Поиск адреса"
-            />
-
-            <div class="text-caption text-grey mt-2">Поиск...</div>
-
-          </div>
-
-        </div>
-
-      </v-card>
-
-    </div>
-
-
-    <!-- Control buttons (right column) -->
-
-    <div
-      class="control-buttons"
-      role="toolbar"
-      aria-label="Инструменты карты"
-      aria-orientation="vertical"
-    >
-
-      <!-- Поиск узлов -->
-      <v-tooltip
-        text="Поиск узлов"
-        location="left"
-      >
-        <template #activator="{ props: tp }">
-          <v-btn
-            v-bind="tp"
-            icon
-            size="default"
-            elevation="4"
-            color="surface"
-            class="control-btn"
-            aria-label="Поиск узлов"
-            @click="$emit('open-node-search')"
-          >
-            <v-icon color="primary">mdi-map-search</v-icon>
-          </v-btn>
-        </template>
-      </v-tooltip>
-
-      <!-- Инструменты приложения (журналы, реестры, отчёты) — отдельная панель -->
-      <v-tooltip
-        text="Инструменты: журналы, реестры, отчёты"
-        location="left"
-      >
-        <template #activator="{ props: tp }">
-          <v-btn
-            v-bind="tp"
-            icon
-            size="default"
-            elevation="4"
-            :color="uiStore.toolsPanelOpen ? 'primary' : 'white'"
-            class="control-btn"
-            aria-label="Инструменты: журналы, реестры, отчёты"
-            @click="uiStore.toggleToolsPanel()"
-          >
-            <v-icon :color="uiStore.toolsPanelOpen ? 'white' : 'primary'">mdi-toolbox-outline</v-icon>
-          </v-btn>
-        </template>
-      </v-tooltip>
-
-      <!-- Измерения (линейка, площадь) — отдельная панель на карте -->
-      <v-tooltip
-        text="Измерения: расстояние и площадь"
-        location="left"
-      >
-        <template #activator="{ props: tp }">
-          <v-btn
-            v-bind="tp"
-            icon
-            size="default"
-            elevation="4"
-            :color="uiStore.drawPanelOpen ? 'primary' : 'white'"
-            class="control-btn"
-            aria-label="Измерения"
-            @click="uiStore.toggleDrawPanel()"
-          >
-            <v-icon :color="uiStore.drawPanelOpen ? 'white' : 'primary'">mdi-ruler</v-icon>
-          </v-btn>
-        </template>
-      </v-tooltip>
-
-
-      <!-- Edit Topology Mode (режим карты, поэтому остаётся отдельной кнопкой) -->
-      <v-tooltip
+      <!-- Редактор топологии — режим карты, только при праве на правку -->
+      <HintTip
         v-if="topologyEditingEnabled"
         :text="isEditTopologyMode ? 'Выключить редактирование топологии' : 'Редактировать топологию сети'"
         location="left"
       >
-        <template #activator="{ props: tp }">
+        <template #default="{ props: tip }">
           <v-btn
-            v-bind="tp"
+            v-bind="tip"
             icon
-            size="default"
-            elevation="4"
-            :color="isEditTopologyMode ? 'red' : 'white'"
+            variant="text"
             class="control-btn"
+            :class="{ 'control-btn--active': isEditTopologyMode }"
+            :aria-pressed="Boolean(isEditTopologyMode)"
             aria-label="Редактировать топологию сети"
             @click="$emit('toggle-edit-topology-mode')"
           >
-            <v-icon :color="isEditTopologyMode ? 'white' : 'red'">mdi-vector-polyline-edit</v-icon>
+            <v-icon size="20">mdi-vector-polyline-edit</v-icon>
           </v-btn>
         </template>
-      </v-tooltip>
-      <!-- Trace mode -->
+      </HintTip>
 
-      <v-tooltip
-
+      <HintTip
         :text="isTraceMode ? 'Отключить режим трассировки' : 'Пьезометрический график'"
-
         location="left"
       >
-
-        <template #activator="{ props: tp }">
-
+        <template #default="{ props: tip }">
           <v-btn
-
-            v-bind="tp"
-
+            v-bind="tip"
             icon
-
-            size="default"
-
-            elevation="4"
-
-            :color="isTraceMode ? 'primary' : 'white'"
-
+            variant="text"
             class="control-btn"
-
-            :class="{ 'identify-active': isTraceMode }"
-
+            :class="{ 'control-btn--active': isTraceMode }"
+            :aria-pressed="Boolean(isTraceMode)"
             aria-label="Пьезометрический график"
-
             @click="$emit('toggle-trace-mode')"
           >
-
-            <v-icon :color="isTraceMode ? 'white' : 'blue'">mdi-chart-line</v-icon>
-
+            <v-icon size="20">mdi-chart-line</v-icon>
           </v-btn>
-
         </template>
+      </HintTip>
 
-      </v-tooltip>
-
-
-      <!-- Identify mode -->
-
-      <v-tooltip
-
+      <HintTip
         :text="identifyMode ? 'Отключить режим информации' : 'Информация об объекте'"
-
         location="left"
       >
-
-        <template #activator="{ props: tp }">
-
+        <template #default="{ props: tip }">
           <v-btn
-
-            v-bind="tp"
-
+            v-bind="tip"
             icon
-
-            size="default"
-
-            elevation="4"
-
-            :color="identifyMode ? 'primary' : 'white'"
-
+            variant="text"
             class="control-btn"
-
-            :class="{ 'identify-active': identifyMode }"
-
-            :aria-label="identifyMode ? 'Отключить режим информации' : 'Информация об объекте'"
-
+            :class="{ 'control-btn--active': identifyMode }"
+            :aria-pressed="identifyMode"
+            aria-label="Информация об объекте"
             @click="toggleIdentifyMode"
           >
-
-            <v-icon>mdi-information</v-icon>
-
+            <v-icon size="20">mdi-information</v-icon>
           </v-btn>
-
         </template>
+      </HintTip>
+    </GlassSurface>
 
-      </v-tooltip>
-
-
-      <!-- Home -->
-
-      <v-tooltip
-        text="Начальный вид"
-        location="left"
+    <!-- Вид и зум — внизу справа, всегда на экране, даже когда верхняя группа не влезает по высоте (QA F17, F59) -->
+    <div class="control-bottom">
+      <GlassSurface
+        level="solid"
+        rounded="md"
+        class="control-group"
+        role="toolbar"
+        aria-label="Вид карты"
+        aria-orientation="vertical"
       >
-
-        <template #activator="{ props: tp }">
-
-          <v-btn
-
-            v-bind="tp"
-
-            icon
-
-            size="default"
-
-            elevation="4"
-
-            color="surface"
-
-            class="control-btn"
-
-            aria-label="Начальный вид"
-
-            @click="goHome"
-          >
-
-            <v-icon color="secondary">mdi-home</v-icon>
-
-          </v-btn>
-
-        </template>
-
-      </v-tooltip>
-
-
-      <!-- 2D/3D Toggle -->
-
-      <v-tooltip
-        :text="cesiumStore.viewMode === '2D' ? 'Переключить в 3D (Cesium)' : 'Переключить в 2D (MapLibre)'"
-        location="left"
-      >
-
-        <template #activator="{ props: tp }">
-
-          <v-btn
-
-            v-bind="tp"
-
-            icon
-
-            size="default"
-
-            elevation="4"
-
-            :color="cesiumStore.viewMode === '3D' ? 'primary' : 'white'"
-
-            class="control-btn font-weight-bold"
-
-            aria-label="Переключить 2D/3D"
-
-            @click="toggle2D3D"
-          >
-
-            {{ cesiumStore.viewMode }}
-
-          </v-btn>
-
-        </template>
-
-      </v-tooltip>
-
-
-      <!-- Geolocation -->
-
-      <v-tooltip
-        text="Моё местоположение"
-        location="left"
-      >
-
-        <template #activator="{ props: tp }">
-
-          <v-btn
-
-            v-bind="tp"
-
-            icon
-
-            size="default"
-
-            elevation="4"
-
-            color="surface"
-
-            class="control-btn"
-
-            aria-label="Моё местоположение"
-
-            :loading="locating"
-
-            @click="getMyLocation"
-          >
-
-            <v-icon color="primary">mdi-crosshairs-gps</v-icon>
-
-          </v-btn>
-
-        </template>
-
-      </v-tooltip>
-
-
-    </div>
-
-
-    <!-- Зум и подложка — отдельный нижний блок: всегда на экране, даже когда верхняя колонка прокручивается (QA F17, F59) -->
-
-    <div
-      class="control-buttons-bottom"
-      role="toolbar"
-      aria-label="Масштаб и подложка"
-      aria-orientation="vertical"
-    >
-
-      <!-- Zoom In -->
-
-      <v-tooltip
-        text="Приблизить"
-        location="left"
-      >
-
-        <template #activator="{ props: tp }">
-
-          <v-btn
-
-            v-bind="tp"
-
-            icon
-
-            size="default"
-
-            elevation="4"
-
-            color="surface"
-
-            class="control-btn"
-
-            aria-label="Приблизить"
-
-            @click="zoomIn"
-          >
-
-            <v-icon color="secondary">mdi-plus</v-icon>
-
-          </v-btn>
-
-        </template>
-
-      </v-tooltip>
-
-
-      <!-- Zoom Out -->
-
-      <v-tooltip
-        text="Отдалить"
-        location="left"
-      >
-
-        <template #activator="{ props: tp }">
-
-          <v-btn
-
-            v-bind="tp"
-
-            icon
-
-            size="default"
-
-            elevation="4"
-
-            color="surface"
-
-            class="control-btn"
-
-            aria-label="Отдалить"
-
-            @click="zoomOut"
-          >
-
-            <v-icon color="secondary">mdi-minus</v-icon>
-
-          </v-btn>
-
-        </template>
-
-      </v-tooltip>
-
-
-      <!-- Base layer switcher -->
-
-      <v-menu
-        offset-y
-        location="left"
-      >
-
-        <template #activator="{ props: menuProps }">
-
-          <v-tooltip
-            text="Базовый слой"
-            location="left"
-          >
-
-            <template #activator="{ props: tp }">
-
-              <v-btn
-
-                v-bind="{ ...menuProps, ...tp }"
-
-                icon
-
-                size="default"
-
-                elevation="4"
-
-                color="surface"
-
-                class="control-btn"
-
-                aria-label="Базовый слой"
-              >
-
-                <v-icon color="deep-orange">{{ currentLayerIcon }}</v-icon>
-
-              </v-btn>
-
-            </template>
-
-          </v-tooltip>
-
-        </template>
-
-
-        <v-list
-          density="compact"
-          class="layer-menu"
+        <HintTip
+          text="Начальный вид"
+          location="left"
         >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              variant="text"
+              class="control-btn"
+              aria-label="Начальный вид"
+              @click="goHome"
+            >
+              <v-icon size="20">mdi-home</v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
 
-          <v-list-subheader>Базовые слои карты</v-list-subheader>
+        <HintTip
+          text="Моё местоположение"
+          location="left"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              variant="text"
+              class="control-btn"
+              aria-label="Моё местоположение"
+              :loading="locating"
+              @click="getMyLocation"
+            >
+              <v-icon size="20">mdi-crosshairs-gps</v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
 
-          <v-list-item
+        <HintTip
+          :text="cesiumStore.viewMode === '2D' ? 'Переключить в 3D (Cesium)' : 'Переключить в 2D (MapLibre)'"
+          location="left"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              variant="text"
+              class="control-btn control-btn--text"
+              :class="{ 'control-btn--active': cesiumStore.viewMode === '3D' }"
+              :aria-pressed="cesiumStore.viewMode === '3D'"
+              aria-label="Переключить 2D/3D"
+              @click="toggle2D3D"
+            >
+              {{ cesiumStore.viewMode }}
+            </v-btn>
+          </template>
+        </HintTip>
 
-            v-for="layer in layers"
+        <v-menu location="left">
+          <template #activator="{ props: menuProps }">
+            <HintTip
+              text="Базовый слой"
+              location="left"
+            >
+              <template #default="{ props: tip }">
+                <v-btn
+                  v-bind="mergeProps(menuProps, tip)"
+                  icon
+                  variant="text"
+                  class="control-btn"
+                  aria-label="Базовый слой"
+                >
+                  <v-icon size="20">{{ currentLayerIcon }}</v-icon>
+                </v-btn>
+              </template>
+            </HintTip>
+          </template>
 
-            :key="layer.id"
-
-            @click="selectBaseLayer(layer.id)"
-
-            :class="{ 'active-layer': currentLayer === layer.id }"
+          <v-list
+            density="compact"
+            class="layer-menu"
           >
+            <v-list-subheader class="section-label">Базовые слои карты</v-list-subheader>
+            <v-list-item
+              v-for="layer in layers"
+              :key="layer.id"
+              :active="currentLayer === layer.id"
+              color="primary"
+              @click="selectBaseLayer(layer.id)"
+            >
+              <template #prepend>
+                <v-icon>{{ layer.icon }}</v-icon>
+              </template>
+              <v-list-item-title>{{ layer.name }}</v-list-item-title>
+              <template #append>
+                <v-icon
+                  v-if="currentLayer === layer.id"
+                  size="18"
+                >mdi-check</v-icon>
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+      </GlassSurface>
 
-            <template #prepend>
-
-              <v-icon :color="currentLayer === layer.id ? 'primary' : 'grey'">{{ layer.icon }}</v-icon>
-
-            </template>
-
-            <v-list-item-title>{{ layer.name }}</v-list-item-title>
-
-            <template #append>
-
-              <v-icon
-                v-if="currentLayer === layer.id"
-                color="primary"
-              >mdi-check</v-icon>
-
-            </template>
-
-          </v-list-item>
-
-        </v-list>
-
-      </v-menu>
-
+      <GlassSurface
+        level="solid"
+        rounded="md"
+        class="control-group"
+        role="toolbar"
+        aria-label="Масштаб"
+        aria-orientation="vertical"
+      >
+        <HintTip
+          text="Приблизить"
+          location="left"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              variant="text"
+              class="control-btn"
+              aria-label="Приблизить"
+              @click="zoomIn"
+            >
+              <v-icon size="20">mdi-plus</v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
+        <HintTip
+          text="Отдалить"
+          location="left"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              variant="text"
+              class="control-btn"
+              aria-label="Отдалить"
+              @click="zoomOut"
+            >
+              <v-icon size="20">mdi-minus</v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
+      </GlassSurface>
     </div>
-
   </div>
-
 </template>
-
 
 <script setup lang="ts">
 import HintTip from '~/components/HintTip.vue'
-
-import { ref, computed, onMounted, nextTick } from 'vue'
-
+import GlassSurface from '~/components/GlassSurface.vue'
+import { ref, computed, onMounted, mergeProps } from 'vue'
 import type { Map } from 'maplibre-gl'
-
-import type { NominatimResult } from '~/composables/useNominatim'
-
-import { useNominatim } from '~/composables/useNominatim'
 import { getCityConfig } from '~/utils/cityConfig'
-
 import { useBaseLayers } from '~/composables/useBaseLayers'
-
 import { useNotificationStore } from '~/stores/notificationStore'
-
 import { useCesiumStore } from '~/stores/cesiumStore'
 import { useUiStore } from '~/stores/uiStore'
-
 import { useFragmentStore } from '~/stores/fragmentStore'
 
-
 const props = withDefaults(defineProps<{
-
   map: Map | null
-
   initialIdentifyMode?: boolean
-
   isTraceMode?: boolean
-
   isEditTopologyMode?: boolean
-
   topologyEditingEnabled?: boolean
-
 }>(), {
-
   initialIdentifyMode: true,
-
   topologyEditingEnabled: false
-
 })
 
-
 const emit = defineEmits<{
-
   'layer-change': [layerId: string]
-
   'identify-mode-change': [enabled: boolean]
-
-  'open-node-search': []
-
   'toggle-trace-mode': []
-
   'toggle-edit-topology-mode': []
-
 }>()
 
-
-const { searchAddress } = useNominatim()
-
 const { layers, currentLayer, getCurrentLayer, setLayer, loadSavedLayer } = useBaseLayers()
-
 const notificationStore = useNotificationStore()
-
 const fragmentStore = useFragmentStore()
-
 const cesiumStore = useCesiumStore()
 const uiStore = useUiStore()
 
-
-const searchExpanded = ref(false)
-
-const searchInput = ref<any>(null)
-
-const searchQuery = ref('')
-
-const searchResults = ref<NominatimResult[]>([])
-
-const searching = ref(false)
-
 const locating = ref(false)
-
 const identifyMode = ref(props.initialIdentifyMode)
-
 const hasLocatedOnce = ref(false)
 
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
-
+/** Сколько держится маркер «Вы здесь», мс */
+const TEMP_MARKER_MS = 5000
 
 const currentLayerIcon = computed(() => getCurrentLayer.value?.icon || 'mdi-map')
 
-
-const expandSearch = () => {
-
-  searchExpanded.value = true
-
-  nextTick(() => searchInput.value?.focus())
-
-}
-
-
-const collapseSearch = () => {
-
-  searchExpanded.value = false
-
-  searchQuery.value = ''
-
-  searchResults.value = []
-
-}
-
-
-const getMainAddress = (s: string) => s.split(',').slice(0, 2).join(',').trim()
-
-const getSecondaryAddress = (s: string) => s.split(',').slice(2).join(',').trim()
-
-
-const onSearchInput = () => {
-
-  if (searchTimeout) clearTimeout(searchTimeout)
-
-  if (!searchQuery.value || searchQuery.value.length < 3) { searchResults.value = []; return }
-
-  searchTimeout = setTimeout(performSearch, 500)
-
-}
-
-
-const performSearch = async () => {
-
-  if (!searchQuery.value || searchQuery.value.length < 3) return
-
-  searching.value = true
-
-  try { searchResults.value = await searchAddress(searchQuery.value) }
-
-  finally { searching.value = false }
-
-}
-
-
-const selectResult = (result: NominatimResult) => {
-
-  if (!props.map) return
-
-  const lat = parseFloat(result.lat)
-
-  const lon = parseFloat(result.lon)
-
-  props.map.flyTo({ center: [lon, lat], zoom: 16, duration: 2000 })
-
-  addTemporaryMarker(lon, lat, result.display_name)
-
-  searchResults.value = []
-
-  searchQuery.value = result.display_name
-
-}
-
-
 const addTemporaryMarker = (lon: number, lat: number, description: string) => {
-
   if (!props.map) return
-
   if (props.map.getLayer('temp-marker')) props.map.removeLayer('temp-marker')
-
   if (props.map.getSource('temp-marker')) props.map.removeSource('temp-marker')
 
-
   props.map.addSource('temp-marker', {
-
     type: 'geojson',
-
     data: { type: 'Feature', geometry: { type: 'Point', coordinates: [lon, lat] }, properties: { description } }
-
   })
-
   props.map.addLayer({
-
     id: 'temp-marker',
-
     type: 'circle',
-
     source: 'temp-marker',
-
     paint: { 'circle-radius': 10, 'circle-color': '#FF5252', 'circle-stroke-width': 3, 'circle-stroke-color': '#FFFFFF' }
-
   })
-
 
   setTimeout(() => {
-
     if (props.map?.getLayer('temp-marker')) props.map.removeLayer('temp-marker')
-
     if (props.map?.getSource('temp-marker')) props.map.removeSource('temp-marker')
-
-  }, 5000)
-
+  }, TEMP_MARKER_MS)
 }
-
 
 // «Домой» — к видимым фрагментам (у города их может быть несколько в разных местах: в Шатуре —
-
 // Шатура, Москва, Петербург); охвата нет (нет узлов, ошибка) — центр города
-
 const goHome = async () => {
-
   if (!props.map) return
-
   const ids = fragmentStore.activeFragmentIds.length ? fragmentStore.activeFragmentIds : fragmentStore.defaultFragmentIds
-
   if (ids.length && await fragmentStore.zoomToFragments(ids)) return
-
   props.map.flyTo({ center: getCityConfig().center, zoom: 11, duration: 2000, essential: true })
-
 }
-
 
 const getMyLocation = () => {
-
   if (!props.map) return
-
   if (!window.isSecureContext) {
-
     notificationStore.showWarning('Геолокация работает только в безопасном контексте (HTTPS или localhost)')
-
     return
-
   }
-
   if (!navigator.geolocation) {
-
     notificationStore.showWarning('Ваш браузер не поддерживает геолокацию')
-
     return
-
   }
-
   locating.value = true
-
   navigator.geolocation.getCurrentPosition(
-
     ({ coords }) => {
-
       if (!hasLocatedOnce.value) {
-
         props.map?.flyTo({ center: [coords.longitude, coords.latitude], zoom: 15, duration: 2000 })
-
         hasLocatedOnce.value = true
-
       } else {
-
         props.map?.easeTo({ center: [coords.longitude, coords.latitude], duration: 1200 })
-
       }
-
       addTemporaryMarker(coords.longitude, coords.latitude, 'Вы здесь')
-
       notificationStore.showSuccess('Местоположение определено')
-
       locating.value = false
-
     },
-
     (error) => {
-
       switch (error.code) {
-
         case error.PERMISSION_DENIED:
-
           notificationStore.showError('Доступ к геолокации запрещён. Разрешите доступ в настройках браузера')
-
           break
-
         case error.POSITION_UNAVAILABLE:
-
           notificationStore.showError('Не удалось определить местоположение. Проверьте GPS/сеть')
-
           break
-
         case error.TIMEOUT:
-
           notificationStore.showError('Превышено время ожидания геолокации')
-
           break
-
         default:
-
           notificationStore.showError('Не удалось получить местоположение')
-
       }
-
       locating.value = false
-
     },
-
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-
   )
-
 }
-
 
 const zoomIn = () => props.map?.zoomIn({ duration: 300 })
-
 const zoomOut = () => props.map?.zoomOut({ duration: 300 })
 
-
 const selectBaseLayer = (layerId: string) => {
-
   setLayer(layerId)
-
   emit('layer-change', layerId)
-
 }
-
 
 const toggleIdentifyMode = () => {
-
   identifyMode.value = !identifyMode.value
-
   emit('identify-mode-change', identifyMode.value)
-
 }
-
 
 const toggle2D3D = () => {
-
   cesiumStore.toggleViewMode()
-
-  if (cesiumStore.viewMode === '3D') {
-
-    notificationStore.showInfo('Включен 3D режим (Cesium)')
-
-  } else {
-
-    notificationStore.showInfo('Включен 2D режим (MapLibre)')
-
-  }
-
+  notificationStore.showInfo(cesiumStore.viewMode === '3D' ? 'Включен 3D режим (Cesium)' : 'Включен 2D режим (MapLibre)')
 }
 
-
-
-
-
 onMounted(() => {
-
   loadSavedLayer()
-
   emit('identify-mode-change', identifyMode.value)
-
 })
 
-
 defineExpose({ identifyMode })
-
 </script>
 
-
 <style scoped>
-
 /*
- * Колонка от шапки до атрибуции карты (QA F17, F59): верхняя группа кнопок
- * прокручивается, если не влезает по высоте; зум и подложка — внизу и видны всегда.
- * Сама колонка прозрачна для мыши, чтобы промежуток между группами не мешал карте.
+ * Колонка от шапки до атрибуции карты: сверху группа режимов, внизу справа — вид и зум (видны всегда; верхняя
+ * группа прокручивается, если не влезает по высоте, QA F17, F59). Сама колонка прозрачна для мыши.
+ * Группа — плотная «таблетка» (стекло только у шапки), кнопки 40 px вплотную, между группами 8 px.
  */
 .map-controls {
   position: fixed;
-  top: calc(var(--shell-top) + var(--shell-inset)); /* под шапкой с отступом каркаса */
-  right: calc(12px + var(--safe-right, 0px));
-  bottom: calc(36px + var(--safe-bottom, 0px)); /* над строкой атрибуции MapLibre */
-  z-index: 200;
+  top: calc(var(--shell-top) + var(--shell-inset));
+  right: calc(var(--shell-inset) + var(--safe-right, 0px));
+  bottom: calc(var(--shell-inset) + 24px + var(--safe-bottom, 0px)); /* над строкой атрибуции MapLibre */
+  z-index: var(--z-controls);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
+  gap: var(--shell-gap);
   pointer-events: none;
 }
+
 .map-controls > * {
   pointer-events: auto;
 }
 
-
-.search-wrapper {
-
-  display: flex;
-
-  justify-content: flex-end;
-
-}
-
-
-.search-panel-expanded {
-
-  width: min(420px, calc(100vw - 24px));
-
-  background: rgba(var(--v-theme-surface), 0.96);
-
-  backdrop-filter: blur(10px);
-
-  animation: expandSearch 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
-}
-
-
-@keyframes expandSearch {
-
-  from { opacity: 0; transform: scale(0.9); }
-
-  to { opacity: 1; transform: scale(1); }
-
-}
-
-
-.search-results-wrapper {
-
-  max-height: 360px;
-
-  overflow: hidden;
-
-}
-
-
-.search-results {
-
-  max-height: 360px;
-
-  overflow-y: auto;
-
-}
-
-
-.search-result-item {
-
-  cursor: pointer;
-
-  border-left: 3px solid transparent;
-
-  margin: 4px 8px;
-
-  border-radius: 8px;
-
-  padding: 8px !important;
-
-  transition: all 0.2s;
-
-}
-
-
-.search-result-item:hover {
-
-  background: rgba(33, 150, 243, 0.08);
-
-  border-left-color: #2196F3;
-
-}
-
-
-.control-buttons {
+.control-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  flex: none;
+  padding: 2px;
+}
+
+.map-controls > .control-group {
   flex: 0 1 auto;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  /* место под тень и увеличение при наведении, иначе их обрежет overflow */
-  padding: 4px 6px;
-  margin: -4px -6px;
 }
-.control-buttons-bottom {
+
+.control-bottom {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: flex-end;
+  gap: var(--shell-gap);
   flex: none;
   margin-top: auto;
 }
 
-
-.control-btn {
-
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-
-}
-/* --- Меню «Журналы, реестры и отчёты» --- */
-.tools-menu-card {
-  width: min(420px, calc(100vw - 32px));
-  overflow: hidden;
+/* Кнопка-иконка: прозрачная, нейтральная иконка, ховер подложкой; активный режим — подложка выбора и синий */
+.control-group .control-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
 }
 
-.tools-menu-header {
-  display: flex;
-  align-items: center;
+.control-group .control-btn:hover {
+  background: var(--surface-hover);
 }
 
-.tools-menu-search :deep(.v-field) {
-  border-radius: 8px;
+.control-group .control-btn--active,
+.control-group .control-btn--active:hover {
+  background: var(--surface-selected);
+  color: rgb(var(--v-theme-primary));
 }
 
-.tools-menu-body {
-  max-height: min(60vh, 520px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.tools-group-title {
-  display: flex;
-  align-items: center;
-  color: rgb(var(--v-theme-on-surface));
-  opacity: 0.72;
-}
-
-.tools-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.tool-tile {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: transparent;
-  border: 1px solid transparent;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.tool-tile:hover,
-.tool-tile:focus-visible {
-  background: rgba(var(--v-theme-primary), 0.08);
-  border-color: rgba(var(--v-theme-primary), 0.24);
-  outline: none;
-}
-
-.tool-tile__label {
+.control-group .control-btn--text {
   font-size: 13px;
-  line-height: 1.25;
-  color: rgb(var(--v-theme-on-surface));
+  font-weight: 600;
 }
 
-@media (max-width: 600px) {
-  .tools-grid {
-    grid-template-columns: 1fr;
+/* Тач-экран: зона 44 px (закон Фиттса) */
+@media (pointer: coarse) {
+  .control-group .control-btn {
+    width: 44px;
+    height: 44px;
   }
 }
 
-
-.control-btn:hover {
-
-  transform: scale(1.08);
-
+/* Низкое окно (телефон боком): вид и зум — в ряд, иначе на режимы сверху не остаётся высоты */
+@media (max-height: 560px) {
+  .control-bottom {
+    flex-direction: row-reverse;
+    align-items: flex-end;
+  }
 }
-
-
-.control-btn:active {
-
-  transform: scale(0.95);
-
-}
-
-
-/* Белая иконка когда кнопка "информация" активна (primary фон) */
-
-.control-btn.identify-active :deep(svg),
-
-.control-btn.identify-active :deep(path) {
-
-  fill: white;
-
-  color: white;
-
-}
-
 
 .layer-menu {
-
   min-width: 220px;
-
 }
-
-
-.active-layer {
-
-  background: rgba(33, 150, 243, 0.08);
-
-  border-left: 3px solid #2196F3;
-
-}
-
 </style>
-
-

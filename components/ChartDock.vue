@@ -178,13 +178,13 @@ const { isMobile } = useMobile()
 const ui = useUiStore()
 const sheetSnap = ref<SheetSnap>('half')
 
-/** Справа — колонка контролов карты (56 px + отступы) и открытая панель карточки */
-const CONTROLS_GUTTER_PX = 84
-/** Отступ слева — от края карты или от открытой панели слоёв */
-const DOCK_SIDE_GAP_PX = 16
+/** Ширины открытых панелей по краям — в CSS-переменные; отступы каркаса добавляет стиль (.chart-dock--desktop):
+ *  справа — колонка контролов (--controls-w), слева — --shell-inset */
 const dockStyle = computed(() => ({
-  right: `${ui.rightInset + CONTROLS_GUTTER_PX}px`,
-  left: `${ui.leftInset + DOCK_SIDE_GAP_PX}px`,
+  '--dock-right': `${ui.rightInset}px`,
+  // открытая карточка справа закрывает колонку контролов — отступ от неё обычный, без ширины колонки
+  '--dock-right-gap': ui.rightInset ? 'var(--shell-inset)' : 'var(--controls-w)',
+  '--dock-left': `${ui.leftInset}px`,
   '--chart-dock-height': props.height
 }))
 
@@ -227,15 +227,16 @@ watch(() => props.modelValue, (open) => {
 
 <style scoped>
 .chart-dock { display: flex; flex-direction: column; min-height: 0; }
+/* Плавающая карточка внизу между панелями: на линиях каркаса, контур — первый слой тени (этап 10е) */
 .chart-dock--desktop {
   position: fixed;
-  left: var(--space-4, 16px);
-  bottom: calc(var(--space-3, 12px) + var(--safe-bottom, 0px));
+  left: calc(var(--dock-left, 0px) + var(--shell-inset));
+  right: calc(var(--dock-right, 0px) + var(--dock-right-gap, var(--controls-w)));
+  bottom: calc(var(--shell-inset) + var(--safe-bottom, 0px));
   z-index: var(--z-toolbar);
-  border-radius: var(--radius-3, 12px);
+  border-radius: var(--radius-md);
   background: rgb(var(--v-theme-surface));
   box-shadow: var(--shadow-3);
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
   overflow: hidden;
   transition: box-shadow var(--duration-2, 200ms) var(--ease-out, ease-out);
 }

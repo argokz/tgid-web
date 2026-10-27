@@ -46,7 +46,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
 import { clampFloat, clampPanelWidth, useObjectCardLayout, type ObjectCardLayout } from '~/composables/useObjectCardLayout';
-import { shellTopPx } from '~/utils/shellMetrics';
+import { readCssPx, shellTopPx } from '~/utils/shellMetrics';
 import { useUiStore } from '~/stores/uiStore';
 import { useFloatingDrag } from '~/composables/useFloatingDrag';
 import type { PanelPos } from '~/utils/floatingPanel';
@@ -64,8 +64,10 @@ const layout = useObjectCardLayout();
 const ui = useUiStore();
 const root = ref<HTMLElement | null>(null);
 const resizing = ref(false);
-// top — высота шапки (--shell-top): плавающее окно держится ниже неё
-const viewport = ref({ w: 1280, h: 800, top: 0 });
+/** Отступ плавающей панели от краёв (--shell-inset) до чтения CSS */
+const SHELL_INSET_FALLBACK_PX = 12;
+// top — высота шапки (--shell-top): плавающее окно держится ниже неё; inset — отступ панели от края
+const viewport = ref({ w: 1280, h: 800, top: 0, inset: SHELL_INSET_FALLBACK_PX });
 /** Положение нижнего листа; каждое открытие — с половины экрана */
 const sheetSnap = ref<SheetSnap>('half');
 /**
@@ -85,17 +87,22 @@ watch(() => props.mobile, (mobile) => {
 // Окно браузера уменьшили — карточка показывается в его пределах (shellStyle), а сохранённое размещение не
 // переписывается: раньше временное сужение окна навсегда ужимало окно карточки до 320×240 в углу
 const updateViewport = () => {
-  viewport.value = { w: window.innerWidth, h: window.innerHeight, top: shellTopPx() };
+  viewport.value = {
+    w: window.innerWidth,
+    h: window.innerHeight,
+    top: shellTopPx(),
+    inset: readCssPx('--shell-inset', SHELL_INSET_FALLBACK_PX),
+  };
 };
 
 onMounted(() => {
   updateViewport();
   window.addEventListener('resize', updateViewport);
 });
-// Ширина панели справа — в менеджер панелей: полосы над картой центрируются по видимой части карты
+// Ширина панели справа с отступом от края — в менеджер панелей: полосы над картой центрируются по видимой части
 watchEffect(() => {
   ui.setRightInset(props.modelValue && !sheet.value && layout.mode === 'panel'
-    ? clampPanelWidth(layout.panelWidth, viewport.value.w)
+    ? clampPanelWidth(layout.panelWidth, viewport.value.w) + viewport.value.inset
     : 0);
 });
 // Карточка — панель менеджера (docs/ui-zones.md): на телефоне вытесняет «Инструменты» и «Измерения».
@@ -210,16 +217,18 @@ const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
   display: flex;
   flex-direction: column;
   background: rgb(var(--v-theme-surface));
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-3);
 }
+/* Панель — плавающая карточка на линиях каркаса, как панель слоёв слева (этап 10е) */
 .oc-shell--panel {
-  top: var(--shell-top);
-  right: 0;
-  bottom: 0;
-  border-left: 1px solid rgba(0, 0, 0, 0.1);
+  top: calc(var(--shell-top) + var(--shell-inset));
+  right: calc(var(--shell-inset) + var(--safe-right, 0px));
+  bottom: calc(var(--shell-inset) + var(--safe-bottom, 0px));
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 .oc-shell--float {
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 .oc-shell--dragging {
@@ -239,7 +248,7 @@ const startResize = (e: PointerEvent, what: 'panel' | 'float') => {
   touch-action: none;
 }
 .oc-resize--left {
-  left: -3px;
+  left: 0; /* внутри карточки: overflow: hidden обрезал бы ручку за краем */
   top: 0;
   bottom: 0;
   width: 6px;

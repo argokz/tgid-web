@@ -27,8 +27,8 @@ const layerStore = useLayerStore();
 .pts-highlight-bar {
   position: absolute;
   /* справа, у кнопок карты: слева её закрывает боковая панель */
-  top: 12px;
-  right: 68px;
+  top: var(--shell-inset);
+  right: var(--controls-w);
   z-index: var(--z-hud);
   max-width: min(480px, calc(100% - 140px));
 }

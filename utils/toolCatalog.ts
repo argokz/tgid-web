@@ -47,6 +47,7 @@ export type ToolEvent =
   | 'open-print-layout'
   | 'open-network-import'
   | 'open-fragment-transfer'
+  | 'open-node-search'
 
 /** Ключ диалога инструмента: MapViewer монтирует диалог лениво при первом открытии */
 export type ToolDialogKey =
@@ -90,6 +91,7 @@ export type ToolDialogKey =
   | 'printLayout'
   | 'networkImport'
   | 'fragmentTransfer'
+  | 'nodeSearch'
 
 export interface ToolDescriptor {
   label: string
@@ -136,6 +138,8 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     icon: 'mdi-pipe-valve',
     color: 'blue-grey-darken-3',
     items: [
+      // окно поиска с фильтрами и поиском фразой; быстрый поиск узла по номеру — в палитре Ctrl+K (этап 10е)
+      { label: 'Поиск узлов', hint: 'По номеру, названию, типу или фразой; переход к узлу на карте', icon: 'mdi-map-search', color: 'blue-grey-darken-3', event: 'open-node-search', dialog: 'nodeSearch' },
       { label: 'Насосное оборудование', hint: 'Агрегаты и характеристики H(Q)', icon: 'mdi-pump', color: 'blue-grey-darken-3', event: 'open-pump-equipment', dialog: 'pumpEquipment' },
       { label: 'Запорная арматура', hint: 'Задвижки и каталог типоразмеров', icon: 'mdi-valve', color: 'deep-purple-darken-3', event: 'open-network-armatures', dialog: 'networkArmature' },
       { label: 'Сетевые регуляторы', hint: 'Давления, расхода, перепада', icon: 'mdi-tune-vertical', color: 'indigo-darken-3', event: 'open-network-regulators', dialog: 'networkRegulator' },

@@ -1,9 +1,11 @@
 <template>
   <client-only>
     <div class="map-viewer-root">
+      <!-- --map-left-inset: правый край открытой карточки слоёв — нижний левый угол MapLibre (масштаб) правее неё -->
       <div
         ref="mapContainerEl"
         class="map-container"
+        :style="{ '--map-left-inset': `${uiStore.leftInset}px` }"
       >
         <!-- 2D Map (MapLibre) -->
         <div
@@ -136,7 +138,6 @@
           v-model:isEditTopologyMode="isEditTopologyMode"
           @layer-change="onBaseLayerChange"
           @identify-mode-change="onIdentifyModeChange"
-          @open-node-search="openLazyDialog('nodeSearch')"
           @toggle-trace-mode="toggleTraceMode"
           @toggle-edit-topology-mode="toggleEditTopologyMode"
         />
@@ -155,6 +156,7 @@
             <component
               :is="dialog.component"
               :ref="dialogRef(dialog.key)"
+              v-bind="dialog.props?.() ?? {}"
               v-on="dialog.on ?? {}"
             />
           </LazyDialogBoundary>
@@ -192,18 +194,6 @@
             @open-wear-index="openLazyDialog('wearIndex', $event)"
             @open-data-quality="openLazyDialog('dataQuality', $event)"
             @open-audit-history="openLazyDialog('auditHistory', $event)"
-          />
-        </LazyDialogBoundary>
-
-        <!-- Node search dialog -->
-        <LazyDialogBoundary
-          v-if="mountedDialogs.nodeSearch"
-          :ref="boundaryRef('nodeSearch')"
-          name="Поиск узлов"
-        >
-          <LazyNodeSearch
-            :ref="dialogRef('nodeSearch')"
-            :map="mapStore.map"
           />
         </LazyDialogBoundary>
 
@@ -735,7 +725,7 @@ let stopPendingPanelShow: (() => void) | null = null;
  * Ключи диалогов инструментов объявлены в utils/toolCatalog.ts,
  * компоненты и обработчики их событий — в таблице toolDialogs ниже.
  */
-type LazyDialogKey = ToolDialogKey | 'nodeSearch';
+type LazyDialogKey = ToolDialogKey;
 
 type LazyDialogInstance = { openDialog: (scope?: any) => void };
 
@@ -1428,6 +1418,8 @@ const journalContourLayer = useJournalContourLayer(() => mapStore.map, {
 interface ToolDialogEntry {
   key: ToolDialogKey;
   component: Component;
+  /** Пропсы диалога (вычисляются при рендере): карта для поиска узлов */
+  props?: () => Record<string, unknown>;
   on?: Record<string, (...args: any[]) => void>;
 }
 const LAZY_CHUNK_RETRIES = 2;
@@ -1444,6 +1436,7 @@ const dialogLabel = (key: ToolDialogKey) => ALL_TOOLS.find((tool) => tool.dialog
 const openDefect = (defectId: unknown) => openLazyDialog('defect', { defectId });
 
 const toolDialogs: ToolDialogEntry[] = [
+  { key: 'nodeSearch', component: lazyDialog(() => import('./NodeSearch.vue')), props: () => ({ map: mapStore.map }) },
   { key: 'passport', component: lazyDialog(() => import('./PassportDialog.vue')) },
   { key: 'defect', component: lazyDialog(() => import('./DefectJournalDialog.vue')), on: { locateDefect: locate.defect } },
   { key: 'shurf', component: lazyDialog(() => import('./ShurfJournalDialog.vue')), on: { locateShurf: locate.shurf, openDefect } },
@@ -1692,10 +1685,10 @@ watch(
 </script>
 
 <style lang="scss" scoped>
-/* Панель построения маршрута пьезометра */
+/* Панель построения маршрута пьезометра: сверху по центру, на верхней линии каркаса (контейнер карты — под шапкой) */
 .trace-panel {
   position: absolute;
-  top: 16px;
+  top: var(--shell-inset);
   left: 50%;
   transform: translateX(-50%);
   z-index: 5;
@@ -1715,8 +1708,7 @@ watch(
 
 @media (max-width: 600px) {
   .trace-panel {
-    top: 8px;
-    width: calc(100vw - 16px);
+    width: calc(100vw - 2 * var(--shell-inset));
   }
 }
 
@@ -1775,10 +1767,11 @@ watch(
   z-index: 10;
 }
 
+/* Загрузка и ошибка карты — левее колонки контролов, на верхней линии каркаса */
 .map-loading-card {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: var(--shell-inset);
+  right: var(--controls-w);
   z-index: 20;
   min-width: auto;
   max-width: 200px;
@@ -1786,8 +1779,8 @@ watch(
 
 .map-error-alert {
   position: absolute;
-  top: calc(var(--shell-inset) + 56px); /* под первой кнопкой правой колонки */
-  right: 12px;
+  top: calc(var(--shell-inset) + 56px); /* ниже карточки загрузки и полосы ПТС на той же линии */
+  right: var(--controls-w);
   z-index: 20;
   max-width: 420px;
 }

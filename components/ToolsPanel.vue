@@ -7,13 +7,8 @@
     class="tools-panel"
     aria-label="Панель инструментов"
   >
-    <div class="tools-panel__header px-4 py-3">
-      <v-icon
-        size="20"
-        color="primary"
-        class="me-2"
-      >mdi-toolbox-outline</v-icon>
-      <span class="text-subtitle-1 font-weight-bold">Инструменты</span>
+    <div class="tools-panel__header">
+      <span class="tools-panel__title">Инструменты</span>
       <v-spacer />
       <HintTip
         text="Закрыть панель инструментов"
@@ -33,9 +28,7 @@
       </HintTip>
     </div>
 
-    <v-divider />
-
-    <div class="px-3 py-2">
+    <div class="px-3 pb-2">
       <v-text-field
         v-model="search"
         density="compact"
@@ -59,7 +52,6 @@
         <div class="tools-panel__group-title px-4 pt-3 pb-1">
           <v-icon
             size="14"
-            :color="group.color"
             class="me-1"
           >{{ group.icon }}</v-icon>
           <span class="section-label">{{ group.title }}</span>
@@ -79,16 +71,10 @@
             @click="runTool(tool)"
           >
             <template #prepend>
-              <v-avatar
-                size="32"
-                :color="`${tool.color}`"
-                variant="tonal"
-              >
-                <v-icon
-                  size="18"
-                  :color="tool.color"
-                >{{ tool.icon }}</v-icon>
-              </v-avatar>
+              <!-- нейтральная иконка: цвет — только у главного действия и выбранного (60–30–10, этап 10е) -->
+              <span class="tools-panel__icon">
+                <v-icon size="18">{{ tool.icon }}</v-icon>
+              </span>
             </template>
             <v-list-item-title class="text-body-2">{{ tool.label }}</v-list-item-title>
             <v-list-item-subtitle
@@ -160,21 +146,67 @@ const runTool = (tool: ToolDescriptor) => {
 </script>
 
 <style scoped>
+/* На десктопе — плавающая карточка на линиях каркаса, как панели слоёв и карточки (этап 10е). Положение и
+   высоту drawer'а Vuetify пишет inline-стилем, поэтому !important */
+@media (min-width: 960px) {
+  .tools-panel.v-navigation-drawer {
+    top: calc(var(--shell-top) + var(--shell-inset)) !important;
+    right: calc(var(--shell-inset) + var(--safe-right, 0px)) !important;
+    height: calc(100% - var(--shell-top) - 2 * var(--shell-inset) - var(--safe-bottom, 0px)) !important;
+    border: none;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-3);
+    overflow: hidden;
+  }
+
+  /* Закрытую панель Vuetify сдвигает на её ширину — с отступом от края у экрана оставалась полоска с тенью */
+  .tools-panel.v-navigation-drawer:not(.v-navigation-drawer--active) {
+    transform: translateX(calc(100% + var(--shell-inset) + var(--safe-right, 0px) + 24px)) !important;
+  }
+}
+
+.tools-panel :deep(.v-navigation-drawer__content) {
+  display: flex;
+  flex-direction: column;
+}
+
 .tools-panel__header {
   display: flex;
   align-items: center;
+  padding: var(--space-3) var(--space-2) var(--space-2) var(--space-4);
+}
+
+.tools-panel__title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  line-height: 24px;
+  color: var(--text-strong);
 }
 
 .tools-panel__body {
-  height: calc(100% - 120px);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .tools-panel__group-title {
   display: flex;
   align-items: center;
-  opacity: 0.75;
+  color: var(--text-muted);
+}
+
+.tools-panel__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-inline-end: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-hover);
+  color: var(--text-muted);
 }
 
 .tools-panel__item {
@@ -182,6 +214,6 @@ const runTool = (tool: ToolDescriptor) => {
 }
 
 .tools-panel__item:hover {
-  background: rgba(var(--v-theme-primary), 0.06);
+  background: var(--surface-hover);
 }
 </style>
