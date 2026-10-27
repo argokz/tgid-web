@@ -1,0 +1,119 @@
+{
+ "base": "http://localhost:3042/",
+ "center": [
+  71.43,
+  51.13
+ ],
+ "at": "2026-10-27T12:29:54.162Z",
+ "zooms": {
+  "11": {
+   "idleMs": 1041,
+   "requests": 13,
+   "kib": 158,
+   "sources": {
+    "maptiler tiles/v4": {
+     "n": 12,
+     "kib": 113,
+     "p50": 156,
+     "max": 219,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    },
+    "maptiler fonts/Open Sans Regular,Arial Unicode MS Regular": {
+     "n": 1,
+     "kib": 45,
+     "p50": 191,
+     "max": 191,
+     "gwcHit": 0,
+     "cacheControl": "",
+     "encoding": "br"
+    }
+   }
+  },
+  "13": {
+   "idleMs": 1315,
+   "requests": 18,
+   "kib": 466,
+   "sources": {
+    "maptiler tiles/v4": {
+     "n": 9,
+     "kib": 326,
+     "p50": 248,
+     "max": 305,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    },
+    "maptiler tiles/buildings": {
+     "n": 9,
+     "kib": 140,
+     "p50": 297,
+     "max": 327,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    }
+   }
+  },
+  "15": {
+   "idleMs": 1342,
+   "requests": 19,
+   "kib": 370,
+   "sources": {
+    "maptiler tiles/v4": {
+     "n": 8,
+     "kib": 168,
+     "p50": 137,
+     "max": 145,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    },
+    "maptiler tiles/buildings": {
+     "n": 8,
+     "kib": 36,
+     "p50": 253,
+     "max": 750,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    },
+    "maptiler fonts/Open Sans Semibold,Arial Unicode MS Regular": {
+     "n": 3,
+     "kib": 166,
+     "p50": 141,
+     "max": 169,
+     "gwcHit": 0,
+     "cacheControl": "",
+     "encoding": "br"
+    }
+   }
+  },
+  "17": {
+   "idleMs": 711,
+   "requests": 8,
+   "kib": 0,
+   "sources": {
+    "maptiler tiles/v4": {
+     "n": 4,
+     "kib": 0,
+     "p50": 18,
+     "max": 31,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    },
+    "maptiler tiles/buildings": {
+     "n": 4,
+     "kib": 0,
+     "p50": 30,
+     "max": 32,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    }
+   }
+  }
+ }
+}

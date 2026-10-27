@@ -1,0 +1,272 @@
+{
+ "base": "http://localhost:3040/",
+ "center": [
+  76.93,
+  43.24
+ ],
+ "at": "2026-10-27T12:29:00.814Z",
+ "zooms": {
+  "11": {
+   "idleMs": 1657,
+   "requests": 79,
+   "kib": 3742,
+   "sources": {
+    "wms AlmatyGIS:zdaniya_tu": {
+     "n": 28,
+     "kib": 261,
+     "p50": 84,
+     "max": 194,
+     "gwcHit": 0,
+     "cacheControl": "",
+     "encoding": ""
+    },
+    "gwc AlmatyGIS:heatpipesections": {
+     "n": 12,
+     "kib": 198,
+     "p50": 150,
+     "max": 159,
+     "gwcHit": 12,
+     "cacheControl": "no-cache, no-store, must-revalidate",
+     "encoding": ""
+    },
+    "maptiler tiles/v4": {
+     "n": 12,
+     "kib": 380,
+     "p50": 307,
+     "max": 332,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    },
+    "gwc AlmatyGIS:zdaniya_2": {
+     "n": 12,
+     "kib": 2736,
+     "p50": 156,
+     "max": 450,
+     "gwcHit": 12,
+     "cacheControl": "no-cache, no-store, must-revalidate",
+     "encoding": ""
+    },
+    "gwc AlmatyGIS:uzel": {
+     "n": 12,
+     "kib": 3,
+     "p50": 172,
+     "max": 187,
+     "gwcHit": 12,
+     "cacheControl": "no-cache, no-store, must-revalidate",
+     "encoding": ""
+    },
+    "maptiler fonts/Open Sans Semibold,Arial Unicode MS Regular": {
+     "n": 2,
+     "kib": 121,
+     "p50": 142,
+     "max": 142,
+     "gwcHit": 0,
+     "cacheControl": "",
+     "encoding": "br"
+    },
+    "maptiler fonts/Open Sans Regular,Arial Unicode MS Regular": {
+     "n": 1,
+     "kib": 45,
+     "p50": 198,
+     "max": 198,
+     "gwcHit": 0,
+     "cacheControl": "",
+     "encoding": "br"
+    }
+   }
+  },
+  "13": {
+   "idleMs": 2332,
+   "requests": 69,
+   "kib": 3467,
+   "sources": {
+    "wms AlmatyGIS:zdaniya_tu": {
+     "n": 24,
+     "kib": 607,
+     "p50": 112,
+     "max": 171,
+     "gwcHit": 0,
+     "cacheControl": "",
+     "encoding": ""
+    },
+    "gwc AlmatyGIS:zdaniya_2": {
+     "n": 9,
+     "kib": 1726,
+     "p50": 125,
+     "max": 157,
+     "gwcHit": 9,
+     "cacheControl": "no-cache, no-store, must-revalidate",
+     "encoding": ""
+    },
+    "maptiler tiles/buildings": {
+     "n": 9,
+     "kib": 332,
+     "p50": 328,
+     "max": 414,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    },
+    "maptiler tiles/v4": {
+     "n": 9,
+     "kib": 604,
+     "p50": 186,
+     "max": 215,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    },
+    "gwc AlmatyGIS:heatpipesections": {
+     "n": 9,
+     "kib": 195,
+     "p50": 91,
+     "max": 115,
+     "gwcHit": 9,
+     "cacheControl": "no-cache, no-store, must-revalidate",
+     "encoding": ""
+    },
+    "gwc AlmatyGIS:uzel": {
+     "n": 9,
+     "kib": 4,
+     "p50": 122,
+     "max": 125,
+     "gwcHit": 9,
+     "cacheControl": "no-cache, no-store, must-revalidate",
+     "encoding": ""
+    }
+   }
+  },
+  "15": {
+   "idleMs": 2636,
+   "requests": 90,
+   "kib": 1535,
+   "sources": {
+    "wms AlmatyGIS:zdaniya_tu": {
+     "n": 28,
+     "kib": 445,
+     "p50": 85,
+     "max": 155,
+     "gwcHit": 0,
+     "cacheControl": "",
+     "encoding": ""
+    },
+    "gwc AlmatyGIS:heatpipesections": {
+     "n": 12,
+     "kib": 56,
+     "p50": 62,
+     "max": 92,
+     "gwcHit": 12,
+     "cacheControl": "no-cache, no-store, must-revalidate",
+     "encoding": ""
+    },
+    "gwc AlmatyGIS:zdaniya_2": {
+     "n": 12,
+     "kib": 345,
+     "p50": 144,
+     "max": 159,
+     "gwcHit": 12,
+     "cacheControl": "no-cache, no-store, must-revalidate",
+     "encoding": ""
+    },
+    "maptiler tiles/v4": {
+     "n": 12,
+     "kib": 418,
+     "p50": 318,
+     "max": 656,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    },
+    "maptiler tiles/buildings": {
+     "n": 12,
+     "kib": 129,
+     "p50": 218,
+     "max": 363,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    },
+    "gwc AlmatyGIS:uzel": {
+     "n": 12,
+     "kib": 34,
+     "p50": 164,
+     "max": 173,
+     "gwcHit": 12,
+     "cacheControl": "no-cache, no-store, must-revalidate",
+     "encoding": ""
+    },
+    "maptiler fonts/Open Sans Semibold,Arial Unicode MS Regular": {
+     "n": 2,
+     "kib": 107,
+     "p50": 167,
+     "max": 167,
+     "gwcHit": 0,
+     "cacheControl": "",
+     "encoding": "br"
+    }
+   }
+  },
+  "17": {
+   "idleMs": 1410,
+   "requests": 68,
+   "kib": 176,
+   "sources": {
+    "wms AlmatyGIS:zdaniya_tu": {
+     "n": 28,
+     "kib": 133,
+     "p50": 164,
+     "max": 315,
+     "gwcHit": 0,
+     "cacheControl": "",
+     "encoding": ""
+    },
+    "maptiler tiles/v4": {
+     "n": 2,
+     "kib": 0,
+     "p50": 94,
+     "max": 94,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    },
+    "maptiler tiles/buildings": {
+     "n": 2,
+     "kib": 0,
+     "p50": 90,
+     "max": 90,
+     "gwcHit": 0,
+     "cacheControl": "public, max-age=14400",
+     "encoding": "gzip"
+    },
+    "gwc AlmatyGIS:heatpipesections": {
+     "n": 12,
+     "kib": 6,
+     "p50": 154,
+     "max": 245,
+     "gwcHit": 12,
+     "cacheControl": "no-cache, no-store, must-revalidate",
+     "encoding": ""
+    },
+    "gwc AlmatyGIS:zdaniya_2": {
+     "n": 12,
+     "kib": 34,
+     "p50": 321,
+     "max": 383,
+     "gwcHit": 12,
+     "cacheControl": "no-cache, no-store, must-revalidate",
+     "encoding": ""
+    },
+    "gwc AlmatyGIS:uzel": {
+     "n": 12,
+     "kib": 4,
+     "p50": 423,
+     "max": 432,
+     "gwcHit": 12,
+     "cacheControl": "no-cache, no-store, must-revalidate",
+     "encoding": ""
+    }
+   }
+  }
+ }
+}
