@@ -50,8 +50,9 @@ export class MapScaleControl implements IControl {
     const map = this.map
     const el = this.container
     if (!map || !el) return
-    // расстояние по горизонтали через середину видимой высоты — как у встроенной линейки
-    const y = map.getContainer().clientHeight / 2
+    // расстояние по горизонтали через середину высоты — как у встроенной линейки. Высота — из буфера холста,
+    // а не clientHeight: чтение вёрстки в moveend форсировало пересчёт стилей всего документа (замер S1)
+    const y = map.getCanvas().height / map.getPixelRatio() / 2
     const left = map.unproject([0, y])
     const right = map.unproject([this.maxWidth, y])
     const bar = scaleBar(left.distanceTo(right), this.maxWidth)

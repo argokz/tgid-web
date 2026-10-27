@@ -24,7 +24,8 @@ describe('mapScaleControl', () => {
     const map = {
       on: vi.fn((ev: string, fn: () => void) => { handlers[ev] = fn; }),
       off: vi.fn(),
-      getContainer: () => ({ clientHeight: 800 }),
+      getCanvas: () => ({ height: 1600 }),
+      getPixelRatio: () => 2,
       // слева направо 100 px = 730 м
       unproject: ([x]: [number, number]) => ({ distanceTo: () => (x === 0 ? 730 : 0) }),
     };
