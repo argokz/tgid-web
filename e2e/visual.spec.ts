@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { test, expect, type Page } from '@playwright/test';
+import { FIRST_RUN_STORAGE_KEY, FIRST_RUN_VERSION } from '../utils/firstRunHints';
 
 const PINIA = "document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$pinia._s";
 
@@ -8,9 +9,9 @@ const PINIA = "document.querySelector('#__nuxt').__vue_app__.config.globalProper
  * фрагмент может не попасть, а холст карты всё равно замаскирован.
  */
 async function openShell(page: Page) {
-  await page.addInitScript(() => {
-    try { localStorage.setItem('firstRunHints', '1'); } catch { /* без хранилища подсказка просто покажется */ }
-  });
+  await page.addInitScript(([key, version]) => {
+    try { localStorage.setItem(key, version); } catch { /* без хранилища подсказка просто покажется */ }
+  }, [FIRST_RUN_STORAGE_KEY, FIRST_RUN_VERSION] as const);
   await page.goto('./', { waitUntil: 'load' });
   await expect(page.locator('canvas.maplibregl-canvas')).toBeVisible({ timeout: 90_000 });
   await expect.poll(() => page.evaluate(`${PINIA}.get('map').firstFrameShown === true`), { timeout: 90_000 }).toBe(true);

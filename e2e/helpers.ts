@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { FIRST_RUN_STORAGE_KEY, FIRST_RUN_VERSION } from '../utils/firstRunHints';
 
 export const FRAGMENT_ID = Number(process.env.E2E_FRAGMENT_ID || 74);
 
@@ -19,9 +20,9 @@ export async function mapEval<T, A = undefined>(page: Page, fn: string, arg?: A)
 /** Открыть карту и дождаться, пока участки сети отрисуются */
 export async function openMap(page: Page) {
   // подсказка первого запуска (FirstRunHints) в e2e не нужна — её проверяют unit-тесты
-  await page.addInitScript(() => {
-    try { localStorage.setItem('firstRunHints', '1'); } catch { /* хранилище недоступно — подсказка просто покажется */ }
-  });
+  await page.addInitScript(([key, version]) => {
+    try { localStorage.setItem(key, version); } catch { /* хранилище недоступно — подсказка просто покажется */ }
+  }, [FIRST_RUN_STORAGE_KEY, FIRST_RUN_VERSION] as const);
   await page.goto('./', { waitUntil: 'load' });
   await expect(page.locator('canvas.maplibregl-canvas')).toBeVisible({ timeout: 90_000 });
   await expect

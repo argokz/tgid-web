@@ -14,8 +14,8 @@ export interface FirstRunStep {
 }
 
 export const FIRST_RUN_STORAGE_KEY = 'firstRunHints';
-/** Версия набора шагов: новая — показать ещё раз тем, кто видел прежний */
-export const FIRST_RUN_VERSION = '1';
+/** Версия набора шагов: новая — показать ещё раз тем, кто видел прежний (2 — каркас этапа 10: углы, строка режимов) */
+export const FIRST_RUN_VERSION = '2';
 
 export const FIRST_RUN_STEPS: FirstRunStep[] = [
   {

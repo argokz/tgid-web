@@ -26,15 +26,22 @@
 | Группа | Токены | Значения |
 |---|---|---|
 | Отступы | `--space-1 … --space-6` | 4 / 8 / 12 / 16 / 24 px |
-| Радиусы | `--radius-sm / -md / -lg` | 6 / 10 / 14 px (поля и кнопки / карточки и поповеры / плавающие панели) |
-| Тени | `--shadow-1 / -2 / -3` | подсказка / панель / окно |
+| Радиусы | `--radius-sm / -md / -lg` | 6 / 8 / 12 px (поля и кнопки / плавающие карточки, группы кнопок, меню / окна, шторка) — этап 10, как у Felt |
+| Тени | `--shadow-1 / -2 / -3`, `--shadow-ink` | шапка / группы кнопок и меню / карточки и окна; многослойные, «чернильного» оттенка `rgb(24 39 75)`, первый слой — волосяной контур вместо границы |
+| Поверхности и текст | `--surface-hover / -pressed / -selected`, `--border-subtle`, `--text-strong / -muted / -faint` | ховер, нажатие, выбранное (primary 8 %); 17,7 / 7,7 / 5,9 : 1 на белом |
+| Каркас | `--shell-top`, `--shell-inset`, `--shell-gap`, `--controls-w`, `--toolbar-row`, `--modes-offset`, `--hud-top`, `--corner-btn` | линии плавающих элементов; значения и телефон — `docs/ui-zones.md` |
+| Связный текст | `--measure` | 65ch — подсказки, пустые состояния, протокол |
 | Z-слои | `--z-map 0 < --z-hud 100 < --z-controls 200 < --z-toolbar 300 < --z-inspector 1010 < --z-popover 2000 < --z-overlay 2400 (= Vuetify v-overlay) < --z-toast 10000 (= v-snackbar)` | свои оверлеи не выше `--z-overlay` |
 | Движение | `--duration-fast / -base / -slow`, `--ease-out`, `--ease-in`, `--ease-spring` | 120 / 200 / 280 мс |
 | Акцент | `--accent`, `--accent-rgb`, `--accent-text`, `--accent-soft` | `#D97706`, `217 119 6`, `#B45309`, 12 % |
 | Стекло | `--glass-1-bg / -filter`, `--glass-solid-bg / -filter`, `--glass-border` | см. выше |
 | Текст | `--text-xs … --text-xl`, `--leading` | 12 / 14 / 16 / 20 / 24, 1,45 |
 
-Брейкпоинты пока два источника (`useMobile` 768 / 1024 и `_variables.scss` 600 / 768 / 960) — сводятся в этапе 3.
+Брейкпоинты — один источник `utils/breakpoints.ts` (600 / 960 / 1280), см. `docs/ui-zones.md`.
+
+Правила кнопок и цвета этапа 10 (`docs/ui-felt-audit.md`): одна залитая синяя кнопка на область; `tonal` без цвета —
+второстепенное, `text` — третье, иконки нейтральные (синий только у активного или выбранного); `outlined` — полям и
+сегментам. Без капса и разрядки. Стекло — только у шапки; группы контролов и карточки — плотные (`GlassSurface level="solid"`).
 
 ## Примитивы
 
@@ -134,7 +141,13 @@
 
 `GlassSurface`: `level` (`1` — тулбары и поповеры с blur; `solid` — инспектор и формы без blur), `rounded`
 (`sm` / `md` / `lg` / `pill`), `padded`, `tag`. Всё оформление — из токенов `--glass-*`; на время движения карты
-корень карты получает `.map-moving`, и blur снимается у всех поверхностей уровня 1.
+корень карты получает `.map-moving`, и blur снимается у всех поверхностей уровня 1. Группы контролов карты
+(`MapControls`: строка режимов, «вид», зум) — `GlassSurface level="solid" rounded="md"`, кнопки 40 px (тач — 44)
+вплотную, активный режим — `--surface-selected` и `aria-pressed`. Режимы — независимые переключатели, поэтому не
+`FloatingToolbar` (тот моделирует один выбор).
+
+Масштабная линейка — `utils/mapScaleControl.ts` (`MapScaleControl`, IControl MapLibre): обновляется по `moveend`, без
+чтения вёрстки; встроенный `ScaleControl` писал в DOM на каждом кадре движения (замер S1, `performance-baseline.md`).
 
 `FloatingToolbar<T>`: `modelValue: T | null`, `items: { value: T, title, icon, hotkey?, hint?, disabled? }[]`, `mandatory` (true),
 `disabled`, `showActiveLabel` (подпись у активного), `tipLocation`, `ariaLabel`. Семантика `toolbar` + `aria-pressed`,

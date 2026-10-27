@@ -35,8 +35,8 @@ const MAP = `${PINIA}.get('map').map`;
 /* ---------- инструментирование страницы ---------- */
 const INIT_SCRIPT = `
 (() => {
-  // подсказка первого запуска (этап 8) не должна попадать в замеры
-  try { localStorage.setItem('firstRunHints', '1'); } catch {}
+  // подсказка первого запуска (этап 8) не должна попадать в замеры; версия — FIRST_RUN_VERSION (utils/firstRunHints.ts)
+  try { localStorage.setItem('firstRunHints', '2'); } catch {}
   const P = (window.__perf = { longTasks: [], frames: [], counters: {}, recording: false, rafId: 0, last: 0 });
   try {
     new PerformanceObserver((list) => {

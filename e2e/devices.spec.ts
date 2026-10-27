@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { fileURLToPath } from 'node:url';
 import { test, expect, type Page } from '@playwright/test';
+import { FIRST_RUN_STORAGE_KEY, FIRST_RUN_VERSION } from '../utils/firstRunHints';
 
 /**
  * Телефоны и планшеты (этап 9, раздел 14 плана): проекты iphone, ipad (WebKit, тач, DPR 2–3) и pixel (Chromium) в
@@ -16,9 +17,9 @@ const SHOT = {
 };
 
 async function openShell(page: Page) {
-  await page.addInitScript(() => {
-    try { localStorage.setItem('firstRunHints', '1'); } catch { /* без хранилища подсказка просто покажется */ }
-  });
+  await page.addInitScript(([key, version]) => {
+    try { localStorage.setItem(key, version); } catch { /* без хранилища подсказка просто покажется */ }
+  }, [FIRST_RUN_STORAGE_KEY, FIRST_RUN_VERSION] as const);
   await page.goto('./', { waitUntil: 'load' });
   await expect(page.locator('canvas.maplibregl-canvas')).toBeVisible({ timeout: 90_000 });
   await expect.poll(() => page.evaluate(`${PINIA}.get('map').firstFrameShown === true`), { timeout: 90_000 }).toBe(true);
