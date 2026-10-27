@@ -1,0 +1,211 @@
+{
+  "base": "http://127.0.0.1:3040/itwin-map/",
+  "cpu": 4,
+  "runs": 1,
+  "contextOff": [],
+  "css": "",
+  "date": "2026-10-27T02:55:25.022Z",
+  "results": [
+    {
+      "run": 1,
+      "name": "load",
+      "wallMs": 19800
+    },
+    {
+      "run": 1,
+      "name": "S1a панорамирование 10 с (карта + панель слоёв, как при открытии)",
+      "wallMs": 11537,
+      "ms": 11539,
+      "frames": 122,
+      "fps": 10.6,
+      "frameP50": 71.1,
+      "frameP95": 244.8,
+      "frameMax": 463.3,
+      "longTasks": 73,
+      "longTaskMs": 7942,
+      "longTaskMax": 357,
+      "counters": {
+        "map.setFilter": 45,
+        "map.setLayoutProperty": 0,
+        "map.setPaintProperty": 0,
+        "map.addLayer": 11,
+        "map.removeLayer": 1,
+        "map.addSource": 1,
+        "map.removeSource": 1,
+        "map.easeTo": 12,
+        "map.jumpTo": 0,
+        "map.flyTo": 0,
+        "map.setPadding": 0,
+        "map.resize": 0,
+        "map.triggerRepaint": 742,
+        "map.setFeatureState": 0,
+        "map.queryRenderedFeatures": 0,
+        "geojson.setData": 0,
+        "map.render": 123
+      },
+      "repaintStacks": [
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.<anonymous> (B6Z0M1oK.js:577:195084) < Rp.L.Map.fire (B6Z0M1oK.js:1:10302) < kn.fire (B6Z0M1oK.js:1:10606)",
+          143
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.<anonymous> (B6Z0M1oK.js:577:193806) < Rp.L.Map.fire (B6Z0M1oK.js:1:10302) < Rp.L.Map._fireMoveEvents (B6Z0M1oK.js:577:135096)",
+          120
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.<anonymous> (B6Z0M1oK.js:577:193877) < Rp.L.Map.fire (B6Z0M1oK.js:1:10302) < Rp.L.Map._fireMoveEvents (B6Z0M1oK.js:577:135140)",
+          116
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map._requestRenderFrame (B6Z0M1oK.js:577:211993) < Object._renderFrameCallback [as callback] (B6Z0M1oK.js:577:127113) < Xe.run (B6Z0M1oK.js:577:144048)",
+          109
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.moveLayer (B6Z0M1oK.js:577:208059) < Proxy.updateLayerOrder (obNPCjwU.js:14:22040) < Proxy.T (Bf699Go_.js:2:63245)",
+          88
+        ]
+      ],
+      "cdp": {
+        "recalcStyle": 153,
+        "recalcStyleMs": 340,
+        "layout": 152,
+        "layoutMs": 156,
+        "scriptMs": 262,
+        "taskMs": 11407,
+        "nodes": 8849,
+        "heapMb": "51.4"
+      }
+    },
+    {
+      "run": 1,
+      "name": "S1b панорамирование 10 с (только карта)",
+      "wallMs": 10263,
+      "ms": 10218,
+      "frames": 237,
+      "fps": 23.2,
+      "frameP50": 41.8,
+      "frameP95": 84.2,
+      "frameMax": 326.2,
+      "longTasks": 56,
+      "longTaskMs": 3802,
+      "longTaskMax": 282,
+      "counters": {
+        "map.setFilter": 0,
+        "map.setLayoutProperty": 0,
+        "map.setPaintProperty": 0,
+        "map.addLayer": 0,
+        "map.removeLayer": 0,
+        "map.addSource": 0,
+        "map.removeSource": 0,
+        "map.easeTo": 12,
+        "map.jumpTo": 0,
+        "map.flyTo": 0,
+        "map.setPadding": 0,
+        "map.resize": 0,
+        "map.triggerRepaint": 974,
+        "map.setFeatureState": 0,
+        "map.queryRenderedFeatures": 20,
+        "geojson.setData": 0,
+        "map.render": 237
+      },
+      "repaintStacks": [
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.<anonymous> (B6Z0M1oK.js:577:193806) < Rp.L.Map.fire (B6Z0M1oK.js:1:10302) < Rp.L.Map._fireMoveEvents (B6Z0M1oK.js:577:135096)",
+          237
+        ],
+        [
+          "Rp.L.Map._render (B6Z0M1oK.js:577:213888) < B6Z0M1oK.js:577:215280",
+          235
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map._requestRenderFrame (B6Z0M1oK.js:577:211993) < Object._renderFrameCallback [as callback] (B6Z0M1oK.js:577:127113) < Xe.run (B6Z0M1oK.js:577:144048)",
+          226
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.<anonymous> (B6Z0M1oK.js:577:193877) < Rp.L.Map.fire (B6Z0M1oK.js:1:10302) < Rp.L.Map._fireMoveEvents (B6Z0M1oK.js:577:135140)",
+          209
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.<anonymous> (B6Z0M1oK.js:577:195084) < Rp.L.Map.fire (B6Z0M1oK.js:1:10302) < kn.fire (B6Z0M1oK.js:1:10606)",
+          44
+        ]
+      ],
+      "cdp": {
+        "recalcStyle": 238,
+        "recalcStyleMs": 120,
+        "layout": 237,
+        "layoutMs": 256,
+        "scriptMs": 477,
+        "taskMs": 10100,
+        "nodes": 9388,
+        "heapMb": "67.1"
+      }
+    },
+    {
+      "run": 1,
+      "name": "S1c панорамирование 10 с (панель слоёв + журнал арматуры)",
+      "wallMs": 10428,
+      "ms": 10338,
+      "frames": 122,
+      "fps": 11.8,
+      "frameP50": 92,
+      "frameP95": 150,
+      "frameMax": 686.8,
+      "longTasks": 78,
+      "longTaskMs": 8709,
+      "longTaskMax": 681,
+      "counters": {
+        "map.setFilter": 0,
+        "map.setLayoutProperty": 0,
+        "map.setPaintProperty": 0,
+        "map.addLayer": 0,
+        "map.removeLayer": 0,
+        "map.addSource": 0,
+        "map.removeSource": 0,
+        "map.easeTo": 12,
+        "map.jumpTo": 0,
+        "map.flyTo": 0,
+        "map.setPadding": 0,
+        "map.resize": 0,
+        "map.triggerRepaint": 487,
+        "map.setFeatureState": 0,
+        "map.queryRenderedFeatures": 4,
+        "geojson.setData": 0,
+        "map.render": 122
+      },
+      "repaintStacks": [
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.<anonymous> (B6Z0M1oK.js:577:193806) < Rp.L.Map.fire (B6Z0M1oK.js:1:10302) < Rp.L.Map._fireMoveEvents (B6Z0M1oK.js:577:135096)",
+          122
+        ],
+        [
+          "Rp.L.Map._render (B6Z0M1oK.js:577:213888) < B6Z0M1oK.js:577:215280",
+          122
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map._requestRenderFrame (B6Z0M1oK.js:577:211993) < Object._renderFrameCallback [as callback] (B6Z0M1oK.js:577:127113) < Xe.run (B6Z0M1oK.js:577:144048)",
+          111
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map.<anonymous> (B6Z0M1oK.js:577:193877) < Rp.L.Map.fire (B6Z0M1oK.js:1:10302) < Rp.L.Map._fireMoveEvents (B6Z0M1oK.js:577:135140)",
+          107
+        ],
+        [
+          "Rp.L.Map._update (B6Z0M1oK.js:577:211930) < Rp.L.Map._requestRenderFrame (B6Z0M1oK.js:577:211993) < Rp.L.Map._ease (B6Z0M1oK.js:577:138428) < Rp.L.Map.easeTo (B6Z0M1oK.js:577:132433)",
+          12
+        ]
+      ],
+      "cdp": {
+        "recalcStyle": 124,
+        "recalcStyleMs": 759,
+        "layout": 123,
+        "layoutMs": 163,
+        "scriptMs": 68,
+        "taskMs": 10411,
+        "nodes": 18114,
+        "heapMb": "75.0"
+      }
+    }
+  ],
+  "consoleErrors": []
+}
