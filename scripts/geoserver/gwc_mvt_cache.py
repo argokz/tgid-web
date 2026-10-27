@@ -210,13 +210,32 @@ DISK_QUOTA_PATH = '/gwc/rest/diskquota.xml'
 DISK_QUOTA_BACKUP = 'diskquota.xml'
 
 
+def quota_for_put(xml: str) -> str:
+    """GET отдаёт квоту как <id>/<bytes>, а PUT принимает только <value>/<units> (иначе 500
+    «Expected element name to be 'value' but was id»): переводим все квоты в байты с единицей B"""
+    root = ET.fromstring(xml)
+    for quota in [root.find('globalQuota'), *root.iter('quota')]:
+        if quota is None or quota.find('bytes') is None:
+            continue
+        size = quota.findtext('bytes')
+        for el in list(quota):
+            quota.remove(el)
+        ET.SubElement(quota, 'value').text = size
+        ET.SubElement(quota, 'units').text = 'B'
+    return ET.tostring(root, encoding='unicode')
+
+
 def set_disk_quota(gwc: 'Gwc', gb: float, backup: Path | None, dry_run: bool):
     """Квота кеша GWC (все слои), вытеснение давно не запрошенных тайлов (LRU)"""
     before = gwc.req('GET', DISK_QUOTA_PATH).text
-    root = ET.fromstring(before)
+    root = ET.fromstring(quota_for_put(before))
     child(root, 'enabled').text = 'true'
     child(root, 'globalExpirationPolicyName').text = 'LRU'
-    child(child(root, 'globalQuota'), 'bytes').text = str(int(gb * 1024 ** 3))
+    quota = child(root, 'globalQuota')
+    for el in list(quota):
+        quota.remove(el)
+    ET.SubElement(quota, 'value').text = f'{gb:g}'
+    ET.SubElement(quota, 'units').text = 'GiB'
     after = ET.tostring(root, encoding='unicode')
     if dry_run:
         print(f'== квота GWC\n{after}\n')
@@ -465,7 +484,7 @@ def main() -> int:
         return 0
 
     if args.restore_disk_quota:
-        xml = (Path(args.restore_disk_quota) / DISK_QUOTA_BACKUP).read_text(encoding='utf-8')
+        xml = quota_for_put((Path(args.restore_disk_quota) / DISK_QUOTA_BACKUP).read_text(encoding='utf-8'))
         gwc.req('PUT', DISK_QUOTA_PATH, data=xml.encode('utf-8'), headers={'Content-Type': 'text/xml'})
         print('квота GWC: настройки из бэкапа')
         return 0
