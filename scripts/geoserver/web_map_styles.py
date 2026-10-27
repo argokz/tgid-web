@@ -18,6 +18,10 @@ GeoServer включает в векторный тайл только объе�
     python scripts/geoserver/web_map_styles.py --workspace AlmatyGIS_test --restore H:/tgid-backups/x
 
 --check — только показать, что будет сделано (слои, текущие стили), ничего не меняя.
+
+--slim-attributes — в векторный тайл зданий только нужные карте и «Подписям» поля (SLIM_ATTRIBUTES):
+служебные и дублирующие (shape_area, shape_leng, street2, house2, коды районов и схем) не нужны —
+карточка здания читает все поля по WFS из id_zdaniya_2. Бэкап хранит featuretype, откат его возвращает.
 """
 from __future__ import annotations
 
@@ -104,6 +108,38 @@ STYLES = {
     'zdaniya_tu': ('zdaniya_tu_web', zdaniya_tu_sld),
 }
 
+# Поля слоя, которые остаются в тайле: геометрия, ключ, фильтр стиля (otop), подпись (txt),
+# нагрузки и адрес — для вкладки «Подписи». Регистр имён — как в базе
+SLIM_ATTRIBUTES = {
+    'zdaniya_2': {'shape', 'objectid', 'otop', 'gvs', 'vent', 'par', 'nagr', 'txt',
+                  'floor', 'number_1', 'street_nam', 'year_of_fo', 'potrebitel'},
+}
+
+
+def ft_path(gs: Gs, ws: str, layer: str) -> str:
+    store = gs.get_xml(f'/rest/workspaces/{ws}/featuretypes/{layer}.xml').findtext('store/name').split(':')[-1]
+    return f'/rest/workspaces/{ws}/datastores/{store}/featuretypes/{layer}.xml'
+
+
+def slim_attributes(gs: Gs, ws: str, layer: str, keep: set[str], check: bool) -> list[str]:
+    """Оставить в featuretype только поля keep (геометрию — всегда). → список убранных полей"""
+    path = ft_path(gs, ws, layer)
+    ft = gs.get_xml(path)
+    attrs = ft.find('attributes')
+    if attrs is None or not attrs.findall('attribute'):
+        sys.exit(f'{ws}:{layer}: у featuretype нет списка атрибутов — урезать нечего, ничего не изменено')
+    removed = []
+    for a in list(attrs.findall('attribute')):
+        name = a.findtext('name') or ''
+        is_geometry = 'jts.geom' in (a.findtext('binding') or '')
+        if name.lower() not in keep and not is_geometry:
+            removed.append(name)
+            if not check:
+                attrs.remove(a)
+    if removed and not check:
+        gs.post_xml(path, ft, method='PUT')
+    return removed
+
 
 def bare(name: str | None) -> str:
     """REST отдаёт имя стиля с префиксом workspace"""
@@ -150,6 +186,11 @@ def backup(gs: Gs, ws: str, folder: str):
         manifest['layers'][layer] = {'default': default, 'styles': others}
         with open(os.path.join(folder, f'layer_{layer}.xml'), 'wb') as f:
             f.write(gs.req('GET', f'/rest/layers/{ws}:{layer}.xml').content)
+        if layer in SLIM_ATTRIBUTES:
+            path = ft_path(gs, ws, layer)
+            with open(os.path.join(folder, f'featuretype_{layer}.xml'), 'wb') as f:
+                f.write(gs.req('GET', path).content)
+            manifest['layers'][layer]['featuretype'] = path
     with open(os.path.join(folder, 'manifest.json'), 'w', encoding='utf-8') as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
     print(f'бэкап {ws}: {folder}')
@@ -162,6 +203,10 @@ def restore(gs: Gs, ws: str, folder: str):
     if manifest['workspace'] != ws:
         sys.exit(f'бэкап сделан для {manifest["workspace"]}, а не для {ws}')
     for layer, item in manifest['layers'].items():
+        if item.get('featuretype'):
+            with open(os.path.join(folder, f'featuretype_{layer}.xml'), encoding='utf-8') as f:
+                gs.post_xml(item['featuretype'], f.read(), method='PUT')
+            print(f'{ws}:{layer}: поля featuretype из бэкапа')
         put_layer_styles(gs, ws, layer, item['default'], item['styles'])
         truncate_gwc(gs, ws, layer)
         print(f'{ws}:{layer}: стиль по умолчанию {item["default"]} (из бэкапа), кеш GWC очищен')
@@ -198,15 +243,31 @@ def main():
     ap.add_argument('--backup-dir', help='Сохранить стили слоёв перед правкой (каталог)')
     ap.add_argument('--restore', metavar='DIR', help='Вернуть стили из каталога бэкапа и выйти')
     ap.add_argument('--check', action='store_true', help='Только показать, что будет сделано')
+    ap.add_argument('--slim-attributes', action='store_true',
+                    help='Оставить в тайлах зданий только нужные карте поля (SLIM_ATTRIBUTES)')
     args = ap.parse_args()
 
     gs = Gs(args.geoserver, os.environ.get('GEOSERVER_REST_USER', 'admin'), os.environ['GEOSERVER_REST_PASSWORD'])
+    ws = args.workspace
     if args.restore:
-        restore(gs, args.workspace, args.restore)
+        restore(gs, ws, args.restore)
+        gs.req('POST', '/rest/reset', ok=(200, 201))
         return
     if args.backup_dir and not args.check:
-        backup(gs, args.workspace, args.backup_dir)
-    apply(gs, args.workspace, args.check)
+        backup(gs, ws, args.backup_dir)
+    apply(gs, ws, args.check)
+    if not args.slim_attributes:
+        return
+    for layer, keep in SLIM_ATTRIBUTES.items():
+        if layer_styles(gs, ws, layer) is None:
+            continue
+        removed = slim_attributes(gs, ws, layer, keep, args.check)
+        verb = 'будут убраны' if args.check else 'убраны'
+        print(f'{ws}:{layer}: поля тайла {verb}: {", ".join(removed) or "—"}')
+        if removed and not args.check:
+            truncate_gwc(gs, ws, layer)
+    if not args.check:
+        gs.req('POST', '/rest/reset', ok=(200, 201))
 
 
 if __name__ == '__main__':

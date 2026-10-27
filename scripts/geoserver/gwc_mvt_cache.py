@@ -36,6 +36,16 @@ requested TILEMATRIXSET»), формат MVT, параметр VIEWPARAMS (фр�
 слоя), — пересчёт границ слоёв по данным без проверки (SQL view: экстент всего запроса):
 
     python scripts/geoserver/gwc_mvt_cache.py --recalc-bounds --layers ShaturaGIS:uzel,ShaturaGIS:heatpipesections         --backup-dir H:/tgid-backups/<дата>_gwc
+
+Срок жизни и квота (этап 11, docs/map-visual-audit.md). Адрес тайла версионирован (rev — версия данных
+из API: сумма счётчиков записей всех таблиц базы города, меняется и от правок десктопа), поэтому
+тайл одной версии не устаревает: --expire 0 — без перерисовки по таймеру. Старые версии копятся на
+диске (у участков Алматы на 27.10 — 390 наборов параметров), их вытесняет квота GWC (LRU):
+
+    python scripts/geoserver/gwc_mvt_cache.py --disk-quota-gb 20 --backup-dir H:/tgid-backups/<дата>_gwc
+    python scripts/geoserver/gwc_mvt_cache.py --restore-disk-quota H:/tgid-backups/<дата>_gwc
+
+Первое включение квоты GWC пересчитывает размер всего кеша — долго и с нагрузкой на диск.
 """
 from __future__ import annotations
 
@@ -147,6 +157,27 @@ def configure(xml: str, expire: int) -> str:
 
 def backup_name(layer: str) -> str:
     return layer.replace(':', '__') + '.xml'
+
+
+DISK_QUOTA_PATH = '/gwc/rest/diskquota.xml'
+DISK_QUOTA_BACKUP = 'diskquota.xml'
+
+
+def set_disk_quota(gwc: 'Gwc', gb: float, backup: Path | None, dry_run: bool):
+    """Квота кеша GWC (все слои), вытеснение давно не запрошенных тайлов (LRU)"""
+    before = gwc.req('GET', DISK_QUOTA_PATH).text
+    root = ET.fromstring(before)
+    child(root, 'enabled').text = 'true'
+    child(root, 'globalExpirationPolicyName').text = 'LRU'
+    child(child(root, 'globalQuota'), 'bytes').text = str(int(gb * 1024 ** 3))
+    after = ET.tostring(root, encoding='unicode')
+    if dry_run:
+        print(f'== квота GWC\n{after}\n')
+        return
+    if backup and not (backup / DISK_QUOTA_BACKUP).exists():
+        (backup / DISK_QUOTA_BACKUP).write_text(before, encoding='utf-8')
+    gwc.req('PUT', DISK_QUOTA_PATH, data=after.encode('utf-8'), headers={'Content-Type': 'text/xml'})
+    print(f'квота GWC: {gb:g} ГБ, вытеснение LRU')
 
 
 # Запас к границам (единицы системы координат слоя — метры): крайние объекты лежат ровно на границе,
@@ -362,10 +393,30 @@ def main() -> int:
                     help='пересчитать границы слоёв --layers по данным без проверки WFS (нужен --backup-dir)')
     ap.add_argument('--fix-bounds', action='store_true',
                     help='пересчитать границы слоёв, у которых есть объекты за ними (нужен --backup-dir)')
+    ap.add_argument('--disk-quota-gb', type=float,
+                    help='включить квоту кеша GWC (ГБ, LRU) и выйти (нужен --backup-dir)')
+    ap.add_argument('--restore-disk-quota', metavar='DIR', help='вернуть настройки квоты из бэкапа и выйти')
     args = ap.parse_args()
 
     gwc = Gwc(args.geoserver, os.environ.get('GEOSERVER_REST_USER', 'admin'), os.environ['GEOSERVER_REST_PASSWORD'])
     layers = [s.strip() for s in args.layers.split(',') if s.strip()]
+
+    if args.restore_disk_quota:
+        xml = (Path(args.restore_disk_quota) / DISK_QUOTA_BACKUP).read_text(encoding='utf-8')
+        gwc.req('PUT', DISK_QUOTA_PATH, data=xml.encode('utf-8'), headers={'Content-Type': 'text/xml'})
+        print('квота GWC: настройки из бэкапа')
+        return 0
+
+    if args.disk_quota_gb is not None:
+        if args.disk_quota_gb <= 0:
+            ap.error('--disk-quota-gb должен быть больше нуля')
+        if not args.dry_run and not args.backup_dir:
+            ap.error('для --disk-quota-gb нужен --backup-dir (или --dry-run)')
+        backup = Path(args.backup_dir) if args.backup_dir else None
+        if backup:
+            backup.mkdir(parents=True, exist_ok=True)
+        set_disk_quota(gwc, args.disk_quota_gb, backup, args.dry_run)
+        return 0
 
     if args.world_extent:
         if not args.dry_run and not args.backup_dir:
