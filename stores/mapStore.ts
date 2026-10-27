@@ -55,12 +55,11 @@ import {
 import { isMapMeasureActive } from '~/composables/useMapDraw';
 import { contextHoverSummary } from '~/utils/buildingStyle';
 import { bindMapMovingClass } from '~/utils/mapMoving';
+import { MapScaleControl } from '~/utils/mapScaleControl';
 import { shellTopPx } from '~/utils/shellMetrics';
 
 /** Подписка на resize для отступа карты под шапкой — одна на приложение, даже если карту пересоздают */
 let headerPaddingListener: (() => void) | null = null;
-/** Длина масштабной линейки, px */
-const SCALE_MAX_WIDTH_PX = 100;
 
 interface LayerStyle {
   color: string;
@@ -277,8 +276,9 @@ export const useMapStore = defineStore('map', {
       // Пока карта движется — стекло шапки и тулбаров плотное, без blur над холстом (utils/mapMoving.ts)
       bindMapMovingClass(this.map);
       // Масштабная линейка слева внизу — привычна в любой ГИС (закон Якоба, этап 10е); правее панели слоёв
-      // её ставит --map-left-inset (assets/styles/_device.scss)
-      this.map.addControl(new maplibregl.ScaleControl({ maxWidth: SCALE_MAX_WIDTH_PX, unit: 'metric' }), 'bottom-left');
+      // её ставит --map-left-inset (assets/styles/_device.scss). Своя, а не ScaleControl: та пересчитывает
+      // вёрстку на каждом кадре движения (utils/mapScaleControl.ts)
+      this.map.addControl(new MapScaleControl(), 'bottom-left');
       // Холст уходит под стекло шапки (этап 10): центр карты, перелёты и fitBounds (он складывает свой padding
       // с этим) — по видимой части, ниже шапки. Высота шапки — токен --shell-top, на телефоне 0
       const syncHeaderPadding = () => this.map?.setPadding({ top: shellTopPx(), right: 0, bottom: 0, left: 0 });
