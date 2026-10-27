@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampPanelPos, parsePanelPos, snapPanelPos } from '~/utils/floatingPanel';
+import { clampBelowModeRow, clampPanelPos, parsePanelPos, snapPanelPos } from '~/utils/floatingPanel';
 
 describe('floatingPanel', () => {
   const panel = { w: 600, h: 48 };
@@ -30,5 +30,13 @@ describe('floatingPanel', () => {
     expect(snapPanelPos({ x: 580, y: 740 }, panel, area)).toEqual({ x: 592, y: 744 });
     expect(snapPanelPos({ x: 310, y: 400 }, panel, area)).toEqual({ x: 300, y: 400 });
     expect(snapPanelPos({ x: 200, y: 200 }, panel, area)).toEqual({ x: 200, y: 200 });
+  });
+
+  it('панель режима не поднимается выше строки режимов; в низкой карте — сколько влезает', () => {
+    // без CSS (jsdom) — запасные значения: отступ 12 + строка 46 + зазор 8 = 66
+    const panel = { w: 300, h: 200 };
+    expect(clampBelowModeRow({ x: 100, y: 8 }, panel, { w: 1200, h: 800 })).toEqual({ x: 100, y: 66 });
+    expect(clampBelowModeRow({ x: 100, y: 300 }, panel, { w: 1200, h: 800 })).toEqual({ x: 100, y: 300 });
+    expect(clampBelowModeRow({ x: 100, y: 8 }, panel, { w: 1200, h: 240 })).toEqual({ x: 100, y: 32 });
   });
 });

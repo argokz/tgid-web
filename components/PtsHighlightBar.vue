@@ -30,7 +30,8 @@ const layerStore = useLayerStore();
   top: var(--shell-inset);
   right: var(--controls-w);
   z-index: var(--z-hud);
-  max-width: min(480px, calc(100% - 140px));
+  /* от правой колонки до строки режимов (центр видимой части + половина строки + зазор) */
+  max-width: min(480px, calc((100% - var(--map-left-inset, 0px) + var(--map-right-inset, 0px)) / 2 - var(--controls-w) - 100px));
 }
 .pts-highlight-bar :deep(.v-chip) {
   max-width: 100%;

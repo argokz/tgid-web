@@ -2,7 +2,6 @@
   <div
     v-if="bridge.state.pick.active || bridge.state.overlay"
     class="journal-contour-bar"
-    :style="barStyle"
   >
     <v-card
       elevation="6"
@@ -56,17 +55,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import { useJournalMapBridge } from '~/composables/useJournalMapBridge';
-import { useUiStore } from '~/stores/uiStore';
 
 const bridge = useJournalMapBridge();
-const ui = useUiStore();
 
-// Карточка объекта открыта панелью справа — панель выбора по центру видимой части карты
-const barStyle = computed(() => (ui.rightInset
-  ? { left: `calc(50% - ${ui.rightInset / 2}px)`, maxWidth: `calc(100% - ${ui.rightInset + 32}px)` }
-  : {}));
 
 const clearAll = () => {
   for (const id of [...bridge.state.pick.lineIds]) bridge.togglePicked(id);
@@ -76,11 +68,11 @@ const clearAll = () => {
 <style scoped>
 .journal-contour-bar {
   position: absolute;
-  left: 50%;
+  left: calc(var(--map-left-inset, 0px) + (100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px)) / 2); /* центр видимой части карты */
   bottom: 24px;
   transform: translateX(-50%);
   z-index: var(--z-hud);
-  max-width: calc(100% - 32px);
+  max-width: calc(100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px) - 2 * var(--shell-inset));
 }
 .bar-text {
   min-width: 0;

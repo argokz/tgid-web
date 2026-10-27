@@ -34,7 +34,7 @@ describe('FirstRunHints', () => {
   it('первый вход: шаги только по зонам на экране, «Понятно» — больше не показывать', async () => {
     vi.useFakeTimers();
     zone('nav-links');
-    zone('map-controls', { left: 1220, top: 68, width: 48, height: 500 });
+    zone('map-modes', { left: 600, top: 60, width: 176, height: 44 });
     const w = mountWithVuetify(FirstRunHints, { props: { delayMs: 10 } });
     vi.advanceTimersByTime(10);
     await flush();
@@ -44,7 +44,7 @@ describe('FirstRunHints', () => {
 
     press('Далее');
     await flush();
-    expect(card()?.textContent).toContain('Инструменты карты');
+    expect(card()?.textContent).toContain('Режимы карты');
     press('Понятно');
     await flush();
     expect(card()).toBeNull();

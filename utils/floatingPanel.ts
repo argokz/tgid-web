@@ -4,6 +4,8 @@
  * ни при смене размера окна или самой панели (у инструментов разный набор параметров).
  */
 
+import { modeDockTopPx } from '~/utils/shellMetrics';
+
 /** Левый верхний угол панели относительно карты, px */
 export interface PanelPos {
   x: number;
@@ -22,6 +24,13 @@ export const clampPanelPos = (pos: PanelPos, panel: Size, area: Size, margin = P
   x: Math.round(Math.min(Math.max(margin, pos.x), Math.max(margin, area.w - panel.w - margin))),
   y: Math.round(Math.min(Math.max(margin, pos.y), Math.max(margin, area.h - panel.h - margin))),
 });
+
+/** clampPanelPos и не выше строки режимов сверху по центру (панели режимов — под ней, этап 10ж) */
+export const clampBelowModeRow = (pos: PanelPos, panel: Size, area: Size): PanelPos => {
+  const p = clampPanelPos(pos, panel, area);
+  const top = modeDockTopPx();
+  return { x: p.x, y: Math.max(p.y, Math.min(top, Math.max(PANEL_MARGIN_PX, area.h - panel.h - PANEL_MARGIN_PX))) };
+};
 
 /** Сохранённое положение; испорченное или чужое значение — null (панель на месте по умолчанию) */
 export const parsePanelPos = (raw: string | null | undefined): PanelPos | null => {

@@ -1,21 +1,22 @@
 <template>
   <!--
-    Контролы карты (этап 10е, docs/ui-felt-audit.md): группы-«таблетки» по закону Хика — не больше четырёх кнопок.
-    Сверху — режимы работы с картой (в 10ж переезжают в тулбар сверху по центру), внизу справа — вид и зум, как
-    в Felt и любой веб-ГИС. Поиск адреса и узлов — палитра Ctrl+K в шапке, «Инструменты» — иконка в шапке.
+    Контролы карты (этапы 10е–10ж, docs/ui-felt-audit.md): группы-«таблетки» по закону Хика — не больше четырёх
+    кнопок. Режимы работы с картой — строка сверху по центру видимой части карты (панели режимов: измерения,
+    редактор сети, маршрут пьезометра — под ней); вид и зум — внизу справа, как в Felt и любой веб-ГИС.
+    Поиск адреса и узлов — палитра Ctrl+K в шапке, «Инструменты» — иконка в шапке.
   -->
-  <div class="map-controls">
+  <div class="map-modes">
     <GlassSurface
       level="solid"
       rounded="md"
-      class="control-group"
+      class="control-group control-group--row"
       role="toolbar"
-      aria-label="Инструменты карты"
-      aria-orientation="vertical"
+      aria-label="Режимы карты"
+      aria-orientation="horizontal"
     >
       <HintTip
         text="Измерения: расстояние и площадь"
-        location="left"
+        location="bottom"
       >
         <template #default="{ props: tip }">
           <v-btn
@@ -37,7 +38,7 @@
       <HintTip
         v-if="topologyEditingEnabled"
         :text="isEditTopologyMode ? 'Выключить редактирование топологии' : 'Редактировать топологию сети'"
-        location="left"
+        location="bottom"
       >
         <template #default="{ props: tip }">
           <v-btn
@@ -57,7 +58,7 @@
 
       <HintTip
         :text="isTraceMode ? 'Отключить режим трассировки' : 'Пьезометрический график'"
-        location="left"
+        location="bottom"
       >
         <template #default="{ props: tip }">
           <v-btn
@@ -77,7 +78,7 @@
 
       <HintTip
         :text="identifyMode ? 'Отключить режим информации' : 'Информация об объекте'"
-        location="left"
+        location="bottom"
       >
         <template #default="{ props: tip }">
           <v-btn
@@ -95,8 +96,10 @@
         </template>
       </HintTip>
     </GlassSurface>
+  </div>
 
-    <!-- Вид и зум — внизу справа, всегда на экране, даже когда верхняя группа не влезает по высоте (QA F17, F59) -->
+  <div class="map-controls">
+    <!-- Вид и зум — внизу справа (QA F17, F59: всегда на экране) -->
     <div class="control-bottom">
       <GlassSurface
         level="solid"
@@ -404,10 +407,22 @@ defineExpose({ identifyMode })
 
 <style scoped>
 /*
- * Колонка от шапки до атрибуции карты: сверху группа режимов, внизу справа — вид и зум (видны всегда; верхняя
- * группа прокручивается, если не влезает по высоте, QA F17, F59). Сама колонка прозрачна для мыши.
+ * Строка режимов — сверху по центру видимой части карты (между карточками слоёв и объекта: --map-left/right-inset
+ * ставит MapViewer). Колонка справа — от шапки до атрибуции, группы прижаты книзу. Обе прозрачны для мыши.
  * Группа — плотная «таблетка» (стекло только у шапки), кнопки 40 px вплотную, между группами 8 px.
  */
+.map-modes {
+  position: fixed;
+  top: calc(var(--shell-top) + var(--shell-inset));
+  left: calc(var(--map-left-inset, 0px) + (100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px)) / 2);
+  transform: translateX(-50%);
+  z-index: var(--z-controls);
+}
+
+.control-group.control-group--row {
+  flex-direction: row;
+}
+
 .map-controls {
   position: fixed;
   top: calc(var(--shell-top) + var(--shell-inset));
@@ -430,15 +445,6 @@ defineExpose({ identifyMode })
   flex-direction: column;
   flex: none;
   padding: 2px;
-}
-
-.map-controls > .control-group {
-  flex: 0 1 auto;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
 }
 
 .control-bottom {
@@ -482,7 +488,7 @@ defineExpose({ identifyMode })
   }
 }
 
-/* Низкое окно (телефон боком): вид и зум — в ряд, иначе на режимы сверху не остаётся высоты */
+/* Низкое окно (телефон боком): вид и зум — в ряд, чтобы колонка влезла по высоте */
 @media (max-height: 560px) {
   .control-bottom {
     flex-direction: row-reverse;

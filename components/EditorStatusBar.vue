@@ -27,7 +27,7 @@ const toolInfo = computed(() => EDITOR_TOOLS.find((t) => t.value === props.tool)
 .editor-status-bar {
   position: absolute;
   bottom: calc(28px + var(--safe-bottom, 0px));
-  left: 50%;
+  left: calc(var(--map-left-inset, 0px) + (100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px)) / 2); /* центр видимой части карты */
   transform: translateX(-50%);
   max-width: calc(100% - 32px);
   z-index: var(--z-hud);

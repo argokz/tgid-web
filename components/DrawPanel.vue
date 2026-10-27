@@ -5,7 +5,7 @@
     level="solid"
     rounded="lg"
     class="draw-panel"
-    :class="{ 'draw-panel--dragging': dragging }"
+    :class="{ 'draw-panel--dragging': dragging, 'draw-panel--moved': pos }"
     :style="posStyle"
     role="region"
     aria-label="Панель измерений"
@@ -272,6 +272,7 @@ import FloatingToolbar, { type FloatingToolbarItem } from '~/components/Floating
 import { formatApiErrorWith } from '~/utils/apiError';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useFloatingDrag, usePersistedPanelPos } from '~/composables/useFloatingDrag';
+import { clampBelowModeRow } from '~/utils/floatingPanel';
 import { useEscapeClose } from '~/composables/useEscape';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import {
@@ -293,13 +294,15 @@ const open = defineModel<boolean>({ default: false });
 // Положение панели: перетаскивание за шапку (общая механика плавающих окон), запоминается между сеансами
 const panelRef = ref<InstanceType<typeof GlassSurface> | null>(null);
 const panelEl = computed(() => (panelRef.value?.$el as HTMLElement | undefined) ?? null);
-/** null — на месте по умолчанию (слева, у кнопки слоёв) */
+/** null — на месте по умолчанию (под строкой режимов, по центру видимой части карты) */
 const { pos, save: savePos, reset: resetPos } = usePersistedPanelPos('drawPanelPos');
 const posStyle = computed(() => (pos.value ? { left: `${pos.value.x}px`, top: `${pos.value.y}px` } : undefined));
 const { dragging, onPointerDown: onDragDown, onKeydown: onDragKeydown, reclamp } = useFloatingDrag({
   target: panelEl,
   pos,
   handle: '[data-panel-drag]',
+  // не выше строки режимов: иначе панель уходила под неё вместе с ручкой
+  clamp: clampBelowModeRow,
   onCommit: savePos,
 });
 // панель появляется по v-if: проверить сохранённое положение, когда она уже в DOM
@@ -404,13 +407,15 @@ onBeforeUnmount(() => draw.detach());
 
 <style scoped>
 .draw-panel {
-  /* Слева, у кнопки слоёв: центр карты (место измерения) остаётся открытым */
+  /* Под строкой режимов, по центру видимой части карты (между карточками слоёв и объекта — --map-left/right-inset
+     ставит MapViewer); раньше стояла слева и при открытой панели слоёв уходила под неё */
   position: absolute;
-  top: 16px;
-  left: 72px;
+  top: calc(var(--shell-inset) + var(--toolbar-row) + var(--shell-gap));
+  left: calc(var(--map-left-inset, 0px) + (100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px)) / 2);
+  transform: translateX(-50%);
   z-index: var(--z-controls);
-  width: min(360px, calc(100vw - 32px));
-  max-height: calc(100% - 32px);
+  width: min(360px, calc(100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px) - 2 * var(--shell-inset)));
+  max-height: calc(100% - 2 * var(--shell-inset) - var(--toolbar-row) - var(--shell-gap));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -534,11 +539,14 @@ onBeforeUnmount(() => draw.detach());
   font-size: 10px;
 }
 
+/* перетащена оператором: угол — из style (left/top), без центрирования */
+.draw-panel--moved {
+  transform: none;
+}
+
 @media (max-width: 600px) {
   .draw-panel {
-    top: 8px;
-    left: 8px;
-    width: calc(100vw - 16px);
+    width: calc(100vw - 2 * var(--shell-inset));
   }
 }
 </style>

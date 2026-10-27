@@ -218,7 +218,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .cursor-coords {
   position: absolute;
-  left: 50%;
+  left: calc(var(--map-left-inset, 0px) + (100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px)) / 2); /* центр видимой части карты */
   bottom: calc(4px + var(--safe-bottom, 0px));
   transform: translateX(-50%);
   z-index: var(--z-hud);

@@ -391,6 +391,7 @@ import { useFragmentStore } from '~/stores/fragmentStore';
 import { useUiStore } from '~/stores/uiStore';
 import { appStorage } from '~/utils/appStorage';
 import { useFloatingDrag, usePersistedPanelPos } from '~/composables/useFloatingDrag';
+import { clampBelowModeRow } from '~/utils/floatingPanel';
 
 const props = defineProps<{ editor: ReturnType<typeof useTopologyEditor> }>();
 
@@ -405,7 +406,7 @@ const readPinned = (): boolean => {
 };
 
 const rootEl = ref<HTMLElement | null>(null);
-/** null — на месте по умолчанию (сверху по центру карты) */
+/** null — на месте по умолчанию (под строкой режимов, по центру видимой части карты) */
 const { pos, save: savePos, reset: resetStoredPos } = usePersistedPanelPos('editorToolbarPos');
 const pinned = ref(readPinned());
 const ui = useUiStore();
@@ -427,6 +428,8 @@ const { dragging, onPointerDown: onHandleDown, onKeydown: onHandleKeydown, recla
   target: rootEl,
   pos,
   enabled: () => !pinned.value,
+  // не выше строки режимов: панель (z выше строки) закрывала бы кнопку, которой её выключают
+  clamp: clampBelowModeRow,
   onCommit: savePos,
 });
 
@@ -525,7 +528,7 @@ const statusChips = computed(() => {
   width: max-content;
   max-width: calc(100% - 32px);
   position: absolute;
-  top: 72px;
+  top: calc(var(--shell-inset) + var(--toolbar-row) + var(--shell-gap)); /* под строкой режимов */
   left: 50%;
   transform: translateX(-50%);
   transform-origin: 50% 0;
@@ -534,7 +537,7 @@ const statusChips = computed(() => {
   -webkit-backdrop-filter: var(--glass-1-filter);
   backdrop-filter: var(--glass-1-filter);
   border: var(--glass-border);
-  border-radius: 24px;
+  border-radius: var(--radius-md);
   z-index: var(--z-toolbar);
   box-shadow: var(--shadow-2);
 }

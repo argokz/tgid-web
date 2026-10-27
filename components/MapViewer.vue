@@ -1,11 +1,11 @@
 <template>
   <client-only>
     <div class="map-viewer-root">
-      <!-- --map-left-inset: правый край открытой карточки слоёв — нижний левый угол MapLibre (масштаб) правее неё -->
+      <!-- --map-left/right-inset: края открытых карточек слоёв и объекта — масштаб MapLibre и строка режимов между ними -->
       <div
         ref="mapContainerEl"
         class="map-container"
-        :style="{ '--map-left-inset': `${uiStore.leftInset}px` }"
+        :style="{ '--map-left-inset': `${uiStore.leftInset}px`, '--map-right-inset': `${uiStore.rightInset}px` }"
       >
         <!-- 2D Map (MapLibre) -->
         <div
@@ -121,7 +121,7 @@
         />
 
         <!-- Панель рисования и измерений на карте -->
-        <Transition name="motion-panel-left">
+        <Transition name="motion-pop">
           <LazyDrawPanel
             v-if="uiStore.drawPanelOpen"
             v-model="uiStore.drawPanelOpen"
@@ -134,12 +134,12 @@
           :map="mapStore.map"
           :initial-identify-mode="savedPageState?.identifyMode ?? true"
           :topology-editing-enabled="topologyEditingEnabled"
-          v-model:isTraceMode="isTraceMode"
-          v-model:isEditTopologyMode="isEditTopologyMode"
+          :is-trace-mode="isTraceMode"
+          :is-edit-topology-mode="isEditTopologyMode"
           @layer-change="onBaseLayerChange"
           @identify-mode-change="onIdentifyModeChange"
           @toggle-trace-mode="toggleTraceMode"
-          @toggle-edit-topology-mode="toggleEditTopologyMode"
+          @toggle-edit-topology-mode="onToggleEditTopology"
         />
 
         <!-- Диалоги инструментов монтируются лениво (таблица toolDialogs): чанк подгружается при первом открытии через openLazyDialog -->
@@ -1122,6 +1122,7 @@ const toggleTraceMode = () => {
   isTraceMode.value = !isTraceMode.value;
   if (isTraceMode.value) {
     if (isEditTopologyMode.value) void toggleEditTopologyMode();
+    uiStore.toggleDrawPanel(false);
     clearTrace();
     mapStore.setIdentifyMode(false); // отключаем обычный identify-клик
     useNotificationStore().showSuccess('Режим трассировки: кликайте по узлам маршрута.');
@@ -1396,6 +1397,50 @@ const {
   cancelSplit,
   onDeleteFeature,
 } = topologyEditor;
+
+// Режимы карты — один за раз (строка режимов, этап 10ж): панели измерений, редактора и маршрута пьезометра
+// встают под строку на одно место. Маршрут и редактор исключали друг друга и раньше; «Информация» — не режим,
+// а поведение клика, её не трогаем
+watch(() => uiStore.drawPanelOpen, async (open: boolean) => {
+  if (!open) return;
+  if (isTraceMode.value) toggleTraceMode();
+  if (!isEditTopologyMode.value) return;
+  await toggleEditTopologyMode();
+  // выход из редактора отменён (несохранённые изломы) — остаётся редактор, а не измерения
+  if (isEditTopologyMode.value) uiStore.toggleDrawPanel(false);
+});
+watch(isEditTopologyMode, (on: boolean) => {
+  if (on) uiStore.toggleDrawPanel(false);
+});
+
+/** Сколько ждать, пока закрытая панель измерений отпустит режим, мс (уход панели анимирован) */
+const DRAW_RELEASE_TIMEOUT_MS = 1000;
+/** Панель измерений закрыта — дождаться, пока она снимет режим (useMapDraw.detach при размонтировании) */
+const waitDrawReleased = () => new Promise<void>((resolve) => {
+  if (activeDrawMode.value === 'none') {
+    resolve();
+    return;
+  }
+  const timer = setTimeout(done, DRAW_RELEASE_TIMEOUT_MS);
+  const stop = watch(activeDrawMode, (mode) => {
+    if (mode === 'none') done();
+  });
+  function done() {
+    clearTimeout(timer);
+    stop();
+    resolve();
+  }
+});
+
+// Кнопка редактора в строке режимов: открытые измерения уступают место (иначе редактор отказывался
+// включаться — «Сначала завершите рисование или измерение»)
+const onToggleEditTopology = async () => {
+  if (!isEditTopologyMode.value && uiStore.drawPanelOpen) {
+    uiStore.toggleDrawPanel(false);
+    await waitDrawReleased();
+  }
+  await toggleEditTopologyMode();
+};
 
 // Холст карты продлён под стекло шапки (.map-canvas-host): `e.point` и `map.project` отсчитываются от его верха,
 // а оверлеи внутри .map-container — от верха контейнера, ниже на высоту шапки (--shell-top). Сдвиг читается из
@@ -1685,14 +1730,14 @@ watch(
 </script>
 
 <style lang="scss" scoped>
-/* Панель построения маршрута пьезометра: сверху по центру, на верхней линии каркаса (контейнер карты — под шапкой) */
+/* Панель построения маршрута пьезометра: под строкой режимов, по центру видимой части карты */
 .trace-panel {
   position: absolute;
-  top: var(--shell-inset);
-  left: 50%;
+  top: calc(var(--shell-inset) + var(--toolbar-row) + var(--shell-gap));
+  left: calc(var(--map-left-inset, 0px) + (100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px)) / 2);
   transform: translateX(-50%);
   z-index: 5;
-  width: min(360px, calc(100vw - 32px));
+  width: min(360px, calc(100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px) - 2 * var(--shell-inset)));
   background: rgb(var(--v-theme-surface));
 
   &__header {
@@ -1762,7 +1807,7 @@ watch(
 .object-loading-indicator {
   position: absolute;
   bottom: 16px;
-  left: 50%;
+  left: calc(var(--map-left-inset, 0px) + (100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px)) / 2); /* центр видимой части карты */
   transform: translateX(-50%);
   z-index: 10;
 }
