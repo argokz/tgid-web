@@ -3,7 +3,7 @@
  * Временный инструмент: не входит в прод-код и в `npm run check`.
  *
  *   node scripts/perf/map-tiles.mjs [--base http://localhost:3040/] [--center 76.93,43.24 (по умолчанию — центр города)]
- *        [--zooms 11,13,15,17] [--shots docs/map-audit/almaty-before] [--out file.json]
+ *        [--zooms 11,13,15,17] [--fragments 72,74] [--shots docs/map-audit/almaty-before] [--out file.json]
  *
  * Для каждого зума: jumpTo, ожидание тишины в сети, снимок 1440×900 и по каждому источнику —
  * число запросов, байты тела, медиана/максимум времени ответа (с учётом очереди браузера),
@@ -24,6 +24,7 @@ const BASE = args.base || 'http://localhost:3040/';
 let CENTER = args.center ? String(args.center).split(',').map(Number) : null;
 const ZOOMS = String(args.zooms || '11,13,15,17').split(',').map(Number);
 const SHOTS = args.shots ? String(args.shots) : '';
+const FRAGMENTS = args.fragments ? String(args.fragments).split(',').map(Number) : [];
 const OUT = args.out ? String(args.out) : '';
 
 /** Ключ источника: слой GWC/WMS GeoServer или набор тайлов MapTiler */
@@ -67,6 +68,14 @@ await page.waitForSelector('.maplibregl-canvas', { timeout: 90000 });
 await page.waitForTimeout(6000);
 // Панель слоёв закрываем: снимок — вся карта
 await page.evaluate(() => document.querySelector('[aria-label="Закрыть панель"]')?.click());
+// --fragments 72,74 — видимые фрагменты сети (на копии БД стенда сеть во фрагменте 72)
+if (FRAGMENTS.length) {
+  await page.evaluate((ids) => {
+    document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$pinia._s.get('fragment')
+      .applyVisibleFragmentsSelection(ids, false);
+  }, FRAGMENTS);
+  await page.waitForTimeout(3000);
+}
 CENTER ||= await page.evaluate(() => {
   const c = document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$pinia._s.get('map').map.getCenter();
   return [Number(c.lng.toFixed(5)), Number(c.lat.toFixed(5))];

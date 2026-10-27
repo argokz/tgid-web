@@ -1252,7 +1252,8 @@ export const useLayerStore = defineStore('layer', {
 
             const isSymbol = mbLayer?.type === 'symbol' || subId.toLowerCase().includes('label');
 
-            if (fragmentFilter && !isSymbol) {
+            // Слой без поля фрагмента (здания): фильтр по fileid скрыл бы его целиком
+            if (fragmentFilter && !isSymbol && layer.hasFragmentField !== false) {
               mapStore.map.setFilter(subId, combineWithFragmentFilter(originalFilter, fragmentIds));
             } else {
               mapStore.map.setFilter(subId, originalFilter);

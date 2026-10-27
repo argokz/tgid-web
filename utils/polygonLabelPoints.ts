@@ -319,6 +319,24 @@ export const LABEL_FIT_SUFFIX = '__fit'
 /** Свойство с площадью объекта (м² меркатора) — крупные дома подписываются первыми */
 export const LABEL_AREA_PROP = '__area'
 
+/** Значащих цифр у дробных значений подписи (Qот, Qгвс, Qсум, Гкал/ч); точные значения — в карточке */
+export const LABEL_SIGNIFICANT_DIGITS = 3
+
+/**
+ * Дробные значения после «=» с 4+ знаками после точки — до LABEL_SIGNIFICANT_DIGITS значащих цифр:
+ * «Qсум=0.0764841» → «Qсум=0.0765». Адреса и целые числа не трогаем.
+ */
+export function roundLabelNumbers(text: string): string {
+  return text.replace(/(=\s*)(-?\d+\.\d{4,})/g, (_, eq: string, num: string) => {
+    const n = Number(num)
+    if (!Number.isFinite(n)) return eq + num
+    const rounded = Math.abs(n) >= 10 ** LABEL_SIGNIFICANT_DIGITS
+      ? Math.round(n)
+      : Number(n.toPrecision(LABEL_SIGNIFICANT_DIGITS))
+    return eq + String(rounded)
+  })
+}
+
 /** Свойства точки подписи и варианты многострочных подписей: имя свойства → текст */
 const cleanProperties = (props: Record<string, any>): { out: Record<string, any>; variants: Record<string, string> } => {
   const out: Record<string, any> = {}
@@ -329,7 +347,7 @@ const cleanProperties = (props: Record<string, any>): { out: Record<string, any>
       continue
     }
     // «\r\n» из базы десктопа MapLibre рисует пустым квадратом
-    const text = v.replace(/\r/g, '').trim()
+    const text = roundLabelNumbers(v.replace(/\r/g, '').trim())
     out[k] = text
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
     if (lines.length < 2) continue

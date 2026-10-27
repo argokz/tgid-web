@@ -231,6 +231,7 @@ export default defineEventHandler(async (event) => {
       layout: Record<string, any>;
       mbLayers: any[];
       sprite?: string;
+      hasFragmentField?: boolean;
     } | null> {
       const styleIdentifier = pickWmtsStyleIdentifier(layerXml?.Style);
       const styleNameParts = String(styleIdentifier).split(':');
@@ -251,6 +252,15 @@ export default defineEventHandler(async (event) => {
         }
 
         if (!cleanStyleName || cleanStyleName === 'generic') return null;
+
+        // Поля слоя: есть ли поле фрагмента (fileid) — иначе клиентский фильтр фрагментов скрыл бы
+        // все объекты (здания). У SQL-view без списка атрибутов — неизвестно, фильтр как раньше
+        const featureTypeUrl = `${geoserverRestBaseUrl}/rest/workspaces/${workspaceName}/featuretypes/${encodeURIComponent(sourceLayer)}.json`;
+        const featureType: any = await $fetch(featureTypeUrl, { headers: authHeaders, timeout: 5000 }).catch(() => null);
+        const attrList = featureType?.featureType?.attributes?.attribute;
+        const attrNames: string[] = (Array.isArray(attrList) ? attrList : attrList ? [attrList] : [])
+          .map((a: any) => String(a?.name || '').toLowerCase());
+        const hasFragmentField = attrNames.length ? attrNames.includes('fileid') : undefined;
 
         let mbStyle: any = null;
         try {
@@ -308,7 +318,7 @@ export default defineEventHandler(async (event) => {
         }
 
         if (!mbLayers.length) return null;
-        return { type, paint, layout, mbLayers, sprite };
+        return { type, paint, layout, mbLayers, sprite, hasFragmentField };
       } catch (e: any) {
         console.warn(`[GEO-STYLE] MBStyle ${workspaceName}:${sourceLayer}: ${e.message}`);
         return null;
@@ -573,6 +583,7 @@ export default defineEventHandler(async (event) => {
         type: mvtPack.type,
         mvtUrl,
         tileBounds,
+        hasFragmentField: mvtPack.hasFragmentField,
         paint: mvtPack.paint,
         layout: mvtPack.layout,
         mbLayers: mvtPack.mbLayers,

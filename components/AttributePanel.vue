@@ -1756,14 +1756,23 @@ const canOpenNetworkDiaphragms = computed(() => Boolean(cardLineId.value) || (Bo
 
 
 const hasTabsStructure = computed(() => objectTabsData.value !== null && tabsData.value.length > 0)
-/** Сводка: первые заполненные поля карточки в порядке десктопа */
+/**
+ * Сводка: первые заполненные поля карточки в порядке десктопа. У объектов без вкладок десктопа
+ * (здания zdaniya_2, zdaniya_tu) — первые заполненные поля плоского списка, как в полной карточке
+ */
 const SUMMARY_FIELD_LIMIT = 5
-const summaryFields = computed(() =>
-  tabsData.value
+/** Служебные поля таблиц ГИС — в сводку не берём (в полной карточке они остаются) */
+const SUMMARY_SKIP_FIELD = /^(id|objectid|fid|gid|shape(_\w+)?|the_geom|geom|tg_\w+|fileid)$/i
+const summaryFields = computed(() => {
+  const fromTabs = tabsData.value
     .flatMap(tab => tab.sections.flatMap(section => section.fields))
     .filter(field => hasValue(field.value))
-    .slice(0, SUMMARY_FIELD_LIMIT),
-)
+  if (fromTabs.length) return fromTabs.slice(0, SUMMARY_FIELD_LIMIT)
+  return Object.entries(filteredAttributesList.value)
+    .filter(([key, value]) => hasValue(value) && value !== 0 && !SUMMARY_SKIP_FIELD.test(key))
+    .slice(0, SUMMARY_FIELD_LIMIT)
+    .map(([key, value]) => ({ key, label: formatAttributeLabel(key), value }))
+})
 const summarySubtitle = computed(() => {
   const { network, networkId } = cardObject.value
   if (!networkId) return ''

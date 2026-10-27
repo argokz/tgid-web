@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { clipRing, computeLabelPoints, labelPointOf, textFit, tileBoundsMerc, wallsOf } from '../../utils/polygonLabelPoints'
+import {
+  clipRing,
+  computeLabelPoints,
+  labelPointOf,
+  roundLabelNumbers,
+  textFit,
+  tileBoundsMerc,
+  wallsOf,
+} from '../../utils/polygonLabelPoints'
 
 const R = 6378137
 const toLonLat = ([x, y]: number[]) => [x / R * 180 / Math.PI, (2 * Math.atan(Math.exp(y / R)) - Math.PI / 2) * 180 / Math.PI]
@@ -64,6 +72,16 @@ describe('точка подписи полигона', () => {
     expect(p[0] >= 0 && p[0] <= 30 && p[1] >= 0 && p[1] <= 30).toBe(true)
   })
 
+  it('дробные значения подписи — три значащих цифры, адреса и целые не трогаются', () => {
+    expect(roundLabelNumbers('Qсум=0.0764841')).toBe('Qсум=0.0765')
+    expect(roundLabelNumbers('Qот=1.54223')).toBe('Qот=1.54')
+    expect(roundLabelNumbers('Qсум= 2.22302')).toBe('Qсум= 2.22')
+    expect(roundLabelNumbers('Q=1234.56789')).toBe('Q=1235')
+    expect(roundLabelNumbers('Q=0.5')).toBe('Q=0.5')
+    expect(roundLabelNumbers('ул.Толе би 226')).toBe('ул.Толе би 226')
+    expect(roundLabelNumbers('пр.Абая 34/96')).toBe('пр.Абая 34/96')
+  })
+
   it('подпись нагрузки: варианты и при каком шрифте каждый помещается в доме', () => {
     const fc = computeLabelPoints([{
       id: 1,
@@ -71,17 +89,18 @@ describe('точка подписи полигона', () => {
       geometry: polygon(rectMerc(0, 0, 80, 20)),
     }])
     const p = fc.features[0].properties!
-    expect(p.txt__short).toBe('Qсум=0.122979')
-    expect(p.txt__mid).toBe('ул.Масанчи 81\nQсум=0.122979')
-    expect(p.txt__wide).toBe('ул.Масанчи 81\nQот=0.092128  Qгвс=0.030851\nQсум=0.122979')
+    // Значения нагрузок — до трёх значащих цифр (точные — в карточке)
+    expect(p.txt__short).toBe('Qсум=0.123')
+    expect(p.txt__mid).toBe('ул.Масанчи 81\nQсум=0.123')
+    expect(p.txt__wide).toBe('ул.Масанчи 81\nQот=0.0921  Qгвс=0.0309\nQсум=0.123')
     expect(p.otop).toBe(0.09)
     expect(p.otop__short).toBeUndefined()
     // дом 80 × 20 м: короче и шире — помещается крупнее; 4 строки ниже, чем 3 широких
     expect(p.txt__short__fit).toBeGreaterThan(p.txt__mid__fit)
     expect(p.txt__mid__fit).toBeGreaterThan(p.txt__fit)
     expect(p.txt__wide__fit).toBeGreaterThan(p.txt__fit)
-    // Qсум (13 знаков) по ширине: 80 / (13 × 0,56) ≈ 11; по высоте: 20 / 1,2 ≈ 16,7
-    expect(p.txt__short__fit).toBeCloseTo(80 / (13 * 0.56), 1)
+    // Qсум (10 знаков) по ширине: 80 / (10 × 0,56) ≈ 14,3; по высоте: 20 / 1,2 ≈ 16,7
+    expect(p.txt__short__fit).toBeCloseTo(80 / (10 * 0.56), 1)
     // целиком (4 строки): по высоте 20 / 4,8 ≈ 4,2
     expect(p.txt__fit).toBeCloseTo(20 / (4 * 1.2), 1)
   })
