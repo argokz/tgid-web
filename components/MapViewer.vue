@@ -1733,7 +1733,7 @@ watch(
 /* Панель построения маршрута пьезометра: под строкой режимов, по центру видимой части карты */
 .trace-panel {
   position: absolute;
-  top: calc(var(--shell-inset) + var(--toolbar-row) + var(--shell-gap));
+  top: calc(var(--modes-offset) + var(--toolbar-row) + var(--shell-gap));
   left: calc(var(--map-left-inset, 0px) + (100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px)) / 2);
   transform: translateX(-50%);
   z-index: 5;
@@ -1815,7 +1815,7 @@ watch(
 /* Загрузка и ошибка карты — левее колонки контролов, на верхней линии каркаса */
 .map-loading-card {
   position: absolute;
-  top: var(--shell-inset);
+  top: var(--hud-top);
   right: var(--controls-w);
   z-index: 20;
   min-width: auto;
@@ -1824,7 +1824,7 @@ watch(
 
 .map-error-alert {
   position: absolute;
-  top: calc(var(--shell-inset) + 56px); /* ниже карточки загрузки и полосы ПТС на той же линии */
+  top: calc(var(--hud-top) + 56px); /* ниже карточки загрузки и полосы ПТС на той же линии */
   right: var(--controls-w);
   z-index: 20;
   max-width: 420px;

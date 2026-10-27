@@ -14,9 +14,9 @@ export function readCssPx(name: string, fallback: number, el?: Element): number 
   return raw.endsWith('px') && Number.isFinite(value) ? value : fallback
 }
 
-/** Верх панелей режимов в контейнере карты: под строкой режимов (--shell-inset + --toolbar-row + --shell-gap) */
+/** Верх панелей режимов в контейнере карты: под строкой режимов (--modes-offset + --toolbar-row + --shell-gap) */
 export function modeDockTopPx(): number {
-  return readCssPx('--shell-inset', 12) + readCssPx('--toolbar-row', 46) + readCssPx('--shell-gap', 8)
+  return readCssPx('--modes-offset', 12) + readCssPx('--toolbar-row', 46) + readCssPx('--shell-gap', 8)
 }
 
 /** Высота шапки (--shell-top): на телефоне 0, на десктопе 48 */

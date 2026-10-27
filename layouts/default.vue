@@ -1,28 +1,40 @@
 ﻿<template>
   <v-app>
-    <!-- Шапка в духе Felt (этап 10): 48 px стекла поверх карты, тень вместо границы; высота = токен --shell-top -->
+    <!-- Шапка в духе Felt (этап 10): 48 px стекла поверх карты, тень вместо границы; высота = токен --shell-top.
+         Телефон (< 960, 10г): полосы нет — меню со знаком, поиск и профиль плавают в углах (стили ниже, по ширине
+         экрана: сервер ширину не знает, поэтому без переключения разметки после гидрации) -->
     <v-app-bar
       app
       flat
       height="48"
       tag="header"
       class="app-header"
+      :class="{ 'app-header--covered': mainMenuOpen || uiStore.toolsPanelOpen }"
     >
       <HintTip
         v-if="navCollapsed"
         text="Открыть главное меню"
+        hint="Разделы, инструменты, город и роль"
       >
         <template #default="{ props: tip }">
+          <!-- знак приложения с «▾» — меню, как у Felt: и бренд, и вход в разделы -->
           <v-btn
             v-bind="tip"
-            icon
             variant="text"
-            class="ms-1"
+            class="corner-btn corner-btn--menu"
             aria-label="Открыть меню"
+            aria-controls="main-menu"
             :aria-expanded="mainMenuOpen"
             @click="mainMenuOpen = !mainMenuOpen"
           >
-            <v-icon>mdi-menu</v-icon>
+            <AppLogo
+              size="22"
+              class="text-primary"
+            />
+            <v-icon
+              size="16"
+              class="corner-btn__chevron"
+            >mdi-chevron-down</v-icon>
           </v-btn>
         </template>
       </HintTip>
@@ -136,7 +148,7 @@
           <button
             v-bind="tip"
             type="button"
-            class="header-search me-1"
+            class="header-search corner-btn me-1"
             data-first-run="palette"
             aria-label="Поиск: узел, адрес, журнал, команда"
             aria-keyshortcuts="Control+K"
@@ -166,7 +178,7 @@
             :icon="item.icon"
             :active="isItemActive(item)"
             variant="text"
-            class="header-icon-btn"
+            class="header-icon-btn header-end-btn"
             :aria-label="item.title"
             :aria-pressed="isItemActive(item)"
             @click="runMenuAction(item)"
@@ -187,7 +199,7 @@
                 v-bind="mergeProps(menuProps, tip)"
                 icon
                 variant="text"
-                class="header-icon-btn user-avatar-btn me-1"
+                class="header-icon-btn user-avatar-btn corner-btn me-1"
                 aria-label="Меню пользователя"
               >
                 <v-avatar
@@ -275,6 +287,7 @@
     <!-- Меню гамбургера: те же пункты и права, что у кнопок шапки -->
     <v-navigation-drawer
       v-if="navCollapsed"
+      id="main-menu"
       v-model="mainMenuOpen"
       temporary
       location="left"
@@ -282,6 +295,23 @@
       class="main-menu-drawer"
       aria-label="Главное меню"
     >
+      <!-- На телефоне шапки нет: знак, город и роль — здесь -->
+      <div class="main-menu-head">
+        <div class="d-flex align-center">
+          <AppLogo
+            size="22"
+            class="text-primary"
+          />
+          <span class="brand-title ms-2">ITwin</span>
+          <span class="brand-subtitle">Map</span>
+        </div>
+        <div
+          v-if="isHydrated && (authStore.isAuthenticated || authStore.authDisabled) && authStore.cityLabel"
+          class="main-menu-head__context"
+        >
+          {{ authStore.cityLabel }} · {{ roleLabel }}
+        </div>
+      </div>
       <v-list
         density="comfortable"
         nav
@@ -485,7 +515,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, mergeProps, onBeforeUnmount, onMounted, watch } from 'vue';
+import { ref, reactive, computed, mergeProps, nextTick, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useMobile } from '~/composables/useMobile';
 import { useEscapeClose, useGlobalEscape } from '~/composables/useEscape';
@@ -645,6 +675,20 @@ watch(navCollapsed, (collapsed) => {
 
 // Временный v-navigation-drawer сам по Esc не закрывается — меню в стеке Esc менеджера панелей (docs/ui-zones.md)
 useEscapeClose({ open: mainMenuOpen, close: () => { mainMenuOpen.value = false; } });
+
+// Телефон: открытое меню прячет угловые кнопки (layouts — .app-header--covered), а с ними и кнопку меню, на которой
+// был фокус. Фокус — в меню, после закрытия — обратно на кнопку (если его не забрало открытое из меню окно)
+watch(mainMenuOpen, async (open) => {
+  await nextTick();
+  if (open) {
+    document.querySelector<HTMLElement>('#main-menu .v-list-item')?.focus();
+    return;
+  }
+  const active = document.activeElement;
+  if (!active || active === document.body || active.closest('#main-menu')) {
+    document.querySelector<HTMLElement>('.corner-btn--menu')?.focus();
+  }
+});
 useGlobalEscape();
 // Глобальные клавиши: «?» — справка (в редакторе её берёт сам редактор); Ctrl/Cmd+K — палитра команд,
 // в том числе из поля ввода и поверх диалога (это и есть способ переключиться)
@@ -972,7 +1016,8 @@ const downloadExcel = async (docType: string) => {
 
 .api-health-alert {
   position: fixed;
-  top: calc(var(--shell-top) + var(--shell-gap));
+  /* на линии строки режимов: под шапкой, на телефоне — под угловыми кнопками */
+  top: calc(var(--shell-top) + var(--modes-offset));
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--z-popover); /* над картой и карточкой, под диалогами */
@@ -1049,5 +1094,80 @@ const downloadExcel = async (docType: string) => {
     radial-gradient(circle at 20% 20%, rgb(var(--v-theme-primary), 0.10), transparent 45%),
     radial-gradient(circle at 80% 85%, rgb(var(--v-theme-primary), 0.08), transparent 40%),
     rgb(var(--v-theme-surface));
+}
+/* Шапка меню на телефоне: знак, город и роль */
+.main-menu-head {
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.main-menu-head__context {
+  margin-top: var(--space-1);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-faint);
+}
+
+/* Телефон (< 960, = HEADER_NAV_MIN_WIDTH и utils/breakpoints md): полосы шапки нет — её кнопки плавают в углах
+   белыми плашками (--corner-btn), карта на весь экран (--shell-top: 0). Сама полоса прозрачна для пальца */
+@media (max-width: 959.98px) {
+  .app-header {
+    background: transparent !important;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none !important;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .app-header :deep(.v-toolbar__content) {
+    align-items: flex-start;
+    gap: var(--shell-gap);
+    /* вырез экрана уже учтён отступами самой полосы (assets/styles/_device.scss) */
+    padding: var(--shell-inset) var(--shell-inset) 0;
+    overflow: visible;
+  }
+  /* бренд, город и «Инструменты» — в меню; разделы там же */
+  .app-brand,
+  .app-context,
+  .nav-links,
+  .header-end-btn {
+    display: none !important;
+  }
+  .corner-btn {
+    pointer-events: auto;
+    width: var(--corner-btn) !important;
+    min-width: var(--corner-btn) !important;
+    height: var(--corner-btn) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: var(--radius-md) !important;
+    background: rgb(var(--v-theme-surface)) !important;
+    box-shadow: var(--shadow-2);
+    color: var(--text-muted);
+  }
+  .corner-btn--menu {
+    width: auto !important;
+    padding: 0 var(--space-2) 0 var(--space-3) !important;
+  }
+  .corner-btn--menu :deep(.v-btn__content) {
+    gap: 2px;
+  }
+  .corner-btn__chevron {
+    color: var(--text-muted);
+  }
+  .header-search::before {
+    display: none;
+  }
+  /* меню и «Инструменты» выезжают поверх углов: угловые кнопки (Vuetify держит полосу выше drawer'ов) прячутся */
+  .app-header--covered {
+    visibility: hidden;
+  }
+  /* Меню выезжает от верха экрана: полосы, под которую Vuetify его ставит, на телефоне нет */
+  .main-menu-drawer {
+    top: 0 !important;
+    height: 100% !important;
+  }
+  .app-main {
+    padding-top: 0;
+  }
 }
 </style>

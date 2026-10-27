@@ -27,15 +27,16 @@
       </div>
     </transition>
 
-    <!-- МОБИЛЬНЫЙ: navigation-drawer (оверлей) -->
-    <v-navigation-drawer
+    <!-- ТЕЛЕФОН: шторка снизу (как карточка объекта) — карта над ней остаётся рабочей; панель менеджера `layers` -->
+    <BottomSheet
       v-if="mobile"
-      v-model="mobileOpen"
-      location="left"
-      temporary
-      width="320"
+      v-model:snap="sheetSnap"
+      :model-value="mobileOpen"
+      aria-label="Слои и фрагменты"
+      @dismiss="mobileOpen = false"
     >
       <MapSidebarPanel
+        class="sheet-panel"
         :layer-opacities="layerOpacities"
         :fragments-loading="fragmentsLoading"
         :active-tab="activeTab"
@@ -50,7 +51,7 @@
         @opacity-change="updateLayerOpacity"
         @load-fragments="loadFragments"
       />
-    </v-navigation-drawer>
+    </BottomSheet>
 
     <!-- ДЕСКТОП: плавающая карточка над картой (первый кадр без slide-enter — иначе CLS в .map-container) -->
     <transition :name="sidebarMotionEnabled ? 'slide' : 'sidebar-static'">
@@ -106,6 +107,8 @@ import { useUiStore }       from '~/stores/uiStore'
 import { setMapSubLayerOpacity } from '~/utils/mapLayerOpacity'
 import { readCssPx } from '~/utils/shellMetrics'
 import MapSidebarPanel from './MapSidebarPanel.vue'
+import BottomSheet from '~/components/BottomSheet.vue'
+import type { SheetSnap } from '~/utils/sheetSnap'
 
 const { mobile } = useDisplay()
 
@@ -114,9 +117,20 @@ const fragmentStore = useFragmentStore()
 const mapStore      = useMapStore()
 const SIDEBAR_STATE_KEY = 'mapSidebarState'
 
+const ui = useUiStore()
+
 // UI state
 const desktopCollapsed = ref(false)
-const mobileOpen       = ref(false)
+/** Шторка слоёв на телефоне — панель менеджера (uiStore `layers`): открытая закрывает «Инструменты» и измерения */
+const mobileOpen = computed({
+  get: () => ui.layersOpen,
+  set: (open: boolean) => ui.setPanel('layers', open),
+})
+/** Положение шторки; каждое открытие — с половины экрана */
+const sheetSnap = ref<SheetSnap>('half')
+watch(mobileOpen, (open) => {
+  if (open) sheetSnap.value = 'half'
+})
 const activeTab        = ref('layers')
 const showSnackbar     = ref(false)
 const snackbarMessage  = ref('')
@@ -210,7 +224,8 @@ onMounted(() => {
     try {
       const savedUiState = JSON.parse(savedUiStateRaw)
       desktopCollapsed.value = Boolean(savedUiState.desktopCollapsed)
-      mobileOpen.value = Boolean(savedUiState.mobileOpen)
+      // шторка — панель менеджера: на десктопе её флаг не поднимаем (иначе она открылась бы при сужении окна)
+      if (mobile.value) mobileOpen.value = Boolean(savedUiState.mobileOpen)
       if (typeof savedUiState.activeTab === 'string' && savedUiState.activeTab.length > 0) {
         activeTab.value = savedUiState.activeTab
       }
@@ -234,7 +249,6 @@ watch([desktopCollapsed, mobileOpen, activeTab], saveSidebarState, { deep: false
  */
 const SIDEBAR_WIDTH_PX = 320
 const SHELL_INSET_FALLBACK_PX = 12
-const ui = useUiStore()
 const sidebarEl = ref<HTMLElement | null>(null)
 /**
  * Правый край карточки: offsetLeft + offsetWidth не зависят от transform анимации входа и учитывают
@@ -249,7 +263,10 @@ watch([mobile, desktopCollapsed, sidebarEl], ([isMobile, collapsed, el]) => {
     ? el.offsetLeft + el.offsetWidth
     : readCssPx('--shell-inset', SHELL_INSET_FALLBACK_PX) + SIDEBAR_WIDTH_PX)
 }, { immediate: true, flush: 'post' })
-onBeforeUnmount(() => ui.setLeftInset(0))
+onBeforeUnmount(() => {
+  ui.setLeftInset(0)
+  ui.setPanel('layers', false)
+})
 </script>
 
 <style scoped>
@@ -258,6 +275,20 @@ onBeforeUnmount(() => ui.setLeftInset(0))
   top: calc(var(--shell-top) + var(--shell-inset));
   left: calc(var(--shell-inset) + var(--safe-left, 0px));
   z-index: var(--z-controls);
+}
+
+/* Телефон: левый верхний угол занят меню — кнопка слоёв внизу слева, под большим пальцем (над масштабом) */
+@media (max-width: 959.98px) {
+  .sidebar-toggle-wrap {
+    top: auto;
+    bottom: calc(var(--shell-inset) + 32px + var(--safe-bottom, 0px));
+  }
+}
+
+/* Панель в шторке: заполняет видимую часть, прокрутка — внутри */
+.sheet-panel {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* Кнопка как у контролов карты: белый квадрат 40 (на тач-экране 44), тень вместо рамки */

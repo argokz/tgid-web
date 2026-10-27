@@ -528,7 +528,7 @@ const statusChips = computed(() => {
   width: max-content;
   max-width: calc(100% - 32px);
   position: absolute;
-  top: calc(var(--shell-inset) + var(--toolbar-row) + var(--shell-gap)); /* под строкой режимов */
+  top: calc(var(--modes-offset) + var(--toolbar-row) + var(--shell-gap)); /* под строкой режимов */
   left: 50%;
   transform: translateX(-50%);
   transform-origin: 50% 0;

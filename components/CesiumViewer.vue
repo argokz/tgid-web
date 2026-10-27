@@ -155,7 +155,7 @@ onMounted(async () => {
 
 .cesium-photo-toggle {
   position: absolute;
-  top: var(--shell-inset);
+  top: var(--hud-top);
   right: var(--controls-w); /* левее колонки контролов карты */
   z-index: 2;
 }
@@ -179,7 +179,7 @@ onMounted(async () => {
 .cesium-error {
   position: absolute;
   z-index: 2;
-  top: calc(var(--shell-inset) + var(--toolbar-row) + var(--shell-gap)); /* под строкой режимов */
+  top: calc(var(--modes-offset) + var(--toolbar-row) + var(--shell-gap)); /* под строкой режимов */
   left: calc(var(--map-left-inset, 0px) + (100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px)) / 2);
   transform: translateX(-50%);
 }

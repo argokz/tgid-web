@@ -410,12 +410,12 @@ onBeforeUnmount(() => draw.detach());
   /* Под строкой режимов, по центру видимой части карты (между карточками слоёв и объекта — --map-left/right-inset
      ставит MapViewer); раньше стояла слева и при открытой панели слоёв уходила под неё */
   position: absolute;
-  top: calc(var(--shell-inset) + var(--toolbar-row) + var(--shell-gap));
+  top: calc(var(--modes-offset) + var(--toolbar-row) + var(--shell-gap));
   left: calc(var(--map-left-inset, 0px) + (100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px)) / 2);
   transform: translateX(-50%);
   z-index: var(--z-controls);
   width: min(360px, calc(100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px) - 2 * var(--shell-inset)));
-  max-height: calc(100% - 2 * var(--shell-inset) - var(--toolbar-row) - var(--shell-gap));
+  max-height: calc(100% - var(--modes-offset) - var(--shell-inset) - var(--toolbar-row) - var(--shell-gap));
   display: flex;
   flex-direction: column;
   overflow: hidden;

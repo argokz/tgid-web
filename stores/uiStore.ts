@@ -6,7 +6,8 @@ import type { DeviceClass } from '~/utils/breakpoints';
  * Менеджер панелей приложения (docs/ui-zones.md).
  *
  * Панели, которые делят экран с картой: «Инструменты» (журналы, реестры, отчёты — правый drawer),
- * «Измерения» (панель рисования слева) и карточка объекта (панель справа или окно). Их содержимое
+ * «Измерения» (панель рисования), карточка объекта (панель справа или окно) и шторка слоёв на телефоне
+ * (`layers`; на десктопе слои — постоянная карточка слева, менеджер её не трогает). Их содержимое
  * рендерится внутри MapViewer и AttributePanel, открываются они из шапки, контролов карты и клика
  * по объекту — связь идёт через этот store.
  *
@@ -17,7 +18,7 @@ import type { DeviceClass } from '~/utils/breakpoints';
  * `bottomInset` — высота панели графиков снизу (`ChartDock`): перелёт к объекту ставит его над панелью.
  * `leftInset` — правый край открытой карточки слоёв слева (десктоп: отступ + ширина): легенда и панель графиков встают правее неё.
  */
-export type PanelKey = 'tools' | 'draw' | 'card';
+export type PanelKey = 'tools' | 'draw' | 'card' | 'layers';
 
 export interface PanelRule {
   /** Панели, которые закрываются при открытии этой */
@@ -35,6 +36,8 @@ export const PANEL_RULES: Readonly<Record<PanelKey, PanelRule>> = {
   tools: { closes: ['draw'], soloOnPhone: true, evictable: true },
   draw: { closes: ['tools'], soloOnPhone: true, evictable: true },
   card: { closes: [], soloOnPhone: true, evictable: false },
+  // шторка слоёв не закрывает измерения: начатая линия пропала бы; «Инструменты» закрывает (оба на весь экран)
+  layers: { closes: ['tools'], soloOnPhone: false, evictable: true },
 };
 
 export const PANEL_KEYS = Object.keys(PANEL_RULES) as PanelKey[];
@@ -55,6 +58,8 @@ export const useUiStore = defineStore('ui', () => {
   const drawPanelOpen = ref(false);
   /** Карточка объекта (ObjectCardShell сообщает о своём состоянии) */
   const cardOpen = ref(false);
+  /** Шторка слоёв на телефоне (MapSidebar) */
+  const layersOpen = ref(false);
   /** Запрос открыть диалог инструментов из-за пределов карты (протокол расчёта → журнал) */
   const toolDialogRequest = ref<ToolDialogRequest | null>(null);
   /** Класс устройства по ширине окна (utils/breakpoints); ставит layout после гидрации */
@@ -66,7 +71,7 @@ export const useUiStore = defineStore('ui', () => {
   /** Правый край карточки слоёв от левого края окна, px (0 — свёрнута или на телефоне) */
   const leftInset = ref(0);
 
-  const flags: Record<PanelKey, Ref<boolean>> = { tools: toolsPanelOpen, draw: drawPanelOpen, card: cardOpen };
+  const flags: Record<PanelKey, Ref<boolean>> = { tools: toolsPanelOpen, draw: drawPanelOpen, card: cardOpen, layers: layersOpen };
 
   const evict = (keys: readonly PanelKey[], except: PanelKey | null) => {
     for (const other of keys) {
@@ -136,6 +141,7 @@ export const useUiStore = defineStore('ui', () => {
     toolsPanelOpen,
     drawPanelOpen,
     cardOpen,
+    layersOpen,
     toolDialogRequest,
     viewport,
     rightInset,

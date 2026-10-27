@@ -1,7 +1,10 @@
 <template>
   <div class="sidebar-inner">
-    <!-- Шапка -->
-    <div class="sidebar-header">
+    <!-- Шапка; на телефоне за неё тянется шторка (BottomSheet) -->
+    <div
+      class="sidebar-header"
+      data-sheet-drag
+    >
       <div class="sidebar-heading">
         <div class="sidebar-title">{{ sidebarTitle }}</div>
         <div class="sidebar-subtitle">{{ tabSubtitle }}</div>

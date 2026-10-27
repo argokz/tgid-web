@@ -20,7 +20,8 @@ export const FIRST_RUN_VERSION = '1';
 export const FIRST_RUN_STEPS: FirstRunStep[] = [
   {
     id: 'sections',
-    anchors: ['.nav-links'],
+    // на телефоне разделов в шапке нет — они в меню за кнопкой со знаком
+    anchors: ['.nav-links', '.corner-btn--menu'],
     side: 'bottom',
     title: 'Разделы',
     text: 'Расчёт, протокол и выгрузки — здесь. Справа — поиск по всему (Ctrl+K), инструменты и ваш профиль.',

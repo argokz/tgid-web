@@ -19,7 +19,7 @@ describe('дизайн-токены', () => {
       '--glass-1-bg', '--glass-1-filter', '--glass-solid-bg', '--glass-border',
       '--surface-hover', '--surface-pressed', '--surface-selected', '--border-subtle',
       '--text-strong', '--text-muted', '--text-faint',
-      '--shell-top', '--shell-inset', '--shell-gap', '--controls-w', '--toolbar-row', '--measure',
+      '--shell-top', '--shell-inset', '--shell-gap', '--controls-w', '--toolbar-row', '--modes-offset', '--corner-btn', '--hud-top', '--measure',
     ]) {
       expect(tokens, name).toMatch(new RegExp(name + ':[ ]*[^;]+;'));
     }

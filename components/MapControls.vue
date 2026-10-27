@@ -413,7 +413,7 @@ defineExpose({ identifyMode })
  */
 .map-modes {
   position: fixed;
-  top: calc(var(--shell-top) + var(--shell-inset));
+  top: calc(var(--shell-top) + var(--modes-offset));
   left: calc(var(--map-left-inset, 0px) + (100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px)) / 2);
   transform: translateX(-50%);
   z-index: var(--z-controls);

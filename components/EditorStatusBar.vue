@@ -45,4 +45,10 @@ const toolInfo = computed(() => EDITOR_TOOLS.find((t) => t.value === props.tool)
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* телефон: внизу по углам — кнопка слоёв и зум, строка состояния между ними */
+@media (max-width: 959.98px) {
+  .editor-status-bar {
+    max-width: calc(100% - 2 * (var(--shell-inset) + var(--corner-btn) + var(--shell-gap)));
+  }
+}
 </style>

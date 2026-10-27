@@ -101,5 +101,9 @@ const ticks = computed(() => props.stops.map(([value], index) => {
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 .map-legend__note { margin-top: var(--space-1); color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity)); }
-@media (max-width: 600px) { .map-legend { bottom: 56px; width: 220px; } }
+@media (max-width: 600px) { .map-legend { width: 220px; } }
+/* телефон: внизу слева — кнопка слоёв (MapSidebar), легенда над ней */
+@media (max-width: 959.98px) {
+  .map-legend { bottom: calc(var(--shell-inset) + 32px + var(--corner-btn) + var(--shell-gap) + var(--safe-bottom, 0px)); }
+}
 </style>

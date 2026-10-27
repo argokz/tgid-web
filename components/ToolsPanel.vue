@@ -165,6 +165,14 @@ const runTool = (tool: ToolDescriptor) => {
   }
 }
 
+/* Телефон: полосы шапки нет (угловые кнопки прячутся, пока панель открыта) — панель от верха экрана */
+@media (max-width: 959.98px) {
+  .tools-panel.v-navigation-drawer {
+    top: 0 !important;
+    height: 100% !important;
+  }
+}
+
 .tools-panel :deep(.v-navigation-drawer__content) {
   display: flex;
   flex-direction: column;

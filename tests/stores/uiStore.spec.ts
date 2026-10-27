@@ -18,6 +18,22 @@ describe('uiStore — менеджер панелей', () => {
     expect(ui.openPanels).toEqual(['tools']);
   });
 
+  it('шторка слоёв на телефоне закрывает «Инструменты», но не измерения; её закрывает карточка', () => {
+    const ui = useUiStore();
+    ui.setViewport('phone');
+    ui.setPanel('tools', true);
+    ui.setPanel('layers', true);
+    expect(ui.openPanels).toEqual(['layers']);
+    ui.setPanel('layers', false);
+    ui.setPanel('draw', true);
+    ui.setPanel('layers', true);
+    expect(ui.openPanels).toEqual(['draw', 'layers']);
+    expect(ui.layersOpen).toBe(true);
+    ui.setPanel('card', true);
+    expect(ui.openPanels).toEqual(['card']);
+    expect(ui.layersOpen).toBe(false);
+  });
+
   it('на десктопе карточка живёт рядом с панелями, на телефоне — одна панель на экране', () => {
     const ui = useUiStore();
     ui.setViewport('desktop');
