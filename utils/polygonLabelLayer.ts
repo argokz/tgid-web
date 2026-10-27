@@ -18,9 +18,22 @@ interface Controller {
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 const registry = new WeakMap<MapLibreMap, Map<string, Controller>>()
 
+const LABEL_POINTS_MARK = '--labelpts--'
+
 /** id GeoJSON-источника точек подписей векторного источника */
 export const labelPointsSourceId = (vectorSourceId: string, sourceLayer: string): string =>
-  `${vectorSourceId}--labelpts--${sourceLayer}`
+  `${vectorSourceId}${LABEL_POINTS_MARK}${sourceLayer}`
+
+/**
+ * Обратно: источник точек подписей → векторный источник и слой полигонов (id объектов те же).
+ * Не источник точек подписей — null
+ */
+export const parseLabelPointsSourceId = (sourceId: string): { vectorSourceId: string; sourceLayer: string } | null => {
+  const at = sourceId.indexOf(LABEL_POINTS_MARK)
+  if (at <= 0) return null
+  const sourceLayer = sourceId.slice(at + LABEL_POINTS_MARK.length)
+  return sourceLayer ? { vectorSourceId: sourceId.slice(0, at), sourceLayer } : null
+}
 
 /** Пикселей на метр меркатора на нулевом зуме (тайл 512) */
 const PX_PER_MERC_M_Z0 = 1 / 78271.51696402048

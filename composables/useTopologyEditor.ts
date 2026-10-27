@@ -14,6 +14,7 @@ import type {
   TopologyUndoEntry,
 } from '~/services/fastApiService';
 import { useNotificationStore } from '~/stores/notificationStore';
+import { useCoordCrs } from '~/composables/useCoordCrs';
 import { useLineVertexEditor } from '~/composables/useLineVertexEditor';
 import { pickNetworkFeature } from '~/utils/networkFeature';
 import { isTouchInput, queryEditorHits } from '~/utils/mapPick';
@@ -1623,12 +1624,8 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
         focusSelection();
         break;
       case 'copy':
-        try {
-          await navigator.clipboard.writeText(`${point[1].toFixed(6)}, ${point[0].toFixed(6)}`);
-          useNotificationStore().showSuccess(`Скопировано: ${point[1].toFixed(6)}, ${point[0].toFixed(6)}`);
-        } catch {
-          useNotificationStore().showWarning('Буфер обмена недоступен');
-        }
+        // В системе, выбранной в строке координат внизу карты (WGS84 / местная / десктоп)
+        await useCoordCrs().copyPoint(point[0], point[1]);
         break;
       case 'dissolve':
       case 'delete':

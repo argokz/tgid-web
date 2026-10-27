@@ -40,6 +40,7 @@ import { computed } from 'vue'
 import { useAuthStore } from '~/stores/authStore'
 import { canDo, type PermKind } from '~/utils/permissions'
 import type { EditorContextAction, EditorContextTarget } from '~/utils/editorTools'
+import { COPY_HINT, useCoordCrs } from '~/composables/useCoordCrs'
 
 const props = defineProps<{ menu: EditorContextTarget | null }>()
 const emit = defineEmits<{ action: [action: EditorContextAction] }>()
@@ -78,11 +79,14 @@ const onItem = (item: Item) => {
   emit('action', item.action)
 }
 
+/** Система из строки координат внизу карты — в ней и копируются координаты */
+const { crs: coordCrs } = useCoordCrs()
+
 const items = computed<Item[]>(() => {
   const m = props.menu
   if (!m) return []
   const common: Item[] = [
-    { action: 'copy', title: 'Копировать координаты', icon: 'mdi-content-copy', hint: 'широта, долгота' },
+    { action: 'copy', title: 'Копировать координаты', icon: 'mdi-content-copy', hint: COPY_HINT[coordCrs.value] },
   ]
   if (m.kind === 'node') {
     return [

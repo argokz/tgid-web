@@ -25,6 +25,7 @@ import { getCityConfig } from '~/utils/cityConfig';
 import { BUILDING_CARD_TABLES, QUERY_LAYER_KEY_TABLE, mergeQueryLayerProperties } from '~/utils/networkFeature';
 import { desktopCardKind, desktopCardProps } from '~/utils/desktopCard';
 import { highlightKey, type HighlightTarget } from '~/utils/selectionHighlight';
+import { parseLabelPointsSourceId } from '~/utils/polygonLabelLayer';
 import {
   getMapTilerGlyphsUrl,
   getMapTilerHybridTilesUrl,
@@ -1364,10 +1365,14 @@ export const useMapStore = defineStore('map', {
       const geometry = this.toPlainGeometry(feature?.geometry);
       if (!geometry) return null;
       const layer = feature?.layer || {};
+      const source = typeof layer.source === 'string' ? layer.source : feature?.source;
+      // Под курсором подпись дома (точка в его середине, источник точек подписей) — подсвечиваем сам дом:
+      // его куски ищутся в векторном источнике по тому же id; иначе вместо контура — кружок в точке подписи
+      const labelOf = typeof source === 'string' ? parseLabelPointsSourceId(source) : null;
       return markRaw({
         geometry,
-        source: typeof layer.source === 'string' ? layer.source : feature?.source,
-        sourceLayer: layer['source-layer'] || feature?.sourceLayer || undefined,
+        source: labelOf ? labelOf.vectorSourceId : source,
+        sourceLayer: labelOf ? labelOf.sourceLayer : (layer['source-layer'] || feature?.sourceLayer || undefined),
         featureId: feature?._sourceId ?? feature?.id,
       });
     },

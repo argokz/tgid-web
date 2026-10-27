@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { attachPolygonLabelPoints, interiorLabelLayout, labelPointsSourceId, zoomValue } from '../../utils/polygonLabelLayer'
+import {
+  attachPolygonLabelPoints,
+  interiorLabelLayout,
+  labelPointsSourceId,
+  parseLabelPointsSourceId,
+  zoomValue,
+} from '../../utils/polygonLabelLayer'
 
 function fakeMap(zoom: number) {
   const sources: Record<string, any> = {}
@@ -97,5 +103,14 @@ describe('слой подписей по точкам полигонов', () =>
     map.fire('moveend')
     vi.advanceTimersByTime(200)
     expect(map.handlers.moveend.size).toBe(0)
+  })
+})
+
+describe('источник точек подписей ↔ векторный источник', () => {
+  it('подпись под курсором ведёт к полигону того же векторного источника (подсветка контура дома)', () => {
+    const id = labelPointsSourceId('vec__AlmatyGIS__zdaniya_2', 'zdaniya_2')
+    expect(parseLabelPointsSourceId(id)).toEqual({ vectorSourceId: 'vec__AlmatyGIS__zdaniya_2', sourceLayer: 'zdaniya_2' })
+    expect(parseLabelPointsSourceId('vec__AlmatyGIS__zdaniya_2')).toBeNull()
+    expect(parseLabelPointsSourceId('--labelpts--x')).toBeNull()
   })
 })

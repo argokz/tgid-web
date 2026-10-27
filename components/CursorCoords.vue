@@ -87,7 +87,7 @@ import HintTip from '~/components/HintTip.vue';
 import { registerHotkeys } from '~/composables/useHotkeys';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { fastApiService } from '~/services/fastApiService';
-import { appStorage } from '~/utils/appStorage';
+import { useCoordCrs } from '~/composables/useCoordCrs';
 import {
   COORD_COPY_ITEMS,
   coordCopyText,
@@ -103,22 +103,9 @@ const CRS_ITEMS: readonly { value: PointCrs; title: string; short: string }[] = 
   { value: 'local', title: 'Местная система (9998), м', short: 'Местн.' },
   { value: 'desktop', title: 'Координаты десктопа (x/y узлов), см', short: 'Десктоп' },
 ];
-const CRS_KEY = 'cursorCoordsCrs';
-
-const crs = ref<PointCrs>((() => {
-  try {
-    const v = appStorage.getItem(CRS_KEY);
-    return CRS_ITEMS.some((c) => c.value === v) ? (v as PointCrs) : 'wgs84';
-  } catch {
-    return 'wgs84';
-  }
-})());
+// Система — общая (composables/useCoordCrs): в ней же копируются координаты объекта из меню редактора
+const { crs } = useCoordCrs();
 watch(crs, (v) => {
-  try {
-    appStorage.setItem(CRS_KEY, v);
-  } catch {
-    // удобство: без хранилища — до перезагрузки
-  }
   if (point.value && !point.value.converted && v !== 'wgs84') scheduleConvert();
 });
 const crsItem = computed(() => CRS_ITEMS.find((c) => c.value === crs.value) ?? CRS_ITEMS[0]!);

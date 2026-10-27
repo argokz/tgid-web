@@ -26,7 +26,8 @@ const toolInfo = computed(() => EDITOR_TOOLS.find((t) => t.value === props.tool)
 <style scoped>
 .editor-status-bar {
   position: absolute;
-  bottom: calc(28px + var(--safe-bottom, 0px));
+  /* над строкой координат (CursorCoords: 4 px от низа + высота 32) с зазором 8 — не заходит под неё */
+  bottom: calc(44px + var(--safe-bottom, 0px));
   left: calc(var(--map-left-inset, 0px) + (100% - var(--map-left-inset, 0px) - var(--map-right-inset, 0px)) / 2); /* центр видимой части карты */
   transform: translateX(-50%);
   max-width: calc(100% - 32px);

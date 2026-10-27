@@ -227,6 +227,26 @@
         vertical
         class="mx-1"
       />
+      <!-- Удалить выделенное (то же, что Del): права и окно предпросмотра — в deleteSelection -->
+      <v-btn
+        size="small"
+        variant="text"
+        icon
+        color="error"
+        :disabled="!selection"
+        aria-label="Удалить выделенное"
+        @click="deleteSelection"
+      >
+        <v-icon size="20">
+          mdi-delete-outline
+        </v-icon>
+        <v-tooltip
+          activator="parent"
+          location="bottom"
+        >
+          {{ selection ? `Удалить ${selection.kind === 'line' ? 'участок' : 'узел'} (Del)` : 'Удалить: сначала выделите узел или участок (инструмент «Выбор», V)' }}
+        </v-tooltip>
+      </v-btn>
       <v-btn
         size="small"
         variant="text"
@@ -466,6 +486,8 @@ const {
   redoBusy,
   undoLastTopologyOperation,
   redoLastTopologyOperation,
+  selection,
+  deleteSelection,
   newLineTemplateId,
   newNodeTemplateId,
   lineTemplates,
