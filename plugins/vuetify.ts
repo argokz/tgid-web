@@ -4,6 +4,7 @@ import { en, ru } from 'vuetify/locale'
 import { h } from 'vue'
 import { loadLazyMdiSvgPaths, resolveMdiSvgPath } from '~/utils/mdiSvgPaths'
 import { BREAKPOINTS } from '~/utils/breakpoints'
+import { Z_TOOLTIP } from '~/utils/zLayers'
 
 // import { mdiDotsVertical, mdiBook, mdiExitToApp, mdiPencil } from '@mdi/js';
 // aliases['dotsVertical'] = mdiDotsVertical
@@ -74,6 +75,12 @@ export default defineNuxtPlugin((app) => {
       mobileBreakpoint: BREAKPOINTS.md,
     },
     defaults: {
+      // Подсказки над поповером у точки карты (--z-popover 2000): при равном z-index Vuetify (2000 без открытых
+      // диалогов) поповер позже в DOM и закрывал подсказки своих кнопок. Внутри диалогов Vuetify сам кладёт
+      // подсказку на 10 выше верхнего оверлея
+      VTooltip: {
+        zIndex: Z_TOOLTIP
+      },
       // Без материальной высоты: окна и меню получают тень-токен в assets/styles/_base.scss, карточки внутри
       // панелей и окон — плоские (иерархия поверхностей, этап 10). Именно variant, а не `elevation: 0`:
       // тот вешает `.elevation-0 { box-shadow: … !important }` и гасит тени-токены. Явный `elevation="N"`

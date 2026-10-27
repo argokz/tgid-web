@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { Z_TOOLTIP } from '../../utils/zLayers';
 
 /** Токены — контракт для примитивов: имена и защитные медиазапросы не должны пропасть при правках */
 const tokens = readFileSync(resolve(__dirname, '../../assets/styles/_tokens.scss'), 'utf8');
@@ -13,7 +14,7 @@ describe('дизайн-токены', () => {
       '--space-1', '--space-2', '--space-3', '--space-4', '--space-6',
       '--radius-sm', '--radius-md', '--radius-lg',
       '--shadow-1', '--shadow-2', '--shadow-3',
-      '--z-map', '--z-hud', '--z-controls', '--z-toolbar', '--z-inspector', '--z-popover', '--z-overlay', '--z-toast',
+      '--z-map', '--z-hud', '--z-controls', '--z-toolbar', '--z-inspector', '--z-popover', '--z-tooltip', '--z-overlay', '--z-toast',
       '--duration-fast', '--duration-base', '--duration-slow', '--ease-out', '--ease-in', '--ease-spring',
       '--accent', '--accent-rgb', '--accent-text', '--accent-soft',
       '--glass-1-bg', '--glass-1-filter', '--glass-solid-bg', '--glass-border',
@@ -27,10 +28,12 @@ describe('дизайн-токены', () => {
 
   it('z-слои идут снизу вверх и не поднимаются выше оверлея Vuetify', () => {
     const z = (name: string) => Number(tokens.match(new RegExp(name + ':[ ]*([0-9]+);'))![1]);
-    const order = ['--z-map', '--z-hud', '--z-controls', '--z-toolbar', '--z-inspector', '--z-popover', '--z-overlay', '--z-toast'].map(z);
+    const order = ['--z-map', '--z-hud', '--z-controls', '--z-toolbar', '--z-inspector', '--z-popover', '--z-tooltip', '--z-overlay', '--z-toast'].map(z);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(z('--z-overlay')).toBe(2400);
     expect(z('--z-toast')).toBe(10000);
+    // Умолчание v-tooltip в plugins/vuetify.ts — тот же слой
+    expect(z('--z-tooltip')).toBe(Z_TOOLTIP);
   });
 
   it('есть fallback без linear() и backdrop-filter и отключение движения по prefers-reduced-motion', () => {

@@ -1877,7 +1877,31 @@ const filledCount = computed(() =>
 )
 
 
-const updateTabsStructure = (objectTabs: any[], objectNames: Record<string, string>) => {
+/**
+ * Открытая вкладка и раскрытые разделы — по именам, а не по номерам: при переходе к другому объекту
+ * (того же типа — те же вкладки, другого — частично) карточка остаётся на той же вкладке с теми же
+ * раскрытыми разделами, а не сбрасывается на первую со свёрнутыми аккордеонами
+ */
+interface CardViewState {
+  tab: string | null
+  /** Вкладка → имена раскрытых разделов (пустое множество — все свёрнуты пользователем) */
+  open: Map<string, Set<string>>
+}
+
+const captureViewState = (): CardViewState => {
+  const open = new Map<string, Set<string>>()
+  tabsData.value.forEach((tab, idx) => {
+    // Номера в expandedSections — позиции в отрисованном списке разделов (getFilteredTabSections)
+    const sections = getFilteredTabSections(tab)
+    const names = (expandedSections.value[idx] || [])
+      .map(i => sections[i]?.sectionName)
+      .filter((name): name is string => Boolean(name))
+    open.set(tab.tabName, new Set(names))
+  })
+  return { tab: tabsData.value[activeTab.value]?.tabName ?? null, open }
+}
+
+const updateTabsStructure = (objectTabs: any[], objectNames: Record<string, string>, previous?: CardViewState) => {
 
   tabsData.value = groupAttributesByTabs(attributes.value, objectTabs, objectNames)
 
@@ -1887,13 +1911,24 @@ const updateTabsStructure = (objectTabs: any[], objectNames: Record<string, stri
 
   tabsData.value.forEach((tab, idx) => {
 
-    if (!expandedSections.value[idx]) {
+    const remembered = previous?.open.get(tab.tabName)
+
+    if (remembered) {
+
+      expandedSections.value[idx] = getFilteredTabSections(tab)
+        .flatMap((section, secIdx) => (remembered.has(section.sectionName) ? [secIdx] : []))
+
+    } else if (!expandedSections.value[idx]) {
 
       expandedSections.value[idx] = tab.sections.length > 0 ? [0] : []
 
     }
 
   })
+
+  const rememberedTab = previous?.tab ? tabsData.value.findIndex(tab => tab.tabName === previous.tab) : -1
+
+  activeTab.value = rememberedTab >= 0 ? rememberedTab : 0
 
 }
 
@@ -1967,6 +2002,9 @@ const show = (props: Record<string, any>, options: { anchor?: [number, number] |
   objectNamesData.value = objectNames
 
 
+  // Вкладка и разделы прежнего объекта — до сброса (восстанавливаются в updateTabsStructure)
+  const previousView = captureViewState()
+
   propsData.value = cleanProps
 
   attributes.value = cleanProps
@@ -1982,7 +2020,7 @@ const show = (props: Record<string, any>, options: { anchor?: [number, number] |
 
   if (objectTabs) {
 
-    updateTabsStructure(objectTabs, objectNames || {})
+    updateTabsStructure(objectTabs, objectNames || {}, previousView)
 
 
   } else {

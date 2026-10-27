@@ -56,6 +56,7 @@
   --z-toolbar: 300;    // плавающий тулбар инструментов
   --z-inspector: 1010; // карточка объекта (панель справа / окно)
   --z-popover: 2000;   // поповер у точки карты, палитра команд
+  --z-tooltip: 2100;   // подсказки (v-tooltip / HintTip) без открытых диалогов — над поповером; = Z_TOOLTIP в plugins/vuetify.ts
   --z-overlay: 2400;   // = Vuetify v-overlay (v-dialog, v-menu): свои оверлеи не выше
   --z-toast: 10000;    // = Vuetify v-snackbar
 
