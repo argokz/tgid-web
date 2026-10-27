@@ -410,8 +410,6 @@ const rootEl = ref<HTMLElement | null>(null);
 const { pos, save: savePos, reset: resetStoredPos } = usePersistedPanelPos('editorToolbarPos');
 const pinned = ref(readPinned());
 const ui = useUiStore();
-/** Зазор между панелью и краями видимой части карты, px */
-const VISIBLE_GAP_PX = 16;
 // Место по умолчанию — по центру видимой части карты (между панелью слоёв и карточкой), не шире её:
 // при масштабе 125–150 % между ними 480–740 px, и панель по центру всей карты наезжала на обе
 const posStyle = computed(() => {
@@ -419,9 +417,12 @@ const posStyle = computed(() => {
   const left = ui.leftInset;
   const right = ui.rightInset;
   if (!left && !right) return undefined;
+  // центр — середина видимой части, ширина — не заходя в колонку контролов справа (и симметрично слева); открытая
+  // карточка справа колонку закрывает — тогда до краёв карточек обычный отступ
+  const sideGap = right ? 'var(--shell-inset)' : 'var(--controls-w)';
   return {
     left: `calc(${left}px + (100% - ${left + right}px) / 2)`,
-    maxWidth: `calc(100% - ${left + right + 2 * VISIBLE_GAP_PX}px)`,
+    maxWidth: `calc(100% - ${left + right}px - 2 * ${sideGap})`,
   };
 });
 const { dragging, onPointerDown: onHandleDown, onKeydown: onHandleKeydown, reclamp } = useFloatingDrag({
@@ -526,7 +527,7 @@ const statusChips = computed(() => {
 .editor-toolbar {
   /* ширина — по содержимому, не по месту на карте: иначе сдвиг панели меняет её размер */
   width: max-content;
-  max-width: calc(100% - 32px);
+  max-width: calc(100% - 2 * var(--controls-w)); /* не заходит в колонку контролов справа */
   position: absolute;
   top: calc(var(--modes-offset) + var(--toolbar-row) + var(--shell-gap)); /* под строкой режимов */
   left: 50%;
