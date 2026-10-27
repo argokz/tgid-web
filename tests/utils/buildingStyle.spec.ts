@@ -3,11 +3,20 @@ import {
   BUILDING_CLASS_COLORS,
   BUILDING_DEFAULT_COLOR,
   BUILDING_OPACITY,
+  BUILDINGS_3D_MIN_PITCH,
   buildingColorExpression,
   buildingExtrusionPaint,
+  buildingFlatColorExpression,
   contextHoverSummary,
+  lightenTowardsBackground,
 } from '~/utils/buildingStyle'
-import { buildingsOpacity, CONTEXT_MAP_LAYER_IDS, contextKeyLayerIds } from '~/utils/contextMapLayers'
+import {
+  applyBuildingsPitchMode,
+  buildingsOpacity,
+  CONTEXT_MAP_LAYER_IDS,
+  contextKeyLayerIds,
+  isBuildings3dPitch,
+} from '~/utils/contextMapLayers'
 
 describe('здания MapTiler', () => {
   it('высота — из height/height_min тайлов MapTiler, цвет — по назначению', () => {
@@ -24,9 +33,42 @@ describe('здания MapTiler', () => {
     expect(buildingsOpacity(false)).toBe(BUILDING_OPACITY.flat)
     expect(buildingsOpacity(true)).toBe(BUILDING_OPACITY.terrain)
     expect(BUILDING_OPACITY.terrain).toBeLessThan(BUILDING_OPACITY.flat)
-    expect(contextKeyLayerIds('buildings')).toEqual([CONTEXT_MAP_LAYER_IDS.buildings, CONTEXT_MAP_LAYER_IDS.buildingsLabel])
+    expect(contextKeyLayerIds('buildings')).toEqual([
+      CONTEXT_MAP_LAYER_IDS.buildingsFlat, CONTEXT_MAP_LAYER_IDS.buildings, CONTEXT_MAP_LAYER_IDS.buildingsLabel,
+    ])
     expect(contextKeyLayerIds('contours')).toContain(CONTEXT_MAP_LAYER_IDS.contoursLabel)
     expect(contextKeyLayerIds('terrain3d')).toEqual([])
+  })
+
+  it('в плане цвет назначения осветлён к фону подложки', () => {
+    expect(lightenTowardsBackground('#000000', 1)).toBe('#f0ede6')
+    expect(lightenTowardsBackground('#cfc6b4', 0)).toBe('#cfc6b4')
+    expect(lightenTowardsBackground('rgb(0,0,0)')).toBe('rgb(0,0,0)')
+    const flat = buildingFlatColorExpression()
+    const residential = flat[flat.indexOf('residential') + 1]
+    expect(residential).toBe(lightenTowardsBackground(BUILDING_CLASS_COLORS.residential))
+    expect(residential).not.toBe(BUILDING_CLASS_COLORS.residential)
+  })
+
+  it('объём — только при наклоне карты, в плане — заливка', () => {
+    expect(isBuildings3dPitch(0)).toBe(false)
+    expect(isBuildings3dPitch(BUILDINGS_3D_MIN_PITCH)).toBe(true)
+    const visibility: Record<string, string> = {}
+    let pitch = 0
+    const map = {
+      getPitch: () => pitch,
+      getLayer: () => ({}),
+      setLayoutProperty: (id: string, _k: string, v: string) => { visibility[id] = v },
+    } as any
+    applyBuildingsPitchMode(map, true)
+    expect(visibility[CONTEXT_MAP_LAYER_IDS.buildingsFlat]).toBe('visible')
+    expect(visibility[CONTEXT_MAP_LAYER_IDS.buildings]).toBe('none')
+    pitch = 45
+    applyBuildingsPitchMode(map, true)
+    expect(visibility[CONTEXT_MAP_LAYER_IDS.buildingsFlat]).toBe('none')
+    expect(visibility[CONTEXT_MAP_LAYER_IDS.buildings]).toBe('visible')
+    applyBuildingsPitchMode(map, false)
+    expect(visibility[CONTEXT_MAP_LAYER_IDS.buildings]).toBe('none')
   })
 
   it('подсказка здания: назначение, высота и этажность, крыша', () => {

@@ -101,6 +101,42 @@ export function buildingColorExpression(): any {
   return match
 }
 
+/** Фон подложки (#f0ede6): к нему осветляются цвета зданий в плане */
+const MAP_BACKGROUND_RGB = [0xf0, 0xed, 0xe6] as const
+/** Доля фона в цвете плоского здания: в плане здания тише сети, оттенок назначения сохраняется */
+export const BUILDING_FLAT_LIGHTEN = 0.45
+
+/** Цвет #rrggbb, смешанный с фоном подложки в доле `share` (0 — исходный, 1 — фон) */
+export function lightenTowardsBackground(hex: string, share: number = BUILDING_FLAT_LIGHTEN): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex)
+  if (!m) return hex
+  const n = Number.parseInt(m[1], 16)
+  const rgb = [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
+  return `#${rgb.map((c, i) => Math.round(c + (MAP_BACKGROUND_RGB[i] - c) * share).toString(16).padStart(2, '0')).join('')}`
+}
+
+/** Выражение MapLibre: цвет здания в плане (2D) — тот же оттенок назначения, светлее объёма */
+export function buildingFlatColorExpression(): any {
+  const match: any[] = ['match', ['get', 'class']]
+  for (const [cls, color] of Object.entries(BUILDING_CLASS_COLORS)) match.push(cls, lightenTowardsBackground(color))
+  match.push(lightenTowardsBackground(BUILDING_DEFAULT_COLOR))
+  return match
+}
+
+/** Paint зданий в плане: заливка с обводкой чуть темнее фона — контур читается, сеть остаётся главной */
+export function buildingFlatPaint(): Record<string, any> {
+  return {
+    'fill-color': buildingFlatColorExpression(),
+    'fill-outline-color': '#d2cabd',
+  }
+}
+
+/**
+ * Наклон карты (°), с которого здания рисуются объёмом. Ниже — в плане: объёмы при взгляде сверху
+ * не видны, а проход fill-extrusion стоит GPU на каждом кадре.
+ */
+export const BUILDINGS_3D_MIN_PITCH = 10
+
 /** Paint объёмов зданий; opacity — ниже при рельефе 3D (сеть натянута на рельеф и видна сквозь здания) */
 export function buildingExtrusionPaint(opacity: number): Record<string, any> {
   return {

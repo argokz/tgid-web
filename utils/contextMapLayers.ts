@@ -7,7 +7,13 @@ import {
   getMapTilerTerrainRgbTilesUrl,
 } from '~/utils/maptiler'
 import { reorderPlanetBaseLayersOnMap } from '~/utils/planetV4Layers'
-import { BUILDING_FILTER, BUILDING_OPACITY, buildingExtrusionPaint } from '~/utils/buildingStyle'
+import {
+  BUILDING_FILTER,
+  BUILDING_OPACITY,
+  BUILDINGS_3D_MIN_PITCH,
+  buildingExtrusionPaint,
+  buildingFlatPaint,
+} from '~/utils/buildingStyle'
 
 /** Логические ключи для UI и localStorage */
 export type ContextLayerKey = 'contours' | 'buildings' | 'hillshade' | 'terrain3d'
@@ -28,9 +34,11 @@ export const CONTEXT_MAP_LAYER_IDS = {
   contours: 'context-contours-line',
   /** Подписи высот на основных изолиниях (каждая 5-я и 10-я) */
   contoursLabel: 'context-contours-label',
+  /** Здания в плане (2D, наклон < BUILDINGS_3D_MIN_PITCH): заливка по назначению, светлее объёмов */
+  buildingsFlat: 'context-buildings-flat',
   /**
-   * Объёмы зданий. С рельефом 3D MapLibre натягивает плоские слои (линии сети) на поверхность и рисует
-   * объёмы поверх — здания тогда полупрозрачные, чтобы трубы под ними оставались видны.
+   * Объёмы зданий — только при наклоне карты. С рельефом 3D MapLibre натягивает плоские слои (линии сети)
+   * на поверхность и рисует объёмы поверх — здания тогда полупрозрачные, чтобы трубы под ними были видны.
    */
   buildings: 'context-buildings-fill',
   /** Названия зданий (слой building_label тех же тайлов) */
@@ -41,9 +49,17 @@ export const CONTEXT_MAP_LAYER_IDS = {
 /** Подслои ключа панели «Контекст» (видимость включается вместе) */
 const CONTEXT_KEY_LAYERS: Record<Exclude<ContextLayerKey, 'terrain3d'>, string[]> = {
   contours: [CONTEXT_MAP_LAYER_IDS.contours, CONTEXT_MAP_LAYER_IDS.contoursLabel],
-  buildings: [CONTEXT_MAP_LAYER_IDS.buildings, CONTEXT_MAP_LAYER_IDS.buildingsLabel],
+  buildings: [CONTEXT_MAP_LAYER_IDS.buildingsFlat, CONTEXT_MAP_LAYER_IDS.buildings, CONTEXT_MAP_LAYER_IDS.buildingsLabel],
   hillshade: [CONTEXT_MAP_LAYER_IDS.hillshade],
 }
+
+/** Карта наклонена настолько, что здания рисуются объёмом */
+export function isBuildings3dPitch(pitch: number): boolean {
+  return pitch >= BUILDINGS_3D_MIN_PITCH
+}
+
+/** Пометка на карте: слушатель наклона для зданий уже подключён */
+const PITCH_LISTENER_FLAG = '__tgidBuildingsPitchListener'
 
 const ALL_CONTEXT_MAP_LAYER_ID_SET = new Set<string>(Object.values(CONTEXT_MAP_LAYER_IDS))
 
@@ -135,6 +151,19 @@ export function ensureContextMapLayers(map: Map): boolean {
     })
   }
 
+  if (!map.getLayer(CONTEXT_MAP_LAYER_IDS.buildingsFlat)) {
+    map.addLayer({
+      id: CONTEXT_MAP_LAYER_IDS.buildingsFlat,
+      type: 'fill',
+      source: CONTEXT_SOURCE_IDS.buildings,
+      'source-layer': 'building',
+      minzoom: 13,
+      filter: BUILDING_FILTER,
+      layout: { visibility: 'none' },
+      paint: buildingFlatPaint() as any,
+    })
+  }
+
   if (!map.getLayer(CONTEXT_MAP_LAYER_IDS.buildings)) {
     map.addLayer({
       id: CONTEXT_MAP_LAYER_IDS.buildings,
@@ -209,7 +238,36 @@ export function ensureContextMapLayers(map: Map): boolean {
     })
   }
 
+  // План ↔ объём при наклоне: переключаем только при переходе через порог, не на каждом кадре
+  const tagged = map as unknown as Record<string, unknown>
+  if (!tagged[PITCH_LISTENER_FLAG]) {
+    tagged[PITCH_LISTENER_FLAG] = true
+    let was3d = isBuildings3dPitch(map.getPitch())
+    map.on('pitch', () => {
+      const is3d = isBuildings3dPitch(map.getPitch())
+      if (is3d === was3d) return
+      was3d = is3d
+      applyBuildingsPitchMode(map)
+    })
+  }
+
   return true
+}
+
+/** Слой «Здания» контекста включён (подписи зданий видимы вместе с ключом панели) */
+function contextBuildingsVisible(map: Map): boolean {
+  return map.getLayer(CONTEXT_MAP_LAYER_IDS.buildingsLabel) != null
+    && map.getLayoutProperty(CONTEXT_MAP_LAYER_IDS.buildingsLabel, 'visibility') !== 'none'
+}
+
+/** Видимость плана и объёма зданий по текущему наклону карты */
+export function applyBuildingsPitchMode(map: Map, visible: boolean = contextBuildingsVisible(map)): void {
+  const is3d = isBuildings3dPitch(map.getPitch())
+  const set = (id: string, on: boolean) => {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none')
+  }
+  set(CONTEXT_MAP_LAYER_IDS.buildingsFlat, visible && !is3d)
+  set(CONTEXT_MAP_LAYER_IDS.buildings, visible && is3d)
 }
 
 /**
@@ -282,7 +340,8 @@ export function restackContextMapLayers(map: Map): void {
       map.moveLayer(ids.buildingsLabel)
     }
     map.moveLayer(ids.buildings, ids.buildingsLabel)
-    map.moveLayer(ids.contoursLabel, ids.buildings)
+    map.moveLayer(ids.buildingsFlat, ids.buildings)
+    map.moveLayer(ids.contoursLabel, ids.buildingsFlat)
     map.moveLayer(ids.contours, ids.contoursLabel)
     map.moveLayer(ids.hillshade, ids.contours)
   } catch (e) {
@@ -314,6 +373,13 @@ export function setContextLayerVisibility(map: Map, layerKey: ContextLayerKey, v
     if (map.getLayer(CONTEXT_MAP_LAYER_IDS.buildings)) {
       map.setPaintProperty(CONTEXT_MAP_LAYER_IDS.buildings, 'fill-extrusion-opacity', buildingsOpacity(visible))
     }
+    return
+  }
+  if (layerKey === 'buildings') {
+    if (map.getLayer(CONTEXT_MAP_LAYER_IDS.buildingsLabel)) {
+      map.setLayoutProperty(CONTEXT_MAP_LAYER_IDS.buildingsLabel, 'visibility', visible ? 'visible' : 'none')
+    }
+    applyBuildingsPitchMode(map, visible)
     return
   }
   for (const id of contextKeyLayerIds(layerKey)) {

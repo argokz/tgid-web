@@ -447,7 +447,8 @@ export const useMapStore = defineStore('map', {
     },
 
     loadVisiblePlanetLayers() {
-      const PLANET_PREFS_VERSION = 2;
+      // 3 — этап 11: детальная подложка по умолчанию (зелень, землепользование, районы, номера домов)
+      const PLANET_PREFS_VERSION = 3;
       const ver = appStorage.getItem('visiblePlanetLayers_v');
       const saved = appStorage.getItem('visiblePlanetLayers');
       if (saved && ver === String(PLANET_PREFS_VERSION)) {
@@ -466,7 +467,7 @@ export const useMapStore = defineStore('map', {
 
     saveVisiblePlanetLayers() {
       appStorage.setItem('visiblePlanetLayers', JSON.stringify(this.visiblePlanetLayers));
-      appStorage.setItem('visiblePlanetLayers_v', '2');
+      appStorage.setItem('visiblePlanetLayers_v', '3');
     },
 
     loadPlanetLayerStyleOverrides() {
