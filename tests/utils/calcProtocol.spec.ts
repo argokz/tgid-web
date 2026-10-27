@@ -11,6 +11,8 @@ import {
   objectFromAnchor,
   primaryObject,
   protocolTarget,
+  regulatorFixField,
+  sameNodePairKey,
   type CalcProtocolRecord,
   type ProtocolEntry,
   type ProtocolLocateResult,
@@ -43,7 +45,12 @@ const ln = { type: 'LineString', coordinates: [[76.9, 43.2], [77.0, 43.3]] };
 const located: ProtocolLocateResult = {
   nodes: { 5: { geometry: pt, shown_id: 100 }, 7: { geometry: pt, shown_id: 7 }, 3: { geometry: pt, shown_id: 3 } },
   lines: { 900: { geometry: ln, owner_id: null }, 901: { geometry: pt, owner_id: 50 } },
-  pairs: { '1-2': { line_id: 900 }, '3-4': { node_id: 3 } },
+  pairs: {
+    '1-2': { line_id: 900 },
+    '3-4': { node_id: 3 },
+    // регулятор внутренней схемы камеры 50: sety пишет оба конца владельцем, участок 901 найден по подписи
+    [sameNodePairKey(50, '(УР2ЧАП) М2 1КЗ-22А О - М2 1КЗ-22Б О')]: { line_id: 901 },
+  },
 };
 
 describe('разобранный протокол расчёта', () => {
@@ -88,6 +95,28 @@ describe('разобранный протокол расчёта', () => {
     expect(protocolTarget({ kind: 'line', id: 901, label: '' }, located)).toMatchObject({ table: 'nodes', id: 50 });
     expect(protocolTarget({ kind: 'node', id: 404, label: '' }, located)).toBeNull();
     expect(protocolTarget({ kind: 'node', id: 5, label: '' }, null)).toBeNull();
+  });
+
+  it('устройство внутренней схемы: на карте узел-владелец, правка — по его участку', () => {
+    // участок внутренней схемы и пара с одинаковыми концами — lineId самого участка
+    expect(protocolTarget({ kind: 'line', id: 901, label: '' }, located)).toMatchObject({ table: 'nodes', id: 50, lineId: 901 });
+    expect(protocolTarget({ kind: 'line2', id1: 50, id2: 50, label: '(УР2ЧАП) М2 1КЗ-22А О - М2 1КЗ-22Б О' }, located))
+      .toMatchObject({ table: 'nodes', id: 50, lineId: 901 });
+    // подпись не та — только узел, без участка
+    expect(protocolTarget({ kind: 'line2', id1: 7, id2: 7, label: 'другой' }, located)?.lineId).toBeUndefined();
+    expect(protocolTarget({ kind: 'line2', id1: 1, id2: 2, label: '' }, located)?.lineId).toBe(900);
+  });
+
+  it('поле регулятора, которое исправляет сообщение протокола', () => {
+    expect(regulatorFixField('Регулятор давления [A - B] не может обеспечить давление в узле [A]\n    Задано 59.0 м. получено 49.66 м.'))
+      .toBe('Заданная величина');
+    expect(regulatorFixField('Не задана относительная протечка или макс. сопр.\n    регулятора [[A] - [B]] Значение берется по умолчанию'))
+      .toBe('Относительная утечка');
+    expect(regulatorFixField('В регуляторе [[A] - [B]] не найден узел с регулируемым напором 5')).toBe('Регулируемый узел');
+    expect(regulatorFixField('В регуляторе [[A] - [B]] не задан узел с регулируемым напором')).toBe('Регулируемый узел');
+    expect(regulatorFixField('Регулятор давления [A - B] работает в режиме реверса: уточните направление установки РД'))
+      .toBe('Начальный узел');
+    expect(regulatorFixField('Прочее сообщение о регуляторе')).toBeNull();
   });
 
   it('основной объект — не контекстный', () => {

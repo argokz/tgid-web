@@ -586,6 +586,7 @@ import {
   categoryChips,
   compareSummaries,
   deviceJournal,
+  regulatorFixField,
   filterEntries,
   geometryView,
   mergeEntries,
@@ -1024,8 +1025,18 @@ const flyTo = (target: ProtocolTarget) => {
 };
 
 /** Устройство (регулятор, насос) на участке: исправляется в журнале, карточки участка у него нет */
+/** Устройство на участке (регулятор, байпас, насос) — в т. ч. во внутренней схеме узла: правят в журнале */
 const deviceOnLine = (e: ProtocolEntry, target: ProtocolTarget | null) =>
-  (target?.table === 'heatpipesections' ? deviceJournal(e) : null);
+  (target?.lineId != null ? deviceJournal(e) : null);
+
+/** Журнал устройства по его участку; у регулятора — сразу карточка с полем, которое надо исправить */
+const openDeviceJournal = (e: ProtocolEntry, target: ProtocolTarget) => {
+  const journal = deviceOnLine(e, target);
+  if (!journal || target.lineId == null) return false;
+  const focusLabel = journal.key === 'networkRegulator' ? regulatorFixField(e.text) ?? undefined : undefined;
+  uiStore.requestToolDialog(journal.key, { lineId: target.lineId, focusLabel });
+  return true;
+};
 
 const entryTarget = (e: ProtocolEntry) => {
   const o = primaryObject(e);
@@ -1048,8 +1059,10 @@ const goTo = async (o: ProtocolObject, e?: ProtocolEntry) => {
     return null;
   }
   flyTo(target);
-  if (e && deviceOnLine(e, target)) {
+  // Регулятор/байпас/насос: подсветка на карте и журнал устройства (не карточка узла-владельца внутренней схемы)
+  if (e && o.kind !== 'node' && deviceOnLine(e, target)) {
     mapStore.selectionTarget = { geometry: target.geometry };
+    openDeviceJournal(e, target);
     return target;
   }
   const sourceId = `${target.table}.${target.id}`;
@@ -1097,12 +1110,9 @@ const runFix = async (e: ProtocolEntry) => {
     }
     default:
       if (o) {
+        // goTo сам открывает журнал устройства с полем, которое надо исправить
         const target = await goTo(o, e);
-        const journal = deviceOnLine(e, target);
-        if (journal && target) {
-          uiStore.requestToolDialog(journal.key, { lineId: target.id });
-          return;
-        }
+        if (target && o.kind !== 'node' && deviceOnLine(e, target)) return;
         if (e.fix === 'fixed_head') {
           notify.showInfo('Задайте в подсети узел с заданным напором (карточка узла → гидравлика) и пересчитайте');
         }

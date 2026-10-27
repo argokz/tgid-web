@@ -1,5 +1,6 @@
 <template>
   <v-expansion-panels
+    ref="rootRef"
     multiple
     variant="accordion"
     :model-value="openPanels"
@@ -15,6 +16,7 @@
           <FieldCell
             v-for="field in group.fields"
             :key="field.label"
+            :class="{ 'journal-detail-focus': focusLabel && field.label === focusLabel }"
             :label="field.label"
             :readonly="!editable(field.key)"
             :dirty="editable(field.key) && isFieldDirty(field.key)"
@@ -85,7 +87,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import AppSelect from '~/components/AppSelect.vue';
 import FieldCell from '~/components/FieldCell.vue';
 import FieldGrid from '~/components/FieldGrid.vue';
@@ -123,10 +125,16 @@ const props = withDefaults(defineProps<{
   /** Какие панели раскрыты; по умолчанию первые две */
   openPanels?: readonly number[];
   minWidth?: number;
+  /**
+   * Подпись поля, к которому привели (переход из протокола расчёта: «что исправить»): его группа раскрыта,
+   * поле подсвечено и прокручено в видимую часть, в правке — курсор в нём
+   */
+  focusLabel?: string | null;
 }>(), {
   requiredKeys: () => [],
   openPanels: () => [0, 1],
   minWidth: 220,
+  focusLabel: null,
 });
 
 /** Одно поле изменилось: родитель сам обновляет свою модель (несколько событий в одном тике не теряются) */
@@ -136,10 +144,48 @@ const setField = (key: string, value: unknown) => {
   emit('update:field', key, value);
 };
 
-const openPanels = computed(() => [...props.openPanels]);
+const focusGroup = computed(() =>
+  props.focusLabel ? props.groups.findIndex((g) => g.fields.some((f) => f.label === props.focusLabel)) : -1);
+
+const openPanels = computed(() => {
+  const open = [...props.openPanels];
+  if (focusGroup.value >= 0 && !open.includes(focusGroup.value)) open.push(focusGroup.value);
+  return open;
+});
+
+const rootRef = ref<{ $el?: HTMLElement } | null>(null);
+
+/** Прокрутить к подсвеченному полю (после раскрытия группы) и поставить курсор, если оно правится */
+const revealFocus = async () => {
+  if (focusGroup.value < 0) return;
+  await nextTick();
+  // панель раскрывается с анимацией — ждём кадр, чтобы поле уже имело размер
+  await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+  const cell = rootRef.value?.$el?.querySelector?.('.journal-detail-focus') as HTMLElement | null;
+  if (!cell) return;
+  cell.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  cell.querySelector<HTMLElement>('input, textarea, [role="combobox"]')?.focus({ preventScroll: true });
+};
+
+/** Поле фокуса сейчас правится (editable — функция, её ссылка не меняется при входе в правку) */
+const focusEditable = computed(() => {
+  const field = props.groups.flatMap((g) => g.fields).find((f) => f.label === props.focusLabel);
+  return Boolean(field && props.editable(field.key));
+});
+
+// Подпись поля, группы (загрузилась карточка) или режим правки сменились — показать поле заново
+watch(() => [props.focusLabel, props.groups, focusEditable.value], () => { void revealFocus(); }, { flush: 'post' });
 </script>
 
 <style scoped>
+/* Поле, к которому привели из протокола расчёта: акцент «что исправить» */
+.journal-detail-focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
 .journal-detail-value {
   color: rgb(var(--v-theme-on-surface));
   font-size: 0.9rem;

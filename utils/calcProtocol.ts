@@ -105,6 +105,11 @@ export interface ProtocolTarget {
   table: 'nodes' | 'heatpipesections';
   id: number;
   geometry: GeoJsonGeometry;
+  /**
+   * Участок (linesobj) объекта сообщения. У участка внутренней схемы узла на карте показывается
+   * узел-владелец (table 'nodes'), но регулятор/байпас/насос стоят именно на этом участке
+   */
+  lineId?: number;
 }
 
 export const FIX_LABELS: Record<ProtocolFix, string> = {
@@ -204,6 +209,9 @@ export function compareSummaries(
   return `${part('ошибки', prev.errors, next.errors)}, ${part('предупреждения', prev.warnings, next.warnings)}`;
 }
 
+/** Ключ pairs ответа locate для line2 с одинаковыми концами (= same_node_pair_key в itwin-api) */
+export const sameNodePairKey = (nodeId: number, label: string): string => `${nodeId}-${nodeId}|${label}`;
+
 /** Цель перехода для объекта сообщения по ответу locate; null — геометрии нет */
 export function protocolTarget(o: ProtocolObject, located: ProtocolLocateResult | null | undefined): ProtocolTarget | null {
   if (!located) return null;
@@ -216,12 +224,16 @@ export function protocolTarget(o: ProtocolObject, located: ProtocolLocateResult 
     if (!l) return null;
     // участок внутренней схемы узла — показываем узел-владелец
     return l.owner_id
-      ? { table: 'nodes', id: l.owner_id, geometry: l.geometry }
-      : { table: 'heatpipesections', id: id!, geometry: l.geometry };
+      ? { table: 'nodes', id: l.owner_id, geometry: l.geometry, lineId: id! }
+      : { table: 'heatpipesections', id: id!, geometry: l.geometry, lineId: id! };
   };
   if (o.kind === 'node') return node(o.id);
   if (o.kind === 'line') return line(o.id);
-  if (o.id1 === o.id2) return node(o.id1);
+  if (o.id1 === o.id2) {
+    // устройство внутренней схемы камеры: sety пишет оба конца узлом-владельцем, участок сервер нашёл по подписи
+    const inner = located.pairs[sameNodePairKey(o.id1, o.label)];
+    return inner?.line_id != null ? line(inner.line_id) : node(o.id1);
+  }
   const pair = located.pairs[`${o.id1}-${o.id2}`];
   if (!pair) return null;
   return pair.line_id != null ? line(pair.line_id) : node(pair.node_id);
@@ -286,6 +298,18 @@ export interface DeviceJournal {
  * Регулятор, байпас, насос — отдельный linesobj без карточки участка: исправляют в журнале,
  * отфильтрованном по линии. null — сообщение не про устройство.
  */
+/**
+ * Поле карточки регулятора (журнал регуляторов), которое исправляет сообщение протокола: подпись поля
+ * в NetworkRegulatorJournalDialog. null — поле не определить (откроется список регуляторов участка)
+ */
+export function regulatorFixField(text: string): string | null {
+  if (/не может обеспечить|Задано\s+[\d.]+/i.test(text)) return 'Заданная величина';
+  if (/протечк|утечк|макс\.?\s*сопр/i.test(text)) return 'Относительная утечка';
+  if (/узел с регулируем/i.test(text)) return 'Регулируемый узел';
+  if (/реверс|направлени/i.test(text)) return 'Начальный узел';
+  return null;
+}
+
 export function deviceJournal(e: Pick<ProtocolEntry, 'category' | 'text'>): DeviceJournal | null {
   if (e.category === 'regulator') {
     return /байпас/i.test(e.text)

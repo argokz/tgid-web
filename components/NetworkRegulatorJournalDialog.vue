@@ -541,6 +541,7 @@
                 :editable="editable"
                 :is-field-dirty="isFieldDirty"
                 :open-panels="[0, 1, 2]"
+                :focus-label="focusLabel"
                 @update:field="setEditField"
               />
               <v-alert
@@ -669,6 +670,12 @@ export interface NetworkRegulatorJournalScope {
   catalogType?: NetworkRegulatorType
   catalogId?: number
   lineId?: number
+  /**
+   * Подпись поля карточки, которое надо исправить (переход из протокола расчёта): «Заданная величина»,
+   * «Относительная утечка», «Регулируемый узел», «Начальный узел». Единственный регулятор линии
+   * открывается сразу, поле подсвечено; правится — сразу правка с курсором в нём
+   */
+  focusLabel?: string
 }
 
 type RegulatorTab = 'inventory' | 'catalog'
@@ -1077,10 +1084,14 @@ const openCatalogDetails = async (type: NetworkRegulatorType, catalogId: number)
   }
 }
 
+/** Поле, к которому привели из протокола расчёта (сбрасывается, когда карточку закрыли) */
+const focusLabel = ref<string | null>(null)
+
 let openDialogSeq = 0
 const openDialog = async (nextScope: NetworkRegulatorJournalScope = {}) => {
   const seq = ++openDialogSeq
-  Object.assign(scope, { regulatorType: undefined, regulatorId: undefined, catalogType: undefined, catalogId: undefined, lineId: undefined }, nextScope)
+  focusLabel.value = nextScope.focusLabel ?? null
+  Object.assign(scope, { regulatorType: undefined, regulatorId: undefined, catalogType: undefined, catalogId: undefined, lineId: undefined, focusLabel: undefined }, nextScope)
   regulatorType.value = nextScope.regulatorType
   catalogType.value = nextScope.catalogType
   inventoryPage.value = 1
@@ -1098,6 +1109,18 @@ const openDialog = async (nextScope: NetworkRegulatorJournalScope = {}) => {
   if (seq !== openDialogSeq) return
   if (nextScope.catalogType && nextScope.catalogId) await openCatalogDetails(nextScope.catalogType, nextScope.catalogId)
   else if (nextScope.regulatorType && nextScope.regulatorId) await openItemDetails(nextScope.regulatorType, nextScope.regulatorId)
+  else if (nextScope.focusLabel && nextScope.lineId) {
+    // Из протокола: на линии один регулятор — сразу его карточка (список при смене раздела грузит watch — ждём сами)
+    if (tabChanged) await loadInventory()
+    if (seq !== openDialogSeq) return
+    const only = inventory.value.length === 1 ? inventory.value[0] : null
+    if (!only) return
+    await openItemDetails(only.regulator_type as NetworkRegulatorType, Number(only.id))
+  } else return
+  if (seq !== openDialogSeq || !focusLabel.value || !itemDetails.value || !mutationsEnabled.value) return
+  // Поле, которое надо исправить, правится в этой карточке — сразу в правку
+  const field = itemGroups.value.flatMap(g => g.fields).find(f => f.label === focusLabel.value)
+  if (field?.key && field.key in editColumns.value) await startEdit()
 }
 
 const startEdit = async () => {
@@ -1117,6 +1140,7 @@ const cancelEdit = async () => {
 }
 // Карточка закрыта крестиком или Esc во время правки — черновик остаётся до следующего открытия
 watch(detailVisible, (open) => {
+  if (!open) focusLabel.value = null
   if (!open) closeKeepingDraft()
 })
 const saveChanges = async () => {
