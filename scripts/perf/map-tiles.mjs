@@ -83,7 +83,7 @@ for (const z of ZOOMS) {
     map.jumpTo({ center: [lng, lat], zoom });
     map.once('idle', () => { window.__mapIdleMs = Math.round(performance.now() - t0); });
   }, [z, CENTER[0], CENTER[1]]);
-  const idleMs = await page.waitForFunction(() => window.__mapIdleMs, null, { timeout: 120000 })
+  const idleMs = await page.waitForFunction(() => window.__mapIdleMs, null, { timeout: 45000 })
     .then((h) => h.jsonValue())
     .catch(() => -1);
   await page.waitForLoadState('networkidle').catch(() => {});

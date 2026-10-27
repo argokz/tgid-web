@@ -9,6 +9,7 @@ import {
 import type { GeoCatalogLayerEntry, GeoWorkspaceCatalogEntry } from '~/utils/geoserverLayerCatalog';
 import { convertSldToMapLibre } from '~/utils/sldToMapLibre';
 import { mergeLineLayers } from '~/utils/mergeStyleLayers';
+import { tuneNetworkStyleLayers } from '~/utils/networkStyleTuning';
 import {
   NODE_BASE_LAYER,
   combineWithNodeCodes,
@@ -495,6 +496,8 @@ export default defineEventHandler(async (event) => {
               filter: combineWithNodeCodes(l.filter, nodeCodes, excludeCodes)
             }));
         }
+        // Участки: белая обводка под трубами и магистрали поверх распределительных; цвета — как в десктопе
+        if (mvtPack) mvtPack.mbLayers = tuneNetworkStyleLayers(mvtPack.mbLayers);
         // Одинаково оформленные линейные подслои (участки: 16 слоёв-копий) — в один слой с выражениями
         // (utils/mergeStyleLayers). По умолчанию выключено: выигрыша по замеру нет, см. флаг выше
         if (mvtPack && mergeStyleLayers) {
