@@ -4,12 +4,14 @@
       <!-- Рамка вокруг зоны: без затемнения, карта остаётся рабочей -->
       <div
         class="first-run__ring"
+        :class="{ 'first-run--placed': placed }"
         :style="ringStyle"
         aria-hidden="true"
       />
       <section
         ref="cardEl"
         class="first-run"
+        :class="{ 'first-run--placed': placed }"
         role="dialog"
         aria-modal="false"
         :aria-labelledby="titleId"
@@ -114,6 +116,11 @@ const props = withDefaults(defineProps<{
 const steps = ref<FirstRunStep[]>([]);
 const index = ref(-1);
 const anchorRect = ref<HintRect | null>(null);
+/**
+ * Карточка уже стоит у зоны: переход к следующей зоне анимируется. Первое появление — без перехода: иначе
+ * карточка ехала от положения по умолчанию (середина низа) и Lighthouse засчитывал это как сдвиг вёрстки (CLS)
+ */
+const placed = ref(false);
 const cardEl = ref<HTMLElement | null>(null);
 const nextBtn = ref<{ $el?: HTMLElement } | null>(null);
 const cardSize = ref({ w: 300, h: 160 });
@@ -195,6 +202,7 @@ const show = async (i: number) => {
   // второй проход: размер карточки известен только после отрисовки нового текста
   await nextTick();
   measure();
+  if (!placed.value) requestAnimationFrame(() => { placed.value = index.value >= 0; });
 };
 
 /** manual — из меню: без зон на экране сказать об этом, а не молчать */
@@ -224,6 +232,7 @@ const finish = () => {
   if (index.value < 0) return;
   index.value = -1;
   anchorRect.value = null;
+  placed.value = false;
   markDone();
   // пункт меню, с которого запустили, к этому времени уже снят — тогда на кнопку меню пользователя
   const target = returnFocus?.isConnected && returnFocus.offsetParent !== null
@@ -282,6 +291,9 @@ defineExpose({ start, finish });
   border: 2px solid rgb(var(--v-theme-primary));
   border-radius: var(--radius-md, 8px);
   pointer-events: none;
+}
+
+.first-run__ring.first-run--placed {
   transition:
     left var(--duration-base) var(--ease-out),
     top var(--duration-base) var(--ease-out),
@@ -298,6 +310,9 @@ defineExpose({ start, finish });
   color: rgb(var(--v-theme-on-surface));
   border-radius: var(--radius-lg, 12px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.first-run.first-run--placed {
   transition:
     left var(--duration-base) var(--ease-out),
     top var(--duration-base) var(--ease-out);
