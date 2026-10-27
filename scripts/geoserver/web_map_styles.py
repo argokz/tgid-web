@@ -108,6 +108,9 @@ STYLES = {
     'zdaniya_tu': ('zdaniya_tu_web', zdaniya_tu_sld),
 }
 
+# Поля, на которые ссылаются правила стилей (фильтр и подпись)
+STYLE_FIELDS = {'zdaniya_2': {'otop', 'txt'}}
+
 # Поля слоя, которые остаются в тайле: геометрия, ключ, фильтр стиля (otop), подпись (txt),
 # нагрузки и адрес — для вкладки «Подписи». Регистр имён — как в базе
 SLIM_ATTRIBUTES = {
@@ -212,11 +215,24 @@ def restore(gs: Gs, ws: str, folder: str):
         print(f'{ws}:{layer}: стиль по умолчанию {item["default"]} (из бэкапа), кеш GWC очищен')
 
 
+def missing_style_fields(gs: Gs, ws: str, layer: str) -> list[str]:
+    """Поля, на которые ссылается стиль, но которых нет у слоя: GeoServer ответил бы 400 на любой тайл"""
+    need = STYLE_FIELDS.get(layer, set())
+    if not need:
+        return []
+    names = {(a.text or '').lower() for a in gs.get_xml(ft_path(gs, ws, layer)).iter('name')}
+    return sorted(need - names)
+
+
 def apply(gs: Gs, ws: str, check: bool):
     for layer, (style, build) in STYLES.items():
         current = layer_styles(gs, ws, layer)
         if current is None:
             print(f'{ws}:{layer}: слоя нет — пропуск')
+            continue
+        missing = missing_style_fields(gs, ws, layer)
+        if missing:
+            print(f'{ws}:{layer}: нет полей {", ".join(missing)} — стиль не ставлю, пропуск')
             continue
         default, others = current
         print(f'{ws}:{layer}: сейчас {default}, станет {style}')

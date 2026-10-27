@@ -46,6 +46,14 @@ requested TILEMATRIXSET»), формат MVT, параметр VIEWPARAMS (фр�
     python scripts/geoserver/gwc_mvt_cache.py --restore-disk-quota H:/tgid-backups/<дата>_gwc
 
 Первое включение квоты GWC пересчитывает размер всего кеша — долго и с нагрузкой на диск.
+
+Каталог кеша. По умолчанию GWC пишет в каталог данных GeoServer (C:/ProgramData/GeoServer/gwc). Перенос на
+другой диск — файловое хранилище GWC по умолчанию (слои без своего хранилища пишут в него). Новые тайлы
+ложатся туда; старый каталог остаётся как есть, его можно удалить вручную. Откат — хранилище перестаёт
+быть основным (файлы не удаляются), GWC снова пишет в каталог данных:
+
+    python scripts/geoserver/gwc_mvt_cache.py --blobstore-dir H:/geoserver-cache/gwc --backup-dir H:/tgid-backups/<дата>_gwc
+    python scripts/geoserver/gwc_mvt_cache.py --restore-blobstore
 """
 from __future__ import annotations
 
@@ -55,6 +63,7 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 import requests
 
@@ -157,6 +166,44 @@ def configure(xml: str, expire: int) -> str:
 
 def backup_name(layer: str) -> str:
     return layer.replace(':', '__') + '.xml'
+
+
+BLOBSTORE_ID = 'tgid_cache'
+BLOBSTORE_PATH = f'/gwc/rest/blobstores/{BLOBSTORE_ID}.xml'
+
+
+def blobstore_xml(base_dir: str, default: bool) -> str:
+    return (f'<FileBlobStore default="{str(default).lower()}"><id>{BLOBSTORE_ID}</id><enabled>true</enabled>'
+            f'<baseDirectory>{escape(base_dir)}</baseDirectory><fileSystemBlockSize>4096</fileSystemBlockSize>'
+            '</FileBlobStore>')
+
+
+def set_blobstore(gwc: 'Gwc', base_dir: str, backup: Path | None, dry_run: bool):
+    """Файловое хранилище GWC base_dir — по умолчанию для слоёв без своего хранилища"""
+    if not os.path.isabs(base_dir):
+        raise SystemExit(f'--blobstore-dir: нужен абсолютный путь, а не {base_dir!r}')
+    xml = blobstore_xml(base_dir, True)
+    if dry_run:
+        print(f'== хранилище GWC по умолчанию\n{xml}\n')
+        return
+    if backup:
+        listing = gwc.req('GET', '/gwc/rest/blobstores.xml').text
+        (backup / 'blobstores.xml').write_text(listing, encoding='utf-8')
+    os.makedirs(base_dir, exist_ok=True)
+    gwc.req('PUT', BLOBSTORE_PATH, ok=(200, 201), data=xml.encode('utf-8'), headers={'Content-Type': 'text/xml'})
+    print(f'кеш GWC: хранилище по умолчанию {BLOBSTORE_ID} → {base_dir}')
+
+
+def restore_blobstore(gwc: 'Gwc'):
+    """Хранилище перестаёт быть основным; GWC пишет в каталог данных GeoServer. Файлы не удаляются"""
+    r = gwc.req('GET', BLOBSTORE_PATH, ok=(200, 404))
+    if r.status_code == 404:
+        print(f'кеш GWC: хранилища {BLOBSTORE_ID} нет — уже каталог данных GeoServer')
+        return
+    base_dir = ET.fromstring(r.text).findtext('baseDirectory') or ''
+    gwc.req('PUT', BLOBSTORE_PATH, ok=(200, 201), data=blobstore_xml(base_dir, False).encode('utf-8'),
+            headers={'Content-Type': 'text/xml'})
+    print(f'кеш GWC: снова каталог данных GeoServer ({base_dir} больше не основной, файлы на месте)')
 
 
 DISK_QUOTA_PATH = '/gwc/rest/diskquota.xml'
@@ -396,10 +443,26 @@ def main() -> int:
     ap.add_argument('--disk-quota-gb', type=float,
                     help='включить квоту кеша GWC (ГБ, LRU) и выйти (нужен --backup-dir)')
     ap.add_argument('--restore-disk-quota', metavar='DIR', help='вернуть настройки квоты из бэкапа и выйти')
+    ap.add_argument('--blobstore-dir', help='каталог кеша GWC по умолчанию (абсолютный путь) и выйти')
+    ap.add_argument('--restore-blobstore', action='store_true',
+                    help='вернуть кеш GWC в каталог данных GeoServer и выйти')
     args = ap.parse_args()
 
     gwc = Gwc(args.geoserver, os.environ.get('GEOSERVER_REST_USER', 'admin'), os.environ['GEOSERVER_REST_PASSWORD'])
     layers = [s.strip() for s in args.layers.split(',') if s.strip()]
+
+    if args.restore_blobstore:
+        restore_blobstore(gwc)
+        return 0
+
+    if args.blobstore_dir:
+        if not args.dry_run and not args.backup_dir:
+            ap.error('для --blobstore-dir нужен --backup-dir (или --dry-run)')
+        backup = Path(args.backup_dir) if args.backup_dir else None
+        if backup:
+            backup.mkdir(parents=True, exist_ok=True)
+        set_blobstore(gwc, args.blobstore_dir, backup, args.dry_run)
+        return 0
 
     if args.restore_disk_quota:
         xml = (Path(args.restore_disk_quota) / DISK_QUOTA_BACKUP).read_text(encoding='utf-8')
