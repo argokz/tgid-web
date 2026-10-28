@@ -1,52 +1,26 @@
 <template>
   <Teleport to="body">
-    <v-dialog
+    <JournalShell
       v-model="visible"
-      :fullscreen="isMobile"
-      max-width="1550"
-      scrollable
+      v-model:page="page"
+      title="Температурные графики источников"
+      :subtitle="`найдено ${total} · готовы ${lookups.counts.ready || 0} из ${lookups.counts.total || 0}`"
+      icon="mdi-chart-bell-curve-cumulative"
+      avatar-color="purple-lighten-5"
+      icon-color="purple-darken-3"
+      :pages="pages"
+      :loading="loading"
+      :error="error"
+      :empty="!sources.length"
+      empty-title="Источники не найдены"
+      :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям источников нет' : 'В базе нет источников тепла'"
+      empty-icon="mdi-chart-bell-curve-cumulative"
+      :empty-action-label="filtersActive ? 'Сбросить фильтры' : undefined"
+      :skeleton-rows="10"
+      @retry="loadSources"
+      @empty-action="resetFilters"
     >
-      <v-card
-        class="tg-journal"
-        :rounded="isMobile ? 0 : 'lg'"
-      >
-        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
-          <v-avatar
-            color="purple-lighten-5"
-            size="40"
-          >
-            <v-icon color="purple-darken-3">mdi-chart-bell-curve-cumulative</v-icon>
-          </v-avatar>
-          <div
-            class="flex-grow-1"
-            style="min-width: 0"
-          >
-            <div class="text-subtitle-1 font-weight-bold">Температурные графики источников</div>
-            <div class="text-caption text-medium-emphasis text-truncate">
-              найдено {{ total }} · готовы {{ lookups.counts.ready || 0 }} из {{ lookups.counts.total || 0 }}
-            </div>
-          </div>
-          <HintTip
-            text="Закрыть журнал"
-            hotkey="Esc"
-            location="bottom"
-          >
-            <template #default="{ props: tip }">
-              <v-btn
-                v-bind="tip"
-                icon
-                variant="text"
-                aria-label="Закрыть журнал"
-                @click="visible = false"
-              >
-                <v-icon>mdi-close</v-icon>
-              </v-btn>
-            </template>
-          </HintTip>
-        </v-card-title>
-
-        <v-divider />
-
+      <template #top>
         <v-alert
           v-if="lookupsLoaded && lookups.fact_point_count === 0"
           type="info"
@@ -72,214 +46,174 @@
             @select="toggleStatus(metric.value)"
           />
         </div>
-
-        <div class="pa-3 pa-md-4 tg-filters">
-          <v-row dense>
-            <v-col
-              cols="12"
-              md="4"
-            >
-              <SearchField
-                :model-value="search"
-                label="Источник, узел, фрагмент или ID"
-                :debounce="350"
-                :loading="loading"
-                @update:model-value="search = $event"
-                @search="onSearch"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="graphStatus"
-                :items="statusOptions"
-                item-title="title"
-                item-value="value"
-                label="Состояние графика"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="summerStatus"
-                :items="summerOptions"
-                item-title="title"
-                item-value="value"
-                label="Летний режим"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="graphTypeId"
-                :items="lookups.graph_types"
-                item-title="name"
-                item-value="id"
-                label="Тип графика"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="fragmentId"
-                :items="lookups.fragments"
-                item-title="name"
-                item-value="id"
-                label="Фрагмент"
-              />
-            </v-col>
-          </v-row>
-          <div class="d-flex align-center flex-wrap ga-2 mt-3">
-            <v-spacer />
-            <v-btn
-              variant="text"
-              prepend-icon="mdi-filter-remove-outline"
-              :disabled="!filtersActive"
-              @click="resetFilters"
-            >
-              Сбросить
-            </v-btn>
-            <v-btn
-              variant="tonal"
-              prepend-icon="mdi-refresh"
-              :loading="loading"
-              @click="loadSources"
-            >
-              Обновить
-            </v-btn>
-          </div>
-        </div>
-
-        <v-divider />
-
-        <v-card-text class="pa-0 tg-table-wrap">
-          <StateView
-            variant="table"
-            :rows="10"
-            :loading="loading && !sources.length"
-            :error="error"
-            :empty="!loading && !sources.length"
-            empty-title="Источники не найдены"
-            :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям источников нет' : 'В базе нет источников тепла'"
-            empty-icon="mdi-chart-bell-curve-cumulative"
-            :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
-            error-title="Не удалось загрузить температурные графики"
-            :retrying="loading"
-            @retry="loadSources"
-            @action="resetFilters"
+      </template>
+      <template #filters>
+        <v-row dense>
+          <v-col
+            cols="12"
+            md="4"
           >
-            <v-progress-linear
-              v-if="loading"
-              indeterminate
-              color="primary"
+            <SearchField
+              :model-value="search"
+              label="Источник, узел, фрагмент или ID"
+              :debounce="350"
+              :loading="loading"
+              @update:model-value="search = $event"
+              @search="onSearch"
             />
-            <DataTable
-              :columns="tableColumns"
-              :items="(sources as Record<string, unknown>[])"
-              item-key="id"
-              selectable
-              :flash-key="flashId"
-              density="compact"
-              class="tg-table"
-              @select="openDetails(Number($event.id))"
-            >
-              <template #[`item.name`]="{ item }">
-                <div class="text-truncate font-weight-medium">
-                  {{ item.name }}
-                </div>
-                <div class="text-caption text-medium-emphasis">
-                  узел {{ item.node_id }}
-                </div>
-              </template>
-              <template #[`item.fragment_name`]="{ item }">
-                <div class="text-truncate">
-                  {{ item.fragment_name || `№${item.fragment_id || '—'}` }}
-                </div>
-              </template>
-              <template #[`item.graph_type_name`]="{ item }">
-                {{ item.graph_type_name || '—' }}
-              </template>
-              <template #[`item.min_outdoor_temperature`]="{ item }">
-                {{ formatRange(item.min_outdoor_temperature, item.max_outdoor_temperature) }}
-              </template>
-              <template #[`item.point_count`]="{ item }">
-                {{ item.point_count }}<span v-if="item.expected_point_count !== null"> / {{ item.expected_point_count }}</span>
-              </template>
-              <template #[`item.design_flow_temperature`]="{ item }">
-                {{ formatNumber(item.design_flow_temperature) }} / {{ formatNumber(item.design_return_temperature) }} °C
-              </template>
-              <template #[`item.has_summer_temperatures`]="{ item }">
-                {{ item.has_summer_temperatures ? `${formatNumber(item.summer_flow_temperature)} / ${formatNumber(item.summer_return_temperature)} °C` : 'не задан' }}
-              </template>
-              <template #[`item.graph_status`]="{ item }">
-                <v-chip
-                  size="x-small"
-                  variant="tonal"
-                  :color="statusColor(item.graph_status as TemperatureGraphStatus)"
-                >
-                  {{ statusLabel(item.graph_status as TemperatureGraphStatus) }}
-                </v-chip>
-              </template>
-              <template #[`item.actions`]="{ item }">
-                <HintTip
-                  v-if="hasCoordinates(item)"
-                  text="Показать источник на карте"
-                  hint="Журнал закроется, маркер останется"
-                >
-                  <template #default="{ props: tip }">
-                    <v-btn
-                      v-bind="tip"
-                      icon="mdi-crosshairs-gps"
-                      size="x-small"
-                      variant="text"
-                      aria-label="Показать источник на карте"
-                      @click.stop="locate(item)"
-                    />
-                  </template>
-                </HintTip>
-                <HintTip text="Открыть график источника">
-                  <template #default="{ props: tip }">
-                    <v-btn
-                      v-bind="tip"
-                      icon="mdi-chevron-right"
-                      size="x-small"
-                      variant="text"
-                      aria-label="Открыть график источника"
-                      @click.stop="openDetails(Number(item.id))"
-                    />
-                  </template>
-                </HintTip>
-              </template>
-            </DataTable>
-          </StateView>
-        </v-card-text>
-
-        <v-divider />
-        <v-card-actions class="px-4 py-2">
-          <span class="text-caption text-medium-emphasis">Страница {{ page }}{{ pages ? ` из ${pages}` : '' }}</span>
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="graphStatus"
+              :items="statusOptions"
+              item-title="title"
+              item-value="value"
+              label="Состояние графика"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="summerStatus"
+              :items="summerOptions"
+              item-title="title"
+              item-value="value"
+              label="Летний режим"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="graphTypeId"
+              :items="lookups.graph_types"
+              item-title="name"
+              item-value="id"
+              label="Тип графика"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="fragmentId"
+              :items="lookups.fragments"
+              item-title="name"
+              item-value="id"
+              label="Фрагмент"
+            />
+          </v-col>
+        </v-row>
+        <div class="d-flex align-center flex-wrap ga-2 mt-3">
           <v-spacer />
-          <v-pagination
-            v-if="pages > 1"
-            v-model="page"
-            :length="pages"
-            :total-visible="isMobile ? 3 : 7"
-            density="compact"
-          />
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+          <v-btn
+            variant="text"
+            prepend-icon="mdi-filter-remove-outline"
+            :disabled="!filtersActive"
+            @click="resetFilters"
+          >
+            Сбросить
+          </v-btn>
+          <v-btn
+            variant="tonal"
+            prepend-icon="mdi-refresh"
+            :loading="loading"
+            @click="loadSources"
+          >
+            Обновить
+          </v-btn>
+        </div>
+      </template>
+      <DataTable
+        :columns="tableColumns"
+        :items="(sources as Record<string, unknown>[])"
+        item-key="id"
+        selectable
+        :flash-key="flashId"
+        density="compact"
+        class="tg-table"
+        @select="openDetails(Number($event.id))"
+      >
+        <template #[`item.name`]="{ item }">
+          <div class="text-truncate font-weight-medium">
+            {{ item.name }}
+          </div>
+          <div class="text-caption text-medium-emphasis">
+            узел {{ item.node_id }}
+          </div>
+        </template>
+        <template #[`item.fragment_name`]="{ item }">
+          <div class="text-truncate">
+            {{ item.fragment_name || `№${item.fragment_id || '—'}` }}
+          </div>
+        </template>
+        <template #[`item.graph_type_name`]="{ item }">
+          {{ item.graph_type_name || '—' }}
+        </template>
+        <template #[`item.min_outdoor_temperature`]="{ item }">
+          {{ formatRange(item.min_outdoor_temperature, item.max_outdoor_temperature) }}
+        </template>
+        <template #[`item.point_count`]="{ item }">
+          {{ item.point_count }}<span v-if="item.expected_point_count !== null"> / {{ item.expected_point_count }}</span>
+        </template>
+        <template #[`item.design_flow_temperature`]="{ item }">
+          {{ formatNumber(item.design_flow_temperature) }} / {{ formatNumber(item.design_return_temperature) }} °C
+        </template>
+        <template #[`item.has_summer_temperatures`]="{ item }">
+          {{ item.has_summer_temperatures ? `${formatNumber(item.summer_flow_temperature)} / ${formatNumber(item.summer_return_temperature)} °C` : 'не задан' }}
+        </template>
+        <template #[`item.graph_status`]="{ item }">
+          <v-chip
+            size="x-small"
+            variant="tonal"
+            :color="statusColor(item.graph_status as TemperatureGraphStatus)"
+          >
+            {{ statusLabel(item.graph_status as TemperatureGraphStatus) }}
+          </v-chip>
+        </template>
+        <template #[`item.actions`]="{ item }">
+          <HintTip
+            v-if="hasCoordinates(item)"
+            text="Показать источник на карте"
+            hint="Журнал закроется, маркер останется"
+          >
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon="mdi-crosshairs-gps"
+                size="x-small"
+                variant="text"
+                aria-label="Показать источник на карте"
+                @click.stop="locate(item)"
+              />
+            </template>
+          </HintTip>
+          <HintTip text="Открыть график источника">
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon="mdi-chevron-right"
+                size="x-small"
+                variant="text"
+                aria-label="Открыть график источника"
+                @click.stop="openDetails(Number(item.id))"
+              />
+            </template>
+          </HintTip>
+        </template>
+      </DataTable>
+    </JournalShell>
 
     <v-dialog
       v-model="detailVisible"
@@ -605,6 +539,7 @@ import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
 import HintTip from '~/components/HintTip.vue'
 import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
 import KpiTile from '~/components/KpiTile.vue'
+import JournalShell from '~/components/JournalShell.vue'
 import SearchField from '~/components/SearchField.vue'
 import StateView from '~/components/StateView.vue'
 import { computed, nextTick, ref, watch } from 'vue'
@@ -1018,10 +953,7 @@ defineExpose({ openDialog })
 </script>
 
 <style scoped>
-.tg-journal { height: min(92vh, 940px); display: flex; flex-direction: column; }
 .tg-kpi { display: flex; flex-wrap: wrap; flex-shrink: 0; gap: var(--space-2); }
-.tg-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
-.tg-table-wrap { min-height: 280px; overflow: auto; flex: 1; }
 .tg-table { min-width: 1300px; }
 .tg-alerts { display: grid; gap: var(--space-2); }
 .tg-alerts:empty { display: none; }
