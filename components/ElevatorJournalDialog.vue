@@ -1,276 +1,208 @@
 <template>
   <Teleport to="body">
-    <v-dialog
+    <JournalShell
       v-model="visible"
-      :fullscreen="isMobile"
-      max-width="1320"
-      scrollable
+      v-model:page="page"
+      title="Элеваторы"
+      :subtitle="`${scopeTitle} · найдено ${total} · готовы ${lookups.counts.ready || 0} из ${lookups.counts.total || 0}`"
+      icon="mdi-elevator"
+      avatar-color="blue-grey-lighten-5"
+      icon-color="blue-grey-darken-2"
+      :pages="pages"
+      :loading="loading"
+      :error="error"
+      :empty="!items.length"
+      empty-title="Элеваторы не найдены"
+      :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В базе нет элеваторов'"
+      empty-icon="mdi-elevator"
+      :empty-action-label="filtersActive ? 'Сбросить фильтры' : undefined"
+      :skeleton-rows="10"
+      @retry="loadItems"
+      @empty-action="resetFilters"
     >
-      <v-card
-        class="elevator-journal"
-        :rounded="isMobile ? 0 : 'lg'"
+      <template #kpi>
+        <KpiTile
+          v-for="metric in qualityMetrics"
+          :key="metric.value"
+          :label="metric.label"
+          :value="lookups.counts[metric.value] || 0"
+          :compact="false"
+          :status="metric.status"
+          selectable
+          :active="qualityStatus === metric.value"
+          @select="toggleQuality(metric.value)"
+        />
+      </template>
+      <template #filters>
+        <v-row dense>
+          <v-col
+            cols="12"
+            md="4"
+          >
+            <SearchField
+              :model-value="search"
+              label="ID, линия, тип, номер или узел"
+              :debounce="350"
+              :loading="loading"
+              @update:model-value="search = $event"
+              @search="onSearch"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="4"
+            md="3"
+          >
+            <AppSelect
+              v-model="qualityStatus"
+              :items="qualityOptions"
+              item-title="title"
+              item-value="value"
+              label="Качество данных"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="4"
+            md="2"
+          >
+            <AppSelect
+              v-model="stateId"
+              :items="lookups.states"
+              item-title="name"
+              item-value="id"
+              label="Состояние"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="4"
+            md="3"
+          >
+            <AppSelect
+              v-model="fragmentId"
+              :items="lookups.fragments"
+              item-title="name"
+              item-value="id"
+              label="Фрагмент"
+            />
+          </v-col>
+        </v-row>
+
+        <div class="d-flex align-center flex-wrap ga-2 mt-3">
+          <v-chip
+            v-if="scope.lineId"
+            size="small"
+            color="primary"
+            closable
+            @click:close="clearScope"
+          >
+            Линия {{ scope.lineId }}
+          </v-chip>
+          <v-chip
+            v-if="scope.nodeId"
+            size="small"
+            color="primary"
+            closable
+            @click:close="clearScope"
+          >
+            Узел {{ scope.nodeId }}
+          </v-chip>
+          <v-spacer />
+          <v-btn
+            variant="text"
+            prepend-icon="mdi-filter-remove-outline"
+            :disabled="!filtersActive"
+            @click="resetFilters"
+          >
+            Сбросить
+          </v-btn>
+          <v-btn
+            variant="tonal"
+            prepend-icon="mdi-refresh"
+            :loading="loading"
+            @click="loadItems"
+          >
+            Обновить
+          </v-btn>
+        </div>
+      </template>
+      <DataTable
+        :columns="tableColumns"
+        :items="(items as Record<string, unknown>[])"
+        item-key="id"
+        selectable
+        density="compact"
+        class="elevator-table"
+        @select="openDetails(Number($event.id))"
       >
-        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
-          <v-avatar
-            color="blue-grey-lighten-5"
-            size="40"
-          >
-            <v-icon color="blue-grey-darken-2">mdi-elevator</v-icon>
-          </v-avatar>
-          <div
-            class="flex-grow-1"
-            style="min-width: 0"
-          >
-            <div class="text-subtitle-1 font-weight-bold">Элеваторы</div>
-            <div class="text-caption text-medium-emphasis text-truncate">
-              {{ scopeTitle }} · найдено {{ total }} · готовы {{ lookups.counts.ready || 0 }} из {{ lookups.counts.total || 0 }}
-            </div>
+        <template #[`item.elevator_type`]="{ item }">
+          <div class="text-truncate">
+            {{ item.elevator_type ?? item.display_name ?? '—' }}
           </div>
+          <div class="text-caption text-medium-emphasis">
+            № {{ item.elevator_num_inst ?? '—' }}
+          </div>
+        </template>
+        <template #[`item.line_id`]="{ item }">
+          <span class="num">{{ item.line_id ?? '—' }}</span>
+          <div class="text-caption text-medium-emphasis text-truncate">
+            {{ nodeLabel(item.node_code_1, item.node_name_1, item.node_id_1) }} → {{ nodeLabel(item.node_code_2, item.node_name_2, item.node_id_2) }}
+          </div>
+        </template>
+        <template #[`item.diameter_nozzle`]="{ item }">
+          {{ formatNumber(item.diameter_nozzle) }}
+        </template>
+        <template #[`item.diameter_chamber`]="{ item }">
+          {{ formatNumber(item.diameter_chamber) }}
+        </template>
+        <template #[`item.material`]="{ item }">
+          {{ item.material || '—' }}
+        </template>
+        <template #[`item.state_name`]="{ item }">
+          {{ item.state_name || '—' }}
+        </template>
+        <template #[`item.quality_status`]="{ item }">
+          <v-chip
+            size="x-small"
+            variant="tonal"
+            :color="qualityColor(item.quality_status as ElevatorQualityStatus)"
+          >
+            {{ qualityLabel(item.quality_status as ElevatorQualityStatus) }}
+          </v-chip>
+        </template>
+        <template #[`item.actions`]="{ item }">
           <HintTip
-            text="Закрыть журнал"
-            hotkey="Esc"
-            location="bottom"
+            v-if="hasCoordinates(item)"
+            text="Показать элеватор на карте"
+            hint="Журнал закроется, маркер останется"
           >
             <template #default="{ props: tip }">
               <v-btn
                 v-bind="tip"
-                icon
+                icon="mdi-crosshairs-gps"
+                size="x-small"
                 variant="text"
-                aria-label="Закрыть журнал"
-                @click="visible = false"
-              >
-                <v-icon>mdi-close</v-icon>
-              </v-btn>
+                aria-label="Показать элеватор на карте"
+                @click.stop="locate(item as ElevatorSummary)"
+              />
             </template>
           </HintTip>
-        </v-card-title>
-
-        <v-divider />
-
-        <!-- Плитки качества данных из справочника (на всю базу, как в прежних чипах); плитка — фильтр -->
-        <div class="elevator-kpi px-3 px-md-4 pt-3">
-          <KpiTile
-            v-for="metric in qualityMetrics"
-            :key="metric.value"
-            :label="metric.label"
-            :value="lookups.counts[metric.value] || 0"
-            :compact="false"
-            :status="metric.status"
-            selectable
-            :active="qualityStatus === metric.value"
-            @select="toggleQuality(metric.value)"
-          />
-        </div>
-
-        <div class="pa-3 pa-md-4 elevator-filters">
-          <v-row dense>
-            <v-col
-              cols="12"
-              md="4"
-            >
-              <SearchField
-                :model-value="search"
-                label="ID, линия, тип, номер или узел"
-                :debounce="350"
-                :loading="loading"
-                @update:model-value="search = $event"
-                @search="onSearch"
+          <HintTip text="Открыть паспорт">
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon="mdi-chevron-right"
+                size="x-small"
+                variant="text"
+                aria-label="Открыть паспорт элеватора"
+                @click.stop="openDetails(Number(item.id))"
               />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="4"
-              md="3"
-            >
-              <AppSelect
-                v-model="qualityStatus"
-                :items="qualityOptions"
-                item-title="title"
-                item-value="value"
-                label="Качество данных"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="4"
-              md="2"
-            >
-              <AppSelect
-                v-model="stateId"
-                :items="lookups.states"
-                item-title="name"
-                item-value="id"
-                label="Состояние"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="4"
-              md="3"
-            >
-              <AppSelect
-                v-model="fragmentId"
-                :items="lookups.fragments"
-                item-title="name"
-                item-value="id"
-                label="Фрагмент"
-              />
-            </v-col>
-          </v-row>
-
-          <div class="d-flex align-center flex-wrap ga-2 mt-3">
-            <v-chip
-              v-if="scope.lineId"
-              size="small"
-              color="primary"
-              closable
-              @click:close="clearScope"
-            >
-              Линия {{ scope.lineId }}
-            </v-chip>
-            <v-chip
-              v-if="scope.nodeId"
-              size="small"
-              color="primary"
-              closable
-              @click:close="clearScope"
-            >
-              Узел {{ scope.nodeId }}
-            </v-chip>
-            <v-spacer />
-            <v-btn
-              variant="text"
-              prepend-icon="mdi-filter-remove-outline"
-              :disabled="!filtersActive"
-              @click="resetFilters"
-            >
-              Сбросить
-            </v-btn>
-            <v-btn
-              variant="tonal"
-              prepend-icon="mdi-refresh"
-              :loading="loading"
-              @click="loadItems"
-            >
-              Обновить
-            </v-btn>
-          </div>
-        </div>
-
-        <v-divider />
-
-        <v-card-text class="pa-0 elevator-table-wrap">
-          <StateView
-            variant="table"
-            :rows="10"
-            :loading="loading && !items.length"
-            :error="error"
-            :empty="!loading && !items.length"
-            empty-title="Элеваторы не найдены"
-            :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В базе нет элеваторов'"
-            empty-icon="mdi-elevator"
-            :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
-            :retrying="loading"
-            @retry="loadItems"
-            @action="resetFilters"
-          >
-            <v-progress-linear
-              v-if="loading"
-              indeterminate
-              color="primary"
-            />
-            <DataTable
-              :columns="tableColumns"
-              :items="(items as Record<string, unknown>[])"
-              item-key="id"
-              selectable
-              density="compact"
-              class="elevator-table"
-              @select="openDetails(Number($event.id))"
-            >
-              <template #[`item.elevator_type`]="{ item }">
-                <div class="text-truncate">
-                  {{ item.elevator_type ?? item.display_name ?? '—' }}
-                </div>
-                <div class="text-caption text-medium-emphasis">
-                  № {{ item.elevator_num_inst ?? '—' }}
-                </div>
-              </template>
-              <template #[`item.line_id`]="{ item }">
-                <span class="num">{{ item.line_id ?? '—' }}</span>
-                <div class="text-caption text-medium-emphasis text-truncate">
-                  {{ nodeLabel(item.node_code_1, item.node_name_1, item.node_id_1) }} → {{ nodeLabel(item.node_code_2, item.node_name_2, item.node_id_2) }}
-                </div>
-              </template>
-              <template #[`item.diameter_nozzle`]="{ item }">
-                {{ formatNumber(item.diameter_nozzle) }}
-              </template>
-              <template #[`item.diameter_chamber`]="{ item }">
-                {{ formatNumber(item.diameter_chamber) }}
-              </template>
-              <template #[`item.material`]="{ item }">
-                {{ item.material || '—' }}
-              </template>
-              <template #[`item.state_name`]="{ item }">
-                {{ item.state_name || '—' }}
-              </template>
-              <template #[`item.quality_status`]="{ item }">
-                <v-chip
-                  size="x-small"
-                  variant="tonal"
-                  :color="qualityColor(item.quality_status as ElevatorQualityStatus)"
-                >
-                  {{ qualityLabel(item.quality_status as ElevatorQualityStatus) }}
-                </v-chip>
-              </template>
-              <template #[`item.actions`]="{ item }">
-                <HintTip
-                  v-if="hasCoordinates(item)"
-                  text="Показать элеватор на карте"
-                  hint="Журнал закроется, маркер останется"
-                >
-                  <template #default="{ props: tip }">
-                    <v-btn
-                      v-bind="tip"
-                      icon="mdi-crosshairs-gps"
-                      size="x-small"
-                      variant="text"
-                      aria-label="Показать элеватор на карте"
-                      @click.stop="locate(item as ElevatorSummary)"
-                    />
-                  </template>
-                </HintTip>
-                <HintTip text="Открыть паспорт">
-                  <template #default="{ props: tip }">
-                    <v-btn
-                      v-bind="tip"
-                      icon="mdi-chevron-right"
-                      size="x-small"
-                      variant="text"
-                      aria-label="Открыть паспорт элеватора"
-                      @click.stop="openDetails(Number(item.id))"
-                    />
-                  </template>
-                </HintTip>
-              </template>
-            </DataTable>
-          </StateView>
-        </v-card-text>
-
-        <v-divider />
-        <v-card-actions class="px-4 py-2">
-          <span class="text-caption text-medium-emphasis">Страница {{ page }}{{ pages ? ` из ${pages}` : '' }}</span>
-          <v-spacer />
-          <v-pagination
-            v-if="pages > 1"
-            v-model="page"
-            :length="pages"
-            :total-visible="isMobile ? 3 : 7"
-            density="compact"
-          />
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+            </template>
+          </HintTip>
+        </template>
+      </DataTable>
+    </JournalShell>
 
     <v-dialog
       v-model="detailVisible"
@@ -370,6 +302,7 @@ import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
 import HintTip from '~/components/HintTip.vue'
 import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
 import KpiTile from '~/components/KpiTile.vue'
+import JournalShell from '~/components/JournalShell.vue'
 import SearchField from '~/components/SearchField.vue'
 import StateView from '~/components/StateView.vue'
 import { computed, reactive, ref, watch } from 'vue'
@@ -636,10 +569,5 @@ defineExpose({ openDialog })
 </script>
 
 <style scoped>
-.elevator-journal { height: min(88vh, 880px); display: flex; flex-direction: column; }
-.elevator-kpi { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.elevator-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
-.elevator-table-wrap { min-height: 280px; overflow: auto; flex: 1; }
 .elevator-table { min-width: 1080px; }
-@media (max-width: 600px) { .elevator-journal { height: 100dvh; } }
 </style>

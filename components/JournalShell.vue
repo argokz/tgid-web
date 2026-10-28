@@ -2,7 +2,7 @@
 /**
  * Рамка журнала (общая для *JournalDialog.vue): окно, шапка со значком, названием и областью,
  * действия шапки, плитки-счётчики, фильтры, таблица в StateView (загрузка / ошибка / пусто),
- * страницы внизу. Содержимое — слотами: actions, kpi, filters, default (таблица), footer.
+ * страницы внизу. Содержимое — слотами: actions, top, kpi, filters, default (таблица), footer.
  * Механика списка — composables/useJournalList.ts.
  */
 import HintTip from '~/components/HintTip.vue'
@@ -100,6 +100,9 @@ const { isMobile } = useMobile()
         </HintTip>
       </v-card-title>
       <v-divider />
+
+      <!-- нестандартный верх журнала (предупреждения, несколько рядов плиток) — как есть -->
+      <slot name="top" />
 
       <div
         v-if="$slots.kpi"

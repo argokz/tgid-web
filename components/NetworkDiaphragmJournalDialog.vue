@@ -1,52 +1,26 @@
 <template>
   <Teleport to="body">
-    <v-dialog
+    <JournalShell
       v-model="visible"
-      :fullscreen="isMobile"
-      max-width="1400"
-      scrollable
+      v-model:page="page"
+      title="Диафрагмы наружных теплопроводов"
+      :subtitle="`${scopeTitle} · найдено ${total} · готовы ${lookups.counts.ready || 0} из ${lookups.counts.total || 0}`"
+      icon="mdi-circle-slice-8"
+      avatar-color="teal-lighten-5"
+      icon-color="teal-darken-2"
+      :pages="pages"
+      :loading="loading"
+      :error="error"
+      :empty="!items.length"
+      empty-title="Диафрагмы не найдены"
+      :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В базе нет диафрагм'"
+      empty-icon="mdi-circle-slice-8"
+      :empty-action-label="filtersActive ? 'Сбросить фильтры' : undefined"
+      :skeleton-rows="10"
+      @retry="loadItems"
+      @empty-action="resetFilters"
     >
-      <v-card
-        class="diaphragm-journal"
-        :rounded="isMobile ? 0 : 'lg'"
-      >
-        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
-          <v-avatar
-            color="teal-lighten-5"
-            size="40"
-          >
-            <v-icon color="teal-darken-2">mdi-circle-slice-8</v-icon>
-          </v-avatar>
-          <div
-            class="flex-grow-1"
-            style="min-width: 0"
-          >
-            <div class="text-subtitle-1 font-weight-bold">Диафрагмы наружных теплопроводов</div>
-            <div class="text-caption text-medium-emphasis text-truncate">
-              {{ scopeTitle }} · найдено {{ total }} · готовы {{ lookups.counts.ready || 0 }} из {{ lookups.counts.total || 0 }}
-            </div>
-          </div>
-          <HintTip
-            text="Закрыть журнал"
-            hotkey="Esc"
-            location="bottom"
-          >
-            <template #default="{ props: tip }">
-              <v-btn
-                v-bind="tip"
-                icon
-                variant="text"
-                aria-label="Закрыть журнал"
-                @click="visible = false"
-              >
-                <v-icon>mdi-close</v-icon>
-              </v-btn>
-            </template>
-          </HintTip>
-        </v-card-title>
-
-        <v-divider />
-
+      <template #top>
         <div class="px-3 px-md-4 pt-3 diaphragm-alerts">
           <v-alert
             type="warning"
@@ -104,261 +78,221 @@
             :compact="false"
           />
         </div>
-
-        <div class="pa-3 pa-md-4 diaphragm-filters">
-          <v-row dense>
-            <v-col
-              cols="12"
-              md="4"
-            >
-              <SearchField
-                :model-value="search"
-                label="ID, линия, узел, место или владелец"
-                :debounce="350"
-                :loading="loading"
-                @update:model-value="search = $event"
-                @search="onSearch"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="qualityStatus"
-                :items="qualityOptions"
-                item-title="title"
-                item-value="value"
-                label="Качество данных"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="diameterMode"
-                :items="diameterOptions"
-                item-title="title"
-                item-value="value"
-                label="Режим диаметра"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="installationPlace"
-                :items="lookups.locations"
-                item-title="name"
-                item-value="name"
-                label="Место установки"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="stateId"
-                :items="lookups.states"
-                item-title="name"
-                item-value="id"
-                label="Состояние"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="externalSignId"
-                :items="lookups.external_signs"
-                item-title="name"
-                item-value="id"
-                label="Признак линии"
-              />
-            </v-col>
-          </v-row>
-
-          <div class="d-flex align-center flex-wrap ga-2 mt-3">
-            <v-chip
-              v-if="scope.lineId"
-              size="small"
-              color="primary"
-              closable
-              @click:close="clearScope"
-            >
-              Линия {{ scope.lineId }}
-            </v-chip>
-            <v-spacer />
-            <v-btn
-              variant="text"
-              prepend-icon="mdi-filter-remove-outline"
-              :disabled="!filtersActive"
-              @click="resetFilters"
-            >
-              Сбросить
-            </v-btn>
-            <v-btn
-              variant="tonal"
-              prepend-icon="mdi-refresh"
-              :loading="loading"
-              @click="loadItems"
-            >
-              Обновить
-            </v-btn>
-          </div>
-        </div>
-
-        <v-divider />
-
-        <v-card-text class="pa-0 diaphragm-table-wrap">
-          <StateView
-            variant="table"
-            :rows="10"
-            :loading="loading && !items.length"
-            :error="error"
-            :empty="!loading && !items.length"
-            empty-title="Диафрагмы не найдены"
-            :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В базе нет диафрагм'"
-            empty-icon="mdi-circle-slice-8"
-            :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
-            error-title="Не удалось загрузить диафрагмы"
-            :retrying="loading"
-            @retry="loadItems"
-            @action="resetFilters"
+      </template>
+      <template #filters>
+        <v-row dense>
+          <v-col
+            cols="12"
+            md="4"
           >
-            <v-progress-linear
-              v-if="loading"
-              indeterminate
-              color="primary"
+            <SearchField
+              :model-value="search"
+              label="ID, линия, узел, место или владелец"
+              :debounce="350"
+              :loading="loading"
+              @update:model-value="search = $event"
+              @search="onSearch"
             />
-            <DataTable
-              :columns="tableColumns"
-              :items="(items as Record<string, unknown>[])"
-              item-key="id"
-              selectable
-              :flash-key="flashId"
-              density="compact"
-              class="diaphragm-table"
-              @select="openDetails(Number($event.id))"
-            >
-              <template #[`item.installation_place`]="{ item }">
-                <div class="text-truncate">
-                  {{ item.installation_place || item.display_name || '—' }}
-                </div>
-              </template>
-              <template #[`item.line_id`]="{ item }">
-                <span class="num">{{ item.line_id ?? '—' }}</span>
-                <div class="text-caption text-medium-emphasis text-truncate">
-                  {{ nodeLabel(item.node_code_1, item.node_name_1, item.node_id_1) }} → {{ nodeLabel(item.node_code_2, item.node_name_2, item.node_id_2) }}
-                </div>
-              </template>
-              <template #[`item.internal_diameter`]="{ item }">
-                {{ diameterLabel(item) }}
-                <div class="text-caption text-medium-emphasis">
-                  {{ diameterModeLabel(item.diameter_mode as NetworkDiaphragmDiameterMode) }}
-                </div>
-              </template>
-              <template #[`item.installed_count`]="{ item }">
-                {{ item.installed_count ?? '—' }}
-              </template>
-              <template #[`item.entry_mark`]="{ item }">
-                <v-chip
-                  size="x-small"
-                  variant="tonal"
-                  :color="item.calculation_writeback_allowed ? 'success' : 'grey'"
-                >
-                  {{ item.entry_mark || 'не разрешена' }}
-                </v-chip>
-              </template>
-              <template #[`item.external_sign_line_name`]="{ item }">
-                {{ item.external_sign_line_name || '—' }}
-              </template>
-              <template #[`item.state_name`]="{ item }">
-                {{ item.state_name || '—' }}
-              </template>
-              <template #[`item.quality_status`]="{ item }">
-                <v-chip
-                  size="x-small"
-                  variant="tonal"
-                  :color="qualityColor(item.quality_status as NetworkDiaphragmQualityStatus)"
-                >
-                  {{ qualityLabel(item.quality_status as NetworkDiaphragmQualityStatus) }}
-                </v-chip>
-              </template>
-              <template #[`item.actions`]="{ item }">
-                <HintTip
-                  v-if="hasCoordinates(item)"
-                  text="Показать диафрагму на карте"
-                  hint="Журнал закроется, маркер останется"
-                >
-                  <template #default="{ props: tip }">
-                    <v-btn
-                      v-bind="tip"
-                      icon="mdi-crosshairs-gps"
-                      size="x-small"
-                      variant="text"
-                      aria-label="Показать диафрагму на карте"
-                      @click.stop="locate(item)"
-                    />
-                  </template>
-                </HintTip>
-                <HintTip
-                  v-else
-                  text="Карта недоступна"
-                  hint="Нет координат: линия отсутствует или без узлов"
-                >
-                  <template #default="{ props: tip }">
-                    <v-btn
-                      v-bind="tip"
-                      icon="mdi-map-marker-off"
-                      size="x-small"
-                      variant="text"
-                      aria-disabled="true"
-                      aria-label="Нет координат: линия отсутствует или без узлов"
-                      @click.stop
-                    />
-                  </template>
-                </HintTip>
-                <HintTip text="Открыть паспорт">
-                  <template #default="{ props: tip }">
-                    <v-btn
-                      v-bind="tip"
-                      icon="mdi-chevron-right"
-                      size="x-small"
-                      variant="text"
-                      aria-label="Открыть паспорт диафрагмы"
-                      @click.stop="openDetails(Number(item.id))"
-                    />
-                  </template>
-                </HintTip>
-              </template>
-            </DataTable>
-          </StateView>
-        </v-card-text>
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="qualityStatus"
+              :items="qualityOptions"
+              item-title="title"
+              item-value="value"
+              label="Качество данных"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="diameterMode"
+              :items="diameterOptions"
+              item-title="title"
+              item-value="value"
+              label="Режим диаметра"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="installationPlace"
+              :items="lookups.locations"
+              item-title="name"
+              item-value="name"
+              label="Место установки"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="stateId"
+              :items="lookups.states"
+              item-title="name"
+              item-value="id"
+              label="Состояние"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="externalSignId"
+              :items="lookups.external_signs"
+              item-title="name"
+              item-value="id"
+              label="Признак линии"
+            />
+          </v-col>
+        </v-row>
 
-        <v-divider />
-        <v-card-actions class="px-4 py-2">
-          <span class="text-caption text-medium-emphasis">Страница {{ page }}{{ pages ? ` из ${pages}` : '' }}</span>
+        <div class="d-flex align-center flex-wrap ga-2 mt-3">
+          <v-chip
+            v-if="scope.lineId"
+            size="small"
+            color="primary"
+            closable
+            @click:close="clearScope"
+          >
+            Линия {{ scope.lineId }}
+          </v-chip>
           <v-spacer />
-          <v-pagination
-            v-if="pages > 1"
-            v-model="page"
-            :length="pages"
-            :total-visible="isMobile ? 3 : 7"
-            density="compact"
-          />
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+          <v-btn
+            variant="text"
+            prepend-icon="mdi-filter-remove-outline"
+            :disabled="!filtersActive"
+            @click="resetFilters"
+          >
+            Сбросить
+          </v-btn>
+          <v-btn
+            variant="tonal"
+            prepend-icon="mdi-refresh"
+            :loading="loading"
+            @click="loadItems"
+          >
+            Обновить
+          </v-btn>
+        </div>
+      </template>
+      <DataTable
+        :columns="tableColumns"
+        :items="(items as Record<string, unknown>[])"
+        item-key="id"
+        selectable
+        :flash-key="flashId"
+        density="compact"
+        class="diaphragm-table"
+        @select="openDetails(Number($event.id))"
+      >
+        <template #[`item.installation_place`]="{ item }">
+          <div class="text-truncate">
+            {{ item.installation_place || item.display_name || '—' }}
+          </div>
+        </template>
+        <template #[`item.line_id`]="{ item }">
+          <span class="num">{{ item.line_id ?? '—' }}</span>
+          <div class="text-caption text-medium-emphasis text-truncate">
+            {{ nodeLabel(item.node_code_1, item.node_name_1, item.node_id_1) }} → {{ nodeLabel(item.node_code_2, item.node_name_2, item.node_id_2) }}
+          </div>
+        </template>
+        <template #[`item.internal_diameter`]="{ item }">
+          {{ diameterLabel(item) }}
+          <div class="text-caption text-medium-emphasis">
+            {{ diameterModeLabel(item.diameter_mode as NetworkDiaphragmDiameterMode) }}
+          </div>
+        </template>
+        <template #[`item.installed_count`]="{ item }">
+          {{ item.installed_count ?? '—' }}
+        </template>
+        <template #[`item.entry_mark`]="{ item }">
+          <v-chip
+            size="x-small"
+            variant="tonal"
+            :color="item.calculation_writeback_allowed ? 'success' : 'grey'"
+          >
+            {{ item.entry_mark || 'не разрешена' }}
+          </v-chip>
+        </template>
+        <template #[`item.external_sign_line_name`]="{ item }">
+          {{ item.external_sign_line_name || '—' }}
+        </template>
+        <template #[`item.state_name`]="{ item }">
+          {{ item.state_name || '—' }}
+        </template>
+        <template #[`item.quality_status`]="{ item }">
+          <v-chip
+            size="x-small"
+            variant="tonal"
+            :color="qualityColor(item.quality_status as NetworkDiaphragmQualityStatus)"
+          >
+            {{ qualityLabel(item.quality_status as NetworkDiaphragmQualityStatus) }}
+          </v-chip>
+        </template>
+        <template #[`item.actions`]="{ item }">
+          <HintTip
+            v-if="hasCoordinates(item)"
+            text="Показать диафрагму на карте"
+            hint="Журнал закроется, маркер останется"
+          >
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon="mdi-crosshairs-gps"
+                size="x-small"
+                variant="text"
+                aria-label="Показать диафрагму на карте"
+                @click.stop="locate(item)"
+              />
+            </template>
+          </HintTip>
+          <HintTip
+            v-else
+            text="Карта недоступна"
+            hint="Нет координат: линия отсутствует или без узлов"
+          >
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon="mdi-map-marker-off"
+                size="x-small"
+                variant="text"
+                aria-disabled="true"
+                aria-label="Нет координат: линия отсутствует или без узлов"
+                @click.stop
+              />
+            </template>
+          </HintTip>
+          <HintTip text="Открыть паспорт">
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon="mdi-chevron-right"
+                size="x-small"
+                variant="text"
+                aria-label="Открыть паспорт диафрагмы"
+                @click.stop="openDetails(Number(item.id))"
+              />
+            </template>
+          </HintTip>
+        </template>
+      </DataTable>
+    </JournalShell>
 
     <v-dialog
       v-model="detailVisible"
@@ -514,6 +448,7 @@ import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
 import HintTip from '~/components/HintTip.vue'
 import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
 import KpiTile from '~/components/KpiTile.vue'
+import JournalShell from '~/components/JournalShell.vue'
 import SearchField from '~/components/SearchField.vue'
 import StateView from '~/components/StateView.vue'
 import { computed, reactive, ref, watch } from 'vue'
@@ -878,11 +813,7 @@ defineExpose({ openDialog })
 </script>
 
 <style scoped>
-.diaphragm-journal { height: min(90vh, 920px); display: flex; flex-direction: column; }
 .diaphragm-alerts { display: grid; gap: var(--space-2); }
 .diaphragm-kpi { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.diaphragm-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
-.diaphragm-table-wrap { min-height: 280px; overflow: auto; flex: 1; }
 .diaphragm-table { min-width: 1240px; }
-@media (max-width: 600px) { .diaphragm-journal { height: 100dvh; } }
 </style>
