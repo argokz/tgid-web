@@ -21,3 +21,4 @@ public/cesium/
 test-results/
 playwright-report/
 lighthouse-results/
+__pycache__/
