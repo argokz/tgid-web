@@ -1,57 +1,35 @@
 <template>
   <Teleport to="body">
-    <v-dialog
+    <JournalShell
       v-model="visible"
-      :fullscreen="isMobile"
-      max-width="1440"
-      scrollable
+      :page="activeTab === 'installed' ? installedPage : catalogPage"
+      @update:page="(p) => { if (activeTab === 'installed') installedPage = p; else catalogPage = p }"
+      title="Насосное оборудование"
+      :subtitle="`${scopeTitle} · найдено ${total} · настроено ${lookups.counts.configured || 0} из ${lookups.counts.total || 0}`"
+      icon="mdi-pump"
+      avatar-color="blue-grey-lighten-5"
+      icon-color="blue-grey-darken-2"
+      :pages="activeTab === 'installed' ? installedPages : catalogPages"
+      :loading="loading"
+      :error="error"
+      :empty="activeTab === 'installed' ? !installed.length : !catalog.length"
+      :empty-title="activeTab === 'installed' ? 'Насосы не найдены' : 'Модели не найдены'"
+      :empty-text="activeTab === 'installed' ? (filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В базе нет установленных насосов') : ''"
+      :empty-icon="'mdi-pump'"
+      :empty-action-label="activeTab === 'installed' ? (filtersActive ? 'Сбросить фильтры' : undefined) : undefined"
+      :skeleton-rows="activeTab === 'installed' ? (10) : (8)"
+      @retry="activeTab === 'installed' ? loadInstalled() : loadCatalog()"
+      @empty-action="activeTab === 'installed' ? resetFilters() : undefined"
     >
-      <v-card
-        class="pump-journal"
-        :rounded="isMobile ? 0 : 'lg'"
-      >
-        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
-          <v-avatar
-            color="blue-grey-lighten-5"
-            size="40"
-          >
-            <v-icon color="blue-grey-darken-2">mdi-pump</v-icon>
-          </v-avatar>
-          <div
-            class="flex-grow-1"
-            style="min-width: 0"
-          >
-            <div class="text-subtitle-1 font-weight-bold">Насосное оборудование</div>
-            <div class="text-caption text-medium-emphasis text-truncate">
-              {{ scopeTitle }} · найдено {{ total }} · настроено {{ lookups.counts.configured || 0 }} из {{ lookups.counts.total || 0 }}
-            </div>
-          </div>
-          <SegmentedToggle
-            v-model="activeTab"
-            :items="tabItems"
-            aria-label="Раздел журнала насосов"
-            class="mr-2"
-          />
-          <HintTip
-            text="Закрыть журнал"
-            hotkey="Esc"
-            location="bottom"
-          >
-            <template #default="{ props: tip }">
-              <v-btn
-                v-bind="tip"
-                icon
-                variant="text"
-                aria-label="Закрыть журнал"
-                @click="visible = false"
-              >
-                <v-icon>mdi-close</v-icon>
-              </v-btn>
-            </template>
-          </HintTip>
-        </v-card-title>
-
-        <v-divider />
+      <template #actions>
+        <SegmentedToggle
+          v-model="activeTab"
+          :items="tabItems"
+          aria-label="Раздел журнала насосов"
+          class="mr-2"
+        />
+      </template>
+      <template #top>
 
         <div
           v-if="lookupsLoaded && lookups.result_count === 0"
@@ -86,218 +64,7 @@
             />
           </div>
 
-          <div class="pa-3 pa-md-4 pump-filters">
-            <v-row dense>
-              <v-col
-                cols="12"
-                md="5"
-              >
-                <SearchField
-                  :model-value="search"
-                  label="Насос, модель, станция, линия или ID"
-                  :debounce="350"
-                  :loading="loading"
-                  @update:model-value="search = $event"
-                  @search="onSearch"
-                />
-              </v-col>
-              <v-col
-                cols="12"
-                sm="4"
-                md="3"
-              >
-                <AppSelect
-                  v-model="configurationStatus"
-                  :items="configurationOptions"
-                  item-title="title"
-                  item-value="value"
-                  label="Готовность характеристики"
-                />
-              </v-col>
-              <v-col
-                cols="12"
-                sm="4"
-                md="2"
-              >
-                <AppSelect
-                  v-model="stateId"
-                  :items="lookups.states"
-                  item-title="name"
-                  item-value="id"
-                  label="Состояние"
-                />
-              </v-col>
-              <v-col
-                cols="12"
-                sm="4"
-                md="2"
-              >
-                <AppSelect
-                  v-model="fragmentId"
-                  :items="lookups.fragments"
-                  item-title="name"
-                  item-value="id"
-                  label="Фрагмент"
-                />
-              </v-col>
-            </v-row>
-
-            <div class="d-flex align-center flex-wrap ga-2 mt-3">
-              <v-chip
-                v-if="scope.lineId"
-                size="small"
-                color="primary"
-                closable
-                @click:close="clearScope"
-              >
-                Линия {{ scope.lineId }}
-              </v-chip>
-              <v-spacer />
-              <v-btn
-                variant="text"
-                prepend-icon="mdi-filter-remove-outline"
-                :disabled="!filtersActive"
-                @click="resetFilters"
-              >
-                Сбросить
-              </v-btn>
-              <v-btn
-                variant="tonal"
-                prepend-icon="mdi-refresh"
-                :loading="loading"
-                @click="loadInstalled"
-              >
-                Обновить
-              </v-btn>
-            </div>
-          </div>
-
-          <v-divider />
-
-          <v-card-text class="pa-0 pump-table-wrap">
-            <StateView
-              variant="table"
-              :rows="10"
-              :loading="loading && !installed.length"
-              :error="error"
-              :empty="!loading && !installed.length"
-              empty-title="Насосы не найдены"
-              :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В базе нет установленных насосов'"
-              empty-icon="mdi-pump"
-              :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
-              :retrying="loading"
-              @retry="loadInstalled"
-              @action="resetFilters"
-            >
-              <v-progress-linear
-                v-if="loading"
-                indeterminate
-                color="primary"
-              />
-              <DataTable
-                :columns="installedColumns"
-                :items="(installed as Record<string, unknown>[])"
-                item-key="id"
-                selectable
-                :flash-key="flashId"
-                density="compact"
-                class="pump-table"
-                @select="openInstalledDetails(Number($event.id))"
-              >
-                <template #[`item.line_id`]="{ item }">
-                  <span class="num">{{ item.line_id ?? '—' }}</span>
-                  <div class="text-caption text-medium-emphasis">
-                    узлы {{ item.node_id_1 ?? '—' }} → {{ item.node_id_2 ?? '—' }}
-                  </div>
-                </template>
-                <template #[`item.number`]="{ item }">
-                  <div class="text-truncate">
-                    {{ item.number || `Насос №${item.id}` }}
-                  </div>
-                  <div class="text-caption text-medium-emphasis text-truncate">
-                    {{ item.station_name || 'станция не указана' }}
-                  </div>
-                </template>
-                <template #[`item.model_name`]="{ item }">
-                  <div class="text-truncate">
-                    {{ item.model_name || item.model_type || 'не выбрана' }}
-                  </div>
-                </template>
-                <template #[`item.parallel_count`]="{ item }">
-                  {{ item.parallel_count ? `${item.parallel_count} шт.` : '—' }}
-                  <div class="text-caption text-medium-emphasis">
-                    {{ item.drive_type_name || 'привод не задан' }}
-                  </div>
-                </template>
-                <template #[`item.state_name`]="{ item }">
-                  <v-chip
-                    size="x-small"
-                    variant="tonal"
-                    :color="stateColor(item.state_name)"
-                  >
-                    {{ item.state_name || '—' }}
-                  </v-chip>
-                </template>
-                <template #[`item.fragment_name`]="{ item }">
-                  {{ item.fragment_name || `№${item.fragment_id || '—'}` }}
-                </template>
-                <template #[`item.configuration_status`]="{ item }">
-                  <v-chip
-                    size="x-small"
-                    variant="tonal"
-                    :color="configurationColor(item.configuration_status as PumpConfigurationStatus)"
-                  >
-                    {{ configurationLabel(item.configuration_status as PumpConfigurationStatus) }}
-                  </v-chip>
-                </template>
-                <template #[`item.actions`]="{ item }">
-                  <HintTip
-                    v-if="hasCoordinates(item)"
-                    text="Показать насос на карте"
-                    hint="Журнал закроется, маркер останется"
-                  >
-                    <template #default="{ props: tip }">
-                      <v-btn
-                        v-bind="tip"
-                        icon="mdi-crosshairs-gps"
-                        size="x-small"
-                        variant="text"
-                        aria-label="Показать насос на карте"
-                        @click.stop="locate(item)"
-                      />
-                    </template>
-                  </HintTip>
-                  <HintTip text="Открыть карточку">
-                    <template #default="{ props: tip }">
-                      <v-btn
-                        v-bind="tip"
-                        icon="mdi-chevron-right"
-                        size="x-small"
-                        variant="text"
-                        aria-label="Открыть карточку насоса"
-                        @click.stop="openInstalledDetails(Number(item.id))"
-                      />
-                    </template>
-                  </HintTip>
-                </template>
-              </DataTable>
-            </StateView>
-          </v-card-text>
-
-          <v-divider />
-          <v-card-actions class="px-4 py-2">
-            <span class="text-caption text-medium-emphasis">Страница {{ installedPage }}{{ installedPages ? ` из ${installedPages}` : '' }}</span>
-            <v-spacer />
-            <v-pagination
-              v-if="installedPages > 1"
-              v-model="installedPage"
-              :length="installedPages"
-              :total-visible="isMobile ? 3 : 7"
-              density="compact"
-            />
-          </v-card-actions>
         </template>
-
         <template v-else>
           <div
             class="pump-kpi px-3 px-md-4 pt-3"
@@ -317,143 +84,286 @@
             />
           </div>
 
-          <div class="pa-3 pa-md-4 pump-filters">
-            <v-row dense>
-              <v-col
-                cols="12"
-                md="5"
-              >
-                <SearchField
-                  :model-value="catalogSearch"
-                  label="Модель, тип, изготовитель или ID"
-                  :debounce="350"
-                  :loading="loading"
-                  @update:model-value="catalogSearch = $event"
-                  @search="onCatalogSearch"
-                />
-              </v-col>
-              <v-col
-                cols="12"
-                sm="6"
-                md="3"
-              >
-                <AppSelect
-                  v-model="catalogQuality"
-                  :items="catalogStatusOptions"
-                  item-title="title"
-                  item-value="value"
-                  label="Качество характеристики"
-                />
-              </v-col>
-              <v-col
-                cols="12"
-                sm="6"
-                md="2"
-              >
-                <AppSelect
-                  v-model="pumpType"
-                  :items="lookups.pump_types"
-                  item-title="name"
-                  item-value="name"
-                  label="Тип насоса"
-                />
-              </v-col>
-              <v-col
-                cols="12"
-                md="2"
-                class="d-flex justify-end align-center"
-              >
-                <v-btn
-                  variant="tonal"
-                  prepend-icon="mdi-refresh"
-                  :loading="loading"
-                  @click="loadCatalog"
-                >
-                  Обновить
-                </v-btn>
-              </v-col>
-            </v-row>
-          </div>
-
-          <v-divider />
-
-          <v-card-text class="pa-0 pump-table-wrap">
-            <StateView
-              variant="table"
-              :rows="8"
-              :loading="loading && !catalog.length"
-              :error="error"
-              :empty="!loading && !catalog.length"
-              empty-title="Модели не найдены"
-              empty-icon="mdi-pump"
-              :retrying="loading"
-              @retry="loadCatalog"
-            >
-              <v-progress-linear
-                v-if="loading"
-                indeterminate
-                color="primary"
-              />
-              <DataTable
-                :columns="catalogColumns"
-                :items="(catalog as Record<string, unknown>[])"
-                item-key="id"
-                selectable
-                density="compact"
-                class="pump-table pump-table--catalog"
-                @select="openCatalogDetails(Number($event.id))"
-              >
-                <template #[`item.name`]="{ item }">
-                  <div class="text-truncate">
-                    {{ item.name || '—' }}
-                  </div>
-                  <div class="text-caption text-medium-emphasis text-truncate">
-                    {{ item.producer || 'изготовитель не указан' }}
-                  </div>
-                </template>
-                <template #[`item.pump_type`]="{ item }">
-                  {{ item.pump_type || '—' }}
-                </template>
-                <template #[`item.working_zone`]="{ item }">
-                  {{ formatNumber(item.min_flow) }} … {{ formatNumber(item.max_flow) }} т/ч
-                </template>
-                <template #[`item.nominal`]="{ item }">
-                  {{ formatNumber(item.nominal_flow) }} т/ч / {{ formatNumber(item.nominal_head) }} м
-                </template>
-                <template #[`item.rotor`]="{ item }">
-                  {{ formatNumber(item.nominal_rotor_diameter) }} мм / {{ formatNumber(item.nominal_rotation_speed) }} об/мин
-                </template>
-                <template #[`item.point_count`]="{ item }">
-                  {{ item.point_count }}/10
-                </template>
-                <template #[`item.quality_status`]="{ item }">
-                  <v-chip
-                    size="x-small"
-                    variant="tonal"
-                    :color="catalogStatusColor(item.quality_status as PumpCatalogStatus)"
-                  >
-                    {{ catalogStatusLabel(item.quality_status as PumpCatalogStatus) }}
-                  </v-chip>
-                </template>
-              </DataTable>
-            </StateView>
-          </v-card-text>
-
-          <v-divider />
-          <v-card-actions class="px-4 py-2">
-            <span class="text-caption text-medium-emphasis">Страница {{ catalogPage }}{{ catalogPages ? ` из ${catalogPages}` : '' }}</span>
-            <v-spacer />
-            <v-pagination
-              v-if="catalogPages > 1"
-              v-model="catalogPage"
-              :length="catalogPages"
-              :total-visible="isMobile ? 3 : 7"
-              density="compact"
-            />
-          </v-card-actions>
         </template>
-      </v-card>
-    </v-dialog>
+      </template>
+      <template #filters>
+        <template v-if="activeTab === 'installed'">
+          <v-row dense>
+            <v-col
+              cols="12"
+              md="5"
+            >
+              <SearchField
+                :model-value="search"
+                label="Насос, модель, станция, линия или ID"
+                :debounce="350"
+                :loading="loading"
+                @update:model-value="search = $event"
+                @search="onSearch"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="4"
+              md="3"
+            >
+              <AppSelect
+                v-model="configurationStatus"
+                :items="configurationOptions"
+                item-title="title"
+                item-value="value"
+                label="Готовность характеристики"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="4"
+              md="2"
+            >
+              <AppSelect
+                v-model="stateId"
+                :items="lookups.states"
+                item-title="name"
+                item-value="id"
+                label="Состояние"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="4"
+              md="2"
+            >
+              <AppSelect
+                v-model="fragmentId"
+                :items="lookups.fragments"
+                item-title="name"
+                item-value="id"
+                label="Фрагмент"
+              />
+            </v-col>
+          </v-row>
+
+          <div class="d-flex align-center flex-wrap ga-2 mt-3">
+            <v-chip
+              v-if="scope.lineId"
+              size="small"
+              color="primary"
+              closable
+              @click:close="clearScope"
+            >
+              Линия {{ scope.lineId }}
+            </v-chip>
+            <v-spacer />
+            <v-btn
+              variant="text"
+              prepend-icon="mdi-filter-remove-outline"
+              :disabled="!filtersActive"
+              @click="resetFilters"
+            >
+              Сбросить
+            </v-btn>
+            <v-btn
+              variant="tonal"
+              prepend-icon="mdi-refresh"
+              :loading="loading"
+              @click="loadInstalled"
+            >
+              Обновить
+            </v-btn>
+          </div>
+        </template>
+        <template v-else>
+          <v-row dense>
+            <v-col
+              cols="12"
+              md="5"
+            >
+              <SearchField
+                :model-value="catalogSearch"
+                label="Модель, тип, изготовитель или ID"
+                :debounce="350"
+                :loading="loading"
+                @update:model-value="catalogSearch = $event"
+                @search="onCatalogSearch"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="3"
+            >
+              <AppSelect
+                v-model="catalogQuality"
+                :items="catalogStatusOptions"
+                item-title="title"
+                item-value="value"
+                label="Качество характеристики"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="pumpType"
+                :items="lookups.pump_types"
+                item-title="name"
+                item-value="name"
+                label="Тип насоса"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              md="2"
+              class="d-flex justify-end align-center"
+            >
+              <v-btn
+                variant="tonal"
+                prepend-icon="mdi-refresh"
+                :loading="loading"
+                @click="loadCatalog"
+              >
+                Обновить
+              </v-btn>
+            </v-col>
+          </v-row>
+        </template>
+      </template>
+      <template v-if="activeTab === 'installed'">
+        <DataTable
+          :columns="installedColumns"
+          :items="(installed as Record<string, unknown>[])"
+          item-key="id"
+          selectable
+          :flash-key="flashId"
+          density="compact"
+          class="pump-table"
+          @select="openInstalledDetails(Number($event.id))"
+        >
+          <template #[`item.line_id`]="{ item }">
+            <span class="num">{{ item.line_id ?? '—' }}</span>
+            <div class="text-caption text-medium-emphasis">
+              узлы {{ item.node_id_1 ?? '—' }} → {{ item.node_id_2 ?? '—' }}
+            </div>
+          </template>
+          <template #[`item.number`]="{ item }">
+            <div class="text-truncate">
+              {{ item.number || `Насос №${item.id}` }}
+            </div>
+            <div class="text-caption text-medium-emphasis text-truncate">
+              {{ item.station_name || 'станция не указана' }}
+            </div>
+          </template>
+          <template #[`item.model_name`]="{ item }">
+            <div class="text-truncate">
+              {{ item.model_name || item.model_type || 'не выбрана' }}
+            </div>
+          </template>
+          <template #[`item.parallel_count`]="{ item }">
+            {{ item.parallel_count ? `${item.parallel_count} шт.` : '—' }}
+            <div class="text-caption text-medium-emphasis">
+              {{ item.drive_type_name || 'привод не задан' }}
+            </div>
+          </template>
+          <template #[`item.state_name`]="{ item }">
+            <v-chip
+              size="x-small"
+              variant="tonal"
+              :color="stateColor(item.state_name)"
+            >
+              {{ item.state_name || '—' }}
+            </v-chip>
+          </template>
+          <template #[`item.fragment_name`]="{ item }">
+            {{ item.fragment_name || `№${item.fragment_id || '—'}` }}
+          </template>
+          <template #[`item.configuration_status`]="{ item }">
+            <v-chip
+              size="x-small"
+              variant="tonal"
+              :color="configurationColor(item.configuration_status as PumpConfigurationStatus)"
+            >
+              {{ configurationLabel(item.configuration_status as PumpConfigurationStatus) }}
+            </v-chip>
+          </template>
+          <template #[`item.actions`]="{ item }">
+            <HintTip
+              v-if="hasCoordinates(item)"
+              text="Показать насос на карте"
+              hint="Журнал закроется, маркер останется"
+            >
+              <template #default="{ props: tip }">
+                <v-btn
+                  v-bind="tip"
+                  icon="mdi-crosshairs-gps"
+                  size="x-small"
+                  variant="text"
+                  aria-label="Показать насос на карте"
+                  @click.stop="locate(item)"
+                />
+              </template>
+            </HintTip>
+            <HintTip text="Открыть карточку">
+              <template #default="{ props: tip }">
+                <v-btn
+                  v-bind="tip"
+                  icon="mdi-chevron-right"
+                  size="x-small"
+                  variant="text"
+                  aria-label="Открыть карточку насоса"
+                  @click.stop="openInstalledDetails(Number(item.id))"
+                />
+              </template>
+            </HintTip>
+          </template>
+        </DataTable>
+      </template>
+      <template v-else>
+        <DataTable
+          :columns="catalogColumns"
+          :items="(catalog as Record<string, unknown>[])"
+          item-key="id"
+          selectable
+          density="compact"
+          class="pump-table pump-table--catalog"
+          @select="openCatalogDetails(Number($event.id))"
+        >
+          <template #[`item.name`]="{ item }">
+            <div class="text-truncate">
+              {{ item.name || '—' }}
+            </div>
+            <div class="text-caption text-medium-emphasis text-truncate">
+              {{ item.producer || 'изготовитель не указан' }}
+            </div>
+          </template>
+          <template #[`item.pump_type`]="{ item }">
+            {{ item.pump_type || '—' }}
+          </template>
+          <template #[`item.working_zone`]="{ item }">
+            {{ formatNumber(item.min_flow) }} … {{ formatNumber(item.max_flow) }} т/ч
+          </template>
+          <template #[`item.nominal`]="{ item }">
+            {{ formatNumber(item.nominal_flow) }} т/ч / {{ formatNumber(item.nominal_head) }} м
+          </template>
+          <template #[`item.rotor`]="{ item }">
+            {{ formatNumber(item.nominal_rotor_diameter) }} мм / {{ formatNumber(item.nominal_rotation_speed) }} об/мин
+          </template>
+          <template #[`item.point_count`]="{ item }">
+            {{ item.point_count }}/10
+          </template>
+          <template #[`item.quality_status`]="{ item }">
+            <v-chip
+              size="x-small"
+              variant="tonal"
+              :color="catalogStatusColor(item.quality_status as PumpCatalogStatus)"
+            >
+              {{ catalogStatusLabel(item.quality_status as PumpCatalogStatus) }}
+            </v-chip>
+          </template>
+        </DataTable>
+      </template>
+    </JournalShell>
 
     <v-dialog
       v-model="detailVisible"
@@ -684,6 +594,7 @@ import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
 import HintTip from '~/components/HintTip.vue'
 import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
 import KpiTile, { type KpiStatus } from '~/components/KpiTile.vue'
+import JournalShell from '~/components/JournalShell.vue'
 import SearchField from '~/components/SearchField.vue'
 import SegmentedToggle from '~/components/SegmentedToggle.vue'
 import StateView from '~/components/StateView.vue'
@@ -1229,14 +1140,10 @@ defineExpose({ openDialog })
 </script>
 
 <style scoped>
-.pump-journal { height: min(90vh, 920px); display: flex; flex-direction: column; }
 .pump-kpi { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.pump-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
-.pump-table-wrap { min-height: 280px; overflow: auto; flex: 1; }
 .pump-table { min-width: 1180px; }
 .pump-table--catalog { min-width: 1180px; }
 .pump-detail-alerts { display: grid; gap: var(--space-2); }
 .pump-detail-alerts:empty { display: none; }
 .pump-panel-table :deep(.v-expansion-panel-text__wrapper) { padding: 0; }
-@media (max-width: 600px) { .pump-journal { height: 100dvh; } }
 </style>

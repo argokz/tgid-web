@@ -1,57 +1,35 @@
 <template>
   <Teleport to="body">
-    <v-dialog
+    <JournalShell
       v-model="visible"
-      :fullscreen="isMobile"
-      max-width="1440"
-      scrollable
+      :page="activeTab === 'inventory' ? inventoryPage : tubePage"
+      @update:page="(p) => { if (activeTab === 'inventory') inventoryPage = p; else tubePage = p }"
+      title="Байпасы наружных теплопроводов"
+      :subtitle="`${scopeTitle} · найдено ${total} · готовы ${lookups.counts.ready || 0} из ${lookups.counts.total || 0}`"
+      icon="mdi-pipe-disconnected"
+      avatar-color="cyan-lighten-5"
+      icon-color="cyan-darken-3"
+      :pages="activeTab === 'inventory' ? inventoryPages : tubePages"
+      :loading="loading"
+      :error="error"
+      :empty="activeTab === 'inventory' ? !inventory.length : !tubes.length"
+      :empty-title="activeTab === 'inventory' ? 'Байпасы не найдены' : 'Стандартные трубы не найдены'"
+      :empty-text="activeTab === 'inventory' ? (filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В базе нет байпасов') : ''"
+      :empty-icon="activeTab === 'inventory' ? 'mdi-pipe-disconnected' : 'mdi-pipe'"
+      :empty-action-label="activeTab === 'inventory' ? (filtersActive ? 'Сбросить фильтры' : undefined) : undefined"
+      :skeleton-rows="activeTab === 'inventory' ? (10) : (8)"
+      @retry="activeTab === 'inventory' ? loadInventory() : loadTubes()"
+      @empty-action="activeTab === 'inventory' ? resetFilters() : undefined"
     >
-      <v-card
-        class="bypass-journal"
-        :rounded="isMobile ? 0 : 'lg'"
-      >
-        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
-          <v-avatar
-            color="cyan-lighten-5"
-            size="40"
-          >
-            <v-icon color="cyan-darken-3">mdi-pipe-disconnected</v-icon>
-          </v-avatar>
-          <div
-            class="flex-grow-1"
-            style="min-width: 0"
-          >
-            <div class="text-subtitle-1 font-weight-bold">Байпасы наружных теплопроводов</div>
-            <div class="text-caption text-medium-emphasis text-truncate">
-              {{ scopeTitle }} · найдено {{ total }} · готовы {{ lookups.counts.ready || 0 }} из {{ lookups.counts.total || 0 }}
-            </div>
-          </div>
-          <SegmentedToggle
-            v-model="activeTab"
-            :items="tabItems"
-            aria-label="Раздел журнала байпасов"
-            class="mr-2"
-          />
-          <HintTip
-            text="Закрыть журнал"
-            hotkey="Esc"
-            location="bottom"
-          >
-            <template #default="{ props: tip }">
-              <v-btn
-                v-bind="tip"
-                icon
-                variant="text"
-                aria-label="Закрыть журнал"
-                @click="visible = false"
-              >
-                <v-icon>mdi-close</v-icon>
-              </v-btn>
-            </template>
-          </HintTip>
-        </v-card-title>
-
-        <v-divider />
+      <template #actions>
+        <SegmentedToggle
+          v-model="activeTab"
+          :items="tabItems"
+          aria-label="Раздел журнала байпасов"
+          class="mr-2"
+        />
+      </template>
+      <template #top>
 
         <div class="px-3 px-md-4 pt-3 bypass-alerts">
           <v-alert
@@ -93,369 +71,299 @@
             />
           </div>
 
-          <div class="pa-3 pa-md-4 bypass-filters">
-            <v-row dense>
-              <v-col
-                cols="12"
-                md="4"
-              >
-                <SearchField
-                  :model-value="search"
-                  label="Узел, линия, место или ID"
-                  :debounce="350"
-                  :loading="loading"
-                  @update:model-value="search = $event"
-                  @search="onSearch"
-                />
-              </v-col>
-              <v-col
-                cols="12"
-                sm="6"
-                md="2"
-              >
-                <AppSelect
-                  v-model="qualityStatus"
-                  :items="qualityOptions"
-                  item-title="title"
-                  item-value="value"
-                  label="Качество данных"
-                />
-              </v-col>
-              <v-col
-                cols="12"
-                sm="6"
-                md="2"
-              >
-                <AppSelect
-                  v-model="stateId"
-                  :items="lookups.states"
-                  item-title="name"
-                  item-value="id"
-                  label="Состояние"
-                />
-              </v-col>
-              <v-col
-                cols="12"
-                sm="6"
-                md="2"
-              >
-                <AppSelect
-                  v-model="pipelineSignId"
-                  :items="lookups.pipeline_signs"
-                  item-title="name"
-                  item-value="id"
-                  label="Трубопровод"
-                />
-              </v-col>
-              <v-col
-                cols="12"
-                sm="6"
-                md="2"
-              >
-                <AppSelect
-                  v-model="fragmentId"
-                  :items="lookups.fragments"
-                  item-title="name"
-                  item-value="id"
-                  label="Фрагмент"
-                />
-              </v-col>
-            </v-row>
+        </template>
+      </template>
+      <template #filters>
+        <template v-if="activeTab === 'inventory'">
+          <v-row dense>
+            <v-col
+              cols="12"
+              md="4"
+            >
+              <SearchField
+                :model-value="search"
+                label="Узел, линия, место или ID"
+                :debounce="350"
+                :loading="loading"
+                @update:model-value="search = $event"
+                @search="onSearch"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="qualityStatus"
+                :items="qualityOptions"
+                item-title="title"
+                item-value="value"
+                label="Качество данных"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="stateId"
+                :items="lookups.states"
+                item-title="name"
+                item-value="id"
+                label="Состояние"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="pipelineSignId"
+                :items="lookups.pipeline_signs"
+                item-title="name"
+                item-value="id"
+                label="Трубопровод"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="fragmentId"
+                :items="lookups.fragments"
+                item-title="name"
+                item-value="id"
+                label="Фрагмент"
+              />
+            </v-col>
+          </v-row>
 
-            <div class="d-flex align-center flex-wrap ga-2 mt-3">
-              <v-chip
-                v-if="scope.lineId"
-                size="small"
-                color="primary"
-                closable
-                @click:close="clearScope"
-              >
-                Линия {{ scope.lineId }}
-              </v-chip>
-              <v-spacer />
-              <v-btn
-                variant="text"
-                prepend-icon="mdi-filter-remove-outline"
-                :disabled="!filtersActive"
-                @click="resetFilters"
-              >
-                Сбросить
-              </v-btn>
+          <div class="d-flex align-center flex-wrap ga-2 mt-3">
+            <v-chip
+              v-if="scope.lineId"
+              size="small"
+              color="primary"
+              closable
+              @click:close="clearScope"
+            >
+              Линия {{ scope.lineId }}
+            </v-chip>
+            <v-spacer />
+            <v-btn
+              variant="text"
+              prepend-icon="mdi-filter-remove-outline"
+              :disabled="!filtersActive"
+              @click="resetFilters"
+            >
+              Сбросить
+            </v-btn>
+            <v-btn
+              variant="tonal"
+              prepend-icon="mdi-refresh"
+              :loading="loading"
+              @click="loadInventory"
+            >
+              Обновить
+            </v-btn>
+          </div>
+        </template>
+        <template v-else>
+          <v-row dense>
+            <v-col
+              cols="12"
+              md="5"
+            >
+              <SearchField
+                :model-value="tubeSearch"
+                label="Стандарт, DN, материал или ID"
+                :debounce="350"
+                :loading="loading"
+                @update:model-value="tubeSearch = $event"
+                @search="onTubeSearch"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="3"
+            >
+              <AppSelect
+                v-model="tubeStandard"
+                :items="lookups.tube_standards"
+                item-title="name"
+                item-value="name"
+                label="Стандарт"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              sm="6"
+              md="2"
+            >
+              <AppSelect
+                v-model="tubeQuality"
+                :items="tubeQualityOptions"
+                item-title="title"
+                item-value="value"
+                label="Полнота паспорта"
+              />
+            </v-col>
+            <v-col
+              cols="12"
+              md="2"
+              class="d-flex justify-end align-center"
+            >
               <v-btn
                 variant="tonal"
                 prepend-icon="mdi-refresh"
                 :loading="loading"
-                @click="loadInventory"
+                @click="loadTubes"
               >
                 Обновить
               </v-btn>
+            </v-col>
+          </v-row>
+        </template>
+      </template>
+      <template v-if="activeTab === 'inventory'">
+        <DataTable
+          :columns="inventoryColumns"
+          :items="(inventory as Record<string, unknown>[])"
+          item-key="id"
+          selectable
+          :flash-key="flashId"
+          density="compact"
+          class="bypass-table"
+          @select="openItemDetails(Number($event.id))"
+        >
+          <template #[`item.installation_place`]="{ item }">
+            <div class="text-truncate">
+              {{ item.installation_place || item.display_name || '—' }}
             </div>
-          </div>
-
-          <v-divider />
-
-          <v-card-text class="pa-0 bypass-table-wrap">
-            <StateView
-              variant="table"
-              :rows="10"
-              :loading="loading && !inventory.length"
-              :error="error"
-              :empty="!loading && !inventory.length"
-              empty-title="Байпасы не найдены"
-              :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В базе нет байпасов'"
-              empty-icon="mdi-pipe-disconnected"
-              :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
-              :retrying="loading"
-              @retry="loadInventory"
-              @action="resetFilters"
+          </template>
+          <template #[`item.line_id`]="{ item }">
+            <span class="num">{{ item.line_id ?? '—' }}</span>
+            <div class="text-caption text-medium-emphasis text-truncate">
+              {{ nodeLabel(item.node_code_1, item.node_name_1, item.node_id_1) }} → {{ nodeLabel(item.node_code_2, item.node_name_2, item.node_id_2) }}
+            </div>
+          </template>
+          <template #[`item.target_flow`]="{ item }">
+            {{ formatNumber(item.target_flow) }}
+            <div class="text-caption text-medium-emphasis">
+              ± {{ formatNumber(item.flow_tolerance) }}
+            </div>
+          </template>
+          <template #[`item.connection_node`]="{ item }">
+            <div class="text-truncate">
+              {{ nodeLabel(item.connection_node_code, item.connection_node_name, item.connection_node_id) }}
+            </div>
+          </template>
+          <template #[`item.pipeline_sign_name`]="{ item }">
+            {{ item.pipeline_sign_name || '—' }}
+          </template>
+          <template #[`item.geometry`]="{ item }">
+            {{ formatUnit(item.length, 'м') }} / {{ formatUnit(item.internal_diameter, 'мм') }}
+          </template>
+          <template #[`item.state_name`]="{ item }">
+            <v-chip
+              size="x-small"
+              variant="tonal"
+              :color="stateColor(item.state_name)"
             >
-              <v-progress-linear
-                v-if="loading"
-                indeterminate
-                color="primary"
-              />
-              <DataTable
-                :columns="inventoryColumns"
-                :items="(inventory as Record<string, unknown>[])"
-                item-key="id"
-                selectable
-                :flash-key="flashId"
-                density="compact"
-                class="bypass-table"
-                @select="openItemDetails(Number($event.id))"
-              >
-                <template #[`item.installation_place`]="{ item }">
-                  <div class="text-truncate">
-                    {{ item.installation_place || item.display_name || '—' }}
-                  </div>
-                </template>
-                <template #[`item.line_id`]="{ item }">
-                  <span class="num">{{ item.line_id ?? '—' }}</span>
-                  <div class="text-caption text-medium-emphasis text-truncate">
-                    {{ nodeLabel(item.node_code_1, item.node_name_1, item.node_id_1) }} → {{ nodeLabel(item.node_code_2, item.node_name_2, item.node_id_2) }}
-                  </div>
-                </template>
-                <template #[`item.target_flow`]="{ item }">
-                  {{ formatNumber(item.target_flow) }}
-                  <div class="text-caption text-medium-emphasis">
-                    ± {{ formatNumber(item.flow_tolerance) }}
-                  </div>
-                </template>
-                <template #[`item.connection_node`]="{ item }">
-                  <div class="text-truncate">
-                    {{ nodeLabel(item.connection_node_code, item.connection_node_name, item.connection_node_id) }}
-                  </div>
-                </template>
-                <template #[`item.pipeline_sign_name`]="{ item }">
-                  {{ item.pipeline_sign_name || '—' }}
-                </template>
-                <template #[`item.geometry`]="{ item }">
-                  {{ formatUnit(item.length, 'м') }} / {{ formatUnit(item.internal_diameter, 'мм') }}
-                </template>
-                <template #[`item.state_name`]="{ item }">
-                  <v-chip
-                    size="x-small"
-                    variant="tonal"
-                    :color="stateColor(item.state_name)"
-                  >
-                    {{ item.state_name || '—' }}
-                  </v-chip>
-                </template>
-                <template #[`item.fragment_name`]="{ item }">
-                  {{ item.fragment_name || `№${item.fragment_id || '—'}` }}
-                </template>
-                <template #[`item.quality_status`]="{ item }">
-                  <v-chip
-                    size="x-small"
-                    variant="tonal"
-                    :color="qualityColor(item.quality_status as NetworkBypassQualityStatus)"
-                  >
-                    {{ qualityLabel(item.quality_status as NetworkBypassQualityStatus) }}
-                  </v-chip>
-                </template>
-                <template #[`item.actions`]="{ item }">
-                  <HintTip
-                    v-if="hasCoordinates(item)"
-                    text="Показать байпас на карте"
-                    hint="Журнал закроется, маркер останется"
-                  >
-                    <template #default="{ props: tip }">
-                      <v-btn
-                        v-bind="tip"
-                        icon="mdi-crosshairs-gps"
-                        size="x-small"
-                        variant="text"
-                        aria-label="Показать байпас на карте"
-                        @click.stop="locate(item)"
-                      />
-                    </template>
-                  </HintTip>
-                  <HintTip text="Открыть карточку">
-                    <template #default="{ props: tip }">
-                      <v-btn
-                        v-bind="tip"
-                        icon="mdi-chevron-right"
-                        size="x-small"
-                        variant="text"
-                        aria-label="Открыть карточку байпаса"
-                        @click.stop="openItemDetails(Number(item.id))"
-                      />
-                    </template>
-                  </HintTip>
-                </template>
-              </DataTable>
-            </StateView>
-          </v-card-text>
-
-          <v-divider />
-          <v-card-actions class="px-4 py-2">
-            <span class="text-caption text-medium-emphasis">Страница {{ inventoryPage }}{{ inventoryPages ? ` из ${inventoryPages}` : '' }}</span>
-            <v-spacer />
-            <v-pagination
-              v-if="inventoryPages > 1"
-              v-model="inventoryPage"
-              :length="inventoryPages"
-              :total-visible="isMobile ? 3 : 7"
-              density="compact"
-            />
-          </v-card-actions>
-        </template>
-
-        <template v-else>
-          <div class="pa-3 pa-md-4 bypass-filters">
-            <v-row dense>
-              <v-col
-                cols="12"
-                md="5"
-              >
-                <SearchField
-                  :model-value="tubeSearch"
-                  label="Стандарт, DN, материал или ID"
-                  :debounce="350"
-                  :loading="loading"
-                  @update:model-value="tubeSearch = $event"
-                  @search="onTubeSearch"
-                />
-              </v-col>
-              <v-col
-                cols="12"
-                sm="6"
-                md="3"
-              >
-                <AppSelect
-                  v-model="tubeStandard"
-                  :items="lookups.tube_standards"
-                  item-title="name"
-                  item-value="name"
-                  label="Стандарт"
-                />
-              </v-col>
-              <v-col
-                cols="12"
-                sm="6"
-                md="2"
-              >
-                <AppSelect
-                  v-model="tubeQuality"
-                  :items="tubeQualityOptions"
-                  item-title="title"
-                  item-value="value"
-                  label="Полнота паспорта"
-                />
-              </v-col>
-              <v-col
-                cols="12"
-                md="2"
-                class="d-flex justify-end align-center"
-              >
+              {{ item.state_name || '—' }}
+            </v-chip>
+          </template>
+          <template #[`item.fragment_name`]="{ item }">
+            {{ item.fragment_name || `№${item.fragment_id || '—'}` }}
+          </template>
+          <template #[`item.quality_status`]="{ item }">
+            <v-chip
+              size="x-small"
+              variant="tonal"
+              :color="qualityColor(item.quality_status as NetworkBypassQualityStatus)"
+            >
+              {{ qualityLabel(item.quality_status as NetworkBypassQualityStatus) }}
+            </v-chip>
+          </template>
+          <template #[`item.actions`]="{ item }">
+            <HintTip
+              v-if="hasCoordinates(item)"
+              text="Показать байпас на карте"
+              hint="Журнал закроется, маркер останется"
+            >
+              <template #default="{ props: tip }">
                 <v-btn
-                  variant="tonal"
-                  prepend-icon="mdi-refresh"
-                  :loading="loading"
-                  @click="loadTubes"
-                >
-                  Обновить
-                </v-btn>
-              </v-col>
-            </v-row>
-          </div>
-
-          <v-divider />
-
-          <v-card-text class="pa-0 bypass-table-wrap">
-            <StateView
-              variant="table"
-              :rows="8"
-              :loading="loading && !tubes.length"
-              :error="error"
-              :empty="!loading && !tubes.length"
-              empty-title="Стандартные трубы не найдены"
-              empty-icon="mdi-pipe"
-              :retrying="loading"
-              @retry="loadTubes"
+                  v-bind="tip"
+                  icon="mdi-crosshairs-gps"
+                  size="x-small"
+                  variant="text"
+                  aria-label="Показать байпас на карте"
+                  @click.stop="locate(item)"
+                />
+              </template>
+            </HintTip>
+            <HintTip text="Открыть карточку">
+              <template #default="{ props: tip }">
+                <v-btn
+                  v-bind="tip"
+                  icon="mdi-chevron-right"
+                  size="x-small"
+                  variant="text"
+                  aria-label="Открыть карточку байпаса"
+                  @click.stop="openItemDetails(Number(item.id))"
+                />
+              </template>
+            </HintTip>
+          </template>
+        </DataTable>
+      </template>
+      <template v-else>
+        <DataTable
+          :columns="tubeColumns"
+          :items="(tubes as Record<string, unknown>[])"
+          item-key="id"
+          selectable
+          density="compact"
+          class="bypass-table bypass-table--tubes"
+          @select="openTubeDetails(Number($event.id))"
+        >
+          <template #[`item.standard`]="{ item }">
+            <div class="text-truncate">
+              {{ item.standard || '—' }}
+            </div>
+          </template>
+          <template #[`item.nominal_diameter`]="{ item }">
+            {{ formatNumber(item.nominal_diameter) }}
+          </template>
+          <template #[`item.external_diameter`]="{ item }">
+            {{ formatNumber(item.external_diameter) }}
+          </template>
+          <template #[`item.internal_diameter`]="{ item }">
+            {{ formatNumber(item.internal_diameter) }}
+          </template>
+          <template #[`item.wall_thickness`]="{ item }">
+            {{ formatNumber(item.wall_thickness) }}
+          </template>
+          <template #[`item.section_area`]="{ item }">
+            {{ formatNumber(item.section_area, 8) }}
+          </template>
+          <template #[`item.quality_status`]="{ item }">
+            <v-chip
+              size="x-small"
+              variant="tonal"
+              :color="item.quality_status === 'ready' ? 'success' : 'warning'"
             >
-              <v-progress-linear
-                v-if="loading"
-                indeterminate
-                color="primary"
-              />
-              <DataTable
-                :columns="tubeColumns"
-                :items="(tubes as Record<string, unknown>[])"
-                item-key="id"
-                selectable
-                density="compact"
-                class="bypass-table bypass-table--tubes"
-                @select="openTubeDetails(Number($event.id))"
-              >
-                <template #[`item.standard`]="{ item }">
-                  <div class="text-truncate">
-                    {{ item.standard || '—' }}
-                  </div>
-                </template>
-                <template #[`item.nominal_diameter`]="{ item }">
-                  {{ formatNumber(item.nominal_diameter) }}
-                </template>
-                <template #[`item.external_diameter`]="{ item }">
-                  {{ formatNumber(item.external_diameter) }}
-                </template>
-                <template #[`item.internal_diameter`]="{ item }">
-                  {{ formatNumber(item.internal_diameter) }}
-                </template>
-                <template #[`item.wall_thickness`]="{ item }">
-                  {{ formatNumber(item.wall_thickness) }}
-                </template>
-                <template #[`item.section_area`]="{ item }">
-                  {{ formatNumber(item.section_area, 8) }}
-                </template>
-                <template #[`item.quality_status`]="{ item }">
-                  <v-chip
-                    size="x-small"
-                    variant="tonal"
-                    :color="item.quality_status === 'ready' ? 'success' : 'warning'"
-                  >
-                    {{ item.quality_status === 'ready' ? 'готово' : 'неполный' }}
-                  </v-chip>
-                </template>
-              </DataTable>
-            </StateView>
-          </v-card-text>
-
-          <v-divider />
-          <v-card-actions class="px-4 py-2">
-            <span class="text-caption text-medium-emphasis">Страница {{ tubePage }}{{ tubePages ? ` из ${tubePages}` : '' }}</span>
-            <v-spacer />
-            <v-pagination
-              v-if="tubePages > 1"
-              v-model="tubePage"
-              :length="tubePages"
-              :total-visible="isMobile ? 3 : 7"
-              density="compact"
-            />
-          </v-card-actions>
-        </template>
-      </v-card>
-    </v-dialog>
+              {{ item.quality_status === 'ready' ? 'готово' : 'неполный' }}
+            </v-chip>
+          </template>
+        </DataTable>
+      </template>
+    </JournalShell>
 
     <v-dialog
       v-model="detailVisible"
@@ -611,6 +519,7 @@ import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
 import HintTip from '~/components/HintTip.vue'
 import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
 import KpiTile, { type KpiStatus } from '~/components/KpiTile.vue'
+import JournalShell from '~/components/JournalShell.vue'
 import SearchField from '~/components/SearchField.vue'
 import SegmentedToggle from '~/components/SegmentedToggle.vue'
 import StateView from '~/components/StateView.vue'
@@ -1068,12 +977,8 @@ defineExpose({ openDialog })
 </script>
 
 <style scoped>
-.bypass-journal { height: min(90vh, 920px); display: flex; flex-direction: column; }
 .bypass-alerts { display: grid; gap: var(--space-2); }
 .bypass-kpi { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.bypass-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
-.bypass-table-wrap { min-height: 280px; overflow: auto; flex: 1; }
 .bypass-table { min-width: 1320px; }
 .bypass-table--tubes { min-width: 1000px; }
-@media (max-width: 600px) { .bypass-journal { height: 100dvh; } }
 </style>

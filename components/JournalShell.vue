@@ -39,7 +39,7 @@ withDefaults(defineProps<{
   avatarColor: 'primary-lighten-5',
   iconColor: 'primary',
   maxWidth: 1240,
-  emptyIcon: 'mdi-clipboard-text-outline',
+  emptyIcon: 'mdi-tray-remove',
   emptyActionLabel: undefined,
   skeletonRows: 10,
   closeText: 'Закрыть журнал',
