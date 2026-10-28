@@ -1,325 +1,257 @@
 <template>
   <Teleport to="body">
-    <v-dialog
+    <JournalShell
       v-model="visible"
-      :fullscreen="isMobile"
-      max-width="1240"
-      scrollable
+      v-model:page="page"
+      title="Журнал нарушений"
+      :subtitle="`${scopeTitle} · найдено ${total}`"
+      icon="mdi-alert-decagram-outline"
+      avatar-color="deep-orange-lighten-5"
+      icon-color="deep-orange-darken-2"
+      :pages="pages"
+      :loading="loading"
+      :error="error"
+      :empty="!items.length"
+      empty-title="Нарушения не найдены"
+      :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В журнале пока нет записей — проверьте загрузку исторических данных TGID'"
+      empty-icon="mdi-clipboard-alert-outline"
+      :empty-action-label="filtersActive ? 'Сбросить фильтры' : undefined"
+      @retry="loadDefects"
+      @empty-action="resetFilters"
     >
-      <v-card
-        class="defect-journal"
-        :rounded="isMobile ? 0 : 'lg'"
+      <template #actions>
+        <v-btn
+          color="secondary"
+          variant="tonal"
+          prepend-icon="mdi-printer"
+          class="mr-2"
+          @click="openForm11Report"
+        >
+          Печать (Форма 11)
+        </v-btn>
+        <v-btn
+          v-if="mutationsEnabled"
+          color="primary"
+          variant="flat"
+          prepend-icon="mdi-plus"
+          class="mr-2"
+          :loading="creating"
+          @click="createDefect"
+        >
+          Создать
+        </v-btn>
+      </template>
+      <template
+        v-if="stateTiles.length"
+        #kpi
       >
-        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
-          <v-avatar
-            color="deep-orange-lighten-5"
-            size="40"
+        <KpiTile
+          label="Найдено"
+          :value="total"
+          :compact="false"
+        />
+        <KpiTile
+          v-for="tile in stateTiles"
+          :key="tile.id"
+          :label="tile.name"
+          :value="tile.count"
+          :compact="false"
+          :status="tile.status"
+          selectable
+          :active="stateId === tile.id"
+          @select="toggleState(tile.id)"
+        />
+      </template>
+      <template #filters>
+        <v-row dense>
+          <v-col
+            cols="12"
+            md="4"
           >
-            <v-icon color="deep-orange-darken-2">mdi-alert-decagram-outline</v-icon>
-          </v-avatar>
-          <div
-            class="flex-grow-1"
-            style="min-width: 0"
+            <SearchField
+              :model-value="search"
+              label="Поиск по ID, адресу, описанию или акту"
+              :debounce="350"
+              :loading="loading"
+              @update:model-value="search = $event"
+              @search="onSearch"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="4"
+            md="2"
           >
-            <div class="text-subtitle-1 font-weight-bold">Журнал нарушений</div>
-            <div class="text-caption text-medium-emphasis text-truncate">
-              {{ scopeTitle }} · найдено {{ total }}
-            </div>
-          </div>
-          <v-btn
-            color="secondary"
-            variant="tonal"
-            prepend-icon="mdi-printer"
-            class="mr-2"
-            @click="openForm11Report"
+            <AppSelect
+              v-model="sourceId"
+              :items="lookups.sources"
+              item-title="name"
+              item-value="id"
+              label="Источник"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="4"
+            md="2"
           >
-            Печать (Форма 11)
-          </v-btn>
-          <v-btn
-            v-if="mutationsEnabled"
+            <AppSelect
+              v-model="stateId"
+              :items="lookups.states"
+              item-title="name"
+              item-value="id"
+              label="Состояние"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="4"
+            md="2"
+          >
+            <v-text-field
+              v-model="dateFrom"
+              type="date"
+              label="С даты"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="4"
+            md="2"
+          >
+            <v-text-field
+              v-model="dateTo"
+              type="date"
+              label="По дату"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </v-col>
+        </v-row>
+        <div class="d-flex align-center flex-wrap ga-2 mt-3">
+          <v-chip
+            v-if="scope.lineId"
+            size="small"
             color="primary"
-            variant="flat"
-            prepend-icon="mdi-plus"
-            class="mr-2"
-            :loading="creating"
-            @click="createDefect"
+            closable
+            @click:close="clearScope"
           >
-            Создать
+            Трубопровод {{ scope.lineId }}
+          </v-chip>
+          <v-chip
+            v-if="scope.nodeId"
+            size="small"
+            color="primary"
+            closable
+            @click:close="clearScope"
+          >
+            Узел {{ scope.nodeId }}
+          </v-chip>
+          <AppSelect
+            v-model="categoryId"
+            :items="lookups.categories"
+            item-title="name"
+            item-value="id"
+            label="Категория"
+            class="category-filter"
+          />
+          <v-spacer />
+          <v-btn
+            variant="text"
+            prepend-icon="mdi-filter-remove-outline"
+            :disabled="!filtersActive"
+            @click="resetFilters"
+          >
+            Сбросить
           </v-btn>
+          <v-btn
+            variant="tonal"
+            prepend-icon="mdi-refresh"
+            :loading="loading"
+            @click="loadDefects"
+          >
+            Обновить
+          </v-btn>
+        </div>
+      </template>
+      <DataTable
+        :columns="tableColumns"
+        :items="(items as Record<string, unknown>[])"
+        item-key="id"
+        selectable
+        :flash-key="flashId"
+        density="compact"
+        class="defect-table"
+        @select="openDetails(Number($event.id))"
+      >
+        <template #[`item.detected_at`]="{ item }">
+          {{ formatDate(item.detected_at) }}
+        </template>
+        <template #[`item.source_name`]="{ item }">
+          {{ item.source_name || '—' }}
+        </template>
+        <template #[`item.state_name`]="{ item }">
+          <v-chip
+            size="x-small"
+            :color="stateColor(Number(item.state_id))"
+            variant="tonal"
+          >
+            {{ item.state_name || 'Не задано' }}
+          </v-chip>
+        </template>
+        <template #[`item.address`]="{ item }">
+          <div class="text-truncate">
+            {{ item.address || nodeRange(item as DefectSummary) || '—' }}
+          </div>
+          <div
+            v-if="item.line_id"
+            class="text-caption text-medium-emphasis"
+          >
+            Линия {{ item.line_id }}
+          </div>
+        </template>
+        <template #[`item.description`]="{ item }">
+          <span
+            class="description-cell"
+            :title="String(item.description || item.report_note || '')"
+          >{{ item.description || item.report_note || '—' }}</span>
+        </template>
+        <template #[`item.actions`]="{ item }">
           <HintTip
-            text="Закрыть журнал"
-            hotkey="Esc"
-            location="bottom"
+            v-if="hasCoordinates(item as DefectSummary)"
+            text="Показать на карте"
+            hint="Журнал закроется, маркер останется"
           >
             <template #default="{ props: tip }">
               <v-btn
                 v-bind="tip"
-                icon
+                icon="mdi-crosshairs-gps"
+                size="x-small"
                 variant="text"
-                aria-label="Закрыть журнал"
-                @click="visible = false"
-              >
-                <v-icon>mdi-close</v-icon>
-              </v-btn>
+                aria-label="Показать нарушение на карте"
+                @click.stop="locate(item as DefectSummary)"
+              />
             </template>
           </HintTip>
-        </v-card-title>
-        <v-divider />
-
-        <!-- Плитки из данных ответа: всего и по состояниям (счётчики — при тех же фильтрах); плитка состояния — фильтр -->
-        <div
-          v-if="stateTiles.length"
-          class="defect-kpi px-3 px-md-4 pt-3"
-        >
-          <KpiTile
-            label="Найдено"
-            :value="total"
-            :compact="false"
-          />
-          <KpiTile
-            v-for="tile in stateTiles"
-            :key="tile.id"
-            :label="tile.name"
-            :value="tile.count"
-            :compact="false"
-            :status="tile.status"
-            selectable
-            :active="stateId === tile.id"
-            @select="toggleState(tile.id)"
-          />
-        </div>
-
-        <div class="pa-3 pa-md-4 defect-filters">
-          <v-row dense>
-            <v-col
-              cols="12"
-              md="4"
-            >
-              <SearchField
-                :model-value="search"
-                label="Поиск по ID, адресу, описанию или акту"
-                :debounce="350"
-                :loading="loading"
-                @update:model-value="search = $event"
-                @search="onSearch"
+          <HintTip text="Открыть карточку">
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon="mdi-chevron-right"
+                size="x-small"
+                variant="text"
+                aria-label="Открыть карточку нарушения"
+                @click.stop="openDetails(Number(item.id))"
               />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="4"
-              md="2"
-            >
-              <AppSelect
-                v-model="sourceId"
-                :items="lookups.sources"
-                item-title="name"
-                item-value="id"
-                label="Источник"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="4"
-              md="2"
-            >
-              <AppSelect
-                v-model="stateId"
-                :items="lookups.states"
-                item-title="name"
-                item-value="id"
-                label="Состояние"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="4"
-              md="2"
-            >
-              <v-text-field
-                v-model="dateFrom"
-                type="date"
-                label="С даты"
-                density="compact"
-                variant="outlined"
-                hide-details
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="4"
-              md="2"
-            >
-              <v-text-field
-                v-model="dateTo"
-                type="date"
-                label="По дату"
-                density="compact"
-                variant="outlined"
-                hide-details
-              />
-            </v-col>
-          </v-row>
-          <div class="d-flex align-center flex-wrap ga-2 mt-3">
-            <v-chip
-              v-if="scope.lineId"
-              size="small"
-              color="primary"
-              closable
-              @click:close="clearScope"
-            >
-              Трубопровод {{ scope.lineId }}
-            </v-chip>
-            <v-chip
-              v-if="scope.nodeId"
-              size="small"
-              color="primary"
-              closable
-              @click:close="clearScope"
-            >
-              Узел {{ scope.nodeId }}
-            </v-chip>
-            <AppSelect
-              v-model="categoryId"
-              :items="lookups.categories"
-              item-title="name"
-              item-value="id"
-              label="Категория"
-              class="category-filter"
-            />
-            <v-spacer />
-            <v-btn
-              variant="text"
-              prepend-icon="mdi-filter-remove-outline"
-              :disabled="!filtersActive"
-              @click="resetFilters"
-            >
-              Сбросить
-            </v-btn>
-            <v-btn
-              variant="tonal"
-              prepend-icon="mdi-refresh"
-              :loading="loading"
-              @click="loadDefects"
-            >
-              Обновить
-            </v-btn>
-          </div>
-        </div>
-
-        <v-divider />
-
-        <v-card-text class="pa-0 defect-table-wrap">
-          <StateView
-            variant="table"
-            :rows="10"
-            :loading="loading && !items.length"
-            :error="error"
-            :empty="!loading && !items.length"
-            empty-title="Нарушения не найдены"
-            :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В журнале пока нет записей — проверьте загрузку исторических данных TGID'"
-            empty-icon="mdi-clipboard-alert-outline"
-            :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
-            :retrying="loading"
-            @retry="loadDefects"
-            @action="resetFilters"
-          >
-            <v-progress-linear
-              v-if="loading"
-              indeterminate
-              color="primary"
-            />
-            <DataTable
-              :columns="tableColumns"
-              :items="(items as Record<string, unknown>[])"
-              item-key="id"
-              selectable
-              :flash-key="flashId"
-              density="compact"
-              class="defect-table"
-              @select="openDetails(Number($event.id))"
-            >
-              <template #[`item.detected_at`]="{ item }">
-                {{ formatDate(item.detected_at) }}
-              </template>
-              <template #[`item.source_name`]="{ item }">
-                {{ item.source_name || '—' }}
-              </template>
-              <template #[`item.state_name`]="{ item }">
-                <v-chip
-                  size="x-small"
-                  :color="stateColor(Number(item.state_id))"
-                  variant="tonal"
-                >
-                  {{ item.state_name || 'Не задано' }}
-                </v-chip>
-              </template>
-              <template #[`item.address`]="{ item }">
-                <div class="text-truncate">
-                  {{ item.address || nodeRange(item as DefectSummary) || '—' }}
-                </div>
-                <div
-                  v-if="item.line_id"
-                  class="text-caption text-medium-emphasis"
-                >
-                  Линия {{ item.line_id }}
-                </div>
-              </template>
-              <template #[`item.description`]="{ item }">
-                <span
-                  class="description-cell"
-                  :title="String(item.description || item.report_note || '')"
-                >{{ item.description || item.report_note || '—' }}</span>
-              </template>
-              <template #[`item.actions`]="{ item }">
-                <HintTip
-                  v-if="hasCoordinates(item as DefectSummary)"
-                  text="Показать на карте"
-                  hint="Журнал закроется, маркер останется"
-                >
-                  <template #default="{ props: tip }">
-                    <v-btn
-                      v-bind="tip"
-                      icon="mdi-crosshairs-gps"
-                      size="x-small"
-                      variant="text"
-                      aria-label="Показать нарушение на карте"
-                      @click.stop="locate(item as DefectSummary)"
-                    />
-                  </template>
-                </HintTip>
-                <HintTip text="Открыть карточку">
-                  <template #default="{ props: tip }">
-                    <v-btn
-                      v-bind="tip"
-                      icon="mdi-chevron-right"
-                      size="x-small"
-                      variant="text"
-                      aria-label="Открыть карточку нарушения"
-                      @click.stop="openDetails(Number(item.id))"
-                    />
-                  </template>
-                </HintTip>
-              </template>
-            </DataTable>
-          </StateView>
-        </v-card-text>
-
-        <v-divider />
-        <v-card-actions class="px-4 py-2">
-          <span class="text-caption text-medium-emphasis">
-            Страница {{ page }}{{ pages ? ` из ${pages}` : '' }}
-          </span>
-          <v-spacer />
-          <v-pagination
-            v-if="pages > 1"
-            v-model="page"
-            :length="pages"
-            :total-visible="isMobile ? 3 : 7"
-            density="compact"
-          />
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+            </template>
+          </HintTip>
+        </template>
+      </DataTable>
+    </JournalShell>
 
     <v-dialog
       v-model="detailsVisible"
@@ -522,9 +454,12 @@ import AppSelect from '~/components/AppSelect.vue'
 import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
 import HintTip from '~/components/HintTip.vue'
 import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
+import JournalShell from '~/components/JournalShell.vue'
 import KpiTile, { type KpiStatus } from '~/components/KpiTile.vue'
 import SearchField from '~/components/SearchField.vue'
 import StateView from '~/components/StateView.vue'
+import { useJournalDetails, useJournalList, useLatestCall } from '~/composables/useJournalList'
+import { downloadBlob } from '~/utils/printRender'
 import { hasLonLat, localToday } from '~/utils/journalFields'
 import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
@@ -566,13 +501,6 @@ const openForm11Report = () => {
 }
 
 const visible = ref(false)
-const loading = ref(false)
-const error = ref('')
-const items = ref<DefectSummary[]>([])
-const total = ref(0)
-const pages = ref(0)
-const page = ref(1)
-const pageSize = 50
 const search = ref('')
 const sourceId = ref<number | undefined>()
 const stateId = ref<number | undefined>()
@@ -581,15 +509,41 @@ const dateFrom = ref('')
 const dateTo = ref('')
 const scope = reactive<DefectJournalScope>({})
 const lookups = reactive<DefectLookups>({ sources: [], states: [], categories: [] })
-/** Счётчики по состояниям из ответа списка; null — API их не отдаёт (плитки скрыты) */
-const stateCounts = ref<{ state_id: number | null; count: number }[] | null>(null)
 
-const detailsVisible = ref(false)
+const list = useJournalList({
+  fetch: (paging) => fastApiService.getDefects({
+    ...paging,
+    source_id: sourceId.value,
+    state_id: stateId.value,
+    category_id: categoryId.value,
+    date_from: dateFrom.value || undefined,
+    date_to: dateTo.value || undefined,
+    line_id: scope.lineId,
+    node_id: scope.nodeId,
+    search: (search.value || '').trim() || undefined,
+  }),
+  errorText: 'Не удалось загрузить журнал нарушений',
+  isActive: () => visible.value,
+  filters: [sourceId, stateId, categoryId, dateFrom, dateTo],
+})
+const { items, total, pages, page, loading, error, onSearch } = list
+const loadDefects = list.load
+/** Счётчики по состояниям из ответа списка; null — API их не отдаёт (плитки скрыты) */
+const stateCounts = computed(() => {
+  const counts = list.lastResult.value?.state_counts
+  return Array.isArray(counts) ? counts : null
+})
+
+const details = useJournalDetails<DefectDetails>({
+  fetch: (id) => fastApiService.getDefect(id),
+  errorText: 'Не удалось открыть карточку нарушения',
+  // открытие другой записи во время правки — черновик текущей остаётся, карточка на просмотр
+  beforeOpen: () => { closeKeepingDraft(); resetEdit() },
+})
+const { visible: detailsVisible, loading: detailsLoading, error: detailsError, selected } = details
+const openDetails = details.open
 // Другой журнал начал выбор участков на карте — закрыть это окно (QA F48)
 useCloseOnMapPick(() => visible.value || detailsVisible.value, () => { detailsVisible.value = false; visible.value = false })
-const detailsLoading = ref(false)
-const detailsError = ref('')
-const selected = ref<DefectDetails | null>(null)
 const reportLoading = ref(false)
 const notificationVisible = ref(false)
 const notificationMessage = ref('')
@@ -665,72 +619,10 @@ const loadLookups = async () => {
   Object.assign(lookups, result)
 }
 
-/** Номер последнего запроса списка */
-let listRequest = 0
-const loadDefects = async () => {
-  const request = ++listRequest
-  loading.value = true
-  error.value = ''
-  try {
-    const result = await fastApiService.getDefects({
-      page: page.value,
-      page_size: pageSize,
-      source_id: sourceId.value,
-      state_id: stateId.value,
-      category_id: categoryId.value,
-      date_from: dateFrom.value || undefined,
-      date_to: dateTo.value || undefined,
-      line_id: scope.lineId,
-      node_id: scope.nodeId,
-      search: (search.value || '').trim() || undefined
-    })
-    if (request !== listRequest) return
-    items.value = result.items
-    total.value = result.total
-    pages.value = result.pages
-    stateCounts.value = Array.isArray(result.state_counts) ? result.state_counts : null
-  } catch (loadError: any) {
-    if (request !== listRequest) return
-    error.value = loadError?.data?.detail || loadError?.message || 'Не удалось загрузить журнал нарушений'
-  } finally {
-    if (request === listRequest) loading.value = false
-  }
-}
-
-/** Текст после паузы ввода (SearchField) */
-const onSearch = () => {
-  if (!visible.value) return
-  page.value = 1
-  void loadDefects()
-}
-
-/** Номер последнего запроса карточки: ответ более раннего запроса не перекрывает поздний */
-let detailsRequest = 0
-const openDetails = async (defectId: number) => {
-  // открытие другой записи во время правки — черновик текущей остаётся, карточка на просмотр
-  closeKeepingDraft()
-  resetEdit()
-  const request = ++detailsRequest
-  detailsVisible.value = true
-  detailsLoading.value = true
-  detailsError.value = ''
-  selected.value = null
-  try {
-    const record = await fastApiService.getDefect(defectId)
-    if (request !== detailsRequest) return
-    selected.value = record
-  } catch (loadError: any) {
-    if (request !== detailsRequest) return
-    detailsError.value = loadError?.data?.detail || loadError?.message || 'Не удалось открыть карточку нарушения'
-  } finally {
-    if (request === detailsRequest) detailsLoading.value = false
-  }
-}
-
 const notifications = useNotificationStore()
-let openDialogSeq = 0
+const openCall = useLatestCall()
 const openDialog = async (nextScope: DefectJournalScope = {}) => {
-  const seq = ++openDialogSeq
+  const call = openCall.next()
   Object.assign(scope, { lineId: undefined, nodeId: undefined, defectId: undefined }, nextScope)
   page.value = 1
   visible.value = true
@@ -738,15 +630,14 @@ const openDialog = async (nextScope: DefectJournalScope = {}) => {
   const [lookupsResult] = await Promise.allSettled([loadLookups(), loadDefects(), recordForm.loadSchema()])
   if (lookupsResult.status === 'rejected') notifications.showWarning(formatApiError(lookupsResult.reason, 'Справочники не загрузились — фильтры и выбор значений могут быть неполными'))
   // журнал открыли снова, пока грузились списки — запись открывает последний вызов
-  if (seq !== openDialogSeq) return
+  if (!openCall.isLatest(call)) return
   if (nextScope.defectId) await openDetails(nextScope.defectId)
 }
 
 const clearScope = () => {
   scope.lineId = undefined
   scope.nodeId = undefined
-  page.value = 1
-  void loadDefects()
+  void list.reload()
 }
 
 const recordForm = useJournalRecordForm('defects')
@@ -807,16 +698,9 @@ const deleteDefect = async (id: number) => {
   }
 }
 
-const refreshSelected = async () => {
-  const id = selected.value?.id
-  if (!id) return
-  try {
-    const record = await fastApiService.getDefect(id)
-    if (selected.value?.id === id) selected.value = record
-  } catch (e: any) {
-    notifications.showWarning(formatApiError(e, 'Карточка не обновилась — показаны прежние данные'))
-  }
-}
+const refreshSelected = () => details.refresh((e) => {
+  notifications.showWarning(formatApiError(e, 'Карточка не обновилась — показаны прежние данные'))
+})
 
 const resetFilters = () => {
   search.value = ''
@@ -825,8 +709,7 @@ const resetFilters = () => {
   categoryId.value = undefined
   dateFrom.value = ''
   dateTo.value = ''
-  page.value = 1
-  void loadDefects()
+  void list.reload()
 }
 
 const locate = (item: DefectSummary) => {
@@ -845,14 +728,7 @@ const downloadReport = async () => {
   reportLoading.value = true
   try {
     const { blob, filename } = await fastApiService.downloadWordReport(selected.value.id)
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, filename)
     notificationMessage.value = `Сформирован отчёт «${filename}»`
     notificationColor.value = 'success'
   } catch (reportError: any) {
@@ -975,46 +851,13 @@ const relationGroups = computed(() => {
   })).filter(group => group.values.length)
 })
 
-watch(page, () => {
-  if (visible.value) void loadDefects()
-})
-
-watch([sourceId, stateId, categoryId, dateFrom, dateTo], () => {
-  if (!visible.value) return
-  page.value = 1
-  void loadDefects()
-})
-
 defineExpose({ openDialog })
 </script>
 
 <style scoped>
-.defect-journal {
-  height: min(88vh, 880px);
-  display: flex;
-  flex-direction: column;
-}
-
-.defect-kpi {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.defect-filters {
-  flex-shrink: 0;
-  background: rgba(var(--v-theme-on-surface), 0.02);
-}
-
 .category-filter {
   min-width: min(100%, 300px);
   max-width: 360px;
-}
-
-.defect-table-wrap {
-  min-height: 280px;
-  overflow: auto;
-  flex: 1;
 }
 
 .defect-table {
@@ -1034,11 +877,5 @@ defineExpose({ openDialog })
   color: var(--text-muted);
   font-size: var(--text-xs);
   font-weight: 600;
-}
-
-@media (max-width: 600px) {
-  .defect-journal {
-    height: 100dvh;
-  }
 }
 </style>
