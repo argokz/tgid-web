@@ -95,7 +95,8 @@ async function renderMapOffscreen(
     attributionControl: false,
     fadeDuration: 0,
     pixelRatio,
-    preserveDrawingBuffer: true,
+    // MapLibre 5: настройки WebGL-контекста — в canvasContextAttributes (без него лист пустой)
+    canvasContextAttributes: { preserveDrawingBuffer: true },
   })
   // Иконки, добавленные в основную карту через addImage, в getStyle() не попадают
   off.on('styleimagemissing', (e: { id: string }) => {

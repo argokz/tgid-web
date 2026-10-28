@@ -737,14 +737,9 @@ export const useLayerStore = defineStore('layer', {
         }
 
         console.log(`[layerStore] Refreshing source ${sourceId}: ${newTileUrl.slice(newTileUrl.indexOf('viewparams='))}`);
-        source.tiles = [newTileUrl];
-        
-        // Clear cache and refresh
-        if ((mapStore.map as any).style.sourceCaches[sourceId]) {
-          (mapStore.map as any).style.sourceCaches[sourceId].clearTiles();
-          (mapStore.map as any).style.sourceCaches[sourceId].update(mapStore.map.transform);
-          mapStore.map.triggerRepaint();
-        }
+        // Публичный API: новый адрес и перезагрузка тайлов (внутренний style.sourceCaches
+        // в MapLibre 5 переименован — прежний сброс молча не срабатывал бы)
+        source.setTiles([newTileUrl]);
       }
     },
 
@@ -1228,12 +1223,7 @@ export const useLayerStore = defineStore('layer', {
 
                 const prev = Array.isArray(source.tiles) ? source.tiles[0] : '';
                 if (prev !== newTileUrl) {
-                  source.tiles = [newTileUrl];
-                  if ((mapStore.map as any).style.sourceCaches[sourceId]) {
-                    (mapStore.map as any).style.sourceCaches[sourceId].clearTiles();
-                    (mapStore.map as any).style.sourceCaches[sourceId].update(mapStore.map.transform);
-                    mapStore.map.triggerRepaint();
-                  }
+                  source.setTiles([newTileUrl]);
                 }
              }
           }

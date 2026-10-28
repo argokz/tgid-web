@@ -239,13 +239,8 @@ export default defineNuxtConfig({
             if (!id.includes('node_modules')) return
 
             // Карта и обвязка — отдельно от entry
-            if (id.includes('maplibre-gl') && !id.includes('maplibre-gl-geocoder')) {
-              return 'maplibre'
-            }
+            if (id.includes('maplibre-gl')) return 'maplibre'
             if (id.includes('@maplibre')) return 'maplibre-misc'
-            if (id.includes('maplibre-gl-geocoder') || id.includes('@maplibre/maplibre-gl-geocoder')) {
-              return 'maplibre-geocoder'
-            }
 
             if (id.includes('vuetify')) return 'vuetify'
             if (id.includes('@mdi')) return 'mdi'
