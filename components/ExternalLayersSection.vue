@@ -316,16 +316,12 @@ const add = () => {
 </template>
 
 <style scoped>
+/* как заголовки блоков MapSidebarPanel; .section-label — общий стиль */
 .group-header {
   display: flex;
   align-items: center;
-}
-.section-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgb(var(--v-theme-on-surface), 0.7);
+  min-height: 32px;
+  margin-top: var(--space-3);
 }
 .ext-row {
   padding: 4px 0;
