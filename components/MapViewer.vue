@@ -547,6 +547,7 @@ import { nearestGroup, queryRenderedNear } from '~/utils/mapPick';
 import { highlightKey } from '~/utils/selectionHighlight';
 import type { PickCandidate } from '~/utils/networkFeature';
 import { useFragmentStore } from '~/stores/fragmentStore';
+import { useMapPermalink } from '~/composables/useMapPermalink';
 import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 import HintTip from '~/components/HintTip.vue';
 import { shellTopPx } from '~/utils/shellMetrics';
@@ -559,6 +560,9 @@ const props = defineProps<{
 defineEmits<{ (e: 'retry-layers'): void }>();
 
 const mapStore = useMapStore();
+// Ссылка на вид карты в адресе (#map=…&fr=…&ly=…): открыть у коллеги то же место
+const mapPermalink = useMapPermalink();
+let stopPermalink: (() => void) | null = null;
 const layerStore = useLayerStore();
 const fragmentStore = useFragmentStore();
 const cesiumStore = useCesiumStore();
@@ -1614,6 +1618,11 @@ const initMap = async () => {
     mapBootstrapped.value = true;
     mapInitLoading.value = false;
     await applyLayersToMap(props.initialLayers);
+    if (mapStore.map) {
+      await mapPermalink.applyFromUrl(mapStore.map);
+      stopPermalink?.();
+      stopPermalink = mapPermalink.follow(mapStore.map);
+    }
   } catch (error) {
     console.error('Map init error:', error);
     mapInitError.value = true;
@@ -1705,6 +1714,8 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  stopPermalink?.();
+  stopPermalink = null;
   if (process.client) {
     window.removeEventListener('pagehide', onPageHideBfCache);
     window.removeEventListener('pageshow', onPageShowBfCache);

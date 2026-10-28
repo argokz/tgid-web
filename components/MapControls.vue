@@ -128,6 +128,25 @@
         </HintTip>
 
         <HintTip
+          text="Скопировать ссылку на этот вид карты"
+          location="left"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              icon
+              variant="text"
+              class="control-btn"
+              aria-label="Скопировать ссылку на этот вид карты"
+              @click="copyViewLink"
+            >
+              <v-icon size="20">mdi-link-variant</v-icon>
+            </v-btn>
+          </template>
+        </HintTip>
+
+
+        <HintTip
           text="Моё местоположение"
           location="left"
         >
@@ -271,6 +290,7 @@ import { useNotificationStore } from '~/stores/notificationStore'
 import { useCesiumStore } from '~/stores/cesiumStore'
 import { useUiStore } from '~/stores/uiStore'
 import { useFragmentStore } from '~/stores/fragmentStore'
+import { useMapPermalink } from '~/composables/useMapPermalink'
 
 const props = withDefaults(defineProps<{
   map: Map | null
@@ -293,6 +313,7 @@ const emit = defineEmits<{
 const { layers, currentLayer, getCurrentLayer, setLayer, loadSavedLayer } = useBaseLayers()
 const notificationStore = useNotificationStore()
 const fragmentStore = useFragmentStore()
+const mapPermalink = useMapPermalink()
 const cesiumStore = useCesiumStore()
 const uiStore = useUiStore()
 
@@ -325,6 +346,14 @@ const addTemporaryMarker = (lon: number, lat: number, description: string) => {
     if (props.map?.getLayer('temp-marker')) props.map.removeLayer('temp-marker')
     if (props.map?.getSource('temp-marker')) props.map.removeSource('temp-marker')
   }, TEMP_MARKER_MS)
+}
+
+// Ссылка на вид: центр, масштаб, фрагменты и слои (utils/mapPermalink.ts)
+const copyViewLink = async () => {
+  if (!props.map) return
+  const { url, copied } = await mapPermalink.copyLink(props.map)
+  if (copied) notificationStore.showSuccess('Ссылка на этот вид карты скопирована')
+  else notificationStore.showInfo(`Скопируйте ссылку из адресной строки: ${url}`)
 }
 
 // «Домой» — к видимым фрагментам (у города их может быть несколько в разных местах: в Шатуре —
