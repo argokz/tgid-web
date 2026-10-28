@@ -191,6 +191,7 @@
             @open-network-bypasses="openLazyDialog('networkBypass', $event)"
             @open-network-diaphragms="openLazyDialog('networkDiaphragm', $event)"
             @open-outage-simulation="openLazyDialog('outageSimulation', $event)"
+            @open-network-trace="openLazyDialog('networkTrace', $event)"
             @open-wear-index="openLazyDialog('wearIndex', $event)"
             @open-data-quality="openLazyDialog('dataQuality', $event)"
             @open-audit-history="openLazyDialog('auditHistory', $event)"
@@ -529,7 +530,8 @@ import type { Component } from 'vue';
 import { markPerf, measurePerf, timeAsync } from '~/utils/perf';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { fastApiService } from '~/services/fastApiService';
-import type { PiezometerRouteResponse } from '~/services/fastApiService';
+import type { NetworkTraceResponse, PiezometerRouteResponse } from '~/services/fastApiService';
+import { featureBounds, traceTypeMeta } from '~/utils/networkTrace';
 import maplibregl from 'maplibre-gl';
 import { useTopologyEditor } from '~/composables/useTopologyEditor';
 import { useJournalContourLayer } from '~/composables/useJournalContourLayer';
@@ -925,6 +927,46 @@ const onClearOutageHighlight = () => {
 
 const onFocusCoords = (lng: number, lat: number) => {
   mapStore.map?.flyTo({ center: [lng, lat], zoom: 18 });
+};
+
+// === Трассировка сети ===
+const traceOverlay = useOverlayLayer(() => mapStore.map, 'network-trace', {
+  layerIds: ['network-trace-glow', 'network-trace-line', 'network-trace-consumers'],
+});
+
+const onShowTraceOnMap = (res: NetworkTraceResponse) => {
+  const map = mapStore.map;
+  if (!map) return;
+  const color = traceTypeMeta(res.trace_type).color;
+  const data: GeoJSON.FeatureCollection = {
+    type: 'FeatureCollection',
+    features: [...res.geojson.lines.features, ...res.geojson.consumers.features],
+  };
+  traceOverlay.show(data, [
+    {
+      id: 'network-trace-glow',
+      type: 'line',
+      filter: ['==', ['geometry-type'], 'LineString'],
+      paint: { 'line-color': color, 'line-width': 9, 'line-opacity': 0.3 },
+    },
+    {
+      id: 'network-trace-line',
+      type: 'line',
+      filter: ['==', ['geometry-type'], 'LineString'],
+      paint: { 'line-color': color, 'line-width': 3.5 },
+    },
+    {
+      id: 'network-trace-consumers',
+      type: 'circle',
+      filter: ['==', ['geometry-type'], 'Point'],
+      paint: { 'circle-radius': 5, 'circle-color': '#fff', 'circle-stroke-width': 2, 'circle-stroke-color': color },
+    },
+  ]);
+  const bounds = featureBounds(res.geojson.lines, res.geojson.consumers);
+  if (bounds) {
+    const [xmin, ymin, xmax, ymax] = bounds;
+    map.fitBounds([[xmin, ymin], [xmax, ymax]], { padding: 80, maxZoom: 18, duration: 1000 });
+  }
 };
 
 // === Hydraulic Thematic Maps & Flow Arrows ===
@@ -1517,6 +1559,12 @@ const toolDialogs: ToolDialogEntry[] = [
     key: 'outageSimulation',
     component: lazyDialog(() => import('./OutageSimulationDialog.vue')),
     on: { showOnMap: onShowOutageOnMap, clearHighlight: onClearOutageHighlight, focusCoords: onFocusCoords },
+  },
+  // Трассировки сети по топологии (фаза 1 модернизации)
+  {
+    key: 'networkTrace',
+    component: lazyDialog(() => import('./NetworkTraceDialog.vue')),
+    on: { showOnMap: onShowTraceOnMap, clearHighlight: () => traceOverlay.clear(), focusCoords: onFocusCoords },
   },
   // Износ участков и план ремонтов (этап 5 ИИ-плана)
   { key: 'wearIndex', component: lazyDialog(() => import('./WearIndexDialog.vue')) },

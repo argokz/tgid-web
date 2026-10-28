@@ -1,6 +1,6 @@
 /** Расчёты, протоколы, анализ и калькуляторы. Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
-import type { CalculationDeleteResponse, CalculationGeoJsonResponse, CalculationListFilter, CalculationListResponse, CalculationSummaryItem, CalculationTemperatureRange, ElevatorEngineParams, ElevatorEngineResult, ElevatorNozzleParams, ElevatorNozzleResult, GvsCirculationParams, GvsCirculationResult, OrificePlateParams, OrificePlateResult, OutageSimulationResponse, RegimeAnalysisKind, RegimeAnalysisResult, SetyRunRequest, SetyRunResponse, ThrottlingSheetParams } from './types';
+import type { CalculationDeleteResponse, CalculationGeoJsonResponse, CalculationListFilter, CalculationListResponse, CalculationSummaryItem, CalculationTemperatureRange, ElevatorEngineParams, ElevatorEngineResult, ElevatorNozzleParams, ElevatorNozzleResult, GvsCirculationParams, NetworkTraceRequest, NetworkTraceResponse, NetworkZonesResponse, GvsCirculationResult, OrificePlateParams, OrificePlateResult, OutageSimulationResponse, RegimeAnalysisKind, RegimeAnalysisResult, SetyRunRequest, SetyRunResponse, ThrottlingSheetParams } from './types';
 import { encodePath, mutationOptions, request } from './http';
 
 export const calcApi = {
@@ -95,6 +95,16 @@ export const calcApi = {
       method: 'POST',
       body: params,
     });
+  },
+
+  /** Трассировка сети: связность, путь к источникам, ниже по потоку, зона */
+  async traceNetwork(body: NetworkTraceRequest): Promise<NetworkTraceResponse> {
+    return request<NetworkTraceResponse>('api/analysis/trace', { method: 'POST', body });
+  },
+
+  /** Зоны сети (компоненты связности) и «острова» без питания */
+  async getNetworkZones(minNodes = 1): Promise<NetworkZonesResponse> {
+    return request<NetworkZonesResponse>('api/analysis/subnetworks', { query: { min_nodes: minNodes } });
   },
 
   async calculateOrificePlate(params: OrificePlateParams): Promise<OrificePlateResult> {

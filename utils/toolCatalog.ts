@@ -22,6 +22,7 @@ export type ToolEvent =
   | 'open-technical-condition-journal'
   | 'open-corrosion-indicator-journal'
   | 'open-outage-simulation'
+  | 'open-network-trace'
   | 'open-alseko-journal'
   | 'open-electrical-network-journal'
   | 'open-heat-loss-journal'
@@ -64,6 +65,7 @@ export type ToolDialogKey =
   | 'technicalCondition'
   | 'corrosionIndicator'
   | 'outageSimulation'
+  | 'networkTrace'
   | 'wearIndex'
   | 'dataQuality'
   | 'throttlingCalculator'
@@ -124,6 +126,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     color: 'deep-orange-darken-2',
     items: [
       { label: 'Локализация аварий', hint: 'Отсекающие задвижки и отключенные потребители', icon: 'mdi-valve-closed', color: 'error', event: 'open-outage-simulation', dialog: 'outageSimulation' },
+      { label: 'Трассировка сети', hint: 'К источнику, ниже по потоку, связанные, зоны и участки без питания', icon: 'mdi-transit-connection-variant', color: 'indigo-darken-2', event: 'open-network-trace', dialog: 'networkTrace' },
       { label: 'Нарушения', hint: 'Журнал дефектов и повреждений', icon: 'mdi-alert-decagram-outline', color: 'deep-orange-darken-2', event: 'open-defect-journal', dialog: 'defect' },
       { label: 'Шурфовки', hint: 'План, предписания, выполнение', icon: 'mdi-shovel', color: 'brown-darken-2', event: 'open-shurf-journal', dialog: 'shurf' },
       { label: 'Осмотры', hint: 'Контуры осмотра и результаты', icon: 'mdi-clipboard-search-outline', color: 'teal-darken-2', event: 'open-inspection-journal', dialog: 'inspection' },

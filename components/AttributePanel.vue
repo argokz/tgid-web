@@ -63,6 +63,21 @@
               >Анализ отключения: какие задвижки закрыть</v-tooltip>
             </v-btn>
 
+            <v-btn
+              v-if="networkJournalScope"
+              icon
+              variant="text"
+              size="small"
+              aria-label="Трассировка сети от объекта"
+              @click="emit('open-network-trace', networkJournalScope)"
+            >
+              <v-icon size="18">mdi-transit-connection-variant</v-icon>
+              <v-tooltip
+                activator="parent"
+                location="bottom"
+              >Трассировка: к источнику, ниже по потоку, зона</v-tooltip>
+            </v-btn>
+
             <!-- Разворот меняет топологию: только в режиме редактирования сети -->
             <v-btn
               v-if="cardLineId && isLineObject && isEditTopologyMode && cardInTerritory"
@@ -1311,6 +1326,8 @@ const emit = defineEmits<{
   'open-repair-journal': [scope: { lineId?: number; nodeId?: number; repairId?: number }]
 
   'open-outage-simulation': [scope: { lineId?: number; nodeId?: number }]
+
+  'open-network-trace': [scope: { lineId?: number; nodeId?: number }]
 
   'open-pressure-test-journal': [scope: { lineId?: number; nodeId?: number; testId?: number }]
 

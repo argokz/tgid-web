@@ -718,6 +718,85 @@ export interface OutageSimulationResponse {
   };
 }
 
+/** Трассировка сети по топологии (POST api/analysis/trace) — фаза 1 модернизации */
+export type NetworkTraceType = 'connected' | 'upstream' | 'downstream' | 'subnetwork';
+
+export interface NetworkTraceRequest {
+  trace_type: NetworkTraceType;
+  start_line_ids?: number[];
+  start_node_ids?: number[];
+  barrier_line_ids?: number[];
+  barrier_node_ids?: number[];
+  /** Остановить обход на задвижках (участок с задвижкой, камера с задвижками во внутренней схеме) */
+  stop_at_valves?: boolean;
+  include_geometry?: boolean;
+}
+
+/** Питающая точка: источник или узел заданного напора (вход квартальной сети из магистрали) */
+export interface NetworkFeedPoint {
+  node_id: number;
+  kind: 'heat_source' | 'set_pressure';
+}
+
+export interface NetworkTraceValve {
+  id: number;
+  lineid: number;
+  owner_node_id: number | null;
+  display_name: string;
+  state_name: string;
+  lng: number | null;
+  lat: number | null;
+}
+
+export interface NetworkTraceResponse {
+  success: boolean;
+  trace_type: NetworkTraceType;
+  model: 'topology';
+  start: { line_ids: number[]; node_ids: number[] };
+  summary: {
+    nodes_count: number;
+    lines_count: number;
+    sources_count: number;
+    valves_count: number;
+    consumers_count: number;
+    total_load_gcal_h: number;
+    total_pipe_length_m: number;
+    total_pipe_volume_m3: number;
+    stopped_at_count: number;
+  };
+  source_node_ids: number[];
+  sources: NetworkFeedPoint[];
+  node_ids: number[];
+  line_ids: number[];
+  stopped_at_node_ids: number[];
+  valves: NetworkTraceValve[];
+  consumers: AffectedConsumer[];
+  consumers_truncated: boolean;
+  /** Участков больше предела — геометрия не отдана, только id */
+  geometry_truncated: boolean;
+  geojson: { lines: GeoJSON.FeatureCollection; consumers: GeoJSON.FeatureCollection };
+}
+
+export interface NetworkZone {
+  zone: number;
+  nodes_count: number;
+  lines_count: number;
+  source_node_ids: number[];
+  sources: NetworkFeedPoint[];
+  has_source: boolean;
+  sample_node_id: number;
+}
+
+export interface NetworkZonesResponse {
+  success: boolean;
+  model: 'topology';
+  zones_count: number;
+  zones_with_source: number;
+  islands_count: number;
+  islands_nodes_count: number;
+  zones: NetworkZone[];
+}
+
 /** Схемы установки шайбы бланка dross.py (поправка к располагаемому напору) */
 export type OrificeScheme =
   | 'bezelevator' // безэлеваторный ввод, Нрас − 5
