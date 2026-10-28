@@ -1,390 +1,328 @@
 <template>
   <Teleport to="body">
-    <v-dialog
+    <JournalShell
       v-model="visible"
-      :fullscreen="isMobile"
-      max-width="1380"
-      scrollable
+      v-model:page="page"
+      title="Технические условия"
+      :subtitle="`${scopeTitle} · найдено ${total}`"
+      icon="mdi-file-certificate-outline"
+      avatar-color="cyan-lighten-5"
+      icon-color="cyan-darken-3"
+      :pages="pages"
+      :loading="loading"
+      :error="error"
+      :empty="!items.length"
+      close-text="Закрыть реестр"
+      empty-title="Технические условия не найдены"
+      :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В реестре пока нет записей'"
+      empty-icon="mdi-file-search-outline"
+      :empty-action-label="filtersActive ? 'Сбросить фильтры' : undefined"
+      :skeleton-rows="10"
+      @retry="loadConditions"
+      @empty-action="resetFilters"
     >
-      <v-card
-        class="tu-journal"
-        :rounded="isMobile ? 0 : 'lg'"
-      >
-        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
-          <v-avatar
-            color="cyan-lighten-5"
-            size="40"
-          >
-            <v-icon color="cyan-darken-3">mdi-file-certificate-outline</v-icon>
-          </v-avatar>
-          <div
-            class="flex-grow-1"
-            style="min-width: 0"
-          >
-            <div class="text-subtitle-1 font-weight-bold">Технические условия</div>
-            <div class="text-caption text-medium-emphasis text-truncate">
-              {{ scopeTitle }} · найдено {{ total }}
-            </div>
-          </div>
-          <HintTip
-            text="Подобрать точку подключения"
-            hint="Узлы рядом с заявкой, режим по расчёту, рекомендация ИИ"
-            location="bottom"
-          >
-            <template #default="{ props: tip }">
-              <v-btn
-                v-bind="tip"
-                color="secondary"
-                variant="tonal"
-                prepend-icon="mdi-map-marker-radius"
-                class="mr-2"
-                @click="connectionVisible = true"
-              >
-                Точка подключения
-              </v-btn>
-            </template>
-          </HintTip>
-          <HintTip
-            text="Выгрузить свод ТУ"
-            hint="Excel по выбранному году выдачи"
-            location="bottom"
-          >
-            <template #default="{ props: tip }">
-              <v-btn
-                v-bind="tip"
-                color="secondary"
-                variant="tonal"
-                prepend-icon="mdi-chart-box-outline"
-                class="mr-2"
-                :loading="loadingBalance"
-                @click="downloadBalance"
-              >
-                Свод
-              </v-btn>
-            </template>
-          </HintTip>
-          <v-btn
-            v-if="mutationsEnabled"
-            color="primary"
-            variant="flat"
-            prepend-icon="mdi-plus"
-            class="mr-2"
-            :loading="creating"
-            @click="createTechnicalCondition"
-          >
-            Создать
-          </v-btn>
-          <HintTip
-            text="Закрыть реестр"
-            hotkey="Esc"
-            location="bottom"
-          >
-            <template #default="{ props: tip }">
-              <v-btn
-                v-bind="tip"
-                icon
-                variant="text"
-                aria-label="Закрыть журнал"
-                @click="visible = false"
-              >
-                <v-icon>mdi-close</v-icon>
-              </v-btn>
-            </template>
-          </HintTip>
-        </v-card-title>
-        <v-divider />
-
-        <!-- Плитки из ответа списка: всего и по состояниям договора при тех же фильтрах; плитка — фильтр -->
-        <div
-          v-if="stateTiles.length"
-          class="tu-kpi px-3 px-md-4 pt-3"
+      <template #actions>
+        <HintTip
+          text="Подобрать точку подключения"
+          hint="Узлы рядом с заявкой, режим по расчёту, рекомендация ИИ"
+          location="bottom"
         >
-          <KpiTile
-            label="Найдено"
-            :value="total"
-            :compact="false"
-          />
-          <KpiTile
-            v-for="tile in stateTiles"
-            :key="tile.id"
-            :label="tile.name"
-            :value="tile.count"
-            :compact="false"
-            :status="tile.status"
-            selectable
-            :active="stateId === tile.id"
-            @select="toggleState(tile.id)"
-          />
-        </div>
-
-        <div class="pa-3 pa-md-4 tu-filters">
-          <v-row dense>
-            <v-col
-              cols="12"
-              md="4"
-            >
-              <SearchField
-                :model-value="search"
-                label="Номер, организация, объект, адрес или договор"
-                :debounce="350"
-                :loading="loading"
-                @update:model-value="search = $event"
-                @search="onSearch"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="stateId"
-                :items="lookups.states"
-                item-title="name"
-                item-value="id"
-                label="Состояние"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="issueYear"
-                :items="lookups.years"
-                item-title="value"
-                item-value="value"
-                label="Год выдачи"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="4"
-            >
-              <AppSelect
-                v-model="heatSource"
-                :items="lookups.heat_sources"
-                item-title="name"
-                item-value="name"
-                label="Источник"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="4"
-            >
-              <AppSelect
-                v-model="district"
-                :items="lookups.districts"
-                item-title="name"
-                item-value="name"
-                label="Район эксплуатации"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="linked"
-                :items="linkOptions"
-                item-title="title"
-                item-value="value"
-                label="Привязка"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <v-text-field
-                v-model="dateFrom"
-                type="date"
-                label="Выдано с"
-                density="compact"
-                variant="outlined"
-                hide-details
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <v-text-field
-                v-model="dateTo"
-                type="date"
-                label="Выдано по"
-                density="compact"
-                variant="outlined"
-                hide-details
-              />
-            </v-col>
-          </v-row>
-          <div class="d-flex align-center flex-wrap ga-2 mt-3">
-            <v-chip
-              v-if="scope.buildingId"
-              size="small"
-              color="primary"
-              closable
-              @click:close="clearScope"
-            >
-              Здание {{ scope.buildingId }}
-            </v-chip>
-            <v-chip
-              v-if="scope.pipeId"
-              size="small"
-              color="primary"
-              closable
-              @click:close="clearScope"
-            >
-              Трубопровод {{ scope.pipeId }}
-            </v-chip>
-            <v-spacer />
+          <template #default="{ props: tip }">
             <v-btn
-              variant="text"
-              prepend-icon="mdi-filter-remove-outline"
-              :disabled="!filtersActive"
-              @click="resetFilters"
-            >
-              Сбросить
-            </v-btn>
-            <v-btn
+              v-bind="tip"
+              color="secondary"
               variant="tonal"
-              prepend-icon="mdi-refresh"
-              :loading="loading"
-              @click="loadConditions"
+              prepend-icon="mdi-map-marker-radius"
+              class="mr-2"
+              @click="connectionVisible = true"
             >
-              Обновить
+              Точка подключения
             </v-btn>
-          </div>
-        </div>
-        <v-divider />
-
-        <v-card-text class="pa-0 tu-table-wrap">
-          <StateView
-            variant="table"
-            :rows="10"
-            :loading="loading && !items.length"
-            :error="error"
-            :empty="!loading && !items.length"
-            empty-title="Технические условия не найдены"
-            :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В реестре пока нет записей'"
-            empty-icon="mdi-file-search-outline"
-            :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
-            :retrying="loading"
-            @retry="loadConditions"
-            @action="resetFilters"
-          >
-            <v-progress-linear
-              v-if="loading"
-              indeterminate
-              color="primary"
-            />
-            <DataTable
-              :columns="tableColumns"
-              :items="(items as Record<string, unknown>[])"
-              item-key="id"
-              selectable
-              :flash-key="flashId"
-              density="compact"
-              class="tu-table"
-              @select="openDetails(Number($event.id))"
+          </template>
+        </HintTip>
+        <HintTip
+          text="Выгрузить свод ТУ"
+          hint="Excel по выбранному году выдачи"
+          location="bottom"
+        >
+          <template #default="{ props: tip }">
+            <v-btn
+              v-bind="tip"
+              color="secondary"
+              variant="tonal"
+              prepend-icon="mdi-chart-box-outline"
+              class="mr-2"
+              :loading="loadingBalance"
+              @click="downloadBalance"
             >
-              <template #[`item.number`]="{ item }">
-                <strong>{{ item.number || `ТУ ${item.id}` }}</strong>
-                <div class="cell-note">
-                  {{ formatDate(item.issued_on) }}
-                </div>
-              </template>
-              <template #[`item.state_name`]="{ item }">
-                <v-chip
-                  size="x-small"
-                  :color="stateColor(Number(item.state_id))"
-                  variant="tonal"
-                >
-                  {{ item.state_name || 'Не задано' }}
-                </v-chip>
-              </template>
-              <template #[`item.object_name`]="{ item }">
-                <span
-                  class="wide-cell"
-                  :title="String(item.object_name || '')"
-                ><strong>{{ item.object_name || 'Объект не указан' }}</strong></span>
-                <div
-                  class="cell-note wide-cell"
-                  :title="String(item.address || item.building_address || '')"
-                >
-                  {{ item.address || item.building_address || 'Адрес не указан' }}
-                </div>
-              </template>
-              <template #[`item.organization_name`]="{ item }">
-                <span
-                  class="wide-cell"
-                  :title="String(item.organization_name || '')"
-                >{{ item.organization_name || '—' }}</span>
-              </template>
-              <template #[`item.heat_source_name`]="{ item }">
-                {{ item.heat_source_name || '—' }}
-                <div class="cell-note">
-                  {{ item.district_name || 'Район не указан' }}
-                </div>
-              </template>
-              <template #[`item.total_heat_load`]="{ item }">
-                <span class="num">{{ heatLoad(item.total_heat_load) }}</span>
-                <div
-                  v-if="item.load_increase != null"
-                  class="cell-note num"
-                >
-                  прирост {{ heatLoad(item.load_increase) }}
-                </div>
-              </template>
-              <template #[`item.building_id`]="{ item }">
-                <v-icon
-                  :color="item.building_link_valid ? 'success' : 'warning'"
-                  size="18"
-                  :aria-label="item.building_link_valid ? 'Привязка к зданию есть' : 'Ссылка на здание не найдена'"
-                >
-                  {{ item.building_link_valid ? 'mdi-link-variant' : 'mdi-link-variant-off' }}
-                </v-icon>
-                <span class="ml-1 num">{{ item.building_id || 'нет' }}</span>
-              </template>
-              <template #[`item.actions`]="{ item }">
-                <HintTip text="Открыть карточку">
-                  <template #default="{ props: tip }">
-                    <v-btn
-                      v-bind="tip"
-                      icon="mdi-chevron-right"
-                      size="x-small"
-                      variant="text"
-                      aria-label="Открыть карточку"
-                      @click.stop="openDetails(Number(item.id))"
-                    />
-                  </template>
-                </HintTip>
-              </template>
-            </DataTable>
-          </StateView>
-        </v-card-text>
-        <v-divider />
-        <v-card-actions class="px-4 py-2">
-          <span class="text-caption text-medium-emphasis">Страница {{ page }} из {{ pages || 1 }}</span>
+              Свод
+            </v-btn>
+          </template>
+        </HintTip>
+        <v-btn
+          v-if="mutationsEnabled"
+          color="primary"
+          variant="flat"
+          prepend-icon="mdi-plus"
+          class="mr-2"
+          :loading="creating"
+          @click="createTechnicalCondition"
+        >
+          Создать
+        </v-btn>
+      </template>
+      <template
+        v-if="stateTiles.length"
+        #kpi
+      >
+        <KpiTile
+          label="Найдено"
+          :value="total"
+          :compact="false"
+        />
+        <KpiTile
+          v-for="tile in stateTiles"
+          :key="tile.id"
+          :label="tile.name"
+          :value="tile.count"
+          :compact="false"
+          :status="tile.status"
+          selectable
+          :active="stateId === tile.id"
+          @select="toggleState(tile.id)"
+        />
+      </template>
+      <template #filters>
+        <v-row dense>
+          <v-col
+            cols="12"
+            md="4"
+          >
+            <SearchField
+              :model-value="search"
+              label="Номер, организация, объект, адрес или договор"
+              :debounce="350"
+              :loading="loading"
+              @update:model-value="search = $event"
+              @search="onSearch"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="stateId"
+              :items="lookups.states"
+              item-title="name"
+              item-value="id"
+              label="Состояние"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="issueYear"
+              :items="lookups.years"
+              item-title="value"
+              item-value="value"
+              label="Год выдачи"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="4"
+          >
+            <AppSelect
+              v-model="heatSource"
+              :items="lookups.heat_sources"
+              item-title="name"
+              item-value="name"
+              label="Источник"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="4"
+          >
+            <AppSelect
+              v-model="district"
+              :items="lookups.districts"
+              item-title="name"
+              item-value="name"
+              label="Район эксплуатации"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="linked"
+              :items="linkOptions"
+              item-title="title"
+              item-value="value"
+              label="Привязка"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <v-text-field
+              v-model="dateFrom"
+              type="date"
+              label="Выдано с"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <v-text-field
+              v-model="dateTo"
+              type="date"
+              label="Выдано по"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </v-col>
+        </v-row>
+        <div class="d-flex align-center flex-wrap ga-2 mt-3">
+          <v-chip
+            v-if="scope.buildingId"
+            size="small"
+            color="primary"
+            closable
+            @click:close="clearScope"
+          >
+            Здание {{ scope.buildingId }}
+          </v-chip>
+          <v-chip
+            v-if="scope.pipeId"
+            size="small"
+            color="primary"
+            closable
+            @click:close="clearScope"
+          >
+            Трубопровод {{ scope.pipeId }}
+          </v-chip>
           <v-spacer />
-          <v-pagination
-            v-if="pages > 1"
-            v-model="page"
-            :length="pages"
-            :total-visible="isMobile ? 3 : 7"
-            density="compact"
-          />
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+          <v-btn
+            variant="text"
+            prepend-icon="mdi-filter-remove-outline"
+            :disabled="!filtersActive"
+            @click="resetFilters"
+          >
+            Сбросить
+          </v-btn>
+          <v-btn
+            variant="tonal"
+            prepend-icon="mdi-refresh"
+            :loading="loading"
+            @click="loadConditions"
+          >
+            Обновить
+          </v-btn>
+        </div>
+      </template>
+      <DataTable
+        :columns="tableColumns"
+        :items="(items as Record<string, unknown>[])"
+        item-key="id"
+        selectable
+        :flash-key="flashId"
+        density="compact"
+        class="tu-table"
+        @select="openDetails(Number($event.id))"
+      >
+        <template #[`item.number`]="{ item }">
+          <strong>{{ item.number || `ТУ ${item.id}` }}</strong>
+          <div class="cell-note">
+            {{ formatDate(item.issued_on) }}
+          </div>
+        </template>
+        <template #[`item.state_name`]="{ item }">
+          <v-chip
+            size="x-small"
+            :color="stateColor(Number(item.state_id))"
+            variant="tonal"
+          >
+            {{ item.state_name || 'Не задано' }}
+          </v-chip>
+        </template>
+        <template #[`item.object_name`]="{ item }">
+          <span
+            class="wide-cell"
+            :title="String(item.object_name || '')"
+          ><strong>{{ item.object_name || 'Объект не указан' }}</strong></span>
+          <div
+            class="cell-note wide-cell"
+            :title="String(item.address || item.building_address || '')"
+          >
+            {{ item.address || item.building_address || 'Адрес не указан' }}
+          </div>
+        </template>
+        <template #[`item.organization_name`]="{ item }">
+          <span
+            class="wide-cell"
+            :title="String(item.organization_name || '')"
+          >{{ item.organization_name || '—' }}</span>
+        </template>
+        <template #[`item.heat_source_name`]="{ item }">
+          {{ item.heat_source_name || '—' }}
+          <div class="cell-note">
+            {{ item.district_name || 'Район не указан' }}
+          </div>
+        </template>
+        <template #[`item.total_heat_load`]="{ item }">
+          <span class="num">{{ heatLoad(item.total_heat_load) }}</span>
+          <div
+            v-if="item.load_increase != null"
+            class="cell-note num"
+          >
+            прирост {{ heatLoad(item.load_increase) }}
+          </div>
+        </template>
+        <template #[`item.building_id`]="{ item }">
+          <v-icon
+            :color="item.building_link_valid ? 'success' : 'warning'"
+            size="18"
+            :aria-label="item.building_link_valid ? 'Привязка к зданию есть' : 'Ссылка на здание не найдена'"
+          >
+            {{ item.building_link_valid ? 'mdi-link-variant' : 'mdi-link-variant-off' }}
+          </v-icon>
+          <span class="ml-1 num">{{ item.building_id || 'нет' }}</span>
+        </template>
+        <template #[`item.actions`]="{ item }">
+          <HintTip text="Открыть карточку">
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon="mdi-chevron-right"
+                size="x-small"
+                variant="text"
+                aria-label="Открыть карточку"
+                @click.stop="openDetails(Number(item.id))"
+              />
+            </template>
+          </HintTip>
+        </template>
+      </DataTable>
+    </JournalShell>
 
     <v-dialog
       v-model="detailsVisible"
@@ -609,6 +547,7 @@ import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
 import HintTip from '~/components/HintTip.vue'
 import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
 import KpiTile, { type KpiStatus } from '~/components/KpiTile.vue'
+import JournalShell from '~/components/JournalShell.vue'
 import SearchField from '~/components/SearchField.vue'
 import StateView from '~/components/StateView.vue'
 import { hasLonLat } from '~/utils/journalFields'
@@ -955,12 +894,7 @@ defineExpose({ openDialog })
 </script>
 
 <style scoped>
-.tu-journal { height: min(90vh, 920px); display: flex; flex-direction: column; }
-.tu-kpi { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.tu-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
-.tu-table-wrap { min-height: 280px; overflow: auto; flex: 1; }
 .tu-table { min-width: 1320px; }
 .wide-cell { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .cell-note { color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity)); font-size: .75rem; margin-top: 2px; }
-@media (max-width: 600px) { .tu-journal { height: 100dvh; } }
 </style>

@@ -1,364 +1,303 @@
 <template>
   <Teleport to="body">
-    <v-dialog
+    <JournalShell
       v-model="visible"
-      :fullscreen="isMobile"
-      max-width="1320"
-      scrollable
+      v-model:page="page"
+      title="Журнал опрессовок"
+      :subtitle="`${scopeTitle} · найдено ${total}`"
+      icon="mdi-gauge"
+      avatar-color="blue-lighten-5"
+      icon-color="blue-darken-2"
+      :pages="pages"
+      :loading="loading"
+      :error="error"
+      :empty="!items.length"
+      empty-title="Опрессовки не найдены"
+      :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В журнале пока нет записей — загрузите исторические контуры TGID в таблицу opres'"
+      empty-icon="mdi-gauge-empty"
+      :empty-action-label="filtersActive ? 'Сбросить фильтры' : undefined"
+      :skeleton-rows="10"
+      @retry="loadTests"
+      @empty-action="resetFilters"
     >
-      <v-card
-        class="pressure-journal"
-        :rounded="isMobile ? 0 : 'lg'"
+      <template #actions>
+        <v-btn
+          v-if="mutationsEnabled"
+          color="teal"
+          variant="tonal"
+          prepend-icon="mdi-stamper"
+          class="mr-2"
+          @click="batchApprovalRef?.open()"
+        >
+          Утвердить план
+        </v-btn>
+        <v-btn
+          v-if="mutationsEnabled"
+          color="primary"
+          variant="flat"
+          prepend-icon="mdi-plus"
+          class="mr-2"
+          :loading="creating"
+          @click="createPressureTest"
+        >
+          Создать
+        </v-btn>
+      </template>
+      <template
+        v-if="stateTiles.length"
+        #kpi
       >
-        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
-          <v-avatar
-            color="blue-lighten-5"
-            size="40"
+        <KpiTile
+          label="Найдено"
+          :value="total"
+          :compact="false"
+        />
+        <KpiTile
+          v-for="tile in stateTiles"
+          :key="tile.id"
+          :label="tile.name"
+          :value="tile.count"
+          :compact="false"
+          :status="tile.status"
+          selectable
+          :active="stateId === tile.id"
+          @select="toggleState(tile.id)"
+        />
+      </template>
+      <template #filters>
+        <v-row dense>
+          <v-col
+            cols="12"
+            md="4"
           >
-            <v-icon color="blue-darken-2">mdi-gauge</v-icon>
-          </v-avatar>
-          <div
-            class="flex-grow-1"
-            style="min-width: 0"
+            <SearchField
+              :model-value="search"
+              label="Поиск по ID, контуру, источнику или решению"
+              :debounce="350"
+              :loading="loading"
+              @update:model-value="search = $event"
+              @search="onSearch"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
           >
-            <div class="text-subtitle-1 font-weight-bold">Журнал опрессовок</div>
-            <div class="text-caption text-medium-emphasis text-truncate">{{ scopeTitle }} · найдено {{ total }}</div>
-          </div>
-          <v-btn
-            v-if="mutationsEnabled"
-            color="teal"
-            variant="tonal"
-            prepend-icon="mdi-stamper"
-            class="mr-2"
-            @click="batchApprovalRef?.open()"
+            <AppSelect
+              v-model="stateId"
+              :items="lookups.states"
+              item-title="name"
+              item-value="id"
+              label="Состояние"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="3"
           >
-            Утвердить план
-          </v-btn>
-          <v-btn
-            v-if="mutationsEnabled"
+            <AppSelect
+              v-model="testTypeId"
+              :items="lookups.test_types"
+              item-title="name"
+              item-value="id"
+              label="Вид испытания"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="3"
+          >
+            <AppSelect
+              v-model="heatSourceId"
+              :items="lookups.heat_sources"
+              item-title="name"
+              item-value="id"
+              label="Источник тепла"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="4"
+          >
+            <AppSelect
+              v-model="responsibleId"
+              :items="lookups.responsible_people"
+              item-title="name"
+              item-value="id"
+              label="Ответственный"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="approved"
+              :items="approvalOptions"
+              item-title="title"
+              item-value="value"
+              label="Утверждение"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <v-text-field
+              v-model="dateFrom"
+              type="date"
+              label="С даты"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <v-text-field
+              v-model="dateTo"
+              type="date"
+              label="По дату"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </v-col>
+        </v-row>
+        <div class="d-flex align-center flex-wrap ga-2 mt-3">
+          <v-chip
+            v-if="scope.lineId"
+            size="small"
             color="primary"
-            variant="flat"
-            prepend-icon="mdi-plus"
-            class="mr-2"
-            :loading="creating"
-            @click="createPressureTest"
+            closable
+            @click:close="clearScope"
           >
-            Создать
+            Трубопровод {{ scope.lineId }}
+          </v-chip>
+          <v-chip
+            v-if="scope.nodeId"
+            size="small"
+            color="primary"
+            closable
+            @click:close="clearScope"
+          >
+            Узел {{ scope.nodeId }}
+          </v-chip>
+          <v-spacer />
+          <v-btn
+            variant="text"
+            prepend-icon="mdi-filter-remove-outline"
+            :disabled="!filtersActive"
+            @click="resetFilters"
+          >
+            Сбросить
           </v-btn>
+          <v-btn
+            variant="tonal"
+            prepend-icon="mdi-refresh"
+            :loading="loading"
+            @click="loadTests"
+          >
+            Обновить
+          </v-btn>
+        </div>
+      </template>
+      <DataTable
+        :columns="tableColumns"
+        :items="(items as Record<string, unknown>[])"
+        item-key="id"
+        selectable
+        :flash-key="flashId"
+        density="compact"
+        class="pressure-table"
+        @select="openDetails(Number($event.id))"
+      >
+        <template #[`item.period`]="{ item }">
+          <span class="text-no-wrap">{{ formatRange(item.effective_start, item.effective_finish) }}</span>
+        </template>
+        <template #[`item.name`]="{ item }">
+          <div class="text-truncate">
+            {{ item.name || `Опрессовка ${item.id}` }}
+          </div>
+          <div class="text-caption text-medium-emphasis text-truncate">
+            {{ item.contour_description || item.boundary_description || '—' }}
+          </div>
+        </template>
+        <template #[`item.source`]="{ item }">
+          {{ [item.heat_source_name, item.test_type_name].filter(Boolean).join(' · ') || '—' }}
+        </template>
+        <template #[`item.state_name`]="{ item }">
+          <v-chip
+            size="x-small"
+            :color="stateColor(Number(item.state_id))"
+            variant="tonal"
+          >
+            {{ item.state_name || 'Не указано' }}
+          </v-chip>
+        </template>
+        <template #[`item.pressure`]="{ item }">
+          <span class="text-no-wrap num">{{ pressure(item.stage_one_pressure) }} / {{ pressure(item.stage_two_pressure) }}</span>
+        </template>
+        <template #[`item.responsible_name`]="{ item }">
+          {{ item.responsible_name || '—' }}
+        </template>
+        <template #[`item.defect_count`]="{ item }">
+          <v-chip
+            size="x-small"
+            :color="item.defect_count ? 'error' : 'success'"
+            variant="tonal"
+            class="num"
+          >
+            {{ item.defect_count }}
+          </v-chip>
+        </template>
+        <template #[`item.result`]="{ item }">
+          <span
+            class="result-cell"
+            :title="String(item.commission_decision || item.report || item.note || '')"
+          >{{ item.commission_decision || item.report || item.note || '—' }}</span>
+        </template>
+        <template #[`item.actions`]="{ item }">
           <HintTip
-            text="Закрыть журнал"
-            hotkey="Esc"
-            location="bottom"
+            v-if="hasCoordinates(item)"
+            text="Показать контур на карте"
+            hint="Журнал закроется, маркер останется"
           >
             <template #default="{ props: tip }">
               <v-btn
                 v-bind="tip"
-                icon
+                icon="mdi-crosshairs-gps"
+                size="x-small"
                 variant="text"
-                aria-label="Закрыть журнал"
-                @click="visible = false"
-              >
-                <v-icon>mdi-close</v-icon>
-              </v-btn>
+                aria-label="Показать контур на карте"
+                @click.stop="locate(item as PressureTestSummary, String(item.name || `Опрессовка ${item.id}`))"
+              />
             </template>
           </HintTip>
-        </v-card-title>
-        <v-divider />
-
-        <!-- Плитки из ответа списка: всего и по состояниям при тех же фильтрах; плитка состояния — фильтр -->
-        <div
-          v-if="stateTiles.length"
-          class="pressure-kpi px-3 px-md-4 pt-3"
-        >
-          <KpiTile
-            label="Найдено"
-            :value="total"
-            :compact="false"
-          />
-          <KpiTile
-            v-for="tile in stateTiles"
-            :key="tile.id"
-            :label="tile.name"
-            :value="tile.count"
-            :compact="false"
-            :status="tile.status"
-            selectable
-            :active="stateId === tile.id"
-            @select="toggleState(tile.id)"
-          />
-        </div>
-
-        <div class="pa-3 pa-md-4 pressure-filters">
-          <v-row dense>
-            <v-col
-              cols="12"
-              md="4"
-            >
-              <SearchField
-                :model-value="search"
-                label="Поиск по ID, контуру, источнику или решению"
-                :debounce="350"
-                :loading="loading"
-                @update:model-value="search = $event"
-                @search="onSearch"
+          <HintTip text="Открыть карточку">
+            <template #default="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon="mdi-chevron-right"
+                size="x-small"
+                variant="text"
+                aria-label="Подробнее"
+                @click.stop="openDetails(Number(item.id))"
               />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="stateId"
-                :items="lookups.states"
-                item-title="name"
-                item-value="id"
-                label="Состояние"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="3"
-            >
-              <AppSelect
-                v-model="testTypeId"
-                :items="lookups.test_types"
-                item-title="name"
-                item-value="id"
-                label="Вид испытания"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="3"
-            >
-              <AppSelect
-                v-model="heatSourceId"
-                :items="lookups.heat_sources"
-                item-title="name"
-                item-value="id"
-                label="Источник тепла"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="4"
-            >
-              <AppSelect
-                v-model="responsibleId"
-                :items="lookups.responsible_people"
-                item-title="name"
-                item-value="id"
-                label="Ответственный"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="approved"
-                :items="approvalOptions"
-                item-title="title"
-                item-value="value"
-                label="Утверждение"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <v-text-field
-                v-model="dateFrom"
-                type="date"
-                label="С даты"
-                density="compact"
-                variant="outlined"
-                hide-details
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <v-text-field
-                v-model="dateTo"
-                type="date"
-                label="По дату"
-                density="compact"
-                variant="outlined"
-                hide-details
-              />
-            </v-col>
-          </v-row>
-          <div class="d-flex align-center flex-wrap ga-2 mt-3">
-            <v-chip
-              v-if="scope.lineId"
-              size="small"
-              color="primary"
-              closable
-              @click:close="clearScope"
-            >
-              Трубопровод {{ scope.lineId }}
-            </v-chip>
-            <v-chip
-              v-if="scope.nodeId"
-              size="small"
-              color="primary"
-              closable
-              @click:close="clearScope"
-            >
-              Узел {{ scope.nodeId }}
-            </v-chip>
-            <v-spacer />
-            <v-btn
-              variant="text"
-              prepend-icon="mdi-filter-remove-outline"
-              :disabled="!filtersActive"
-              @click="resetFilters"
-            >
-              Сбросить
-            </v-btn>
-            <v-btn
-              variant="tonal"
-              prepend-icon="mdi-refresh"
-              :loading="loading"
-              @click="loadTests"
-            >
-              Обновить
-            </v-btn>
-          </div>
-        </div>
-        <v-divider />
-
-        <v-card-text class="pa-0 pressure-table-wrap">
-          <StateView
-            variant="table"
-            :rows="10"
-            :loading="loading && !items.length"
-            :error="error"
-            :empty="!loading && !items.length"
-            empty-title="Опрессовки не найдены"
-            :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В журнале пока нет записей — загрузите исторические контуры TGID в таблицу opres'"
-            empty-icon="mdi-gauge-empty"
-            :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
-            :retrying="loading"
-            @retry="loadTests"
-            @action="resetFilters"
-          >
-            <v-progress-linear
-              v-if="loading"
-              indeterminate
-              color="primary"
-            />
-            <DataTable
-              :columns="tableColumns"
-              :items="(items as Record<string, unknown>[])"
-              item-key="id"
-              selectable
-              :flash-key="flashId"
-              density="compact"
-              class="pressure-table"
-              @select="openDetails(Number($event.id))"
-            >
-              <template #[`item.period`]="{ item }">
-                <span class="text-no-wrap">{{ formatRange(item.effective_start, item.effective_finish) }}</span>
-              </template>
-              <template #[`item.name`]="{ item }">
-                <div class="text-truncate">
-                  {{ item.name || `Опрессовка ${item.id}` }}
-                </div>
-                <div class="text-caption text-medium-emphasis text-truncate">
-                  {{ item.contour_description || item.boundary_description || '—' }}
-                </div>
-              </template>
-              <template #[`item.source`]="{ item }">
-                {{ [item.heat_source_name, item.test_type_name].filter(Boolean).join(' · ') || '—' }}
-              </template>
-              <template #[`item.state_name`]="{ item }">
-                <v-chip
-                  size="x-small"
-                  :color="stateColor(Number(item.state_id))"
-                  variant="tonal"
-                >
-                  {{ item.state_name || 'Не указано' }}
-                </v-chip>
-              </template>
-              <template #[`item.pressure`]="{ item }">
-                <span class="text-no-wrap num">{{ pressure(item.stage_one_pressure) }} / {{ pressure(item.stage_two_pressure) }}</span>
-              </template>
-              <template #[`item.responsible_name`]="{ item }">
-                {{ item.responsible_name || '—' }}
-              </template>
-              <template #[`item.defect_count`]="{ item }">
-                <v-chip
-                  size="x-small"
-                  :color="item.defect_count ? 'error' : 'success'"
-                  variant="tonal"
-                  class="num"
-                >
-                  {{ item.defect_count }}
-                </v-chip>
-              </template>
-              <template #[`item.result`]="{ item }">
-                <span
-                  class="result-cell"
-                  :title="String(item.commission_decision || item.report || item.note || '')"
-                >{{ item.commission_decision || item.report || item.note || '—' }}</span>
-              </template>
-              <template #[`item.actions`]="{ item }">
-                <HintTip
-                  v-if="hasCoordinates(item)"
-                  text="Показать контур на карте"
-                  hint="Журнал закроется, маркер останется"
-                >
-                  <template #default="{ props: tip }">
-                    <v-btn
-                      v-bind="tip"
-                      icon="mdi-crosshairs-gps"
-                      size="x-small"
-                      variant="text"
-                      aria-label="Показать контур на карте"
-                      @click.stop="locate(item as PressureTestSummary, String(item.name || `Опрессовка ${item.id}`))"
-                    />
-                  </template>
-                </HintTip>
-                <HintTip text="Открыть карточку">
-                  <template #default="{ props: tip }">
-                    <v-btn
-                      v-bind="tip"
-                      icon="mdi-chevron-right"
-                      size="x-small"
-                      variant="text"
-                      aria-label="Подробнее"
-                      @click.stop="openDetails(Number(item.id))"
-                    />
-                  </template>
-                </HintTip>
-              </template>
-            </DataTable>
-          </StateView>
-        </v-card-text>
-        <v-divider />
-        <v-card-actions class="px-4 py-2">
-          <span class="text-caption text-medium-emphasis">Страница {{ page }}{{ pages ? ` из ${pages}` : '' }}</span>
-          <v-spacer />
-          <v-pagination
-            v-if="pages > 1"
-            v-model="page"
-            :length="pages"
-            :total-visible="isMobile ? 3 : 7"
-            density="compact"
-          />
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+            </template>
+          </HintTip>
+        </template>
+      </DataTable>
+    </JournalShell>
 
     <v-dialog
       v-model="detailsVisible"
@@ -673,6 +612,7 @@ import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
 import HintTip from '~/components/HintTip.vue'
 import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
 import KpiTile, { type KpiStatus } from '~/components/KpiTile.vue'
+import JournalShell from '~/components/JournalShell.vue'
 import SearchField from '~/components/SearchField.vue'
 import StateView from '~/components/StateView.vue'
 import { hasLonLat } from '~/utils/journalFields'
@@ -990,11 +930,6 @@ defineExpose({ openDialog })
 </script>
 
 <style scoped>
-.pressure-journal { height: min(90vh, 900px); display: flex; flex-direction: column; }
-.pressure-kpi { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.pressure-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
-.pressure-table-wrap { min-height: 280px; overflow: auto; flex: 1; }
 .pressure-table { min-width: 1340px; }
 .result-cell { display: inline-block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
-@media (max-width: 600px) { .pressure-journal { height: 100dvh; } }
 </style>

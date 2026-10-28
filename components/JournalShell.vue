@@ -32,6 +32,8 @@ withDefaults(defineProps<{
   emptyActionLabel?: string
   /** строк-заглушек при первой загрузке */
   skeletonRows?: number
+  /** подсказка кнопки закрытия («Закрыть реестр» у реестров) */
+  closeText?: string
 }>(), {
   subtitle: '',
   avatarColor: 'primary-lighten-5',
@@ -40,6 +42,7 @@ withDefaults(defineProps<{
   emptyIcon: 'mdi-clipboard-text-outline',
   emptyActionLabel: undefined,
   skeletonRows: 10,
+  closeText: 'Закрыть журнал',
 })
 
 const emit = defineEmits<{ retry: []; 'empty-action': [] }>()
@@ -79,7 +82,7 @@ const { isMobile } = useMobile()
         </div>
         <slot name="actions" />
         <HintTip
-          text="Закрыть журнал"
+          :text="closeText"
           hotkey="Esc"
           location="bottom"
         >
