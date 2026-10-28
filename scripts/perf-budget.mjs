@@ -19,8 +19,11 @@ const budgetCriticalTotalKb = Number(process.env.PERF_BUDGET_TOTAL_JS_KB || 1500
 const budgetCriticalLargestKb = Number(process.env.PERF_BUDGET_LARGEST_JS_KB || 900);
 // Cesium один даёт ~4.7 MB — бюджет ловит только неконтролируемый рост lazy-чанков.
 // 24.10.2026: факт 7 597 KiB (Cesium 4 705 + maplibre 785 + ECharts 545 + диалоги); порог 7 500 был
-// превышен ещё до модернизации UI — поднят до 8 000, дальше бюджет только вниз
-const budgetDeferredTotalKb = Number(process.env.PERF_BUDGET_DEFERRED_JS_KB || 8000);
+// превышен ещё до модернизации UI — поднят до 8 000, дальше бюджет только вниз.
+// 28.10.2026: MapLibre 4 → 5 (фаза 0 модернизации) — готовый бандл, не урезается: основной чанк
+// 785 → 1 028 KiB, вместе с @maplibre/* +~490 KiB отложенного JS (факт 8 088). Критический путь
+// не изменился (550 из 1 500 KiB). Порог 8 300; дальше — только вниз.
+const budgetDeferredTotalKb = Number(process.env.PERF_BUDGET_DEFERRED_JS_KB || 8300);
 
 const nuxtDir = join(process.cwd(), '.output', 'public', '_nuxt');
 const manifestPath = join(process.cwd(), '.output', 'server', 'chunks', 'build', 'client.manifest.mjs');
