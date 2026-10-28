@@ -116,7 +116,9 @@ export default defineNuxtConfig({
           geoserverCatalogFirst?.url ||
           'https://itwin.kz/geoserver',
         /** Каталог workspace + слои (подписи, mvt/wms). Единственный источник списка схем для UI. */
-        layerCatalog: geoserverLayerCatalog || undefined,
+        // Пустой массив, а не undefined: Nuxt выводит тип runtimeConfig из значения, и без каталога
+        // в .env (CI) тип становился строковым — typecheck падал. Потребители считают [] «каталога нет».
+        layerCatalog: geoserverLayerCatalog ?? [],
         workspace: geoserverCatalogFirst?.workspace || 'AlmatyGIS',
         groupName: geoserverCatalogFirst?.groupName || geoserverCatalogFirst?.workspace || 'AlmatyGIS'
       }

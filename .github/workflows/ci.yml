@@ -1,8 +1,8 @@
 name: CI
 
 on:
+  # любая ветка: рабочие ветки (modernization/*) тоже проверяются до слияния
   push:
-    branches: [main, master, develop]
   pull_request:
 
 jobs:
