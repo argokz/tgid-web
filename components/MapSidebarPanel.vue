@@ -310,6 +310,9 @@
               </v-card>
             </v-dialog>
 
+            <!-- ── Внешние слои (WMS/WMTS/XYZ других серверов) ── -->
+            <ExternalLayersSection />
+
             <!-- ── Planet V4 слои ── -->
             <template v-if="mapStore.selectedBaseLayer === 'planet-v4'">
               <div class="group-header px-3 py-1">
@@ -880,6 +883,7 @@ import { ref, computed, watch } from 'vue'
 import { useDisplay } from 'vuetify'
 import { storeToRefs } from 'pinia'
 import { useLayerStore } from '~/stores/layerStore'
+import ExternalLayersSection from '~/components/ExternalLayersSection.vue'
 import { useMapStore } from '~/stores/mapStore'
 import { useFragmentStore } from '~/stores/fragmentStore'
 import { useLabelStore } from '~/stores/labelStore'

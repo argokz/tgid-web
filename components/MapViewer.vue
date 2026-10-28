@@ -548,6 +548,7 @@ import { highlightKey } from '~/utils/selectionHighlight';
 import type { PickCandidate } from '~/utils/networkFeature';
 import { useFragmentStore } from '~/stores/fragmentStore';
 import { useMapPermalink } from '~/composables/useMapPermalink';
+import { useExternalLayerStore } from '~/stores/externalLayerStore';
 import { isStyleMutable, waitForStyleMutable } from '~/services/mapService';
 import HintTip from '~/components/HintTip.vue';
 import { shellTopPx } from '~/utils/shellMetrics';
@@ -1618,6 +1619,8 @@ const initMap = async () => {
     mapBootstrapped.value = true;
     mapInitLoading.value = false;
     await applyLayersToMap(props.initialLayers);
+    // внешние слои пользователя (WMS/WMTS/XYZ) — под сетью ТГИД
+    useExternalLayerStore().syncToMap();
     if (mapStore.map) {
       await mapPermalink.applyFromUrl(mapStore.map);
       stopPermalink?.();
