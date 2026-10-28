@@ -118,7 +118,48 @@
           <template v-if="result.valves_already_closed?.length">
             Уже закрыты и не требуют действий: {{ result.valves_already_closed.length }} задв.
           </template>
+          <template v-if="optionalCount">
+            Необязательных задвижек {{ optionalCount }}: за ними питания нет.
+          </template>
         </v-alert>
+
+        <v-alert
+          v-if="result?.feed_points_in_zone?.length"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+        >
+          Зона включает {{ result.feed_points_in_zone.length > 1 ? 'питающие точки' : 'питающую точку' }}:
+          <template
+            v-for="(p, i) in result.feed_points_in_zone.slice(0, FEED_POINTS_SHOWN)"
+            :key="p.node_id"
+          >{{ i ? ', ' : '' }}узел {{ p.node_id }} ({{ FEED_POINT_LABELS[p.kind] }})</template>
+          <template v-if="result.feed_points_in_zone.length > FEED_POINTS_SHOWN">
+            и ещё {{ result.feed_points_in_zone.length - FEED_POINTS_SHOWN }}
+          </template>.
+          Задвижками в модели её не отсечь — отключать на источнике или на вводе из магистрали.
+        </v-alert>
+
+        <div
+          v-if="failedValveIds.length"
+          class="d-flex flex-wrap align-center ga-2 mb-3"
+        >
+          <span class="text-body-2 text-medium-emphasis">Не держат (зона расширена):</span>
+          <v-chip
+            v-for="id in failedValveIds"
+            :key="id"
+            size="small"
+            color="warning"
+            variant="tonal"
+            closable
+            :disabled="loading"
+            :close-label="`Вернуть задвижку ${id} в расчёт`"
+            @click:close="restoreValve(id)"
+          >
+            #{{ id }}
+          </v-chip>
+        </div>
 
         <!-- KPI Сводка результатов -->
         <div
@@ -139,9 +180,11 @@
                 <div class="text-caption text-medium-emphasis">Отсекающие задвижки</div>
                 <div class="text-h4 font-weight-bold d-flex align-center justify-center ga-2 mt-1">
                   <v-icon size="28">mdi-valve</v-icon>
-                  {{ result.summary.valves_count }}
+                  {{ requiredCount }}
                 </div>
-                <div class="text-caption mt-1">к закрытию бригадой</div>
+                <div class="text-caption mt-1">
+                  обязательных · всего к закрытию {{ result.summary.valves_count }}
+                </div>
               </v-card>
             </v-col>
 
@@ -181,7 +224,7 @@
                   <v-icon size="28">mdi-fire-alert</v-icon>
                   {{ result.summary.total_with_downstream_load_gcal_h ?? result.summary.total_load_gcal_h }}
                 </div>
-                <div class="text-caption mt-1">Гкал/ч (Qот + Qгвс + Qвент)</div>
+                <div class="text-caption mt-1">Гкал/ч, все нагрузки — в зоне и ниже задвижек</div>
               </v-card>
             </v-col>
 
@@ -261,16 +304,18 @@
                     <th>Наименование</th>
                     <th>Диаметр (мм)</th>
                     <th>Текущее состояние</th>
+                    <th>Нужна</th>
                     <th>Действие</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr
-                    v-for="v in result.valves_to_close"
+                    v-for="v in sortedValves"
                     :key="v.id"
+                    :class="{ 'text-medium-emphasis': !isRequiredValve(v) }"
                   >
                     <td class="font-weight-bold">#{{ v.id }}</td>
-                    <td>{{ v.lineid }}</td>
+                    <td>{{ v.owner_node_id ? `камера, узел ${v.owner_node_id}` : v.lineid }}</td>
                     <td>{{ v.display_name }}</td>
                     <td>{{ v.nominal_diameter }} мм</td>
                     <td>
@@ -283,6 +328,23 @@
                       </v-chip>
                     </td>
                     <td>
+                      <HintTip
+                        v-if="v.reason"
+                        :text="VALVE_REASON_LABELS[v.reason].hint"
+                      >
+                        <template #default="{ props: tip }">
+                          <v-chip
+                            v-bind="tip"
+                            size="x-small"
+                            :color="VALVE_REASON_LABELS[v.reason].color"
+                            :variant="isRequiredValve(v) ? 'flat' : 'tonal'"
+                          >
+                            {{ VALVE_REASON_LABELS[v.reason].label }}
+                          </v-chip>
+                        </template>
+                      </HintTip>
+                    </td>
+                    <td class="text-no-wrap">
                       <v-btn
                         v-if="v.lng && v.lat"
                         size="x-small"
@@ -293,11 +355,26 @@
                       >
                         К задвижке
                       </v-btn>
+                      <HintTip :text="failedHint(v)">
+                        <template #default="{ props: tip }">
+                          <v-btn
+                            v-bind="tip"
+                            size="x-small"
+                            variant="text"
+                            color="warning"
+                            prepend-icon="mdi-alert-circle-outline"
+                            :disabled="loading"
+                            @click="markValveFailed(v.id)"
+                          >
+                            Не держит
+                          </v-btn>
+                        </template>
+                      </HintTip>
                     </td>
                   </tr>
                   <tr v-if="!result.valves_to_close.length">
                     <td
-                      colspan="6"
+                      colspan="7"
                       class="text-center text-medium-emphasis py-4"
                     >
                       Задвижки не найдены на границах изолированного сегмента
@@ -467,7 +544,12 @@ import {
   fastApiService,
   type OutageSimulationResponse,
 } from '~/services/fastApiService';
+import type { ValveToClose } from '~/services/api/types';
 import HintTip from '~/components/HintTip.vue';
+import { FEED_POINT_LABELS } from '~/utils/networkTrace';
+import { VALVE_REASON_LABELS, isRequiredValve, sortValvesForCrew } from '~/utils/valveIsolation';
+
+const FEED_POINTS_SHOWN = 5;
 
 const props = defineProps<{
   initialLineId?: number | null;
@@ -501,6 +583,14 @@ const allConsumers = computed(() => [
   ...(result.value?.affected_consumers || []).map((c) => ({ ...c, downstream: false })),
   ...(result.value?.downstream_consumers || []).map((c) => ({ ...c, downstream: true })),
 ]);
+const sortedValves = computed(() => sortValvesForCrew(result.value?.valves_to_close ?? []));
+const requiredCount = computed(() => sortedValves.value.filter(isRequiredValve).length);
+const optionalCount = computed(() => sortedValves.value.length - requiredCount.value);
+
+/** Задвижки «не держит» относятся к одному объекту аварии; новый объект — список с нуля */
+const failedValveIds = ref<number[]>([]);
+const failedFor = ref('');
+const targetKey = () => `${targetType.value}:${targetId.value}`;
 
 watch(
   () => props.initialLineId,
@@ -526,13 +616,14 @@ watch(
 
 const runSimulation = async () => {
   if (!targetId.value) return;
+  if (failedFor.value !== targetKey()) failedValveIds.value = [];
   loading.value = true;
   errorMessage.value = '';
   try {
-    const payload =
-      targetType.value === 'line'
-        ? { line_id: targetId.value }
-        : { node_id: targetId.value };
+    const payload = {
+      ...(targetType.value === 'line' ? { line_id: targetId.value } : { node_id: targetId.value }),
+      ...(failedValveIds.value.length ? { failed_valve_ids: failedValveIds.value } : {}),
+    };
     const res = await fastApiService.simulateValveIsolation(payload);
     result.value = res;
     emit('show-on-map', res);
@@ -543,6 +634,24 @@ const runSimulation = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+const failedHint = (v: ValveToClose) =>
+  'Задвижка не держит или к ней нет доступа: пересчитать зону до следующих задвижек' +
+  (v.owner_node_id
+    ? `. Камера (узел ${v.owner_node_id}) уйдёт в зону целиком — ветки её схемы по модели не сопоставить с участками`
+    : '');
+
+const markValveFailed = (id: number) => {
+  if (failedValveIds.value.includes(id)) return;
+  failedFor.value = targetKey();
+  failedValveIds.value = [...failedValveIds.value, id];
+  runSimulation();
+};
+
+const restoreValve = (id: number) => {
+  failedValveIds.value = failedValveIds.value.filter((x) => x !== id);
+  runSimulation();
 };
 
 const emitShowOnMap = () => {
@@ -567,9 +676,9 @@ const exportCsv = () => {
     ['Тип объекта', 'ID', 'Наименование', 'Параметр 1', 'Параметр 2', 'Координаты'],
   ];
 
-  for (const v of result.value.valves_to_close) {
+  for (const v of sortedValves.value) {
     rows.push([
-      'Задвижка',
+      v.reason ? `Задвижка (${VALVE_REASON_LABELS[v.reason].label})` : 'Задвижка',
       String(v.id),
       v.display_name,
       `Ду=${v.nominal_diameter}мм`,

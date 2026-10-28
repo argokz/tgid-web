@@ -668,17 +668,28 @@ export interface OutageSimulationSummary {
   downstream_load_gcal_h?: number;
   total_with_downstream_load_gcal_h?: number;
   sources_count?: number;
+  /** Mincut: задвижки, за которыми после отключения остаётся питание */
+  valves_required_count?: number;
+  failed_valves_count?: number;
+  feed_points_in_zone_count?: number;
 }
+
+/** supply — отсекает питание; no_supply — за ней питания нет; inside_zone — на аварийном участке */
+export type ValveIsolationReason = 'supply' | 'no_supply' | 'inside_zone';
 
 export interface ValveToClose {
   id: number;
   lineid: number;
+  /** Узел-камера, во внутренней схеме которой стоит задвижка */
+  owner_node_id?: number | null;
   display_name: string;
   nominal_diameter: number;
   state_id: number;
   state_name: string;
   lng: number | null;
   lat: number | null;
+  required?: boolean;
+  reason?: ValveIsolationReason;
 }
 
 export interface AffectedConsumer {
@@ -701,6 +712,10 @@ export interface OutageSimulationResponse {
   valves_to_close: ValveToClose[];
   /** Уже закрытые задвижки на границе зоны — закрывать не нужно */
   valves_already_closed: ValveToClose[];
+  /** Задвижки из запроса «не держит», через которые прошла зона */
+  failed_valves?: ValveToClose[];
+  /** Питающие точки внутри зоны — задвижками не отсечь, отключать на источнике или вводе */
+  feed_points_in_zone?: NetworkFeedPoint[];
   /** Камеры/ТРП с задвижками во внутренней схеме, на которых остановлена зона */
   boundary_nodes: number[];
   affected_consumers: AffectedConsumer[];

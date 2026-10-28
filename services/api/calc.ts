@@ -90,6 +90,8 @@ export const calcApi = {
   async simulateValveIsolation(params: {
     line_id?: number | null;
     node_id?: number | null;
+    /** Задвижки «не держит» — зона расширяется до следующих */
+    failed_valve_ids?: number[];
   }): Promise<OutageSimulationResponse> {
     return request<OutageSimulationResponse>('api/analysis/valve-isolation', {
       method: 'POST',

@@ -897,11 +897,12 @@ const onShowOutageOnMap = (res: any) => {
       {
         id: 'outage-valves-to-close-points',
         type: 'circle',
+        // Необязательные (за ними нет питания, required = false) — серые; без поля — как обязательные
         paint: {
-          'circle-radius': 9,
-          'circle-color': '#ffd600',
+          'circle-radius': ['case', ['==', ['get', 'required'], false], 7, 9],
+          'circle-color': ['case', ['==', ['get', 'required'], false], '#bdbdbd', '#ffd600'],
           'circle-stroke-width': 3,
-          'circle-stroke-color': '#d50000',
+          'circle-stroke-color': ['case', ['==', ['get', 'required'], false], '#616161', '#d50000'],
         },
       },
     ]);
