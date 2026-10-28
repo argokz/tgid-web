@@ -1,337 +1,274 @@
 <template>
   <Teleport to="body">
-    <v-dialog
+    <JournalShell
       v-model="visible"
-      :fullscreen="isMobile"
-      max-width="1360"
-      scrollable
+      v-model:page="page"
+      title="Индикаторы коррозии"
+      :subtitle="`${scopeTitle} · найдено ${total}`"
+      icon="mdi-test-tube"
+      avatar-color="orange-lighten-5"
+      icon-color="orange-darken-3"
+      :pages="pages"
+      :loading="loading"
+      :error="error"
+      :empty="!items.length"
+      empty-title="Индикаторы коррозии не найдены"
+      :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В текущей базе журнал пока не заполнен'"
+      empty-icon="mdi-test-tube-empty"
+      :empty-action-label="filtersActive ? 'Сбросить фильтры' : undefined"
+      :skeleton-rows="10"
+      @retry="loadIndicators"
+      @empty-action="resetFilters"
     >
-      <v-card
-        class="corrosion-journal"
-        :rounded="isMobile ? 0 : 'lg'"
+      <template #actions>
+        <v-btn
+          v-if="mutationsEnabled"
+          color="primary"
+          variant="flat"
+          prepend-icon="mdi-plus"
+          class="mr-2"
+          :loading="creating"
+          @click="createIndicator"
+        >
+          Создать
+        </v-btn>
+      </template>
+      <template
+        v-if="phaseTiles.length"
+        #kpi
       >
-        <v-card-title class="d-flex align-center ga-3 px-4 py-3">
-          <v-avatar
-            color="orange-lighten-5"
-            size="40"
+        <KpiTile
+          label="Найдено"
+          :value="total"
+          :compact="false"
+        />
+        <KpiTile
+          v-for="tile in phaseTiles"
+          :key="tile.id"
+          :label="tile.name"
+          :value="tile.count"
+          :compact="false"
+          :status="tile.status"
+          selectable
+          :active="phaseId === tile.id"
+          @select="togglePhase(tile.id)"
+        />
+      </template>
+      <template #filters>
+        <v-row dense>
+          <v-col
+            cols="12"
+            md="4"
           >
-            <v-icon color="orange-darken-3">mdi-test-tube</v-icon>
-          </v-avatar>
-          <div
-            class="flex-grow-1"
-            style="min-width: 0"
+            <SearchField
+              :model-value="search"
+              label="Номер, место, адрес, источник или ответственный"
+              :debounce="350"
+              :loading="loading"
+              @update:model-value="search = $event"
+              @search="onSearch"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
           >
-            <div class="text-subtitle-1 font-weight-bold">Индикаторы коррозии</div>
-            <div class="text-caption text-medium-emphasis text-truncate">
-              {{ scopeTitle }} · найдено {{ total }}
-            </div>
-          </div>
-          <v-btn
-            v-if="mutationsEnabled"
+            <AppSelect
+              v-model="phaseId"
+              :items="lookups.phases"
+              item-title="name"
+              item-value="id"
+              label="Этап"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="seasonYear"
+              :items="lookups.years"
+              item-title="value"
+              item-value="value"
+              label="Сезон с года"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="rodStateId"
+              :items="lookups.rod_states"
+              item-title="name"
+              item-value="id"
+              label="Стержень"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <AppSelect
+              v-model="processMarkId"
+              :items="lookups.process_marks"
+              item-title="name"
+              item-value="id"
+              label="Оценка"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="4"
+          >
+            <AppSelect
+              v-model="waterAggressivenessId"
+              :items="lookups.water_aggressiveness"
+              item-title="name"
+              item-value="id"
+              label="Агрессивность сетевой воды"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <v-text-field
+              v-model="dateFrom"
+              type="date"
+              label="С даты"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="2"
+          >
+            <v-text-field
+              v-model="dateTo"
+              type="date"
+              label="По дату"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </v-col>
+        </v-row>
+        <div class="d-flex align-center flex-wrap ga-2 mt-3">
+          <v-chip
+            v-if="scope.lineId"
+            size="small"
             color="primary"
-            variant="flat"
-            prepend-icon="mdi-plus"
-            class="mr-2"
-            :loading="creating"
-            @click="createIndicator"
+            closable
+            @click:close="clearScope"
           >
-            Создать
+            Линия {{ scope.lineId }}
+          </v-chip>
+          <v-chip
+            v-if="scope.nodeId"
+            size="small"
+            color="primary"
+            closable
+            @click:close="clearScope"
+          >
+            Узел {{ scope.nodeId }}
+          </v-chip>
+          <v-spacer />
+          <v-btn
+            variant="text"
+            prepend-icon="mdi-filter-remove-outline"
+            :disabled="!filtersActive"
+            @click="resetFilters"
+          >
+            Сбросить
           </v-btn>
-          <HintTip
-            text="Закрыть журнал"
-            hotkey="Esc"
-            location="bottom"
+          <v-btn
+            variant="tonal"
+            prepend-icon="mdi-refresh"
+            :loading="loading"
+            @click="loadIndicators"
           >
+            Обновить
+          </v-btn>
+        </div>
+      </template>
+      <DataTable
+        :columns="tableColumns"
+        :items="(items as Record<string, unknown>[])"
+        item-key="id"
+        selectable
+        :flash-key="flashId"
+        density="compact"
+        class="corrosion-table"
+        @select="openDetails(Number($event.id))"
+      >
+        <template #[`item.number`]="{ item }">
+          <strong>{{ item.number || `Индикатор ${item.id}` }}</strong>
+          <div class="cell-note">
+            {{ item.pipeline_sign_name || 'Трубопровод не указан' }}
+          </div>
+        </template>
+        <template #[`item.phase_name`]="{ item }">
+          <v-chip
+            size="x-small"
+            :color="phaseColor(Number(item.phase_id))"
+            variant="tonal"
+          >
+            {{ item.phase_name || 'Не задан' }}
+          </v-chip>
+        </template>
+        <template #[`item.dates`]="{ item }">
+          {{ formatDate(item.planned_on) }}
+          <div class="cell-note">
+            {{ formatDate(item.installed_on) }} · {{ formatDate(item.extracted_on) }}
+          </div>
+        </template>
+        <template #[`item.place`]="{ item }">
+          <span
+            class="wide-cell"
+            :title="String(item.installation_place || item.address || '')"
+          >{{ item.installation_place || item.address || '—' }}</span>
+        </template>
+        <template #[`item.line`]="{ item }">
+          Линия {{ item.line_id || '—' }}
+          <div class="cell-note">
+            {{ nodeRange(item as CorrosionIndicatorSummary) }}
+          </div>
+        </template>
+        <template #[`item.corrosion_rate`]="{ item }">
+          <span class="num">{{ corrosionRate(item.corrosion_rate) }}</span>
+        </template>
+        <template #[`item.process_mark_name`]="{ item }">
+          {{ item.process_mark_name || '—' }}
+          <div class="cell-note">
+            вода: {{ item.water_aggressiveness_name || '—' }}
+          </div>
+        </template>
+        <template #[`item.actions`]="{ item }">
+          <HintTip text="Открыть карточку">
             <template #default="{ props: tip }">
               <v-btn
                 v-bind="tip"
-                icon
+                icon="mdi-chevron-right"
+                size="x-small"
                 variant="text"
-                aria-label="Закрыть журнал"
-                @click="visible = false"
-              >
-                <v-icon>mdi-close</v-icon>
-              </v-btn>
+                aria-label="Открыть карточку"
+                @click.stop="openDetails(Number(item.id))"
+              />
             </template>
           </HintTip>
-        </v-card-title>
-        <v-divider />
-
-        <!-- Плитки из ответа списка: всего и по этапам при тех же фильтрах; плитка этапа — фильтр -->
-        <div
-          v-if="phaseTiles.length"
-          class="corrosion-kpi px-3 px-md-4 pt-3"
-        >
-          <KpiTile
-            label="Найдено"
-            :value="total"
-            :compact="false"
-          />
-          <KpiTile
-            v-for="tile in phaseTiles"
-            :key="tile.id"
-            :label="tile.name"
-            :value="tile.count"
-            :compact="false"
-            :status="tile.status"
-            selectable
-            :active="phaseId === tile.id"
-            @select="togglePhase(tile.id)"
-          />
-        </div>
-
-        <div class="pa-3 pa-md-4 corrosion-filters">
-          <v-row dense>
-            <v-col
-              cols="12"
-              md="4"
-            >
-              <SearchField
-                :model-value="search"
-                label="Номер, место, адрес, источник или ответственный"
-                :debounce="350"
-                :loading="loading"
-                @update:model-value="search = $event"
-                @search="onSearch"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="phaseId"
-                :items="lookups.phases"
-                item-title="name"
-                item-value="id"
-                label="Этап"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="seasonYear"
-                :items="lookups.years"
-                item-title="value"
-                item-value="value"
-                label="Сезон с года"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="rodStateId"
-                :items="lookups.rod_states"
-                item-title="name"
-                item-value="id"
-                label="Стержень"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <AppSelect
-                v-model="processMarkId"
-                :items="lookups.process_marks"
-                item-title="name"
-                item-value="id"
-                label="Оценка"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="4"
-            >
-              <AppSelect
-                v-model="waterAggressivenessId"
-                :items="lookups.water_aggressiveness"
-                item-title="name"
-                item-value="id"
-                label="Агрессивность сетевой воды"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <v-text-field
-                v-model="dateFrom"
-                type="date"
-                label="С даты"
-                density="compact"
-                variant="outlined"
-                hide-details
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-              md="2"
-            >
-              <v-text-field
-                v-model="dateTo"
-                type="date"
-                label="По дату"
-                density="compact"
-                variant="outlined"
-                hide-details
-              />
-            </v-col>
-          </v-row>
-          <div class="d-flex align-center flex-wrap ga-2 mt-3">
-            <v-chip
-              v-if="scope.lineId"
-              size="small"
-              color="primary"
-              closable
-              @click:close="clearScope"
-            >
-              Линия {{ scope.lineId }}
-            </v-chip>
-            <v-chip
-              v-if="scope.nodeId"
-              size="small"
-              color="primary"
-              closable
-              @click:close="clearScope"
-            >
-              Узел {{ scope.nodeId }}
-            </v-chip>
-            <v-spacer />
-            <v-btn
-              variant="text"
-              prepend-icon="mdi-filter-remove-outline"
-              :disabled="!filtersActive"
-              @click="resetFilters"
-            >
-              Сбросить
-            </v-btn>
-            <v-btn
-              variant="tonal"
-              prepend-icon="mdi-refresh"
-              :loading="loading"
-              @click="loadIndicators"
-            >
-              Обновить
-            </v-btn>
-          </div>
-        </div>
-        <v-divider />
-
-        <v-card-text class="pa-0 corrosion-table-wrap">
-          <StateView
-            variant="table"
-            :rows="10"
-            :loading="loading && !items.length"
-            :error="error"
-            :empty="!loading && !items.length"
-            empty-title="Индикаторы коррозии не найдены"
-            :empty-text="filtersActive ? 'Измените фильтры: по выбранным условиям записей нет' : 'В текущей базе журнал пока не заполнен'"
-            empty-icon="mdi-test-tube-empty"
-            :action-label="filtersActive ? 'Сбросить фильтры' : undefined"
-            :retrying="loading"
-            @retry="loadIndicators"
-            @action="resetFilters"
-          >
-            <v-progress-linear
-              v-if="loading"
-              indeterminate
-              color="primary"
-            />
-            <DataTable
-              :columns="tableColumns"
-              :items="(items as Record<string, unknown>[])"
-              item-key="id"
-              selectable
-              :flash-key="flashId"
-              density="compact"
-              class="corrosion-table"
-              @select="openDetails(Number($event.id))"
-            >
-              <template #[`item.number`]="{ item }">
-                <strong>{{ item.number || `Индикатор ${item.id}` }}</strong>
-                <div class="cell-note">
-                  {{ item.pipeline_sign_name || 'Трубопровод не указан' }}
-                </div>
-              </template>
-              <template #[`item.phase_name`]="{ item }">
-                <v-chip
-                  size="x-small"
-                  :color="phaseColor(Number(item.phase_id))"
-                  variant="tonal"
-                >
-                  {{ item.phase_name || 'Не задан' }}
-                </v-chip>
-              </template>
-              <template #[`item.dates`]="{ item }">
-                {{ formatDate(item.planned_on) }}
-                <div class="cell-note">
-                  {{ formatDate(item.installed_on) }} · {{ formatDate(item.extracted_on) }}
-                </div>
-              </template>
-              <template #[`item.place`]="{ item }">
-                <span
-                  class="wide-cell"
-                  :title="String(item.installation_place || item.address || '')"
-                >{{ item.installation_place || item.address || '—' }}</span>
-              </template>
-              <template #[`item.line`]="{ item }">
-                Линия {{ item.line_id || '—' }}
-                <div class="cell-note">
-                  {{ nodeRange(item as CorrosionIndicatorSummary) }}
-                </div>
-              </template>
-              <template #[`item.corrosion_rate`]="{ item }">
-                <span class="num">{{ corrosionRate(item.corrosion_rate) }}</span>
-              </template>
-              <template #[`item.process_mark_name`]="{ item }">
-                {{ item.process_mark_name || '—' }}
-                <div class="cell-note">
-                  вода: {{ item.water_aggressiveness_name || '—' }}
-                </div>
-              </template>
-              <template #[`item.actions`]="{ item }">
-                <HintTip text="Открыть карточку">
-                  <template #default="{ props: tip }">
-                    <v-btn
-                      v-bind="tip"
-                      icon="mdi-chevron-right"
-                      size="x-small"
-                      variant="text"
-                      aria-label="Открыть карточку"
-                      @click.stop="openDetails(Number(item.id))"
-                    />
-                  </template>
-                </HintTip>
-              </template>
-            </DataTable>
-          </StateView>
-        </v-card-text>
-        <v-divider />
-        <v-card-actions class="px-4 py-2">
-          <span class="text-caption text-medium-emphasis">Страница {{ page }} из {{ pages || 1 }}</span>
-          <v-spacer />
-          <v-pagination
-            v-if="pages > 1"
-            v-model="page"
-            :length="pages"
-            :total-visible="isMobile ? 3 : 7"
-            density="compact"
-          />
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        </template>
+      </DataTable>
+    </JournalShell>
 
     <v-dialog
       v-model="detailsVisible"
@@ -513,6 +450,7 @@ import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
 import HintTip from '~/components/HintTip.vue'
 import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
 import KpiTile, { type KpiStatus } from '~/components/KpiTile.vue'
+import JournalShell from '~/components/JournalShell.vue'
 import SearchField from '~/components/SearchField.vue'
 import StateView from '~/components/StateView.vue'
 import { hasLonLat } from '~/utils/journalFields'
@@ -826,12 +764,7 @@ defineExpose({ openDialog })
 </script>
 
 <style scoped>
-.corrosion-journal { height: min(90vh, 920px); display: flex; flex-direction: column; }
-.corrosion-kpi { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.corrosion-filters { flex-shrink: 0; background: rgba(var(--v-theme-on-surface), 0.02); }
-.corrosion-table-wrap { min-height: 280px; overflow: auto; flex: 1; }
 .corrosion-table { min-width: 1320px; }
 .wide-cell { display: inline-block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .cell-note { color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity)); font-size: .75rem; margin-top: 2px; }
-@media (max-width: 600px) { .corrosion-journal { height: 100dvh; } }
 </style>
