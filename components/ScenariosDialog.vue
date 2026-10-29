@@ -359,6 +359,16 @@
                   density="compact"
                   :clearable="false"
                 />
+                <v-btn
+                  v-if="regime && regime.total > 0"
+                  prepend-icon="mdi-microsoft-excel"
+                  variant="text"
+                  size="small"
+                  :loading="regimeExporting"
+                  @click="downloadRegimeExcel"
+                >
+                  Excel
+                </v-btn>
               </div>
               <v-alert
                 v-if="!calcsLoading && !regimeError && missingCalcText"
@@ -507,6 +517,7 @@ import { useFragmentStore } from '~/stores/fragmentStore'
 import { useLayerStore } from '~/stores/layerStore'
 import { useNotificationStore } from '~/stores/notificationStore'
 import { formatApiErrorWith } from '~/utils/apiError'
+import { downloadBlob } from '~/utils/printRender'
 import {
   SCENARIO_KIND_META,
   SCENARIO_REGIME_META,
@@ -728,6 +739,22 @@ const loadRegime = async () => {
     if (seq === regimeSeq) regimeError.value = formatApiErrorWith('Не удалось сравнить расчёты', err)
   } finally {
     if (seq === regimeSeq) regimeLoading.value = false
+  }
+}
+
+/** Отчёт Excel «сценарий против основы»: все изменения (в окне — первые), сводка и пороги */
+const regimeExporting = ref(false)
+const downloadRegimeExcel = async () => {
+  const s = selected.value
+  if (!s || baseCalcId.value === null || scenarioCalcId.value === null) return
+  regimeExporting.value = true
+  try {
+    const { blob, filename } = await fastApiService.downloadScenarioCompareExcel(s.id, baseCalcId.value, scenarioCalcId.value)
+    downloadBlob(blob, filename)
+  } catch (err: unknown) {
+    regimeError.value = formatApiErrorWith('Отчёт Excel не сформирован', err)
+  } finally {
+    regimeExporting.value = false
   }
 }
 

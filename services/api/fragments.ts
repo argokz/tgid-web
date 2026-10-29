@@ -1,7 +1,7 @@
 /** Фрагменты сети и данные карты. Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type { FeatureData, Fragment } from '~/types';
 import type { FragmentTransferReport, Scenario, ScenarioCreateResult, ScenarioDiff, ScenarioMergeReport, ScenarioRegimeCompare } from './types';
-import { buildApiUrl, encodePath, fetchWithRetry, mutationOptions, request } from './http';
+import { buildApiUrl, encodePath, fetchWithRetry, filenameFromDisposition, mutationOptions, request } from './http';
 
 export const fragmentsApi = {
   async getObjectData(
@@ -76,6 +76,20 @@ export const fragmentsApi = {
     return request<ScenarioRegimeCompare>(`api/v1/scenarios/${encodePath(scenarioId)}/compare`, {
       query: { base_calculation_id: baseCalculationId, scenario_calculation_id: scenarioCalculationId },
     });
+  },
+
+  /** Отчёт Excel «сценарий против основы» по двум расчётам (все изменения, сводка, пороги) */
+  async downloadScenarioCompareExcel(scenarioId: number, baseCalculationId: number, scenarioCalculationId: number):
+    Promise<{ blob: Blob; filename: string }> {
+    let filename = '';
+    const blob = await request<Blob>(`api/v1/scenarios/${encodePath(scenarioId)}/compare.xlsx`, {
+      responseType: 'blob',
+      query: { base_calculation_id: baseCalculationId, scenario_calculation_id: scenarioCalculationId },
+      onResponse({ response }: any) {
+        filename = filenameFromDisposition(response?.headers?.get?.('content-disposition')) ?? '';
+      },
+    });
+    return { blob, filename: filename || `scenario_${scenarioId}_compare.xlsx` };
   },
 
   /** Перенос правок сценария в основу; dryRun — предпросмотр с откатом. Конфликты: 'scenario' — взять сценарий */
