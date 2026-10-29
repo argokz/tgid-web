@@ -140,3 +140,20 @@ export const scenarioRegimeText = (item: ScenarioRegimeItem): string =>
     : [pairText('расход', item.flow, 'т/ч'), pairText('скорость', item.velocity, 'м/с', 2), pairText('потери', item.loss, 'Па/м')])
     .filter(Boolean)
     .join(' · ')
+
+// --- Перенос правок сценария в основу (POST api/v1/scenarios/{id}/merge) ---
+
+const MERGE_ACTION_LABELS: Record<string, string> = {
+  updated: 'изменить',
+  inserted: 'добавить',
+  removed: 'снять',
+  deleted: 'удалить',
+  kept_with_removed_object: 'оставить при снятом объекте',
+}
+
+/** «Узел: добавить 1; Участок: добавить 1, снять 1» — по таблицам в порядке отчёта */
+export const scenarioMergeCountsText = (counts: Record<string, Record<string, number>> | null | undefined): string[] =>
+  Object.entries(counts || {}).map(([table, actions]) =>
+    `${scenarioTableLabel(table)}: ${Object.entries(actions)
+      .map(([action, n]) => `${MERGE_ACTION_LABELS[action] ?? action} ${n}`)
+      .join(', ')}`)

@@ -453,6 +453,32 @@ export interface ScenarioRegimeCompare {
   items: ScenarioRegimeItem[];
 }
 
+export interface ScenarioSkippedConflict {
+  /** «таблица:id копии» — ключ решения конфликта */
+  key: string;
+  table: string;
+  base_id: number;
+  copy_id: number;
+  fields: Record<string, [unknown, unknown]> | null;
+}
+
+/** POST api/v1/scenarios/{id}/merge: отчёт переноса (dry_run — предпросмотр с откатом) */
+export interface ScenarioMergeReport {
+  dry_run?: boolean;
+  scenario_id: number;
+  base_fileid: number;
+  fileid: number;
+  counts: Record<string, Record<string, number>>;
+  updated: number;
+  inserted: number;
+  removed: number;
+  skipped_conflicts: ScenarioSkippedConflict[];
+  touched_nodes: number[];
+  touched_lines: number[];
+  check: TopologyAreaCheck;
+  operation_id?: number | null;
+}
+
 export type TopologyRuleSeverity = 'error' | 'warning';
 
 /** Замечание правил связности: error — sety не рассчитает, warning — подозрительно */

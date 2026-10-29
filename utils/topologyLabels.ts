@@ -120,6 +120,7 @@ const OPERATION_LABELS: Record<string, string> = {
   DISSOLVE_NODE: 'соединение труб через узел',
   CARD_EDIT: 'свойства',
   SCENARIO_CREATE: 'создание сценария',
+  SCENARIO_MERGE: 'перенос сценария в основу',
 };
 
 /** Подпись кнопки «Отменить»: «разрезание участка 17» */

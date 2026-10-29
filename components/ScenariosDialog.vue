@@ -210,6 +210,17 @@
               >
                 Показать основу
               </v-btn>
+              <v-btn
+                v-if="canCreate"
+                size="small"
+                variant="tonal"
+                prepend-icon="mdi-source-merge"
+                :disabled="!selected.exists || scenarioEdits === 0"
+                :title="scenarioEdits === 0 ? 'В сценарии нет правок для переноса' : 'Перенести правки сценария в основу'"
+                @click="mergeOpen = true"
+              >
+                Перенести в основу
+              </v-btn>
               <HintTip text="Сравнить заново">
                 <template #default="{ props: tip }">
                   <v-btn
@@ -462,6 +473,12 @@
         </section>
       </v-card-text>
     </v-card>
+    <ScenarioMergeDialog
+      v-if="mergeOpen && selected"
+      v-model="mergeOpen"
+      :scenario="selected"
+      @merged="onMerged"
+    />
   </v-dialog>
 </template>
 
@@ -471,6 +488,7 @@ import AppSelect from '~/components/AppSelect.vue'
 import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
 import HintTip from '~/components/HintTip.vue'
 import KpiTile from '~/components/KpiTile.vue'
+import ScenarioMergeDialog from '~/components/ScenarioMergeDialog.vue'
 import StateView from '~/components/StateView.vue'
 import {
   fastApiService,
@@ -479,12 +497,14 @@ import {
   type ScenarioChangeKind,
   type ScenarioDiff,
   type ScenarioDiffItem,
+  type ScenarioMergeReport,
   type ScenarioRegimeCompare,
   type ScenarioRegimeItem,
   type ScenarioRegimeKind,
 } from '~/services/fastApiService'
 import { useAuthStore } from '~/stores/authStore'
 import { useFragmentStore } from '~/stores/fragmentStore'
+import { useLayerStore } from '~/stores/layerStore'
 import { useNotificationStore } from '~/stores/notificationStore'
 import { formatApiErrorWith } from '~/utils/apiError'
 import {
@@ -530,6 +550,7 @@ const creating = ref(false)
 const notificationStore = useNotificationStore()
 const fragmentStore = useFragmentStore()
 const authStore = useAuthStore()
+const mergeOpen = ref(false)
 const tab = ref<'net' | 'regime'>('net')
 const baseCalcs = ref<CalculationListItem[]>([])
 const scenarioCalcs = ref<CalculationListItem[]>([])
@@ -553,6 +574,11 @@ const fragmentItems = computed(() =>
 )
 const selected = computed(() => scenarios.value.find((s) => s.id === selectedId.value) ?? null)
 const kindRows = computed(() => scenarioKindCounts(diff.value?.by_kind))
+/** Правок сценария (переносимых в основу), включая конфликты */
+const scenarioEdits = computed(() => {
+  const k = diff.value?.by_kind ?? {}
+  return (k.changed ?? 0) + (k.added ?? 0) + (k.removed ?? 0) + (k.conflict ?? 0)
+})
 const tableRows = computed<DiffRow[]>(() =>
   (diff.value?.items ?? [])
     .filter((item) => !kindFilter.value || item.kind === kindFilter.value)
@@ -779,6 +805,34 @@ const toggleArchive = async () => {
   } catch (err: unknown) {
     notificationStore.showError(formatApiErrorWith('Не удалось изменить сценарий', err))
   }
+}
+
+/** После переноса и после его отмены: сравнить заново и обновить слои сети */
+const refreshAfterMerge = () => {
+  void loadDiff()
+  useLayerStore().refreshVisibleDataLayers()
+}
+
+/** Перенос выполнен: уведомление с «Отменить» (отмена именно этой операции журнала) */
+const onMerged = (res: ScenarioMergeReport) => {
+  const name = selected.value?.name ?? ''
+  const text = `Сценарий «${name}» перенесён в основу: изменено ${res.updated}, добавлено ${res.inserted}, снято ${res.removed}`
+  refreshAfterMerge()
+  const operationId = res.operation_id
+  if (!operationId) {
+    notificationStore.showSuccess(text)
+    return
+  }
+  notificationStore.showUndo(text, async () => {
+    try {
+      await fastApiService.undoTopologyOperation(operationId)
+      notificationStore.showSuccess('Перенос сценария отменён')
+    } catch (err: unknown) {
+      notificationStore.showError(formatApiErrorWith('Отменить перенос нельзя', err))
+    } finally {
+      refreshAfterMerge()
+    }
+  })
 }
 
 const locateItem = (row: { lat: number | null; lng: number | null }) => {

@@ -1,6 +1,6 @@
 /** Фрагменты сети и данные карты. Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type { FeatureData, Fragment } from '~/types';
-import type { FragmentTransferReport, Scenario, ScenarioCreateResult, ScenarioDiff, ScenarioRegimeCompare } from './types';
+import type { FragmentTransferReport, Scenario, ScenarioCreateResult, ScenarioDiff, ScenarioMergeReport, ScenarioRegimeCompare } from './types';
 import { buildApiUrl, encodePath, fetchWithRetry, mutationOptions, request } from './http';
 
 export const fragmentsApi = {
@@ -76,6 +76,12 @@ export const fragmentsApi = {
     return request<ScenarioRegimeCompare>(`api/v1/scenarios/${encodePath(scenarioId)}/compare`, {
       query: { base_calculation_id: baseCalculationId, scenario_calculation_id: scenarioCalculationId },
     });
+  },
+
+  /** Перенос правок сценария в основу; dryRun — предпросмотр с откатом. Конфликты: 'scenario' — взять сценарий */
+  async mergeScenario(scenarioId: number, opts: { dryRun: boolean; resolutions?: Record<string, 'scenario' | 'base'> }): Promise<ScenarioMergeReport> {
+    return request<ScenarioMergeReport>(`api/v1/scenarios/${encodePath(scenarioId)}/merge`,
+      mutationOptions('POST', { dry_run: opts.dryRun, resolutions: opts.resolutions ?? {} }));
   },
 
   async setScenarioStatus(scenarioId: number, status: Scenario['status']): Promise<{ id: number; status: Scenario['status'] }> {

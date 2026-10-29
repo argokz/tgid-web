@@ -8,6 +8,7 @@ import {
   isScenarioEdit,
   scenarioFieldsText,
   scenarioKindCounts,
+  scenarioMergeCountsText,
   scenarioObjectTitle,
   scenarioRegimeText,
   scenarioRegimeTitle,
@@ -69,5 +70,13 @@ describe('scenarios: режим', () => {
     for (const meta of Object.values(SCENARIO_REGIME_META)) {
       expect(resolveMdiSvgPath(meta.icon), meta.icon).toBeTruthy()
     }
+  })
+})
+
+describe('scenarios: перенос в основу', () => {
+  it('итог переноса по таблицам', () => {
+    expect(scenarioMergeCountsText({ nodes: { inserted: 1 }, linesobj: { inserted: 1, removed: 1 } }))
+      .toEqual(['Узел: добавить 1', 'Участок: добавить 1, снять 1'])
+    expect(scenarioMergeCountsText(null)).toEqual([])
   })
 })
