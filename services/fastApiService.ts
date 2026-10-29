@@ -18,6 +18,7 @@ import { calcApi } from './api/calc';
 import { adminApi } from './api/admin';
 import { reportsApi } from './api/reports';
 import { workOrdersApi } from './api/workOrders';
+import { outagesApi } from './api/outages';
 
 export const fastApiService = {
   ...coreApi,
@@ -33,4 +34,5 @@ export const fastApiService = {
   ...adminApi,
   ...reportsApi,
   ...workOrdersApi,
+  ...outagesApi,
 };

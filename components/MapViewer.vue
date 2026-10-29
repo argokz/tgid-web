@@ -1027,6 +1027,31 @@ const onShowSelectOnMap = (res: SelectResult) => {
   }
 };
 
+// === Отключения: зона (цвет — статус), задвижки (обязательные — красные), потребители ===
+const outagesOverlay = useOverlayLayer(() => mapStore.map, 'outages', {
+  layerIds: ['outages-zone-fill', 'outages-zone-line', 'outages-consumers', 'outages-valves'],
+});
+
+const onShowOutagesOnMap = (data: GeoJSON.FeatureCollection) => {
+  const kind = (k: string) => ['==', ['get', 'kind'], k];
+  outagesOverlay.show(data, [
+    { id: 'outages-zone-fill', type: 'fill', filter: kind('zone'), paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.18 } },
+    { id: 'outages-zone-line', type: 'line', filter: kind('zone'), paint: { 'line-color': ['get', 'color'], 'line-width': 2 } },
+    {
+      id: 'outages-consumers',
+      type: 'circle',
+      filter: kind('consumer'),
+      paint: { 'circle-radius': 4, 'circle-color': ['case', ['get', 'downstream'], '#FFB74D', '#E65100'], 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' },
+    },
+    {
+      id: 'outages-valves',
+      type: 'circle',
+      filter: kind('valve'),
+      paint: { 'circle-radius': 6, 'circle-color': ['case', ['get', 'required'], '#C62828', '#757575'], 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' },
+    },
+  ]);
+};
+
 // === Наряды и заявки: открытые наряды точками (цвет — статус) ===
 const workOrdersOverlay = useOverlayLayer(() => mapStore.map, 'work-orders', {
   layerIds: ['work-orders-halo', 'work-orders-points'],
@@ -1653,6 +1678,12 @@ const toolDialogs: ToolDialogEntry[] = [
   { key: 'throttlingCalculator', component: lazyDialog(() => import('./ThrottlingCalculatorDialog.vue')) },
   // Тематическая карта участков (Smart Mapping, фаза 1): слой и легенда — useThematicMap
   { key: 'thematicMap', component: lazyDialog(() => import('./ThematicMapDialog.vue')) },
+  // Отключения (фаза 2)
+  {
+    key: 'outages',
+    component: lazyDialog(() => import('./OutagesDialog.vue')),
+    on: { showOnMap: onShowOutagesOnMap, clearHighlight: () => outagesOverlay.clear(), focusCoords: onFocusCoords },
+  },
   // Наряды и заявки (фаза 2)
   {
     key: 'workOrders',

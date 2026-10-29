@@ -88,6 +88,14 @@
             density="compact"
             hide-details
           />
+          <v-btn
+            v-if="overlayShown"
+            variant="tonal"
+            size="small"
+            @click="keepOnMap"
+          >
+            Оставить на карте
+          </v-btn>
         </div>
 
         <div class="wo-body">
@@ -362,6 +370,20 @@
               </div>
 
               <div
+                v-if="canEdit && !['closed', 'cancelled'].includes(current.status)"
+                class="mb-2"
+              >
+                <v-btn
+                  variant="tonal"
+                  size="small"
+                  prepend-icon="mdi-calendar-alert"
+                  @click="planOutage"
+                >
+                  Отключение для работ
+                </v-btn>
+              </div>
+
+              <div
                 v-if="canEdit"
                 class="d-flex ga-2 align-start mb-2"
               >
@@ -433,6 +455,7 @@ import { useDialogMapOverlay } from '~/composables/useDialogMapOverlay';
 import { useMobile } from '~/composables/useMobile';
 import { fastApiService } from '~/services/fastApiService';
 import { useAuthStore } from '~/stores/authStore';
+import { useUiStore } from '~/stores/uiStore';
 import { formatApiError } from '~/utils/apiError';
 import {
   PRIORITY_COLORS,
@@ -465,8 +488,10 @@ const emit = defineEmits<{
 
 const visible = defineModel<boolean>({ default: false });
 const overlay = useDialogMapOverlay(visible, () => emit('clear-highlight'));
+const { shown: overlayShown, keepOnMap } = overlay;
 const { isMobile } = useMobile();
 const authStore = useAuthStore();
+const uiStore = useUiStore();
 const canEdit = computed(() => authStore.canEditData);
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -625,6 +650,14 @@ const move = async (to: WorkOrderStatus) => {
   } finally {
     moving.value = null;
   }
+};
+
+/** Окно «Отключения» с нарядом: место работ — из наряда, расчёт изоляции — там */
+const planOutage = () => {
+  const o = current.value;
+  if (!o) return;
+  uiStore.requestToolDialog('outages', { workOrderId: o.id, lineId: o.line_id, nodeId: o.node_id,
+    title: `Отключение для наряда ${o.number}` });
 };
 
 const sendComment = async () => {
