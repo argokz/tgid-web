@@ -17,6 +17,7 @@ import { translationsApi } from './api/translations';
 import { calcApi } from './api/calc';
 import { adminApi } from './api/admin';
 import { reportsApi } from './api/reports';
+import { workOrdersApi } from './api/workOrders';
 
 export const fastApiService = {
   ...coreApi,
@@ -31,4 +32,5 @@ export const fastApiService = {
   ...calcApi,
   ...adminApi,
   ...reportsApi,
+  ...workOrdersApi,
 };

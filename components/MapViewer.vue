@@ -1027,6 +1027,22 @@ const onShowSelectOnMap = (res: SelectResult) => {
   }
 };
 
+// === Наряды и заявки: открытые наряды точками (цвет — статус) ===
+const workOrdersOverlay = useOverlayLayer(() => mapStore.map, 'work-orders', {
+  layerIds: ['work-orders-halo', 'work-orders-points'],
+});
+
+const onShowWorkOrdersOnMap = (data: GeoJSON.FeatureCollection) => {
+  workOrdersOverlay.show(data, [
+    { id: 'work-orders-halo', type: 'circle', paint: { 'circle-radius': 11, 'circle-color': ['get', 'color'], 'circle-opacity': 0.25 } },
+    {
+      id: 'work-orders-points',
+      type: 'circle',
+      paint: { 'circle-radius': 6, 'circle-color': ['get', 'color'], 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' },
+    },
+  ]);
+};
+
 // === Hydraulic Thematic Maps & Flow Arrows ===
 const FLOW_ARROW_ICON = 'hydraulic-flow-arrow';
 const HAS_DELTA_H = ['==', ['typeof', ['get', 'delta_h']], 'number'] as any;
@@ -1637,6 +1653,12 @@ const toolDialogs: ToolDialogEntry[] = [
   { key: 'throttlingCalculator', component: lazyDialog(() => import('./ThrottlingCalculatorDialog.vue')) },
   // Тематическая карта участков (Smart Mapping, фаза 1): слой и легенда — useThematicMap
   { key: 'thematicMap', component: lazyDialog(() => import('./ThematicMapDialog.vue')) },
+  // Наряды и заявки (фаза 2)
+  {
+    key: 'workOrders',
+    component: lazyDialog(() => import('./WorkOrdersDialog.vue')),
+    on: { showOnMap: onShowWorkOrdersOnMap, clearHighlight: () => workOrdersOverlay.clear(), focusCoords: onFocusCoords },
+  },
   // Выборка по условиям и вопрос словами (фаза 1, п. 10)
   {
     key: 'networkSelect',
