@@ -17,7 +17,11 @@ export function isHeaderNavCollapsed(viewportWidth: number): boolean {
   return viewportWidth > 0 && viewportWidth < HEADER_NAV_MIN_WIDTH
 }
 
-export type ExportFormat = 'shp' | 'dxf' | 'geojson' | 'geojson-attrs'
+export type ExportFormat = 'gpkg' | 'fgb' | 'shp' | 'dxf' | 'geojson' | 'geojson-attrs'
+
+/** Выгрузки сети через /api/export/network (database/vector_export.py) */
+export const NETWORK_FILE_FORMATS = ['gpkg', 'fgb', 'shp'] as const
+export type NetworkFileFormat = (typeof NETWORK_FILE_FORMATS)[number]
 
 export type HeaderAction =
   | { kind: 'route'; to: string }
@@ -41,6 +45,14 @@ export interface HeaderMenuItem {
 }
 
 const EXPORT_ITEMS: HeaderMenuItem[] = [
+  {
+    id: 'export-gpkg',
+    title: 'GeoPackage (узлы и участки)',
+    subtitle: 'Один файл для QGIS и ArcGIS: Ду и длина по паспорту',
+    icon: 'mdi-export',
+    action: { kind: 'export', format: 'gpkg' },
+  },
+  { id: 'export-fgb', title: 'FlatGeobuf (узлы и участки, zip)', icon: 'mdi-export', action: { kind: 'export', format: 'fgb' } },
   { id: 'export-shp', title: 'SHP (узлы и участки, zip)', icon: 'mdi-export', action: { kind: 'export', format: 'shp' } },
   { id: 'export-dxf', title: 'DXF (линии участков)', icon: 'mdi-vector-polyline', action: { kind: 'export', format: 'dxf' } },
   { id: 'export-geojson', title: 'GeoJSON (геометрия и паспорт)', icon: 'mdi-code-json', action: { kind: 'export', format: 'geojson' } },

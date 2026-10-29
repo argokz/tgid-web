@@ -78,6 +78,8 @@ describe('buildHeaderMenu: состав меню по правам', () => {
     const geo = exportItem.children!.filter((c) => c.group === 'Геоданные')
     const excel = exportItem.children!.filter((c) => c.group === 'Ведомости Excel')
     expect(geo.map((c) => c.action)).toEqual([
+      { kind: 'export', format: 'gpkg' },
+      { kind: 'export', format: 'fgb' },
       { kind: 'export', format: 'shp' },
       { kind: 'export', format: 'dxf' },
       { kind: 'export', format: 'geojson' },
@@ -101,7 +103,7 @@ describe('groupMenuChildren: подгруппы подменю', () => {
   it('«Выгрузка» — две подгруппы по порядку', () => {
     const exportItem = buildHeaderMenu({ canCalculate: false }).find((i) => i.id === 'export')!
     const groups = groupMenuChildren(exportItem.children!)
-    expect(groups.map((g) => [g.title, g.items.length])).toEqual([['Геоданные', 4], ['Ведомости Excel', 6]])
+    expect(groups.map((g) => [g.title, g.items.length])).toEqual([['Геоданные', 6], ['Ведомости Excel', 6]])
   })
 
   it('пункты без группы — одна группа без заголовка', () => {

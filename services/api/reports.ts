@@ -2,7 +2,7 @@
 import { fastApiService } from '../fastApiService';
 import type { NetworkImportInspect, NetworkImportMode, NetworkImportParams, NetworkImportReport } from '~/utils/networkImport';
 import type { PassportHierarchyGroup, PassportOptions, PassportSite, RegimeAnalysisResult, ReportCatalogItem, ReportsCatalog } from './types';
-import { REPORT_TIMEOUT_MS, buildApiUrl, encodePath, mutationOptions, parseExcelReportMeta, parseNetworkExportMeta, request, runFileJob } from './http';
+import { REPORT_TIMEOUT_MS, buildApiUrl, encodePath, filenameFromDisposition, mutationOptions, parseExcelReportMeta, parseNetworkExportMeta, request, runFileJob } from './http';
 import type { ExcelReportMeta, FileJobOptions, HeaderGetter, NetworkExportMeta } from './http';
 
 export const reportsApi = {
@@ -28,21 +28,25 @@ export const reportsApi = {
     return { blob, filename: `${journal}_${recordId}.docx` };
   },
 
-  async downloadShpExport(fragmentIds?: number[]): Promise<{ blob: Blob; filename: string; meta?: NetworkExportMeta }> {
+  /** Сеть фрагментов файлом ГИС: GeoPackage, FlatGeobuf (zip) или Shapefile (zip) — /api/export/network */
+  async downloadNetworkExport(
+    format: 'gpkg' | 'fgb' | 'shp',
+    fragmentIds?: number[],
+  ): Promise<{ blob: Blob; filename: string; meta?: NetworkExportMeta }> {
     let meta: NetworkExportMeta | undefined;
-    const blob = await request<Blob>('api/export/shp', {
+    let filename = '';
+    const blob = await request<Blob>('api/export/network', {
       responseType: 'blob',
-      query: fragmentIds?.length
-        ? fragmentIds.length === 1
-          ? { fragment_id: fragmentIds[0] }
-          : { fragments: fragmentIds.join(',') }
-        : undefined,
+      query: { format, ...(fragmentIds?.length ? { fragments: fragmentIds.join(',') } : {}) },
+      timeout: REPORT_TIMEOUT_MS,
       onResponse({ response }: any) {
-        if (response?.headers?.get) meta = parseNetworkExportMeta((name) => response.headers.get(name));
+        if (!response?.headers?.get) return;
+        meta = parseNetworkExportMeta((name) => response.headers.get(name));
+        filename = filenameFromDisposition(response.headers.get('content-disposition')) ?? '';
       },
     });
     const suffix = fragmentIds?.length === 1 ? `_f${fragmentIds[0]}` : fragmentIds?.length ? '_frag' : '';
-    return { blob, filename: `network_export${suffix}.zip`, meta };
+    return { blob, filename: filename || `network_export${suffix}.${format === 'gpkg' ? 'gpkg' : 'zip'}`, meta };
   },
 
   /**

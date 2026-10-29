@@ -2,7 +2,7 @@
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
 import type { CalculationDeleteResponse, CalculationGeoJsonResponse, CalculationListFilter, CalculationListResponse, CalculationSummaryItem, CalculationTemperatureRange, ElevatorEngineParams, ElevatorEngineResult, ElevatorNozzleParams, ElevatorNozzleResult, GvsCirculationParams, NetworkTraceRequest, NetworkTraceResponse, NetworkZonesResponse, TraceConfig, TraceConfigList, LayerStyle, LayerStyleList, SelectFields, SelectResult, SelectSpec, ThematicPipesResponse, GvsCirculationResult, OrificePlateParams, OrificePlateResult, OutageSimulationResponse, RegimeAnalysisKind, RegimeAnalysisResult, SetyRunRequest, SetyRunResponse, ThrottlingSheetParams } from './types';
 import type { ThematicStyle, ThematicTheme } from '~/utils/thematicStyle';
-import { encodePath, mutationOptions, request } from './http';
+import { encodePath, filenameFromDisposition, mutationOptions, request } from './http';
 
 export const calcApi = {
   async getLatestCalculations(limit = 20): Promise<CalculationSummaryItem[]> {
@@ -138,6 +138,25 @@ export const calcApi = {
   async runNetworkSelect(spec: SelectSpec, bbox?: [number, number, number, number] | null): Promise<SelectResult> {
     const body = { spec, bbox: bbox ? bbox.map((v) => v.toFixed(5)).join(',') : null };
     return request<SelectResult>('api/v1/network-select', { method: 'POST', body });
+  },
+
+  /** Результат выборки файлом ГИС (GeoPackage, FlatGeobuf, Shapefile zip) */
+  async exportNetworkSelect(
+    spec: SelectSpec,
+    format: 'gpkg' | 'fgb' | 'shp',
+    bbox?: [number, number, number, number] | null,
+  ): Promise<{ blob: Blob; filename: string }> {
+    let filename = '';
+    const body = { spec, format, bbox: bbox ? bbox.map((v) => v.toFixed(5)).join(',') : null };
+    const blob = await request<Blob>('api/v1/network-select/export', {
+      method: 'POST',
+      body,
+      responseType: 'blob',
+      onResponse({ response }: any) {
+        filename = filenameFromDisposition(response?.headers?.get?.('content-disposition')) ?? '';
+      },
+    });
+    return { blob, filename: filename || `selection_${spec.target}.${format === 'gpkg' ? 'gpkg' : format === 'fgb' ? 'fgb' : 'zip'}` };
   },
 
   async getLayerStyles(): Promise<LayerStyleList> {

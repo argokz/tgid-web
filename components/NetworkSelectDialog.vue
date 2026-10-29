@@ -278,15 +278,28 @@
           <div class="d-flex flex-wrap align-center ga-2 mb-2">
             <span class="text-subtitle-2">{{ totalText }}</span>
             <v-spacer />
-            <v-btn
-              v-if="result.items.length"
-              prepend-icon="mdi-download"
-              variant="text"
-              size="small"
-              @click="downloadCsv"
-            >
-              CSV
-            </v-btn>
+            <v-menu v-if="result.items.length">
+              <template #activator="{ props: menu }">
+                <v-btn
+                  v-bind="menu"
+                  prepend-icon="mdi-download"
+                  variant="text"
+                  size="small"
+                  :loading="exporting"
+                >
+                  Скачать
+                </v-btn>
+              </template>
+              <v-list density="compact">
+                <v-list-item
+                  v-for="f in DOWNLOAD_FORMATS"
+                  :key="f.value"
+                  :title="f.title"
+                  :subtitle="f.subtitle"
+                  @click="download(f.value)"
+                />
+              </v-list>
+            </v-menu>
             <v-btn
               v-if="overlayShown"
               variant="text"
@@ -325,7 +338,7 @@
             v-if="result.items.length > ITEMS_SHOWN"
             class="text-caption text-medium-emphasis mt-1"
           >
-            В списке первые {{ ITEMS_SHOWN }}; все {{ result.items.length }} — на карте и в CSV.
+            В списке первые {{ ITEMS_SHOWN }}; все {{ result.items.length }} — на карте и в выгрузке.
           </p>
         </template>
       </v-card-text>
@@ -370,7 +383,7 @@ import { downloadBlob } from '~/utils/printRender';
 /**
  * Выборка объектов сети по условиям (п. 10 фазы 1): конструктор запроса и вопрос словами (помощник ИИ
  * заполняет тот же конструктор). Запрос выполняет сервер по белому списку полей и показывает его словами;
- * найденное — на карте (оверлей MapViewer) и в списке, выгрузка — CSV.
+ * найденное — на карте (оверлей MapViewer) и в списке, выгрузка — CSV или файл ГИС (GeoPackage, FlatGeobuf, SHP).
  */
 const emit = defineEmits<{
   'show-on-map': [data: SelectResult];
@@ -387,7 +400,7 @@ const fragmentStore = useFragmentStore();
 const mapStore = useMapStore();
 
 const MAX_ROWS = 8;
-/** Сколько строк показывать в списке (все — на карте и в CSV) */
+/** Сколько строк показывать в списке (все — на карте и в выгрузке) */
 const ITEMS_SHOWN = 200;
 
 const fields = ref<SelectFields | null>(null);
@@ -565,9 +578,33 @@ const focus = (item: SelectItem) => {
   if (item.lon != null && item.lat != null) emit('focus-coords', item.lon, item.lat);
 };
 
-const downloadCsv = () => {
+type DownloadFormat = 'csv' | 'gpkg' | 'fgb' | 'shp';
+const DOWNLOAD_FORMATS: Array<{ value: DownloadFormat; title: string; subtitle: string }> = [
+  { value: 'csv', title: 'CSV', subtitle: 'Таблица для Excel' },
+  { value: 'gpkg', title: 'GeoPackage', subtitle: 'С геометрией — QGIS, ArcGIS' },
+  { value: 'fgb', title: 'FlatGeobuf', subtitle: 'С геометрией, компактный' },
+  { value: 'shp', title: 'Shapefile (zip)', subtitle: 'Для старых программ: имена полей до 10 знаков' },
+];
+const exporting = ref(false);
+
+/** CSV собирается в браузере из найденного; файлы ГИС — сервер тем же запросом (с геометрией) */
+const download = async (format: DownloadFormat) => {
   const res = result.value;
   if (!res) return;
+  if (format !== 'csv') {
+    exporting.value = true;
+    errorMessage.value = '';
+    try {
+      const { blob, filename } = await fastApiService.exportNetworkSelect(
+        res.spec, format, res.spec.in_view ? currentBbox() : null);
+      downloadBlob(blob, filename);
+    } catch (err: unknown) {
+      errorMessage.value = formatApiError(err, 'Файл не выгружен');
+    } finally {
+      exporting.value = false;
+    }
+    return;
+  }
   const blob = new Blob([`\uFEFF${resultCsv(res)}`], { type: 'text/csv;charset=utf-8;' });
   downloadBlob(blob, `Выборка_${res.target === 'lines' ? 'участки' : 'узлы'}_${Date.now()}.csv`);
 };

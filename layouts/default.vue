@@ -545,7 +545,7 @@ import { formatApiErrorWith } from '~/utils/apiError';
 import { ROLE_LABELS, type Role } from '~/utils/permissions';
 import { deviceClass } from '~/utils/breakpoints';
 import { buildPageTitle } from '~/utils/pageTitle';
-import { buildHeaderMenu, groupMenuChildren, isHeaderNavCollapsed, type HeaderMenuItem } from '~/utils/headerMenu';
+import { NETWORK_FILE_FORMATS, buildHeaderMenu, groupMenuChildren, isHeaderNavCollapsed, type HeaderMenuItem, type NetworkFileFormat } from '~/utils/headerMenu';
 
 const { screenWidth } = useMobile();
 // SSR не знает ширину окна и рендерит десктопную шапку; до монтирования клиент
@@ -792,7 +792,7 @@ const runMenuAction = (item: HeaderMenuItem) => {
         useNotificationStore().showInfo('Выгрузка уже идёт — дождитесь её окончания');
         return;
       }
-      if (action.format === 'shp') void downloadShp();
+      if (isNetworkFileFormat(action.format)) void downloadNetworkFile(action.format);
       else if (action.format === 'dxf') void downloadDxf();
       else void downloadGeoJson(action.format === 'geojson-attrs');
       return;
@@ -837,19 +837,25 @@ const resolveExportFragmentIds = (): number[] | undefined => {
   return undefined;
 };
 
-const downloadShp = async () => {
+const NETWORK_FILE_LABELS: Record<NetworkFileFormat, string> = { gpkg: 'GeoPackage', fgb: 'FlatGeobuf', shp: 'SHP' };
+const isNetworkFileFormat = (format: string): format is NetworkFileFormat =>
+  (NETWORK_FILE_FORMATS as readonly string[]).includes(format);
+
+/** Сеть фрагментов файлом ГИС (узлы и участки): GeoPackage, FlatGeobuf, SHP — /api/export/network */
+const downloadNetworkFile = async (format: NetworkFileFormat) => {
+  const label = NETWORK_FILE_LABELS[format];
   exportingShp.value = true;
   try {
     const fragmentIds = resolveExportFragmentIds();
     if (!fragmentIds?.length) {
-      useNotificationStore().showError('Выберите фрагмент на карте перед экспортом SHP');
+      useNotificationStore().showError(`Выберите фрагмент на карте перед экспортом ${label}`);
       return;
     }
-    const { blob, filename, meta } = await fastApiService.downloadShpExport(fragmentIds);
+    const { blob, filename, meta } = await fastApiService.downloadNetworkExport(format, fragmentIds);
     saveBlob(blob, filename);
-    notifyNetworkExport('SHP', fragmentIds, meta);
+    notifyNetworkExport(label, fragmentIds, meta);
   } catch (err: any) {
-    useNotificationStore().showError(formatApiErrorWith('Ошибка экспорта SHP', err));
+    useNotificationStore().showError(formatApiErrorWith(`Ошибка экспорта ${label}`, err));
   } finally {
     exportingShp.value = false;
   }
