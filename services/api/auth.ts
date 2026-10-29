@@ -1,5 +1,6 @@
 /** Вход, выход, профиль. Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type { ServerPermissions } from '~/utils/permissions';
+import type { McpInfo, McpToken } from '~/utils/mcpClient';
 import type { CityItem } from './types';
 import { mutationOptions, request } from './http';
 
@@ -66,6 +67,16 @@ export const authApi = {
     role_label?: string;
   }> {
     return request('api/v1/auth/me', mutationOptions('GET'));
+  },
+
+  /** MCP-сервер ТГИД: включён ли, инструменты и срок токена ИИ-клиента */
+  async getMcpInfo(): Promise<McpInfo> {
+    return request<McpInfo>('api/v1/mcp/info', mutationOptions('GET'));
+  },
+
+  /** Токен ИИ-клиента: действует только на /mcp, права — пользователя */
+  async createMcpToken(): Promise<McpToken> {
+    return request<McpToken>('api/v1/mcp/token', mutationOptions('POST'));
   },
 
   /** Выход: сервер удаляет cookie доступа к GeoServer */

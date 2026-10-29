@@ -168,6 +168,11 @@
             >— {{ p.note }}</span>
           </div>
 
+          <McpClientPanel
+            v-if="authStore.isAuthenticated || authStore.authDisabled"
+            class="mt-3"
+          />
+
           <v-alert
             v-if="authStore.isMaster"
             type="info"
@@ -221,6 +226,7 @@ import { computed, ref, watch } from 'vue'
 import { useMobile } from '~/composables/useMobile'
 import { useAuthStore } from '~/stores/authStore'
 import UsersAdminPanel from '~/components/UsersAdminPanel.vue'
+import McpClientPanel from '~/components/McpClientPanel.vue'
 import { jwtExpiresAt } from '~/utils/jwt'
 import { ROLE_LABELS, type Role } from '~/utils/permissions'
 
