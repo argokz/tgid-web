@@ -335,6 +335,67 @@ export interface TopologyDiagnosticsResponse {
   faults: TopologyDiagnosticFault[];
 }
 
+/** Сценарий «что если»: копия фрагмента-основы (GET api/v1/scenarios) */
+export interface Scenario {
+  id: number;
+  name: string;
+  note: string | null;
+  base_fileid: number;
+  base_name: string | null;
+  fileid: number;
+  fragment_name: string | null;
+  created_by: string | null;
+  created_at: string;
+  status: 'active' | 'archived';
+  /** false — фрагмент-копию удалили (например, в десктопе) */
+  exists: boolean;
+}
+
+export interface ScenarioCreateResult {
+  scenario_id: number;
+  name: string;
+  base_fileid: number;
+  base_name: string | null;
+  fileid: number;
+  tables: Record<string, number>;
+  created_nodes: number;
+  created_lines: number;
+  unresolved_refs: Record<string, number>;
+  operation_id?: number | null;
+}
+
+export type ScenarioChangeKind =
+  | 'changed' | 'added' | 'removed' | 'conflict' | 'base_changed' | 'base_added' | 'base_removed';
+
+export interface ScenarioDiffItem {
+  table: string;
+  kind: ScenarioChangeKind;
+  base_id: number | null;
+  copy_id: number | null;
+  name: string | null;
+  /** {колонка: [в основе, в сценарии]} */
+  fields: Record<string, [unknown, unknown]> | null;
+  anchor_type: 'node' | 'line' | null;
+  anchor_id: number | null;
+  lat: number | null;
+  lng: number | null;
+}
+
+/** GET api/v1/scenarios/{id}/diff: summary — полные числа по таблицам, items — не больше limit */
+export interface ScenarioDiff {
+  scenario_id: number;
+  name: string;
+  base_fileid: number;
+  fileid: number;
+  summary: Record<string, Partial<Record<ScenarioChangeKind, number>>>;
+  by_kind: Partial<Record<ScenarioChangeKind, number>>;
+  total: number;
+  limit: number;
+  truncated: boolean;
+  kinds: Record<ScenarioChangeKind, string>;
+  items: ScenarioDiffItem[];
+}
+
 export type TopologyRuleSeverity = 'error' | 'warning';
 
 /** Замечание правил связности: error — sety не рассчитает, warning — подозрительно */

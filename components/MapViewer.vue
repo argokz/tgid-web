@@ -1622,6 +1622,7 @@ const toolDialogs: ToolDialogEntry[] = [
   { key: 'networkImport', component: lazyDialog(() => import('./NetworkImportDialog.vue')) },
   // экспорт / импорт / слияние фрагментов .tgid: после импорта и слияния — новый список фрагментов
   { key: 'fragmentTransfer', component: lazyDialog(() => import('./FragmentTransferDialog.vue')), on: { changed: () => fragmentStore.loadFragments() } },
+  { key: 'scenarios', component: lazyDialog(() => import('./ScenariosDialog.vue')), on: { locate: locate.fault } },
 ];
 
 /** Стабильная сигнатура каталога слоёв (порядок в ответе API не должен вызывать повторный init) */

@@ -1,6 +1,6 @@
 /** Фрагменты сети и данные карты. Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type { FeatureData, Fragment } from '~/types';
-import type { FragmentTransferReport } from './types';
+import type { FragmentTransferReport, Scenario, ScenarioCreateResult, ScenarioDiff } from './types';
 import { buildApiUrl, encodePath, fetchWithRetry, mutationOptions, request } from './http';
 
 export const fragmentsApi = {
@@ -53,5 +53,25 @@ export const fragmentsApi = {
     dry_run: boolean;
   }): Promise<FragmentTransferReport> {
     return request<FragmentTransferReport>('api/v1/fragments/merge', mutationOptions('POST', body));
+  },
+
+  /** Сценарии «что если»: копии фрагментов с соответствием объектов основе */
+  async getScenarios(includeArchived = false): Promise<Scenario[]> {
+    const res = await request<{ items: Scenario[] }>('api/v1/scenarios', { query: { include_archived: includeArchived } });
+    return res.items;
+  },
+
+  /** Новый сценарий — копия фрагмента-основы (крупный фрагмент копируется до минуты) */
+  async createScenario(body: { base_fileid: number; name: string; note?: string }): Promise<ScenarioCreateResult> {
+    return request<ScenarioCreateResult>('api/v1/scenarios', mutationOptions('POST', body));
+  },
+
+  /** Отличия сценария от основы: правки сценария, конфликты, правки основы после создания */
+  async getScenarioDiff(scenarioId: number, limit = 500): Promise<ScenarioDiff> {
+    return request<ScenarioDiff>(`api/v1/scenarios/${encodePath(scenarioId)}/diff`, { query: { limit } });
+  },
+
+  async setScenarioStatus(scenarioId: number, status: Scenario['status']): Promise<{ id: number; status: Scenario['status'] }> {
+    return request(`api/v1/scenarios/${encodePath(scenarioId)}/status`, mutationOptions('POST', { status }));
   },
 };

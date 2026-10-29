@@ -108,8 +108,8 @@ describe('каталог инструментов по ролям', () => {
   it('инструменты без requires видны всем, пустые группы скрываются', () => {
     const groups = filterByRole(TOOL_GROUPS, computePermissions(base))
     expect(groups.find((g) => g.title === 'Администрирование')).toBeUndefined()
-    // «Исходные данные»: импорт — по праву import, «Качество данных» (2cbe85c) открыто всем — группа остаётся с ним одним
-    expect(groups.find((g) => g.title === 'Исходные данные')?.items.map((i) => i.event)).toEqual(['open-data-quality'])
+    // «Исходные данные»: импорт — по праву import; «Сценарии» (просмотр и сравнение) и «Качество данных» (2cbe85c) открыты всем
+    expect(groups.find((g) => g.title === 'Исходные данные')?.items.map((i) => i.event)).toEqual(['open-scenarios', 'open-data-quality'])
     const open = TOOL_GROUPS.flatMap((g) => g.items).filter((i) => !i.requires && !i.requiresPerm)
     expect(groups.flatMap((g) => g.items).length).toBe(open.length)
   })

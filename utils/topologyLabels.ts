@@ -119,6 +119,7 @@ const OPERATION_LABELS: Record<string, string> = {
   CHANGE_LINE_TYPE: 'смена типа линии',
   DISSOLVE_NODE: 'соединение труб через узел',
   CARD_EDIT: 'свойства',
+  SCENARIO_CREATE: 'создание сценария',
 };
 
 /** Подпись кнопки «Отменить»: «разрезание участка 17» */
