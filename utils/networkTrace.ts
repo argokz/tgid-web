@@ -2,7 +2,7 @@
  * Трассировки сети (фаза 1 модернизации): подписи типов, цвета на карте, разбор списков id
  * и охват результата для fitBounds. Расчёт — в API (database/network_trace.py).
  */
-import type { NetworkFeedPoint, NetworkTraceType } from '~/services/api/types';
+import type { NetworkFeedPoint, NetworkStopKind, NetworkTraceType } from '~/services/api/types';
 
 export interface TraceTypeMeta {
   value: NetworkTraceType;
@@ -41,6 +41,21 @@ export const TRACE_TYPES: readonly TraceTypeMeta[] = [
 
 export const traceTypeMeta = (type: NetworkTraceType): TraceTypeMeta =>
   TRACE_TYPES.find((t) => t.value === type) ?? TRACE_TYPES[0];
+
+/** Барьеры по условию (API network_trace.STOP_KINDS): где останавливается обход */
+export const STOP_KINDS: readonly { value: NetworkStopKind; label: string }[] = [
+  { value: 'valves', label: 'Задвижки' },
+  { value: 'pumpstations', label: 'Насосные' },
+  { value: 'setpress', label: 'Узлы заданного напора' },
+  { value: 'sources', label: 'Источники' },
+];
+
+/** Барьеры по условию действуют у «связанных» и «зоны» (API STOP_TRACE_TYPES) */
+export const supportsStops = (type: NetworkTraceType): boolean => type === 'connected' || type === 'subnetwork';
+
+/** «Задвижки, насосные» — для подписи настройки и результата */
+export const stopKindsText = (kinds: readonly NetworkStopKind[] | undefined): string =>
+  STOP_KINDS.filter((k) => kinds?.includes(k.value)).map((k) => k.label.toLowerCase()).join(', ');
 
 export const FEED_POINT_LABELS: Record<NetworkFeedPoint['kind'], string> = {
   heat_source: 'Источник',

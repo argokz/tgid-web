@@ -5,13 +5,25 @@ import HintTip from '~/components/HintTip.vue';
 import { formatApiError } from '~/utils/apiError';
 import { useMobile } from '~/composables/useMobile';
 import { useDialogMapOverlay } from '~/composables/useDialogMapOverlay';
+import { confirmAction } from '~/composables/useConfirm';
+import { useJournalMapBridge } from '~/composables/useJournalMapBridge';
 import {
   fastApiService,
+  type NetworkStopKind,
   type NetworkTraceResponse,
   type NetworkTraceType,
   type NetworkZonesResponse,
+  type TraceConfig,
 } from '~/services/fastApiService';
-import { FEED_POINT_LABELS, TRACE_TYPES, parseIdList, traceTypeMeta } from '~/utils/networkTrace';
+import {
+  FEED_POINT_LABELS,
+  STOP_KINDS,
+  TRACE_TYPES,
+  parseIdList,
+  stopKindsText,
+  supportsStops,
+  traceTypeMeta,
+} from '~/utils/networkTrace';
 
 const props = defineProps<{
   initialLineId?: number | null;
@@ -55,8 +67,96 @@ const startLines = ref('');
 const startNodes = ref('');
 const barrierLines = ref('');
 const barrierNodes = ref('');
-const stopAtValves = ref(false);
+/** Барьеры по условию (задвижки, насосные…) — у «связанных» и «зоны» */
+const stopAt = ref<NetworkStopKind[]>([]);
 const showBarriers = ref(false);
+
+// --- именованные настройки трассировки (api/v1/trace-configs) ---
+const bridge = useJournalMapBridge();
+const configs = ref<TraceConfig[]>([]);
+const canShared = ref(false);
+const configId = ref<string | null>(null);
+const selectedConfig = computed(() => configs.value.find((c) => c.id === configId.value) ?? null);
+const configItems = computed(() => configs.value.map((c) => ({
+  value: c.id,
+  title: c.name,
+  subtitle: c.builtin ? 'встроенная' : c.shared ? `общая · ${c.author ?? ''}` : 'моя',
+})));
+const saveOpen = ref(false);
+const saveName = ref('');
+const saveShared = ref(false);
+const saving = ref(false);
+
+const loadConfigs = async () => {
+  try {
+    const res = await fastApiService.getTraceConfigs();
+    configs.value = res.configs;
+    canShared.value = res.can_shared;
+  } catch (err: unknown) {
+    errorMessage.value = formatApiError(err, 'Не удалось загрузить настройки трассировки');
+  }
+};
+
+/** Настройка задаёт тип и барьеры по условию; правка руками — уже «своя» (выбор снимается) */
+const applyConfig = (id: string | null) => {
+  configId.value = id;
+  const config = configs.value.find((c) => c.id === id);
+  if (!config) return;
+  traceType.value = config.params.trace_type;
+  stopAt.value = [...config.params.stop_at];
+};
+
+watch([traceType, stopAt], () => {
+  const config = selectedConfig.value;
+  if (!config) return;
+  const same = config.params.trace_type === traceType.value
+    && [...config.params.stop_at].sort().join() === [...stopAt.value].sort().join();
+  if (!same) configId.value = null;
+}, { deep: true });
+
+const currentParams = () => ({
+  trace_type: traceType.value,
+  stop_at: supportsStops(traceType.value) ? [...stopAt.value] : [],
+});
+
+const openSave = () => {
+  saveName.value = '';
+  saveShared.value = false;
+  saveOpen.value = true;
+};
+
+const saveConfig = async () => {
+  const name = saveName.value.trim();
+  if (!name) return;
+  saving.value = true;
+  try {
+    const created = await fastApiService.createTraceConfig({ name, params: currentParams(), shared: saveShared.value });
+    configs.value = [...configs.value, created];
+    configId.value = created.id;
+    saveOpen.value = false;
+  } catch (err: unknown) {
+    errorMessage.value = formatApiError(err, 'Не удалось сохранить настройку');
+  } finally {
+    saving.value = false;
+  }
+};
+
+const deleteConfig = async () => {
+  const config = selectedConfig.value;
+  if (!config || config.builtin) return;
+  if (!(await confirmAction({ text: `Удалить настройку «${config.name}»?`, action: 'Удалить' }))) return;
+  try {
+    await fastApiService.deleteTraceConfig(config.id);
+    configs.value = configs.value.filter((c) => c.id !== config.id);
+    configId.value = null;
+  } catch (err: unknown) {
+    errorMessage.value = formatApiError(err, 'Не удалось удалить настройку');
+  }
+};
+
+watch(visible, (open) => {
+  if (open && !configs.value.length) loadConfigs();
+}, { immediate: true });
 
 const loading = ref(false);
 const errorMessage = ref('');
@@ -98,14 +198,21 @@ const runTrace = async () => {
   errorMessage.value = '';
   try {
     const res = await fastApiService.traceNetwork({
-      trace_type: traceType.value,
+      ...currentParams(),
+      ...(configId.value ? { config_id: configId.value } : {}),
       start_line_ids: lines.ids,
       start_node_ids: nodes.ids,
       barrier_line_ids: bLines.ids,
       barrier_node_ids: bNodes.ids,
-      stop_at_valves: traceType.value === 'connected' && stopAtValves.value,
     });
     result.value = res;
+    // результат — готовая выборка для режима выбора на карте (групповая правка, контур журнала)
+    bridge.offerSelection({
+      label: res.config?.name ?? traceTypeMeta(res.trace_type).label,
+      lineIds: res.line_ids,
+      nodeIds: res.node_ids,
+      lineFeatures: res.geojson?.lines?.features ?? [],
+    });
     resultTab.value = res.trace_type === 'upstream' ? 'sources' : 'consumers';
     emit('show-on-map', res);
     overlay.markShown();
@@ -137,6 +244,7 @@ watch(mode, (m) => {
 const traceZone = (nodeId: number) => {
   mode.value = 'trace';
   traceType.value = 'subnetwork';
+  stopAt.value = [];
   startNodes.value = String(nodeId);
   startLines.value = '';
   runTrace();
@@ -240,6 +348,96 @@ defineExpose({ openDialog });
             variant="outlined"
             class="mb-3 pa-3 rounded-lg"
           >
+            <div class="d-flex flex-wrap align-center ga-2 mb-3">
+              <v-select
+                :model-value="configId"
+                :items="configItems"
+                label="Настройка трассировки"
+                placeholder="Своя"
+                persistent-placeholder
+                density="compact"
+                variant="outlined"
+                hide-details
+                clearable
+                class="trace-config"
+                @update:model-value="applyConfig"
+              >
+                <template #item="{ props: itemProps, item }">
+                  <v-list-item
+                    v-bind="itemProps"
+                    :subtitle="item.raw.subtitle"
+                  />
+                </template>
+              </v-select>
+              <HintTip text="Сохранить тип и барьеры как настройку">
+                <template #default="{ props: tip }">
+                  <v-btn
+                    v-bind="tip"
+                    icon="mdi-content-save-outline"
+                    variant="text"
+                    size="small"
+                    aria-label="Сохранить настройку"
+                    @click="openSave"
+                  />
+                </template>
+              </HintTip>
+              <HintTip
+                v-if="selectedConfig && !selectedConfig.builtin"
+                text="Удалить настройку"
+              >
+                <template #default="{ props: tip }">
+                  <v-btn
+                    v-bind="tip"
+                    icon="mdi-delete-outline"
+                    variant="text"
+                    size="small"
+                    aria-label="Удалить настройку"
+                    @click="deleteConfig"
+                  />
+                </template>
+              </HintTip>
+            </div>
+            <div
+              v-if="saveOpen"
+              class="d-flex flex-wrap align-center ga-2 mb-3"
+            >
+              <v-text-field
+                v-model="saveName"
+                label="Название настройки"
+                density="compact"
+                variant="outlined"
+                hide-details
+                autofocus
+                maxlength="200"
+                class="trace-config"
+                @keyup.enter="saveConfig"
+              />
+              <v-checkbox
+                v-if="canShared"
+                v-model="saveShared"
+                label="Общая"
+                density="compact"
+                hide-details
+              />
+              <v-btn
+                color="primary"
+                variant="tonal"
+                size="small"
+                :loading="saving"
+                :disabled="!saveName.trim()"
+                @click="saveConfig"
+              >
+                Сохранить
+              </v-btn>
+              <v-btn
+                variant="text"
+                size="small"
+                @click="saveOpen = false"
+              >
+                Отмена
+              </v-btn>
+            </div>
+
             <SegmentedToggle
               v-model="traceType"
               :items="traceTypeItems"
@@ -277,13 +475,6 @@ defineExpose({ openDialog });
               >
                 Барьеры
               </v-btn>
-              <v-checkbox
-                v-if="traceType === 'connected'"
-                v-model="stopAtValves"
-                label="Остановить на задвижках"
-                density="compact"
-                hide-details
-              />
               <v-spacer />
               <v-btn
                 color="primary"
@@ -294,6 +485,24 @@ defineExpose({ openDialog });
               >
                 Трассировать
               </v-btn>
+            </div>
+
+            <div
+              v-if="supportsStops(traceType)"
+              class="d-flex flex-wrap align-center ga-2 mt-2"
+            >
+              <span class="text-caption text-medium-emphasis">Остановить на:</span>
+              <v-chip
+                v-for="kind in STOP_KINDS"
+                :key="kind.value"
+                size="small"
+                filter
+                :variant="stopAt.includes(kind.value) ? 'flat' : 'outlined'"
+                :color="stopAt.includes(kind.value) ? 'primary' : undefined"
+                @click="stopAt = stopAt.includes(kind.value) ? stopAt.filter((k) => k !== kind.value) : [...stopAt, kind.value]"
+              >
+                {{ kind.label }}
+              </v-chip>
             </div>
 
             <div
@@ -331,7 +540,13 @@ defineExpose({ openDialog });
                 variant="flat"
                 size="small"
               >
-                {{ traceTypeMeta(result.trace_type).label }}
+                {{ result.config?.name ?? traceTypeMeta(result.trace_type).label }}
+              </v-chip>
+              <v-chip
+                v-if="result.stop_at?.length"
+                size="small"
+              >
+                Остановка: {{ stopKindsText(result.stop_at) }} ({{ result.summary.stopped_at_count }})
               </v-chip>
               <v-chip size="small">Участков: {{ result.summary.lines_count }}</v-chip>
               <v-chip size="small">Узлов: {{ result.summary.nodes_count }}</v-chip>
@@ -358,6 +573,8 @@ defineExpose({ openDialog });
               <template v-if="result.geometry_truncated">
                 Участков слишком много для показа на карте — доступны списком и в CSV.
               </template>
+              Результат можно добавить в выбор на карте (правка нескольких объектов, контур журнала) —
+              кнопка «Трассировка» в панели выбора.
             </v-alert>
 
             <div class="d-flex flex-wrap ga-2 mb-3">
@@ -683,5 +900,9 @@ defineExpose({ openDialog });
 .trace-field {
   min-width: 220px;
   flex: 1 1 220px;
+}
+.trace-config {
+  min-width: 240px;
+  flex: 1 1 320px;
 }
 </style>

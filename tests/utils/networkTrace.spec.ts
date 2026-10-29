@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_TRACE_IDS, TRACE_TYPES, featureBounds, parseIdList, traceTypeMeta } from '~/utils/networkTrace';
+import { useJournalMapBridge } from '~/composables/useJournalMapBridge';
+import {
+  MAX_TRACE_IDS,
+  STOP_KINDS,
+  TRACE_TYPES,
+  featureBounds,
+  parseIdList,
+  stopKindsText,
+  supportsStops,
+  traceTypeMeta,
+} from '~/utils/networkTrace';
 
 describe('parseIdList', () => {
   it('принимает запятые, пробелы и точки с запятой, убирает повторы', () => {
@@ -52,5 +62,47 @@ describe('traceTypeMeta', () => {
       expect(meta.color).toMatch(/^#[0-9a-f]{6}$/);
     }
     expect(TRACE_TYPES).toHaveLength(4);
+  });
+});
+
+describe('барьеры по условию', () => {
+  it('действуют у «связанных» и «зоны»', () => {
+    expect(supportsStops('connected')).toBe(true);
+    expect(supportsStops('subnetwork')).toBe(true);
+    expect(supportsStops('upstream')).toBe(false);
+    expect(supportsStops('downstream')).toBe(false);
+  });
+
+  it('подпись в порядке справочника, без неизвестных', () => {
+    expect(stopKindsText(['setpress', 'valves'])).toBe('задвижки, узлы заданного напора');
+    expect(stopKindsText([])).toBe('');
+    expect(stopKindsText(undefined)).toBe('');
+    expect(STOP_KINDS.map((k) => k.value)).toEqual(['valves', 'pumpstations', 'setpress', 'sources']);
+  });
+});
+
+describe('результат трассировки как выборка', () => {
+  it('добавляется в выбор участков с геометрией и в выбор узлов', async () => {
+    const bridge = useJournalMapBridge();
+    bridge.offerSelection({
+      label: 'Квартал',
+      lineIds: [10, 20],
+      nodeIds: [1, 2, 3],
+      lineFeatures: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1]] }, properties: { id: 10 } }],
+    });
+    const lines = bridge.startPick([20, 30], 'свойства участков', 'line');
+    expect(bridge.addOffered()).toBe(1);
+    expect(bridge.state.pick.lineIds).toEqual([20, 30, 10]);
+    expect(bridge.state.pick.features[10]).toBeTruthy();
+    bridge.finishPick(true);
+    await expect(lines).resolves.toEqual([20, 30, 10]);
+
+    const nodes = bridge.startPick([], 'узлы', 'node');
+    expect(bridge.addOffered()).toBe(3);
+    bridge.finishPick(false);
+    await expect(nodes).resolves.toBeNull();
+    // вне режима выбора ничего не добавляется
+    expect(bridge.addOffered()).toBe(0);
+    bridge.offerSelection(null);
   });
 });

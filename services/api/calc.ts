@@ -1,6 +1,6 @@
 /** Расчёты, протоколы, анализ и калькуляторы. Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
-import type { CalculationDeleteResponse, CalculationGeoJsonResponse, CalculationListFilter, CalculationListResponse, CalculationSummaryItem, CalculationTemperatureRange, ElevatorEngineParams, ElevatorEngineResult, ElevatorNozzleParams, ElevatorNozzleResult, GvsCirculationParams, NetworkTraceRequest, NetworkTraceResponse, NetworkZonesResponse, GvsCirculationResult, OrificePlateParams, OrificePlateResult, OutageSimulationResponse, RegimeAnalysisKind, RegimeAnalysisResult, SetyRunRequest, SetyRunResponse, ThrottlingSheetParams } from './types';
+import type { CalculationDeleteResponse, CalculationGeoJsonResponse, CalculationListFilter, CalculationListResponse, CalculationSummaryItem, CalculationTemperatureRange, ElevatorEngineParams, ElevatorEngineResult, ElevatorNozzleParams, ElevatorNozzleResult, GvsCirculationParams, NetworkTraceRequest, NetworkTraceResponse, NetworkZonesResponse, TraceConfig, TraceConfigList, GvsCirculationResult, OrificePlateParams, OrificePlateResult, OutageSimulationResponse, RegimeAnalysisKind, RegimeAnalysisResult, SetyRunRequest, SetyRunResponse, ThrottlingSheetParams } from './types';
 import { encodePath, mutationOptions, request } from './http';
 
 export const calcApi = {
@@ -102,6 +102,19 @@ export const calcApi = {
   /** Трассировка сети: связность, путь к источникам, ниже по потоку, зона */
   async traceNetwork(body: NetworkTraceRequest): Promise<NetworkTraceResponse> {
     return request<NetworkTraceResponse>('api/analysis/trace', { method: 'POST', body });
+  },
+
+  /** Именованные настройки трассировки: встроенные, общие и свои */
+  async getTraceConfigs(): Promise<TraceConfigList> {
+    return request<TraceConfigList>('api/v1/trace-configs', mutationOptions('GET'));
+  },
+
+  async createTraceConfig(body: { name: string; params: TraceConfig['params']; shared: boolean }): Promise<TraceConfig> {
+    return request<TraceConfig>('api/v1/trace-configs', mutationOptions('POST', body));
+  },
+
+  async deleteTraceConfig(id: string): Promise<void> {
+    await request(`api/v1/trace-configs/${encodePath(id)}`, mutationOptions('DELETE'));
   },
 
   /** Зоны сети (компоненты связности) и «острова» без питания */

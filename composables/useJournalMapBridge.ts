@@ -25,10 +25,20 @@ interface PickState {
   features: Record<number, any>;
 }
 
+/** Готовая выборка (результат трассировки): в режиме выбора её можно добавить одной кнопкой */
+export interface OfferedSelection {
+  label: string;
+  lineIds: number[];
+  nodeIds: number[];
+  /** Геометрия участков (GeoJSON Feature с properties.id) — подсветить выбранное до сохранения */
+  lineFeatures: any[];
+}
+
 const state = reactive({
   overlay: null as ContourOverlay | null,
   overlayVersion: 0,
   pick: { active: false, label: '', kind: 'line', title: '', lineIds: [], features: {} } as PickState,
+  offered: null as OfferedSelection | null,
 });
 
 let resolvePick: ((ids: number[] | null) => void) | null = null;
@@ -84,6 +94,25 @@ export function useJournalMapBridge() {
     }
   };
 
+  /** Предложить выборку режиму выбора (последний результат трассировки); null — убрать */
+  const offerSelection = (selection: OfferedSelection | null) => {
+    state.offered = selection;
+  };
+
+  /** Добавить предложенную выборку в текущий выбор: участки или узлы — по виду выбора */
+  const addOffered = (): number => {
+    const offered = state.offered;
+    if (!state.pick.active || !offered) return 0;
+    const before = state.pick.lineIds.length;
+    if (state.pick.kind === 'line') {
+      const byId = new Map(offered.lineFeatures.map((f) => [Number(f?.properties?.id), f]));
+      addPicked(offered.lineIds.map((id) => ({ id, feature: byId.get(id) })));
+    } else {
+      addPicked(offered.nodeIds.map((id) => ({ id })));
+    }
+    return state.pick.lineIds.length - before;
+  };
+
   const finishPick = (commit: boolean) => {
     const ids = commit ? [...state.pick.lineIds] : null;
     state.pick.active = false;
@@ -93,7 +122,7 @@ export function useJournalMapBridge() {
     resolve?.(ids);
   };
 
-  return { state, showContour, clearContour, startPick, togglePicked, addPicked, finishPick };
+  return { state, showContour, clearContour, startPick, togglePicked, addPicked, offerSelection, addOffered, finishPick };
 }
 
 /**

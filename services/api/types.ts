@@ -900,8 +900,14 @@ export interface OutageSimulationResponse {
 /** Трассировка сети по топологии (POST api/analysis/trace) — фаза 1 модернизации */
 export type NetworkTraceType = 'connected' | 'upstream' | 'downstream' | 'subnetwork';
 
+/** Барьеры по условию: обход останавливается на объектах этого вида (у «связанных» и «зоны») */
+export type NetworkStopKind = 'valves' | 'pumpstations' | 'setpress' | 'sources';
+
 export interface NetworkTraceRequest {
-  trace_type: NetworkTraceType;
+  /** Тип — явно или из именованной настройки config_id */
+  trace_type?: NetworkTraceType;
+  config_id?: string;
+  stop_at?: NetworkStopKind[];
   start_line_ids?: number[];
   start_node_ids?: number[];
   barrier_line_ids?: number[];
@@ -954,6 +960,26 @@ export interface NetworkTraceResponse {
   /** Участков больше предела — геометрия не отдана, только id */
   geometry_truncated: boolean;
   geojson: { lines: GeoJSON.FeatureCollection; consumers: GeoJSON.FeatureCollection };
+  /** Барьеры по условию, с которыми выполнена трассировка */
+  stop_at?: NetworkStopKind[];
+  /** Именованная настройка, если трассировка запущена по ней */
+  config?: { id: string; name: string };
+}
+
+/** Именованная настройка трассировки (api/v1/trace-configs): тип и барьеры по условию */
+export interface TraceConfig {
+  id: string;
+  name: string;
+  params: { trace_type: NetworkTraceType; stop_at: NetworkStopKind[] };
+  author: string | null;
+  shared: boolean;
+  builtin: boolean;
+}
+
+export interface TraceConfigList {
+  configs: TraceConfig[];
+  /** Может ли пользователь сохранять общие настройки (право «Справочники и шаблоны») */
+  can_shared: boolean;
 }
 
 export interface NetworkZone {

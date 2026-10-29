@@ -20,6 +20,14 @@
           </div>
         </div>
         <v-btn
+          v-if="offeredCount"
+          size="small"
+          variant="tonal"
+          prepend-icon="mdi-transit-connection-variant"
+          :title="`Добавить в выбор результат трассировки: ${bridge.state.offered?.label}`"
+          @click="bridge.addOffered()"
+        >Трассировка ({{ offeredCount }})</v-btn>
+        <v-btn
           size="small"
           variant="text"
           :disabled="!bridge.state.pick.lineIds.length"
@@ -55,9 +63,17 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useJournalMapBridge } from '~/composables/useJournalMapBridge';
 
 const bridge = useJournalMapBridge();
+
+/** Сколько объектов вида выбора (участки или узлы) в последнем результате трассировки */
+const offeredCount = computed(() => {
+  const offered = bridge.state.offered;
+  if (!offered) return 0;
+  return bridge.state.pick.kind === 'line' ? offered.lineIds.length : offered.nodeIds.length;
+});
 
 
 const clearAll = () => {
