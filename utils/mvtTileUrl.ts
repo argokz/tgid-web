@@ -121,3 +121,39 @@ export function tileUrlWithViewparams(baseUrl: string, viewparams: string): stri
   const separator = baseUrl.includes('?') ? '&' : '?'
   return `${baseUrl}${separator}viewparams=${viewparams}`
 }
+
+/**
+ * martin (векторные тайлы прямо из PostGIS) вместо GeoServer для слоёв сети. Функция слоя
+ * tgid_mvt_<слой> в базе города (itwin-api scripts/martin) опубликована в martin под именем
+ * <префикс города><слой>; параметры SQL-представления — та же строка viewparams, что у GeoServer.
+ */
+export interface MartinConfig {
+  url: string
+  prefix: string
+  layers: Set<string>
+  /** Рабочая область GeoServer, слои которой отдаёт martin; пусто — любая */
+  workspace: string
+}
+
+export const MARTIN_DEFAULT_LAYERS = 'heatpipesections,uzel,zdaniya_2,zdaniya_tu'
+
+/** Настройка martin из окружения; пустой адрес — martin не используется (тайлы из GeoServer) */
+export function parseMartinConfig(
+  url?: string | null, prefix?: string | null, layers?: string | null, workspace?: string | null,
+): MartinConfig | null {
+  const base = String(url ?? '').trim().replace(/\/$/, '')
+  if (!base) return null
+  const names = String(layers || MARTIN_DEFAULT_LAYERS).split(',').map((s) => s.trim()).filter(Boolean)
+  return { url: base, prefix: String(prefix ?? '').trim(), layers: new Set(names), workspace: String(workspace ?? '').trim() }
+}
+
+/** Слой layerName рабочей области workspace берётся из martin */
+export function servedByMartin(config: MartinConfig | null, workspace: string, layerName: string): boolean {
+  if (!config || !config.layers.has(layerName)) return false
+  return !config.workspace || config.workspace.toLowerCase() === workspace.toLowerCase()
+}
+
+/** Шаблон XYZ-тайла martin для слоя GeoServer layerName */
+export function martinTileUrl(config: MartinConfig, layerName: string): string {
+  return `${config.url}/${encodeURIComponent(config.prefix + layerName)}/{z}/{x}/{y}`
+}

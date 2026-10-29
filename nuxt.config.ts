@@ -54,6 +54,17 @@ export default defineNuxtConfig({
     /** Автообнаружение слоёв: workspace через запятую или '*' (все опубликованные) */
     geoserverDiscoverWorkspaces:
       process.env.GEOSERVER_DISCOVER_WORKSPACES || env.GEOSERVER_DISCOVER_WORKSPACES || '',
+    /**
+     * martin — векторные тайлы слоёв сети прямо из PostGIS вместо GeoServer (itwin-api scripts/martin).
+     * MARTIN_TILES_URL — публичный адрес (https://<сайт>/tiles); пусто — тайлы из GeoServer, как раньше.
+     * MARTIN_SOURCE_PREFIX — префикс источников города в martin (almaty_); MARTIN_LAYERS — слои GeoServer,
+     * которые отдаёт martin (по умолчанию heatpipesections,uzel,zdaniya_2,zdaniya_tu); MARTIN_WORKSPACE —
+     * рабочая область этих слоёв (AlmatyGIS): одноимённые слои других рабочих областей остаются на GeoServer.
+     */
+    martinTilesUrl: process.env.MARTIN_TILES_URL || env.MARTIN_TILES_URL || '',
+    martinSourcePrefix: process.env.MARTIN_SOURCE_PREFIX || env.MARTIN_SOURCE_PREFIX || '',
+    martinLayers: process.env.MARTIN_LAYERS || env.MARTIN_LAYERS || '',
+    martinWorkspace: process.env.MARTIN_WORKSPACE || env.MARTIN_WORKSPACE || '',
     /** Вспомогательные слои (отдельная группа, скрыты по умолчанию) */
     geoserverServiceLayers:
       process.env.GEOSERVER_SERVICE_LAYERS || env.GEOSERVER_SERVICE_LAYERS || '',

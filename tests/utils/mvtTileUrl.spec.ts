@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   dataVersionRevision,
   gwcMvtTileUrl,
+  martinTileUrl,
   mergeViewparamFields,
+  parseMartinConfig,
+  servedByMartin,
   tileUrlWithViewparams,
   withTileRevision,
   wmtsLayerBounds,
@@ -92,5 +95,32 @@ describe('dataVersionRevision', () => {
     expect(a).toBeGreaterThan(0)
     expect(dataVersionRevision('99999999999999999999')).toBe(a)
     expect(dataVersionRevision('0')).toBeGreaterThan(0)
+  })
+})
+
+describe('martin', () => {
+  it('настройка: пустой адрес — без martin, список слоёв по умолчанию', () => {
+    expect(parseMartinConfig('', 'almaty_')).toBeNull()
+    const cfg = parseMartinConfig('https://itwin.kz/tiles/', 'almaty_', '')!
+    expect(cfg.url).toBe('https://itwin.kz/tiles')
+    expect([...cfg.layers]).toEqual(['heatpipesections', 'uzel', 'zdaniya_2', 'zdaniya_tu'])
+    expect([...parseMartinConfig('http://x', '', ' uzel , heatpipesections ')!.layers]).toEqual(['uzel', 'heatpipesections'])
+  })
+
+  it('слой другой рабочей области с тем же именем остаётся на GeoServer', () => {
+    const cfg = parseMartinConfig('http://x', 'almaty_', '', 'AlmatyGIS')
+    expect(servedByMartin(cfg, 'AlmatyGIS', 'uzel')).toBe(true)
+    expect(servedByMartin(cfg, 'Almaty2', 'uzel')).toBe(false)
+    expect(servedByMartin(cfg, 'AlmatyGIS', 'vr_tep')).toBe(false)
+    expect(servedByMartin(parseMartinConfig('http://x', 'almaty_'), 'Almaty2', 'uzel')).toBe(true)
+    expect(servedByMartin(null, 'AlmatyGIS', 'uzel')).toBe(false)
+  })
+
+  it('адрес тайла: префикс города + слой, шаблон {z}/{x}/{y} не кодируется', () => {
+    const cfg = parseMartinConfig('https://itwin.kz/tiles', 'almaty_')!
+    expect(martinTileUrl(cfg, 'uzel')).toBe('https://itwin.kz/tiles/almaty_uzel/{z}/{x}/{y}')
+    // параметры SQL-представления — как у GeoServer
+    expect(tileUrlWithViewparams(martinTileUrl(cfg, 'uzel'), 'fragments:74;'))
+      .toBe('https://itwin.kz/tiles/almaty_uzel/{z}/{x}/{y}?viewparams=fragments:74;')
   })
 })

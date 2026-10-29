@@ -18,7 +18,7 @@ import {
   nodeKindCodes,
   withCqlParam
 } from '~/utils/nodeKindLayers';
-import { gwcMvtTileUrl, wmtsLayerGridBounds, wmtsLayerHasGwcMvt } from '~/utils/mvtTileUrl';
+import { gwcMvtTileUrl, martinTileUrl, parseMartinConfig, servedByMartin, wmtsLayerGridBounds, wmtsLayerHasGwcMvt } from '~/utils/mvtTileUrl';
 import { readCityConfig } from '~/utils/cityConfig';
 
 /** Тестовый BBOX Web Mercator (±40 км от центра города), чтобы подставить вместо {bbox-epsg-3857}. */
@@ -195,6 +195,10 @@ export default defineEventHandler(async (event) => {
       `${defaultPublicUrl}/gwc/service/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER={layerName}&STYLE=&TILEMATRIXSET=EPSG:900913&TILEMATRIX=EPSG:900913:{z}&TILEROW={y}&TILECOL={x}&FORMAT=application/vnd.mapbox-vector-tile`;
     // GEOSERVER_MVT_GWC=false — всегда шаблон выше, даже если у слоя настроен кеш GWC
     const gwcMvtEnabled = String(process.env.GEOSERVER_MVT_GWC ?? '').trim().toLowerCase() !== 'false';
+    // martin: тайлы слоёв сети из PostGIS (стиль и атрибуты — по-прежнему из GeoServer)
+    const martin = parseMartinConfig(
+      (runtimeConfig as any).martinTilesUrl, (runtimeConfig as any).martinSourcePrefix, (runtimeConfig as any).martinLayers,
+      (runtimeConfig as any).martinWorkspace);
 
     // Явная сигнатура вместо типизированного $fetch: динамический URL заставляет TS
     // перебирать все nitro-маршруты и падать с "Excessive stack depth".
@@ -489,11 +493,14 @@ export default defineEventHandler(async (event) => {
       if (le.mvt && wmtsXml) {
         // Кеш GWC, если у слоя на GeoServer настроены сетка и MVT (scripts/geoserver/gwc_mvt_cache.py),
         // иначе WMS GetMap — тайл строится заново на каждый запрос
-        const useGwc = gwcMvtEnabled && wmtsLayerHasGwcMvt(wmtsXml);
+        const viaMartin = servedByMartin(martin, le.workspace, tileSource);
+        const useGwc = !viaMartin && gwcMvtEnabled && wmtsLayerHasGwcMvt(wmtsXml);
         if (useGwc) tileBounds = wmtsLayerGridBounds(wmtsXml) ?? undefined;
-        const baseMvtUrl = useGwc
-          ? gwcMvtTileUrl(le.workspaceBaseUrl || defaultPublicUrl, le.workspace, tileSource)
-          : mvtTemplateUrl.replace('{layerName}', qualified);
+        const baseMvtUrl = viaMartin
+          ? martinTileUrl(martin!, tileSource)
+          : useGwc
+            ? gwcMvtTileUrl(le.workspaceBaseUrl || defaultPublicUrl, le.workspace, tileSource)
+            : mvtTemplateUrl.replace('{layerName}', qualified);
         // Все слои узлов (uzel и выборки по типу) берут одни и те же тайлы uzel — один источник
         // на карте и один поток запросов; тип узла отделяет фильтр MapLibre ниже (CQL_FILTER не нужен)
         mvtUrl = nodeCodes ? baseMvtUrl : (withCqlParam(baseMvtUrl, cqlFilter) ?? baseMvtUrl);
