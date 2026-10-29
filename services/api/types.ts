@@ -335,6 +335,26 @@ export interface TopologyDiagnosticsResponse {
   faults: TopologyDiagnosticFault[];
 }
 
+export type TopologyRuleSeverity = 'error' | 'warning';
+
+/** Замечание правил связности: error — sety не рассчитает, warning — подозрительно */
+export interface TopologyAreaIssue extends TopologyDiagnosticFault {
+  severity: TopologyRuleSeverity;
+  component_size?: number;
+}
+
+/** Проверка области правки: GET api/v1/topology/operations/{id}/check, POST …/check-area */
+export interface TopologyAreaCheck {
+  operation_id?: number;
+  area: { nodes: number; lines: number };
+  truncated: boolean;
+  counts: Record<string, number>;
+  total: number;
+  errors: number;
+  rules: Record<string, { title: string; severity: TopologyRuleSeverity }>;
+  issues: TopologyAreaIssue[];
+}
+
 export interface PiezometerPathNode {
   node_id: number;
   distance: number;

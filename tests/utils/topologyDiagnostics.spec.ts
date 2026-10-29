@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { resolveMdiSvgPath } from '~/utils/mdiSvgPaths'
 import {
   TOPOLOGY_FAULT_META,
+  topologyCheckSummary,
   topologyFaultCounts,
   topologyFaultMeta,
   topologyFaultTitle,
@@ -26,5 +27,13 @@ describe('topologyDiagnostics (QA F35)', () => {
     for (const meta of [...Object.values(TOPOLOGY_FAULT_META), topologyFaultMeta('x')]) {
       expect(resolveMdiSvgPath(meta.icon), meta.icon).toBeTruthy()
     }
+  })
+
+  it('итог проверки правки: ошибки и предупреждения со склонением', () => {
+    expect(topologyCheckSummary({ total: 3, errors: 1 })).toBe('1 ошибка, 2 предупреждения')
+    expect(topologyCheckSummary({ total: 5, errors: 5 })).toBe('5 ошибок')
+    expect(topologyCheckSummary({ total: 1, errors: 0 })).toBe('1 предупреждение')
+    expect(topologyCheckSummary({ total: 0, errors: 0 })).toBe('')
+    expect(topologyCheckSummary(null)).toBe('')
   })
 })

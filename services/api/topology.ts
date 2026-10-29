@@ -4,7 +4,7 @@ import type { NodeFlag, NodeFlagResult, NodeType, NodeTypeChangeResult, NodeType
 import type { LineType, LineTypeChangeResult, LineTypeInfo } from '~/utils/lineTypes';
 import type { LineBendsData } from '~/utils/bends';
 import type { ConvertedPoint, PointCrs } from '~/utils/pointCrs';
-import type { ChainRequest, ChainResult, DissolveResult, LineDeletePreview, LineGeometryResponse, LineRef, MergeNodesReport, NodeDeletePreview, ReverseLineReport, SplitPreview, SplitReviewDecision, TopologyDiagnosticsResponse, TopologyHistoryItem, TopologyUndoEntry, TopologyUndoResult, TopologyVersionMap, TopologyVersionsResponse } from './types';
+import type { ChainRequest, ChainResult, DissolveResult, LineDeletePreview, LineGeometryResponse, LineRef, MergeNodesReport, NodeDeletePreview, ReverseLineReport, SplitPreview, SplitReviewDecision, TopologyAreaCheck, TopologyDiagnosticsResponse, TopologyHistoryItem, TopologyUndoEntry, TopologyUndoResult, TopologyVersionMap, TopologyVersionsResponse } from './types';
 import { compact, encodePath, mutationOptions, request } from './http';
 
 export const topologyApi = {
@@ -240,6 +240,19 @@ export const topologyApi = {
 
   async getTopologyDiagnostics(fragmentId: number, limit = 200): Promise<TopologyDiagnosticsResponse> {
     return request('api/v1/topology/diagnostics', { query: { fragment_id: fragmentId, limit } });
+  },
+
+  /** Проверка после правки: правила связности для области операции журнала (узлы, участки и соседи) */
+  async checkTopologyOperation(operationId: number): Promise<TopologyAreaCheck> {
+    return request<TopologyAreaCheck>(`api/v1/topology/operations/${encodePath(operationId)}/check`);
+  },
+
+  /** Правила связности для произвольных узлов и участков (не больше 500 каждого) */
+  async checkTopologyArea(ids: { nodes?: number[]; lines?: number[] }): Promise<TopologyAreaCheck> {
+    return request<TopologyAreaCheck>('api/v1/topology/check-area', {
+      method: 'POST',
+      body: { node_ids: ids.nodes ?? [], line_ids: ids.lines ?? [] },
+    });
   },
 
   /** Превью разворота участка: узлы, геометрия, оборудование по классам, версия участка */

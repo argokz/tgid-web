@@ -11,6 +11,7 @@ import type {
   MergeNodesReport,
   SplitReviewDecision,
   SplitTransferReport,
+  TopologyAreaCheck,
   TopologyUndoEntry,
 } from '~/services/fastApiService';
 import { useNotificationStore } from '~/stores/notificationStore';
@@ -300,10 +301,48 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
   const undoBusy = ref(false);
   const redoBusy = ref(false);
 
+  // === Проверка после правки: правила связности для области новой операции журнала ===
+  const areaCheck = ref<TopologyAreaCheck | null>(null);
+  // последняя проверенная операция; null — журнал ещё не читали (старые операции не проверяем)
+  let checkedOperationId: number | null = null;
+
+  const checkNewOperation = async (entry: TopologyUndoEntry | null) => {
+    const id = entry?.operation_id ?? null;
+    if (checkedOperationId === null) {
+      checkedOperationId = id ?? 0;
+      return;
+    }
+    // отмена открывает старую операцию, повтор — уже проверенную: новой правки нет
+    if (id === null || id <= checkedOperationId) return;
+    checkedOperationId = id;
+    try {
+      const res = await fastApiService.checkTopologyOperation(id);
+      if (checkedOperationId !== id) return; // пока проверяли, успела следующая правка
+      areaCheck.value = res.total > 0 ? res : null;
+    } catch (err) {
+      // проверка — подсказка, правка уже сохранена: сбой проверки не показываем уведомлением
+      console.warn('Проверка правки не выполнена', id, err);
+    }
+  };
+
+  const dismissAreaCheck = () => {
+    areaCheck.value = null;
+  };
+
+  /** «Отменить правку» из панели проверки — отмена именно проверенной операции */
+  const undoCheckedOperation = async () => {
+    const id = areaCheck.value?.operation_id;
+    if (!id) return;
+    areaCheck.value = null;
+    await undoOperation(id);
+  };
+
   const refreshUndoState = async () => {
     if (!enabled.value) {
       lastTopologyOperation.value = null;
       lastRedoOperation.value = null;
+      areaCheck.value = null;
+      checkedOperationId = null;
       return;
     }
     const safe = async (load: () => Promise<TopologyUndoEntry | null>) => {
@@ -320,6 +359,7 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     ]);
     lastTopologyOperation.value = undo;
     lastRedoOperation.value = redo;
+    void checkNewOperation(undo);
   };
 
   // === Трасса участков (CAD): полилиния с привязкой, врезкой и режимом трубы ===
@@ -1820,6 +1860,9 @@ export function useTopologyEditor(options: TopologyEditorOptions) {
     splitPreviewTarget,
     refreshUndoState,
     afterTopologyChange,
+    areaCheck,
+    dismissAreaCheck,
+    undoCheckedOperation,
     onCardRefreshLayers,
     undoLastTopologyOperation,
     reportTopologyError,

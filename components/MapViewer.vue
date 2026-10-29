@@ -357,6 +357,16 @@
           :tool="activeTool"
           :hint="statusHint"
         />
+        <!-- Проверка после правки: правила связности для области последней операции -->
+        <Transition name="motion-panel-up">
+          <TopologyCheckPanel
+            v-if="isEditTopologyMode && areaCheck"
+            :check="areaCheck"
+            @locate="(issue) => locate.fault({ lat: issue.lat, lng: issue.lng })"
+            @undo="undoCheckedOperation"
+            @close="dismissAreaCheck"
+          />
+        </Transition>
         <!-- Координаты курсора внизу карты: WGS84 / местная / десктоп, копирование -->
         <CursorCoords />
         <!-- Легенда раскраски результатов расчёта: та же шкала, что у слоя (utils/calculationScale) -->
@@ -1394,6 +1404,9 @@ const {
   historyOpen,
   showBbox,
   afterTopologyChange,
+  areaCheck,
+  dismissAreaCheck,
+  undoCheckedOperation,
   deleteTarget,
   deleteOpen,
   onDeleteDone,
