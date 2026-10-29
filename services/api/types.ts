@@ -1,6 +1,7 @@
 /** Типы ответов и запросов API ТГИД (вынесены из services/fastApiService.ts). */
 import type { PermAction, PermKind, PermMatrix, PermScope, ServerPermissions } from '~/utils/permissions';
 import type { NodeType } from '~/utils/nodeTypes';
+import type { ThematicStyle, ThematicTheme } from '~/utils/thematicStyle';
 import type { FileJobOptions } from './http';
 
 export interface ColumnTranslation {
@@ -979,6 +980,42 @@ export interface TraceConfig {
 export interface TraceConfigList {
   configs: TraceConfig[];
   /** Может ли пользователь сохранять общие настройки (право «Справочники и шаблоны») */
+  can_shared: boolean;
+}
+
+/** Тематическая карта участков (api/v1/thematic/pipes): значение темы v у каждого участка */
+export interface ThematicPipesResponse {
+  theme: ThematicTheme;
+  /** Расчёт-источник (износ, теплопотери) для подписи легенды */
+  source_run: { id: number; label: string } | null;
+  summary: {
+    count: number;
+    with_value: number;
+    min?: number;
+    max?: number;
+    /** темы-справочники: коды по убыванию числа участков */
+    categories?: { value: number; label: string; count: number }[];
+  };
+  /** Участков больше предела — показана часть */
+  truncated: boolean;
+  geojson: GeoJSON.FeatureCollection<GeoJSON.LineString | GeoJSON.MultiLineString,
+    { id: number; fileid: number; v: number | null }>;
+}
+
+/** Сохранённый стиль тематической карты (api/v1/layer-styles) */
+export interface LayerStyle {
+  id: string;
+  name: string;
+  style: ThematicStyle;
+  /** растёт при каждом сохранении; PUT с прежней — 409 */
+  revision: number;
+  author: string | null;
+  shared: boolean;
+  updated_at: string | null;
+}
+
+export interface LayerStyleList {
+  styles: LayerStyle[];
   can_shared: boolean;
 }
 

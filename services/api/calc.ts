@@ -1,6 +1,7 @@
 /** Расчёты, протоколы, анализ и калькуляторы. Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
-import type { CalculationDeleteResponse, CalculationGeoJsonResponse, CalculationListFilter, CalculationListResponse, CalculationSummaryItem, CalculationTemperatureRange, ElevatorEngineParams, ElevatorEngineResult, ElevatorNozzleParams, ElevatorNozzleResult, GvsCirculationParams, NetworkTraceRequest, NetworkTraceResponse, NetworkZonesResponse, TraceConfig, TraceConfigList, GvsCirculationResult, OrificePlateParams, OrificePlateResult, OutageSimulationResponse, RegimeAnalysisKind, RegimeAnalysisResult, SetyRunRequest, SetyRunResponse, ThrottlingSheetParams } from './types';
+import type { CalculationDeleteResponse, CalculationGeoJsonResponse, CalculationListFilter, CalculationListResponse, CalculationSummaryItem, CalculationTemperatureRange, ElevatorEngineParams, ElevatorEngineResult, ElevatorNozzleParams, ElevatorNozzleResult, GvsCirculationParams, NetworkTraceRequest, NetworkTraceResponse, NetworkZonesResponse, TraceConfig, TraceConfigList, LayerStyle, LayerStyleList, ThematicPipesResponse, GvsCirculationResult, OrificePlateParams, OrificePlateResult, OutageSimulationResponse, RegimeAnalysisKind, RegimeAnalysisResult, SetyRunRequest, SetyRunResponse, ThrottlingSheetParams } from './types';
+import type { ThematicStyle, ThematicTheme } from '~/utils/thematicStyle';
 import { encodePath, mutationOptions, request } from './http';
 
 export const calcApi = {
@@ -115,6 +116,35 @@ export const calcApi = {
 
   async deleteTraceConfig(id: string): Promise<void> {
     await request(`api/v1/trace-configs/${encodePath(id)}`, mutationOptions('DELETE'));
+  },
+
+  /** Тематические карты (Smart Mapping): темы и значения темы у участков фрагментов */
+  async getThematicThemes(): Promise<{ themes: ThematicTheme[]; max_features: number }> {
+    return request('api/v1/thematic/themes');
+  },
+
+  async getThematicPipes(theme: string, fragmentIds: number[], bbox?: [number, number, number, number] | null):
+    Promise<ThematicPipesResponse> {
+    const query: Record<string, string> = { theme, fragment_ids: fragmentIds.join(',') };
+    if (bbox) query.bbox = bbox.map((v) => v.toFixed(5)).join(',');
+    return request<ThematicPipesResponse>('api/v1/thematic/pipes', { query });
+  },
+
+  async getLayerStyles(): Promise<LayerStyleList> {
+    return request<LayerStyleList>('api/v1/layer-styles', mutationOptions('GET'));
+  },
+
+  async createLayerStyle(body: { name: string; style: ThematicStyle; shared: boolean }): Promise<LayerStyle> {
+    return request<LayerStyle>('api/v1/layer-styles', mutationOptions('POST', body));
+  },
+
+  async updateLayerStyle(id: string, body: { name?: string; style?: ThematicStyle; shared?: boolean; revision?: number }):
+    Promise<LayerStyle> {
+    return request<LayerStyle>(`api/v1/layer-styles/${encodePath(id)}`, mutationOptions('PUT', body));
+  },
+
+  async deleteLayerStyle(id: string): Promise<void> {
+    await request(`api/v1/layer-styles/${encodePath(id)}`, mutationOptions('DELETE'));
   },
 
   /** Зоны сети (компоненты связности) и «острова» без питания */

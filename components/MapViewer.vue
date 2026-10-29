@@ -369,6 +369,13 @@
         </Transition>
         <!-- Координаты курсора внизу карты: WGS84 / местная / десктоп, копирование -->
         <CursorCoords />
+        <!-- Легенда тематической карты (useThematicMap): над легендой расчёта, если обе на карте -->
+        <Transition name="motion-panel-up">
+          <ThematicLegend
+            v-if="thematicMap.shown.value"
+            :stacked="mapStore.activeCalculationId !== null"
+          />
+        </Transition>
         <!-- Легенда раскраски результатов расчёта: та же шкала, что у слоя (utils/calculationScale) -->
         <Transition name="motion-panel-up">
           <MapLegend
@@ -549,6 +556,8 @@ import { useOverlayLayer } from '~/composables/useOverlayLayer';
 import { useSelectionHighlight } from '~/composables/useSelectionHighlight';
 import { useRouteMapLink } from '~/composables/useRouteMapLink';
 import MapLegend from '~/components/MapLegend.vue';
+import ThematicLegend from '~/components/ThematicLegend.vue';
+import { useThematicMap } from '~/composables/useThematicMap';
 import { calculationScale } from '~/utils/calculationScale';
 import type { RegimePointsResult } from '~/utils/regimeMapPoints';
 import { useLocateMarkers } from '~/composables/useLocateMarkers';
@@ -1011,6 +1020,8 @@ const hydraulicOverlay = useOverlayLayer(() => mapStore.map, 'hydraulic-calc-sou
 });
 
 const onClearHydraulicThematic = () => hydraulicOverlay.clear();
+
+const thematicMap = useThematicMap();
 
 // «Анализ режима» → «Показать все на карте»: все найденные объекты разом (как gid6, QA F39)
 const regimeOverlay = useOverlayLayer(() => mapStore.map, 'regime-analysis-points', {
@@ -1586,6 +1597,8 @@ const toolDialogs: ToolDialogEntry[] = [
   { key: 'dataQuality', component: lazyDialog(() => import('./DataQualityDialog.vue')) },
   // Калькулятор дросселирования (шайбы и элеваторы)
   { key: 'throttlingCalculator', component: lazyDialog(() => import('./ThrottlingCalculatorDialog.vue')) },
+  // Тематическая карта участков (Smart Mapping, фаза 1): слой и легенда — useThematicMap
+  { key: 'thematicMap', component: lazyDialog(() => import('./ThematicMapDialog.vue')) },
   // Гидравлический режим и стрелки потоков
   {
     key: 'hydraulicThematic',
