@@ -547,8 +547,9 @@ import type { Component } from 'vue';
 import { markPerf, measurePerf, timeAsync } from '~/utils/perf';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { fastApiService } from '~/services/fastApiService';
-import type { NetworkTraceResponse, PiezometerRouteResponse } from '~/services/fastApiService';
+import type { NetworkTraceResponse, PiezometerRouteResponse, SelectResult } from '~/services/fastApiService';
 import { featureBounds, traceTypeMeta } from '~/utils/networkTrace';
+import { resultMapData } from '~/utils/networkSelect';
 import maplibregl from 'maplibre-gl';
 import { useTopologyEditor } from '~/composables/useTopologyEditor';
 import { useJournalContourLayer } from '~/composables/useJournalContourLayer';
@@ -986,6 +987,41 @@ const onShowTraceOnMap = (res: NetworkTraceResponse) => {
   if (bounds) {
     const [xmin, ymin, xmax, ymax] = bounds;
     map.fitBounds([[xmin, ymin], [xmax, ymax]], { padding: 80, maxZoom: 18, duration: 1000 });
+  }
+};
+
+// === Выборка по условиям: найденные участки и узлы, окружность «в N м от» ===
+const SELECT_COLOR = '#1565C0';
+const selectOverlay = useOverlayLayer(() => mapStore.map, 'network-select', {
+  layerIds: ['network-select-near-fill', 'network-select-near-line', 'network-select-glow', 'network-select-line', 'network-select-nodes'],
+});
+
+const onShowSelectOnMap = (res: SelectResult) => {
+  const map = mapStore.map;
+  if (!map) return;
+  const data = resultMapData(res);
+  const isLine = ['==', ['geometry-type'], 'LineString'];
+  selectOverlay.show(data, [
+    { id: 'network-select-near-fill', type: 'fill', filter: ['==', ['get', 'kind'], 'near'], paint: { 'fill-color': SELECT_COLOR, 'fill-opacity': 0.06 } },
+    {
+      id: 'network-select-near-line',
+      type: 'line',
+      filter: ['==', ['get', 'kind'], 'near'],
+      paint: { 'line-color': SELECT_COLOR, 'line-width': 1.5, 'line-dasharray': [3, 2] },
+    },
+    { id: 'network-select-glow', type: 'line', filter: isLine, paint: { 'line-color': SELECT_COLOR, 'line-width': 9, 'line-opacity': 0.25 } },
+    { id: 'network-select-line', type: 'line', filter: isLine, paint: { 'line-color': SELECT_COLOR, 'line-width': 3.5 } },
+    {
+      id: 'network-select-nodes',
+      type: 'circle',
+      filter: ['==', ['geometry-type'], 'Point'],
+      paint: { 'circle-radius': 5, 'circle-color': '#fff', 'circle-stroke-width': 2.5, 'circle-stroke-color': SELECT_COLOR },
+    },
+  ]);
+  const bounds = featureBounds(data);
+  if (bounds) {
+    const [xmin, ymin, xmax, ymax] = bounds;
+    map.fitBounds([[xmin, ymin], [xmax, ymax]], { padding: 80, maxZoom: 17, duration: 1000 });
   }
 };
 
@@ -1599,6 +1635,12 @@ const toolDialogs: ToolDialogEntry[] = [
   { key: 'throttlingCalculator', component: lazyDialog(() => import('./ThrottlingCalculatorDialog.vue')) },
   // Тематическая карта участков (Smart Mapping, фаза 1): слой и легенда — useThematicMap
   { key: 'thematicMap', component: lazyDialog(() => import('./ThematicMapDialog.vue')) },
+  // Выборка по условиям и вопрос словами (фаза 1, п. 10)
+  {
+    key: 'networkSelect',
+    component: lazyDialog(() => import('./NetworkSelectDialog.vue')),
+    on: { showOnMap: onShowSelectOnMap, clearHighlight: () => selectOverlay.clear(), focusCoords: onFocusCoords },
+  },
   // Гидравлический режим и стрелки потоков
   {
     key: 'hydraulicThematic',

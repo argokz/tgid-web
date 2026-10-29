@@ -1,6 +1,6 @@
 /** Расчёты, протоколы, анализ и калькуляторы. Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type { CalcProtocolRecord, ProtocolLocateResult, ProtocolObject } from '~/utils/calcProtocol';
-import type { CalculationDeleteResponse, CalculationGeoJsonResponse, CalculationListFilter, CalculationListResponse, CalculationSummaryItem, CalculationTemperatureRange, ElevatorEngineParams, ElevatorEngineResult, ElevatorNozzleParams, ElevatorNozzleResult, GvsCirculationParams, NetworkTraceRequest, NetworkTraceResponse, NetworkZonesResponse, TraceConfig, TraceConfigList, LayerStyle, LayerStyleList, ThematicPipesResponse, GvsCirculationResult, OrificePlateParams, OrificePlateResult, OutageSimulationResponse, RegimeAnalysisKind, RegimeAnalysisResult, SetyRunRequest, SetyRunResponse, ThrottlingSheetParams } from './types';
+import type { CalculationDeleteResponse, CalculationGeoJsonResponse, CalculationListFilter, CalculationListResponse, CalculationSummaryItem, CalculationTemperatureRange, ElevatorEngineParams, ElevatorEngineResult, ElevatorNozzleParams, ElevatorNozzleResult, GvsCirculationParams, NetworkTraceRequest, NetworkTraceResponse, NetworkZonesResponse, TraceConfig, TraceConfigList, LayerStyle, LayerStyleList, SelectFields, SelectResult, SelectSpec, ThematicPipesResponse, GvsCirculationResult, OrificePlateParams, OrificePlateResult, OutageSimulationResponse, RegimeAnalysisKind, RegimeAnalysisResult, SetyRunRequest, SetyRunResponse, ThrottlingSheetParams } from './types';
 import type { ThematicStyle, ThematicTheme } from '~/utils/thematicStyle';
 import { encodePath, mutationOptions, request } from './http';
 
@@ -128,6 +128,16 @@ export const calcApi = {
     const query: Record<string, string> = { theme, fragment_ids: fragmentIds.join(',') };
     if (bbox) query.bbox = bbox.map((v) => v.toFixed(5)).join(',');
     return request<ThematicPipesResponse>('api/v1/thematic/pipes', { query });
+  },
+
+  /** Выборка объектов сети по условиям: поля конструктора и выполнение запроса */
+  async getNetworkSelectFields(): Promise<SelectFields> {
+    return request<SelectFields>('api/v1/network-select/fields');
+  },
+
+  async runNetworkSelect(spec: SelectSpec, bbox?: [number, number, number, number] | null): Promise<SelectResult> {
+    const body = { spec, bbox: bbox ? bbox.map((v) => v.toFixed(5)).join(',') : null };
+    return request<SelectResult>('api/v1/network-select', { method: 'POST', body });
   },
 
   async getLayerStyles(): Promise<LayerStyleList> {

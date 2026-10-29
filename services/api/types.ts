@@ -1019,6 +1019,102 @@ export interface LayerStyleList {
   can_shared: boolean;
 }
 
+/** Выборка объектов сети по условиям (api/v1/network-select, itwin-api database/network_select.py) */
+export type SelectTarget = 'lines' | 'nodes';
+export type SelectOp = 'lt' | 'le' | 'gt' | 'ge' | 'eq' | 'ne' | 'between' | 'in' | 'not_in' | 'is_null' | 'not_null' | 'contains';
+export type SelectValue = number | string;
+
+export interface SelectCondition {
+  field: string;
+  op: SelectOp;
+  value?: SelectValue | null;
+  value2?: number | null;
+  values?: SelectValue[];
+}
+
+export interface SelectNear {
+  node_id?: number | null;
+  node_name?: string | null;
+  lon?: number | null;
+  lat?: number | null;
+  meters: number;
+}
+
+export interface SelectSpec {
+  target: SelectTarget;
+  conditions: SelectCondition[];
+  match: 'all' | 'any';
+  near?: SelectNear | null;
+  in_view: boolean;
+  /** null — все фрагменты */
+  fragment_ids?: number[] | null;
+  order_by?: string | null;
+  order_desc: boolean;
+  limit: number;
+}
+
+export interface SelectFieldChoice {
+  value: SelectValue;
+  label: string;
+}
+
+export interface SelectField {
+  key: string;
+  label: string;
+  kind: 'number' | 'category' | 'text';
+  units: string;
+  /** passport | calc | wear | heat_losses | node */
+  source: string;
+  hint: string;
+  ops: SelectOp[];
+  choices: SelectFieldChoice[];
+}
+
+export interface SelectFields {
+  targets: Array<{ key: SelectTarget; label: string; fields: SelectField[] }>;
+  op_labels: Record<SelectOp, string>;
+  max_limit: number;
+  max_near_m: number;
+}
+
+export interface SelectItem {
+  id: number;
+  fileid: number | null;
+  title: string;
+  length?: number | null;
+  node_type?: string | null;
+  card_type?: string | null;
+  distance_m?: number;
+  values: Record<string, SelectValue | null>;
+  lon: number | null;
+  lat: number | null;
+}
+
+export interface SelectResult {
+  spec: SelectSpec;
+  /** Запрос словами — как его понял сервер */
+  description: string;
+  target: SelectTarget;
+  columns: Array<{ key: string; label: string; units: string }>;
+  total: number;
+  truncated: boolean;
+  items: SelectItem[];
+  total_length_m?: number;
+  near_center?: { lon: number; lat: number; meters: number };
+  geojson?: GeoJSON.FeatureCollection;
+}
+
+/** Вопрос → выборка (api/v1/ai/select): запрос модели и результат; error — запрос не прошёл проверку */
+export interface AiSelectResult extends Partial<Omit<SelectResult, 'spec'>> {
+  spec: SelectSpec;
+  confidence: number;
+  note: string;
+  description: string;
+  items: SelectItem[];
+  total: number;
+  error?: string;
+}
+
 export interface NetworkZone {
   zone: number;
   nodes_count: number;

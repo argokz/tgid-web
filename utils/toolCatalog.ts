@@ -40,6 +40,7 @@ export type ToolEvent =
   | 'open-throttling-calculator'
   | 'open-hydraulic-thematic'
   | 'open-thematic-map'
+  | 'open-network-select'
   | 'open-users-admin'
   | 'open-audit-history'
   | 'open-activity-log'
@@ -73,6 +74,7 @@ export type ToolDialogKey =
   | 'throttlingCalculator'
   | 'hydraulicThematic'
   | 'thematicMap'
+  | 'networkSelect'
   | 'alseko'
   | 'electricalNetwork'
   | 'heatLoss'
@@ -162,6 +164,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     items: [
       { label: 'Гидравлический режим на карте', hint: 'Стрелки потоков, hуд > 80 Па/м, скорости и напоры', icon: 'mdi-map-clock-outline', color: 'indigo-darken-2', event: 'open-hydraulic-thematic', dialog: 'hydraulicThematic' },
       { label: 'Тематическая карта', hint: 'Участки по диаметру, году, износу, теплопотерям, напору — классы и легенда', icon: 'mdi-palette-swatch-variant', color: 'deep-purple-darken-2', event: 'open-thematic-map', dialog: 'thematicMap' },
+      { label: 'Выборка по условиям', hint: 'Участки и узлы по паспорту, режиму, износу, «в N м от узла»; вопрос словами — помощник ИИ', icon: 'mdi-database-search', color: 'blue-darken-3', event: 'open-network-select', dialog: 'networkSelect' },
       { label: 'Калькулятор дросселирования', hint: 'Расчёт шайб и сопел элеваторов', icon: 'mdi-calculator', color: 'teal-darken-3', event: 'open-throttling-calculator', dialog: 'throttlingCalculator' },
       { label: 'Диагностика расчётов', hint: 'Готовность исходных данных', icon: 'mdi-calculator-variant', color: 'primary', event: 'open-calculation-diagnostics', dialog: 'calculationDiagnostics' },
       { label: 'Диагностика топологии', hint: 'Разрывы и висячие узлы', icon: 'mdi-stethoscope', color: 'deep-purple-darken-2', event: 'open-topology-diagnostics', dialog: 'topologyDiagnostics' },
