@@ -32,6 +32,8 @@ export type PermScope = 'none' | 'own' | 'all'
 export type PermMatrix = Partial<Record<PermKind, Partial<Record<PermAction, PermScope>>>>
 export type GeneralPerm =
   | 'calc_run' | 'calc_save' | 'export' | 'import' | 'journals' | 'refs' | 'audit_view' | 'users_admin'
+  /** Персональные данные потребителей без маскирования (itwin-api database/pii.py) */
+  | 'pii_view'
 
 export const PERM_KIND_LABELS: Record<PermKind, string> = {
   line: 'Участки',
@@ -63,11 +65,11 @@ export const ROLE_PRESETS: Record<Role, { matrix: PermMatrix; general: GeneralPe
   operator: { matrix: fill(ALL_KINDS, { edit: 'own', create: 'all', move: 'own', delete: 'own' }), general: ['export'] },
   editor: {
     matrix: fill(ALL_KINDS, { edit: 'all', create: 'all', move: 'all', delete: 'own' }),
-    general: ['calc_run', 'calc_save', 'export', 'import', 'journals', 'refs'],
+    general: ['calc_run', 'calc_save', 'export', 'import', 'journals', 'refs', 'pii_view'],
   },
   admin: {
     matrix: fill(ALL_KINDS, { edit: 'all', create: 'all', move: 'all', delete: 'all' }),
-    general: ['calc_run', 'calc_save', 'export', 'import', 'journals', 'refs', 'audit_view', 'users_admin'],
+    general: ['calc_run', 'calc_save', 'export', 'import', 'journals', 'refs', 'audit_view', 'users_admin', 'pii_view'],
   },
 }
 
