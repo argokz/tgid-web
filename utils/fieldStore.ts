@@ -3,17 +3,24 @@
  * загруженный список нарядов, чтобы открыть его без связи. База — своя на город (storageKey: Алматы и Астана
  * живут на одном домене). Нет IndexedDB (приватный режим старого Safari) — очередь живёт до закрытия вкладки.
  */
+import type { FieldNetwork } from './fieldNetwork';
 import type { FieldAction } from './fieldQueue';
 import type { WorkOrder } from './workOrders';
 import { toRaw } from 'vue';
 import { storageKey } from './appStorage';
 
-const DB_VERSION = 1;
+// 2 — сеть вокруг нарядов (шаг 2: карта места работ без связи)
+const DB_VERSION = 2;
 const QUEUE = 'queue';
 const ORDERS = 'orders';
+const NETWORK = 'network';
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
-const memory = { queue: new Map<string, FieldAction>(), orders: new Map<string, unknown>() };
+const memory = {
+  queue: new Map<string, FieldAction>(),
+  orders: new Map<string, unknown>(),
+  network: new Map<number, FieldNetwork>(),
+};
 
 function openDb(): Promise<IDBDatabase | null> {
   if (dbPromise) return dbPromise;
@@ -28,6 +35,7 @@ function openDb(): Promise<IDBDatabase | null> {
         const db = req.result;
         if (!db.objectStoreNames.contains(QUEUE)) db.createObjectStore(QUEUE, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(ORDERS)) db.createObjectStore(ORDERS);
+        if (!db.objectStoreNames.contains(NETWORK)) db.createObjectStore(NETWORK, { keyPath: 'orderId' });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
@@ -83,11 +91,44 @@ export const fieldStore = {
     else memory.orders.set(key, plain);
   },
 
-  /** При выходе: списки нарядов не остаются на чужом телефоне */
+  /** При выходе: списки нарядов и сеть вокруг них не остаются на чужом телефоне */
   async clearOrders(): Promise<void> {
     const db = await openDb();
-    if (db) await run(db, ORDERS, 'readwrite', (s) => s.clear());
-    else memory.orders.clear();
+    if (db) {
+      await run(db, ORDERS, 'readwrite', (s) => s.clear());
+      await run(db, NETWORK, 'readwrite', (s) => s.clear());
+    } else {
+      memory.orders.clear();
+      memory.network.clear();
+    }
+  },
+
+  async saveNetwork(net: FieldNetwork): Promise<void> {
+    const plain = JSON.parse(JSON.stringify(net)) as FieldNetwork;
+    const db = await openDb();
+    if (db) await run(db, NETWORK, 'readwrite', (s) => s.put(plain));
+    else memory.network.set(plain.orderId, plain);
+  },
+
+  async loadNetwork(orderId: number): Promise<FieldNetwork | null> {
+    const db = await openDb();
+    const value = db ? await run<FieldNetwork | undefined>(db, NETWORK, 'readonly', (s) => s.get(orderId))
+      : memory.network.get(orderId);
+    return value ?? null;
+  },
+
+  /** Сеть закрытых нарядов больше не нужна — не копить на телефоне */
+  async pruneNetwork(keepOrderIds: number[]): Promise<void> {
+    const keep = new Set(keepOrderIds);
+    const db = await openDb();
+    if (!db) {
+      [...memory.network.keys()].filter((id) => !keep.has(id)).forEach((id) => memory.network.delete(id));
+      return;
+    }
+    const ids = await run<IDBValidKey[]>(db, NETWORK, 'readonly', (s) => s.getAllKeys());
+    for (const id of ids) {
+      if (!keep.has(Number(id))) await run(db, NETWORK, 'readwrite', (s) => s.delete(id));
+    }
   },
 
   async loadOrders(key: string): Promise<WorkOrder[] | null> {

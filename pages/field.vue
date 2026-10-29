@@ -227,6 +227,15 @@
           {{ selected.description }}
         </p>
 
+        <ClientOnly v-if="selected.lat != null && selected.lon != null">
+          <LazyFieldOrderMap
+            :key="selected.id"
+            :order="selected"
+            :network="network"
+            :online="online"
+            class="mb-2"
+          />
+        </ClientOnly>
         <div
           v-if="selected.lat != null && selected.lon != null"
           class="d-flex ga-2 mb-4 flex-wrap"
@@ -426,7 +435,9 @@ import {
   newActionId,
   type FieldAction,
 } from '~/utils/fieldQueue';
+import { isFresh, networkSpec, resultToFeatures, type FieldNetwork } from '~/utils/fieldNetwork';
 import { fieldStore } from '~/utils/fieldStore';
+import { getMaplibreDefault } from '~/utils/maplibreLoader';
 import { formatPermalinkHash } from '~/utils/mapPermalink';
 import {
   PRIORITY_COLORS,
@@ -439,13 +450,18 @@ import {
 } from '~/utils/workOrders';
 
 definePageMeta({ layout: false });
-useHead({ title: 'Наряды бригады — ITwin Map' });
+useHead({
+  title: 'Наряды бригады — ITwin Map',
+  // «На главный экран» открывает сразу страницу бригады (ключ — тот же, что у manifest в app.vue)
+  link: [{ key: 'manifest', rel: 'manifest', href: `${String(useRuntimeConfig().app.baseURL || '/').replace(/\/?$/, '/')}field.webmanifest` }],
+});
 
 /** Пока есть неотправленное — пробовать раз в 30 с (событие online приходит не всегда) */
 const SYNC_INTERVAL_MS = 30_000;
 const BRIGADE_KEY = 'field:brigade';
 const LOOKUPS_KEY = 'field:lookups';
 const SAVED_AT_KEY = 'field:savedAt';
+const CAN_EDIT_KEY = 'field:canEdit';
 const ALL = 0;
 
 const authStore = useAuthStore();
@@ -469,11 +485,24 @@ const resultText = ref('');
 const commentText = ref('');
 const photoCaption = ref('');
 const photoInput = ref<HTMLInputElement | null>(null);
+/** сеть вокруг открытого наряда (карта места работ) */
+const network = ref<FieldNetwork | null>(null);
+let prefetching = false;
 /** id фото → object URL (фото отдаются с токеном, поэтому через blob) */
 const photoUrls = ref<Record<number, string>>({});
 const pendingUrls = new Map<string, string>();
 
-const canEdit = computed(() => authStore.canEditData);
+/**
+ * Право отмечать работу считается по настройкам сервера (/auth/config), а без связи их нет — тогда последнее
+ * известное право (сервер всё равно проверит его при отправке очереди)
+ */
+const savedCanEdit = ref(false);
+const canEdit = computed(() => (authStore.configLoaded ? authStore.canEditData : savedCanEdit.value));
+watch(() => [authStore.configLoaded, authStore.canEditData], () => {
+  if (!authStore.configLoaded) return;
+  savedCanEdit.value = authStore.canEditData;
+  appStorage.setItem(CAN_EDIT_KEY, authStore.canEditData ? '1' : '0');
+});
 const brigadeItems = computed(() => [{ id: ALL, name: 'Все бригады' }, ...(lookups.value?.brigades ?? [])]);
 const transitions = computed(() => lookups.value?.transitions ?? ({} as Record<WorkOrderStatus, WorkOrderStatus[]>));
 const hasProblems = computed(() => queue.value.some((a) => a.state !== 'pending'));
@@ -530,9 +559,12 @@ async function loadOrders(): Promise<void> {
   // сохранённое — сразу: без связи запрос с повторами отвечает отказом через несколько секунд
   if (!orders.value.length) orders.value = (await fieldStore.loadOrders(cacheKey())) ?? [];
   try {
-    if (!lookups.value) {
-      lookups.value = await fastApiService.getWorkOrderLookups();
-      appStorage.setItem(LOOKUPS_KEY, JSON.stringify(lookups.value));
+    // справочники — каждый раз при связи (бригады правят), сохранённые — только на случай без сети
+    lookups.value = await fastApiService.getWorkOrderLookups();
+    appStorage.setItem(LOOKUPS_KEY, JSON.stringify(lookups.value));
+    if (brigadeId.value !== ALL && !lookups.value.brigades.some((b) => b.id === brigadeId.value)) {
+      brigadeId.value = ALL; // бригаду удалили — список заново загрузит наблюдатель
+      return;
     }
     const list = await fastApiService.getWorkOrders({ open_only: true, brigade_id: brigadeId.value || null });
     // карточки, открытые раньше (с историей и фото), не теряем — список отдаёт наряды без них
@@ -540,6 +572,7 @@ async function loadOrders(): Promise<void> {
     orders.value = list.items.map((o) => ({ ...known.get(o.id), ...o }));
     cachedAt.value = '';
     await saveCache();
+    void prefetchForOffline(orders.value.filter((o) => o.lon != null && o.lat != null));
   } catch (error) {
     const { status, message } = errorInfo(error);
     if (status === 401) {
@@ -581,12 +614,71 @@ async function openOrder(id: number): Promise<void> {
   commentText.value = '';
   photoCaption.value = '';
   window.scrollTo({ top: 0 });
+  network.value = await fieldStore.loadNetwork(id);
   try {
     mergeOrder(await fastApiService.getWorkOrder(id));
   } catch {
     // без связи — карточка из сохранённого списка
   }
   void loadPhotos();
+  const o = orders.value.find((x) => x.id === id);
+  if (o && !isFresh(network.value)) {
+    const fresh = await fetchNetwork(o);
+    if (fresh && selectedId.value === id) network.value = fresh;
+  }
+}
+
+/** Сеть вокруг наряда — с сервера на телефон; не вышло (нет связи, сервер занят) — остаётся сохранённая */
+async function fetchNetwork(o: WorkOrder): Promise<FieldNetwork | null> {
+  if (o.lon == null || o.lat == null || !online.value) return null;
+  try {
+    const lines = await fastApiService.runNetworkSelect(networkSpec(o, 'lines'));
+    const nodes = await fastApiService.runNetworkSelect(networkSpec(o, 'nodes'));
+    const net: FieldNetwork = {
+      orderId: o.id,
+      savedAt: new Date().toISOString(),
+      lines: resultToFeatures(lines),
+      nodes: resultToFeatures(nodes),
+      truncated: lines.truncated || nodes.truncated,
+    };
+    await fieldStore.saveNetwork(net);
+    return net;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * После загрузки списка: сеть вокруг каждого открытого наряда — на телефон (по одному: у выборок лимит на
+ * пользователя), сеть закрытых — долой; заодно — карта (maplibre), чтобы service worker сохранил её файлы.
+ */
+async function prefetchForOffline(list: WorkOrder[]): Promise<void> {
+  if (prefetching) return;
+  prefetching = true;
+  try {
+    void getMaplibreDefault().then(() => import('maplibre-gl/dist/maplibre-gl.css')).catch(() => undefined);
+    for (const o of list) {
+      if (!online.value) break;
+      if (!isFresh(await fieldStore.loadNetwork(o.id))) await fetchNetwork(o);
+    }
+    await fieldStore.pruneNetwork(list.map((o) => o.id));
+  } finally {
+    prefetching = false;
+  }
+}
+
+/** Страница открывается без связи: service worker хранит её и файлы приложения (public/field-sw.js) */
+function registerServiceWorker(): void {
+  if (!('serviceWorker' in navigator)) return;
+  const base = String(config.app.baseURL || '/').replace(/\/?$/, '/');
+  navigator.serviceWorker.register(`${base}field-sw.js`, { scope: base }).catch((error: unknown) => {
+    notice.value = { type: 'warning', text: `Работа без связи недоступна: ${errorInfo(error).message}` };
+  });
+  // при первом открытии файлы страницы загрузились раньше service worker — передать ему их список
+  void navigator.serviceWorker.ready.then((reg) => {
+    const urls = performance.getEntriesByType('resource').map((e) => e.name).filter((u) => u.includes('/_nuxt/'));
+    reg.active?.postMessage({ type: 'cache-urls', urls });
+  });
 }
 
 function closeOrder(): void {
@@ -744,6 +836,8 @@ async function logout(): Promise<void> {
     return;
   }
   authStore.logout();
+  appStorage.removeItem(CAN_EDIT_KEY);
+  savedCanEdit.value = false;
   await fieldStore.clearOrders();
   orders.value = [];
   selectedId.value = null;
@@ -785,11 +879,13 @@ onMounted(async () => {
   } catch {
     appStorage.removeItem(LOOKUPS_KEY);
   }
+  savedCanEdit.value = appStorage.getItem(CAN_EDIT_KEY) === '1';
   const saved = Number(appStorage.getItem(BRIGADE_KEY));
   if (Number.isInteger(saved) && saved > 0) brigadeId.value = saved;
   // пришли из приложения — сессия уже в сторе, наблюдатель входа не сработает
   const wasSignedIn = signedIn();
   authStore.hydrate();
+  registerServiceWorker();
   await reloadQueue();
   // без связи — сохранённый список; 401 — форма входа (loadOrders)
   void loadOrders();
