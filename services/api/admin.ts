@@ -1,8 +1,22 @@
 /** Пользователи, журнал действий, аудит. Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type { ActivityLogQuery, ActivityLogResponse, AdminCap, AdminRole, AdminUser, AdminUserUpdate, AdminUsersResponse, AuditLogFilter, AuditLogItem, AuditLogResponse, AuditLookups, PermissionsModel, UserRole } from './types';
 import { cleanQuery, encodePath, mutationOptions, request } from './http';
+import type { StaticTilesList } from '~/utils/staticTiles';
 
 export const adminApi = {
+  /** Статичные слои в PMTiles: архивы города, слои для запекания (админ), запуск и удаление */
+  async getStaticTiles(): Promise<StaticTilesList> {
+    return request<StaticTilesList>('api/v1/static-tiles', mutationOptions('GET'));
+  },
+
+  async buildStaticTiles(layer: string, body: { minzoom?: number | null; maxzoom: number }): Promise<{ task_id: string }> {
+    return request(`api/v1/static-tiles/${encodePath(layer)}/build`, mutationOptions('POST', body));
+  },
+
+  async deleteStaticTiles(layer: string): Promise<{ deleted: string }> {
+    return request(`api/v1/static-tiles/${encodePath(layer)}`, mutationOptions('DELETE'));
+  },
+
   /** Администрирование пользователей UsersDB (только admin) */
   async getAdminRoles(): Promise<{ items: AdminRole[]; caps?: AdminCap[]; backend?: string; model?: PermissionsModel }> {
     return request('api/v1/admin/roles', mutationOptions('GET'));

@@ -148,8 +148,9 @@ export const mapService = {
         map.addSource(layer.sourceId, {
           type: 'vector',
           tiles: [layer.mvtUrl],
-          minzoom: 0,
-          maxzoom: 22,
+          // архив PMTiles (utils/staticTiles.ts): его зумы; выше верхнего — растяжение тайлов MapLibre
+          minzoom: layer.staticTiles?.minzoom ?? 0,
+          maxzoom: layer.staticTiles?.maxzoom ?? 22,
           // Кеш GWC за границами слоя отвечает 400 TileOutOfRange — такие тайлы не запрашиваем
           ...(layer.tileBounds ? { bounds: layer.tileBounds } : {}),
         });

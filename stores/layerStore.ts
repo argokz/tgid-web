@@ -1098,6 +1098,8 @@ export const useLayerStore = defineStore('layer', {
      * тайлы uzel), фрагменты, подсветка ПТС и версия данных (сброс кеша GWC после изменений).
      */
     mvtSourceTileUrl(layer: ExtendedLayerConfig): string {
+      // архив PMTiles не зависит от фрагментов и подписей: адрес с версией архива как есть
+      if (layer.staticTiles) return layer.mvtUrl || '';
       const fragmentStore = useFragmentStore();
       const sharing = this.geoServerLayers.filter(
         (l) => l.sourceId === layer.sourceId && (l.renderFormat || 'mvt') === 'mvt'

@@ -542,6 +542,8 @@ import LazyDialogBoundary from '~/components/LazyDialogBoundary.vue';
 import { isStaleChunkError } from '~/utils/staleChunk';
 import type { ToolDialogKey, ToolEvent } from '~/utils/toolCatalog';
 import type { LayerConfig } from '~/types';
+import { getApiBaseUrl } from '~/services/api/http';
+import { absoluteApiBase, applyStaticTiles, type StaticTileArchive } from '~/utils/staticTiles';
 import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowReactive, watch } from 'vue';
 import type { Component } from 'vue';
 import { markPerf, measurePerf, timeAsync } from '~/utils/perf';
@@ -1668,6 +1670,8 @@ const toolDialogs: ToolDialogEntry[] = [
   { key: 'auditHistory', component: lazyDialog(() => import('./AuditHistoryDialog.vue')) },
   // журнал действий пользователей (activity_log, право «Просмотр журнала действий»)
   { key: 'activityLog', component: lazyDialog(() => import('./ActivityLogDialog.vue')) },
+  // Статичные слои в PMTiles (фаза 1, п. 13): запекание и удаление архивов — администратор
+  { key: 'staticTiles', component: lazyDialog(() => import('./StaticTilesDialog.vue')) },
   // Исходные данные (этап 9): участки ПТС, групповые установщики aSet* и справочники
   { key: 'ptsSites', component: lazyDialog(() => import('./PtsSitesDialog.vue')) },
   { key: 'groupSetters', component: lazyDialog(() => import('./GroupSetterDialog.vue')) },
@@ -1684,6 +1688,16 @@ const toolDialogs: ToolDialogEntry[] = [
 const getLayerSignature = (layers: LayerConfig[]) =>
   [...layers.map((layer) => layer.layerId)].sort().join('|');
 
+/** Архивы PMTiles города; API недоступен или старый — слои как раньше (из GeoServer/martin) */
+const loadStaticArchives = async (): Promise<StaticTileArchive[]> => {
+  try {
+    return (await fastApiService.getStaticTiles()).archives;
+  } catch (err: unknown) {
+    console.warn('[static-tiles] список архивов не получен', err);
+    return [];
+  }
+};
+
 const applyLayersToMap = async (layers: LayerConfig[]) => {
   if (!mapStore.map || layers.length === 0) return;
 
@@ -1691,7 +1705,10 @@ const applyLayersToMap = async (layers: LayerConfig[]) => {
   if (nextSignature === appliedLayerSignature.value) return;
 
   markPerf('map:layers:init:start');
-  await layerStore.initializeLayers(layers);
+  // Слои с архивом PMTiles (здания) — тайлы из API, а не из GeoServer/martin
+  const archives = await loadStaticArchives();
+  const withStatic = applyStaticTiles(layers, archives, absoluteApiBase(getApiBaseUrl(), window.location.origin));
+  await layerStore.initializeLayers(withStatic);
   markPerf('map:layers:init:end');
   measurePerf('map:layers:init', 'map:layers:init:start', 'map:layers:init:end');
 

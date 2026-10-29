@@ -13,6 +13,8 @@ import type {
 import { getMaplibreDefault } from '~/utils/maplibreLoader';
 import type { FeatureData } from '~/types';
 import { fastApiService } from '~/services/fastApiService';
+import { authHeaders } from '~/services/api/http';
+import { isStaticTileUrl } from '~/utils/staticTiles';
 
 import { useGeoServer } from '~/composables/useGeoServer';
 import { useLayerStore } from '~/stores/layerStore';
@@ -243,6 +245,10 @@ export const useMapStore = defineStore('map', {
         center: getCityConfig().center,
         zoom: 12,
         transformRequest: (url, resourceType) => {
+          // Тайлы архивов PMTiles отдаёт API — с токеном, как остальные запросы к нему
+          if (resourceType === 'Tile' && isStaticTileUrl(url)) {
+            return { url, headers: authHeaders() };
+          }
           if (resourceType === 'Tile' || resourceType === 'Source') {
             const layerStore = useLayerStore();
             // Проверяем кэширование для MVT слоев GeoServer

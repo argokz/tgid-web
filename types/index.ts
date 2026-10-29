@@ -19,6 +19,8 @@ export interface LayerConfig {
   mvtUrl?: string;
   /** Границы тайлов [west, south, east, north] (кеш GWC: за ними 400 TileOutOfRange) */
   tileBounds?: [number, number, number, number];
+  /** Тайлы из архива PMTiles API (utils/staticTiles.ts): зумы источника и версия архива */
+  staticTiles?: { layer: string; minzoom: number; maxzoom: number; version: number };
   /**
    * У слоя есть поле фрагмента (fileid): клиентский фильтр фрагментов применим. false — поля нет
    * (здания zdaniya_2, zdaniya_tu): фильтр по fileid скрыл бы все объекты слоя. Не задано — неизвестно.

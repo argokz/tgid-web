@@ -44,6 +44,7 @@ export type ToolEvent =
   | 'open-users-admin'
   | 'open-audit-history'
   | 'open-activity-log'
+  | 'open-static-tiles'
   | 'open-group-setters'
   | 'open-pts-sites'
   | 'open-dictionaries'
@@ -92,6 +93,7 @@ export type ToolDialogKey =
   | 'usersAdmin'
   | 'auditHistory'
   | 'activityLog'
+  | 'staticTiles'
   | 'groupSetters'
   | 'ptsSites'
   | 'dictionaries'
@@ -212,6 +214,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
       { label: 'История правок', hint: 'Кто, когда и что изменил в данных', icon: 'mdi-history', color: 'blue-grey-darken-2', event: 'open-audit-history', dialog: 'auditHistory', requires: 'viewer' },
       { label: 'Журнал действий', hint: 'Входы, правки, расчёты и выгрузки всех пользователей', icon: 'mdi-account-clock-outline', color: 'blue-grey-darken-3', event: 'open-activity-log', dialog: 'activityLog', requiresPerm: 'audit_view' },
       { label: 'Пользователи', hint: 'Роли и права, блокировка, пароли', icon: 'mdi-account-cog', color: 'blue-grey-darken-3', event: 'open-users-admin', dialog: 'usersAdmin', requiresPerm: 'users_admin' },
+      { label: 'Статичные слои (PMTiles)', hint: 'Здания и другие большие слои — готовым архивом тайлов: запечь, пересобрать, удалить', icon: 'mdi-layers-outline', color: 'blue-grey-darken-2', event: 'open-static-tiles', dialog: 'staticTiles', requires: 'admin' },
     ],
   },
 ]
