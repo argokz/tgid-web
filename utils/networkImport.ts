@@ -15,7 +15,16 @@ export interface NetworkImportTarget {
   required: boolean
 }
 
-export type NetworkImportKind = 'shp' | 'gpx' | 'dxf' | 'table'
+/** shp — Shapefile; vector — другой формат ГИС через GDAL (GeoPackage, SXF, ESRI JSON, *.gdb…) */
+export type NetworkImportKind = 'shp' | 'vector' | 'gpx' | 'dxf' | 'table'
+
+/** Слой файла ГИС (в GeoPackage, SXF, базе ArcGIS их несколько) */
+export interface NetworkImportSourceLayer {
+  name: string
+  geometry_type: string | null
+  /** -1 — число объектов не прочитано */
+  count: number
+}
 
 export interface NetworkImportInspect {
   kind: NetworkImportKind
@@ -32,6 +41,10 @@ export interface NetworkImportInspect {
   suggested_mapping: Record<string, string>
   /** слои DXF с числом линий (можно взять только нужные) */
   layers?: { layer: string; count: number }[]
+  /** файл ГИС: формат, выбранный слой и все слои файла */
+  format?: string | null
+  layer?: string | null
+  source_layers?: NetworkImportSourceLayer[]
 }
 
 export interface NetworkImportParams {
@@ -48,6 +61,8 @@ export interface NetworkImportParams {
   sheet?: string
   /** слои DXF; не задано — все */
   layers?: string[]
+  /** слой многослойного файла ГИС */
+  layer?: string
 }
 
 export interface NetworkImportAction {
@@ -79,26 +94,28 @@ export const IMPORT_MODES: { value: NetworkImportMode; title: string; hint: stri
   {
     value: 'nodes',
     title: 'Узлы',
-    hint: 'Точки SHP или таблица Excel/CSV с X/Y → новые узлы фрагмента (код, наименование, отметка)',
-    accept: '.zip,.shp,.shx,.dbf,.prj,.cpg,.xlsx,.xlsm,.csv,.txt',
+    hint: 'Точки из файла ГИС (shapefile, GeoPackage, SXF, ESRI JSON, KML…) или таблица Excel/CSV с X/Y → '
+      + 'новые узлы фрагмента (код, наименование, отметка)',
+    accept: '.zip,.shp,.shx,.dbf,.prj,.cpg,.gpkg,.geojson,.json,.fgb,.sxf,.rsc,.gml,.xsd,.kml,.mif,.mid,.tab,.dat,.map,.id,.xlsx,.xlsm,.csv,.txt',
   },
   {
     value: 'lines',
     title: 'Участки',
-    hint: 'Трассы: линии SHP, треки GPX, линии DXF или таблица точек съёмки (X/Y по порядку, колонка «трасса» '
-      + 'делит линии) → участки; концы привязываются к узлам фрагмента в допуске, иначе создаются узлы',
-    accept: '.zip,.shp,.shx,.dbf,.prj,.cpg,.gpx,.dxf,.xlsx,.xlsm,.csv,.txt',
+    hint: 'Трассы: линии файла ГИС (shapefile, GeoPackage, SXF, ESRI JSON, KML…), треки GPX, линии DXF или '
+      + 'таблица точек съёмки (X/Y по порядку, колонка «трасса» делит линии) → участки; концы привязываются к '
+      + 'узлам фрагмента в допуске, иначе создаются узлы',
+    accept: '.zip,.shp,.shx,.dbf,.prj,.cpg,.gpkg,.geojson,.json,.fgb,.sxf,.rsc,.gml,.xsd,.kml,.mif,.mid,.tab,.dat,.map,.id,.gpx,.dxf,.xlsx,.xlsm,.csv,.txt',
   },
   {
     value: 'coords',
     title: 'Координаты узлов',
     hint: 'Таблица «id или код узла → X, Y»: перенос узлов, концы участков и длины пересчитываются',
-    accept: '.xlsx,.xlsm,.csv,.txt,.zip,.shp,.shx,.dbf,.prj,.cpg',
+    accept: '.xlsx,.xlsm,.csv,.txt,.zip,.shp,.shx,.dbf,.prj,.cpg,.gpkg,.geojson,.json,.fgb,.sxf,.rsc,.gml,.xsd,.kml,.mif,.mid,.tab,.dat,.map,.id',
   },
 ]
 
 export const IMPORT_CRS_OPTIONS: { value: NetworkImportCrs; title: string }[] = [
-  { value: 'auto', title: 'Из файла (.prj)' },
+  { value: 'auto', title: 'Из файла' },
   { value: 'wgs84', title: 'WGS84: долгота / широта' },
   { value: 'local', title: 'Местная система (SRID 9998), м' },
   { value: 'desktop', title: 'Координаты десктопа (x/y узлов, см)' },
@@ -114,6 +131,10 @@ export const crsOptionsFor = (inspect: NetworkImportInspect | null) =>
 
 export const importSourceTitle = (inspect: NetworkImportInspect): string => {
   if (inspect.kind === 'shp') return `Shapefile: ${inspect.geometry_type || 'без геометрии'}`
+  if (inspect.kind === 'vector') {
+    const layer = (inspect.source_layers?.length ?? 0) > 1 && inspect.layer ? `, слой «${inspect.layer}»` : ''
+    return `${inspect.format || 'Файл ГИС'}${layer}: ${inspect.geometry_type || 'без геометрии'}`
+  }
   if (inspect.kind === 'gpx') return 'GPX: треки и маршруты'
   if (inspect.kind === 'dxf') return `DXF: линии${inspect.layers?.length ? `, слоёв ${inspect.layers.length}` : ''}`
   return `Таблица${inspect.sheet ? ` «${inspect.sheet}»` : ''}`

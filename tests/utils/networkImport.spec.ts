@@ -5,6 +5,7 @@ import {
   defaultCrsFor,
   describeImportAction,
   importApiError,
+  importSourceTitle,
   importSummary,
   missingRequiredTargets,
   type NetworkImportInspect,
@@ -105,5 +106,23 @@ describe('network import helpers', () => {
     const res = importApiError({ data: { detail: { code: 'row_errors', message: 'm', report: rep } } });
     expect(res.report).toBe(rep);
     expect(importApiError({ data: { detail: 'Фрагмент 5 не найден' } }).message).toBe('Фрагмент 5 не найден');
+  });
+});
+
+describe('файлы ГИС через GDAL', () => {
+  it('подпись: формат и слой многослойного файла', () => {
+    const gpkg = inspect({
+      kind: 'vector', format: 'GeoPackage', layer: 'pipes', geometry_type: 'LineString',
+      source_layers: [{ name: 'pipes', geometry_type: 'LineString', count: 2 }, { name: 'wells', geometry_type: 'Point', count: 1 }],
+    });
+    expect(importSourceTitle(gpkg)).toBe('GeoPackage, слой «pipes»: LineString');
+    const one = inspect({ kind: 'vector', format: 'SXF («Панорама»)', layer: 'L', geometry_type: 'Point',
+      source_layers: [{ name: 'L', geometry_type: 'Point', count: 5 }] });
+    expect(importSourceTitle(one)).toBe('SXF («Панорама»): Point');
+  });
+
+  it('система координат — из файла, если она в нём есть', () => {
+    expect(crsOptionsFor(inspect({ kind: 'vector', crs_known: true })).map((o) => o.value)).toEqual(['auto']);
+    expect(crsOptionsFor(inspect({ kind: 'vector', crs_known: false })).map((o) => o.value)).toEqual(['wgs84', 'local', 'desktop']);
   });
 });

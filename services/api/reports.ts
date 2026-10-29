@@ -98,13 +98,14 @@ export const reportsApi = {
   async inspectNetworkImport(
     files: File[],
     mode: NetworkImportMode,
-    opts: { encoding?: string; sheet?: string } = {}
+    opts: { encoding?: string; sheet?: string; layer?: string } = {}
   ): Promise<NetworkImportInspect> {
     const form = new FormData();
     files.forEach((f) => form.append('files', f, f.name));
     form.append('mode', mode);
     if (opts.encoding) form.append('encoding', opts.encoding);
     if (opts.sheet) form.append('sheet', opts.sheet);
+    if (opts.layer) form.append('layer', opts.layer);
     return request<NetworkImportInspect>('api/v1/import/inspect', mutationOptions('POST', form));
   },
 

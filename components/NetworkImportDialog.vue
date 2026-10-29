@@ -72,7 +72,9 @@
             v-model="files"
             :accept="currentMode.accept"
             multiple
-            :label="mode === 'lines' ? 'Файл: zip с shapefile, .gpx, .dxf, .xlsx или .csv (точки съёмки)' : 'Файл: zip с shapefile (или .shp+.shx+.dbf+.prj), .xlsx, .csv'"
+            :label="mode === 'lines'
+              ? 'Файл ГИС (shapefile, GeoPackage, SXF+RSC, ESRI JSON, KML, MapInfo, zip), .gpx, .dxf, .xlsx или .csv'
+              : 'Файл ГИС (shapefile, GeoPackage, SXF+RSC, ESRI JSON, KML, MapInfo, zip), .xlsx или .csv'"
             density="compact"
             hide-details
             prepend-icon="mdi-file-upload-outline"
@@ -85,6 +87,15 @@
             :items="inspect.sheets"
             label="Лист"
             style="max-width: 200px"
+            :clearable="false"
+            @update:model-value="runInspect"
+          />
+          <AppSelect
+            v-if="(inspect?.source_layers?.length ?? 0) > 1"
+            v-model="sourceLayer"
+            :items="sourceLayerItems"
+            label="Слой файла"
+            style="max-width: 280px"
             :clearable="false"
             @update:model-value="runInspect"
           />
@@ -391,6 +402,8 @@ const visible = ref(false);
 const mode = ref<NetworkImportMode>('nodes');
 const files = ref<File[]>([]);
 const sheet = ref<string | undefined>(undefined);
+/** Слой многослойного файла ГИС (GeoPackage, SXF, база ArcGIS) */
+const sourceLayer = ref<string | undefined>(undefined);
 const inspect = ref<NetworkImportInspect | null>(null);
 const mapping = reactive<Record<string, string | null | undefined>>({});
 const fileid = ref<number | null>(null);
@@ -412,6 +425,10 @@ const currentMode = computed(() => IMPORT_MODES.find((m) => m.value === mode.val
 const canApply = computed(() => authStore.canEditTopology);
 const needsFragment = computed(() => mode.value !== 'coords' || matchBy.value === 'code');
 const crsItems = computed(() => crsOptionsFor(inspect.value));
+const sourceLayerItems = computed(() => (inspect.value?.source_layers ?? []).map((l) => ({
+  title: `${l.name}${l.geometry_type ? ` · ${l.geometry_type}` : ''}${l.count >= 0 ? ` (${l.count})` : ''}`,
+  value: l.name,
+})));
 const matchItems = [
   { title: 'Код узла (externalnodename, в пределах фрагмента)', value: 'code' },
   { title: 'Номер узла (id)', value: 'id' },
@@ -439,6 +456,7 @@ const params = (): NetworkImportParams => ({
   build_missing_lines: buildMissingLines.value,
   skip_errors: skipErrors.value,
   sheet: sheet.value,
+  layer: sourceLayer.value,
   layers: layers.value.length ? layers.value : undefined,
 });
 
@@ -466,6 +484,7 @@ function resetInspect() {
   undone.value = false;
   error.value = '';
   sheet.value = undefined;
+  sourceLayer.value = undefined;
   layers.value = [];
   Object.keys(mapping).forEach((k) => delete mapping[k]);
 }
@@ -496,9 +515,11 @@ const runInspect = async () => {
   error.value = '';
   report.value = null;
   try {
-    const res = await fastApiService.inspectNetworkImport(files.value, mode.value, { sheet: sheet.value });
+    const res = await fastApiService.inspectNetworkImport(files.value, mode.value,
+      { sheet: sheet.value, layer: sourceLayer.value });
     inspect.value = res;
     if (res.sheet) sheet.value = res.sheet;
+    if (res.layer) sourceLayer.value = res.layer;
     Object.keys(mapping).forEach((k) => delete mapping[k]);
     Object.assign(mapping, res.suggested_mapping);
     sourceCrs.value = defaultCrsFor(res);
