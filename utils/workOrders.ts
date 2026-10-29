@@ -13,6 +13,22 @@ export interface WorkOrderEvent {
   to_status: WorkOrderStatus | null;
   to_label: string | null;
   note: string;
+  /** где был телефон при действии из полевого приложения */
+  lon?: number | null;
+  lat?: number | null;
+}
+
+/** Фото с места работ (само фото — GET api/v1/work-orders/photos/{id}) */
+export interface WorkOrderPhoto {
+  id: number;
+  caption: string;
+  content_type: string;
+  size: number;
+  lon: number | null;
+  lat: number | null;
+  taken_at: string | null;
+  by_user: string;
+  created_at: string;
 }
 
 export interface WorkOrder {
@@ -50,6 +66,7 @@ export interface WorkOrder {
   revision: number;
   overdue: boolean;
   events?: WorkOrderEvent[];
+  photos?: WorkOrderPhoto[];
 }
 
 export interface WorkOrderList {

@@ -406,6 +406,30 @@
                 />
               </div>
 
+              <!-- фото с места работ (полевое приложение, pages/field.vue) -->
+              <template v-if="current.photos?.length">
+                <div class="text-caption text-medium-emphasis mb-1">
+                  Фото с места работ
+                </div>
+                <div class="wo-photos mb-3">
+                  <a
+                    v-for="p in current.photos"
+                    :key="p.id"
+                    :href="photoUrls[p.id] || undefined"
+                    target="_blank"
+                    rel="noopener"
+                    class="wo-photo"
+                    :title="[p.caption, formatDateTime(p.taken_at || p.created_at), p.by_user].filter(Boolean).join(' · ')"
+                  >
+                    <img
+                      v-if="photoUrls[p.id]"
+                      :src="photoUrls[p.id]"
+                      :alt="p.caption || 'Фото с места работ'"
+                    >
+                  </a>
+                </div>
+              </template>
+
               <div class="text-caption text-medium-emphasis mb-1">
                 История
               </div>
@@ -446,7 +470,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import AppSelect from '~/components/AppSelect.vue';
 import DataTable, { type DataTableColumn } from '~/components/DataTable.vue';
 import HintTip from '~/components/HintTip.vue';
@@ -570,8 +594,25 @@ const loadList = async () => {
   }
 };
 
+/** Фото отдаются с токеном — через blob; ссылки живут, пока открыто окно */
+const photoUrls = ref<Record<number, string>>({});
+const loadPhotos = async (order: WorkOrder) => {
+  for (const p of order.photos ?? []) {
+    if (photoUrls.value[p.id]) continue;
+    try {
+      const url = URL.createObjectURL(await fastApiService.getWorkOrderPhoto(p.id));
+      photoUrls.value = { ...photoUrls.value, [p.id]: url };
+    } catch (err: unknown) {
+      fail(err, 'Фото не загрузилось');
+      return;
+    }
+  }
+};
+onBeforeUnmount(() => Object.values(photoUrls.value).forEach((u) => URL.revokeObjectURL(u)));
+
 const show = (order: WorkOrder) => {
   current.value = order;
+  void loadPhotos(order);
   edit.value = {
     brigade_id: order.brigade_id, responsible_id: order.responsible_id,
     planned_finish: toInputDateTime(order.planned_finish),
@@ -730,6 +771,9 @@ defineExpose({ openDialog });
 .wo-field { flex: 1 1 0; min-width: 0; }
 .wo-pre { white-space: pre-wrap; }
 .wo-history { max-height: 260px; overflow-y: auto; }
+.wo-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+.wo-photo { aspect-ratio: 1; overflow: hidden; border-radius: 6px; background: rgba(var(--v-theme-on-surface), 0.06); }
+.wo-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 @media (max-width: 900px) {
   .wo-body { grid-template-columns: 1fr; }
 }

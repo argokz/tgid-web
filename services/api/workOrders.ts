@@ -8,6 +8,13 @@ import type {
 } from '~/utils/workOrders';
 import { encodePath, mutationOptions, request } from './http';
 
+/** Действие с устройства в поле: ключ (повтор отправки без дублей) и где был телефон */
+export interface FieldStamp {
+  client_id?: string;
+  lon?: number | null;
+  lat?: number | null;
+}
+
 export interface WorkOrderFilters {
   status?: WorkOrderStatus | null;
   brigade_id?: number | null;
@@ -47,12 +54,35 @@ export const workOrdersApi = {
 
   async transitionWorkOrder(
     id: number,
-    body: { to: WorkOrderStatus; revision: number; note?: string; result?: string | null },
+    body: { to: WorkOrderStatus; revision: number; note?: string; result?: string | null } & FieldStamp,
   ): Promise<WorkOrder> {
     return request<WorkOrder>(`api/v1/work-orders/${encodePath(id)}/transition`, mutationOptions('POST', body));
   },
 
-  async commentWorkOrder(id: number, note: string): Promise<WorkOrder> {
-    return request<WorkOrder>(`api/v1/work-orders/${encodePath(id)}/comments`, mutationOptions('POST', { note }));
+  async commentWorkOrder(id: number, note: string, stamp: FieldStamp = {}): Promise<WorkOrder> {
+    return request<WorkOrder>(`api/v1/work-orders/${encodePath(id)}/comments`, mutationOptions('POST', { note, ...stamp }));
+  },
+
+  /** Фото с места работ: JPEG/PNG/WebP до 2 МБ (на телефоне уменьшается заранее, utils/fieldPhoto.ts) */
+  async addWorkOrderPhoto(
+    id: number,
+    photo: Blob,
+    opts: { caption?: string; takenAt?: string | null } & FieldStamp = {},
+  ): Promise<WorkOrder> {
+    const form = new FormData();
+    form.append('file', photo, 'photo.jpg');
+    if (opts.caption) form.append('caption', opts.caption);
+    if (opts.takenAt) form.append('taken_at', opts.takenAt);
+    if (opts.client_id) form.append('client_id', opts.client_id);
+    if (opts.lon != null && opts.lat != null) {
+      form.append('lon', String(opts.lon));
+      form.append('lat', String(opts.lat));
+    }
+    return request<WorkOrder>(`api/v1/work-orders/${encodePath(id)}/photos`, mutationOptions('POST', form));
+  },
+
+  /** Само фото (с токеном — поэтому blob, а не ссылка в <img>) */
+  async getWorkOrderPhoto(photoId: number): Promise<Blob> {
+    return request<Blob>(`api/v1/work-orders/photos/${encodePath(photoId)}`, { responseType: 'blob' });
   },
 };
