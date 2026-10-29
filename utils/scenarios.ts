@@ -2,7 +2,7 @@
  * Сценарии «что если» (GET api/v1/scenarios/{id}/diff): подписи видов отличий, таблиц и полей,
  * текст «поле: было → стало». Иконки — из utils/mdiSvgPaths.ts / mdiSvgPathsLazy.ts.
  */
-import type { ScenarioChangeKind, ScenarioDiffItem } from '~/services/api/types'
+import type { ScenarioChangeKind, ScenarioDiffItem, ScenarioRegimeItem, ScenarioRegimeKind, ScenarioValuePair } from '~/services/api/types'
 
 export interface ScenarioKindMeta {
   label: string
@@ -105,3 +105,38 @@ export const scenarioKindCounts = (byKind: Partial<Record<ScenarioChangeKind, nu
   (Object.keys(SCENARIO_KIND_META) as ScenarioChangeKind[])
     .filter((kind) => (byKind?.[kind] ?? 0) > 0)
     .map((kind) => ({ kind, count: byKind![kind]!, ...SCENARIO_KIND_META[kind] }))
+
+// --- Режим сценария против основы (GET api/v1/scenarios/{id}/compare) ---
+
+/** Порядок — как на сервере: сначала последствия для потребителей */
+export const SCENARIO_REGIME_META: Record<ScenarioRegimeKind, ScenarioKindMeta> = {
+  became_underheated: { label: 'Стал недотоп', color: 'error', icon: 'mdi-thermometer' },
+  lost: { label: 'Не рассчитан (отключён)', color: 'error', icon: 'mdi-power-plug-off' },
+  became_overloaded: { label: 'Перегрузка участка', color: 'deep-orange-darken-2', icon: 'mdi-alert-octagon' },
+  became_fast: { label: 'Скорость выше нормы', color: 'deep-orange-darken-2', icon: 'mdi-speedometer' },
+  recovered: { label: 'Недотоп устранён', color: 'success', icon: 'mdi-check-circle' },
+  relieved: { label: 'Перегрузка снята', color: 'success', icon: 'mdi-check-circle' },
+  new: { label: 'Новый в сценарии', color: 'primary', icon: 'mdi-plus-circle-outline' },
+  changed: { label: 'Изменился режим', color: 'primary', icon: 'mdi-pencil' },
+}
+
+const fmt = (value: number | null | undefined, digits: number): string =>
+  value === null || value === undefined ? '—' : value.toLocaleString('ru-RU', { maximumFractionDigits: digits })
+
+const pairText = (label: string, pair: ScenarioValuePair | undefined, unit: string, digits = 1): string | null =>
+  pair ? `${label} ${fmt(pair[0], digits)} → ${fmt(pair[1], digits)} ${unit}` : null
+
+/** «Потребитель, узел №536426 «ТК-5»» / «Участок №325765»; у нового объекта — номер в сценарии */
+export const scenarioRegimeTitle = (item: Pick<ScenarioRegimeItem, 'object' | 'base_id' | 'copy_id' | 'name'>): string => {
+  const id = item.base_id != null ? `№${item.base_id}` : `№${item.copy_id} (новый)`
+  if (item.object === 'line') return `Участок ${id}`
+  return item.name ? `Потребитель, узел ${id} «${item.name}»` : `Потребитель, узел ${id}`
+}
+
+/** «напор 30 → 28 м · обеспеченность 105 → 80 % · расход 10 → 0 т/ч» */
+export const scenarioRegimeText = (item: ScenarioRegimeItem): string =>
+  (item.object === 'consumer'
+    ? [pairText('напор', item.head, 'м'), pairText('обеспеченность', item.supply, '%', 0), pairText('расход', item.flow, 'т/ч')]
+    : [pairText('расход', item.flow, 'т/ч'), pairText('скорость', item.velocity, 'м/с', 2), pairText('потери', item.loss, 'Па/м')])
+    .filter(Boolean)
+    .join(' · ')

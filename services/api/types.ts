@@ -396,6 +396,63 @@ export interface ScenarioDiff {
   items: ScenarioDiffItem[];
 }
 
+export type ScenarioRegimeKind =
+  | 'became_underheated' | 'lost' | 'became_overloaded' | 'became_fast' | 'recovered' | 'relieved' | 'new' | 'changed';
+
+/** Пары [основа, сценарий]; null — нет результата расчёта */
+export type ScenarioValuePair = [number | null, number | null];
+
+export interface ScenarioRegimeItem {
+  object: 'consumer' | 'line';
+  kind: ScenarioRegimeKind;
+  base_id: number | null;
+  copy_id: number | null;
+  anchor_type: 'node' | 'line';
+  anchor_id: number;
+  name: string | null;
+  /** потребитель: располагаемый напор, м; теплообеспеченность, %; расход, т/ч */
+  head?: ScenarioValuePair;
+  supply?: ScenarioValuePair;
+  /** участок: расход, т/ч; скорость, м/с; удельные потери, Па/м */
+  flow?: ScenarioValuePair;
+  velocity?: ScenarioValuePair;
+  loss?: ScenarioValuePair;
+  lat: number | null;
+  lng: number | null;
+}
+
+export interface ScenarioCalcInfo {
+  id: number;
+  fileid: number;
+  tn: number | null;
+  name: string | null;
+  date: string | null;
+  emergency: boolean;
+}
+
+/** GET api/v1/scenarios/{id}/compare: режим сценария против основы */
+export interface ScenarioRegimeCompare {
+  scenario_id: number;
+  name: string;
+  base_calculation: ScenarioCalcInfo;
+  scenario_calculation: ScenarioCalcInfo;
+  warnings: string[];
+  consumers: {
+    base: number; scenario: number; underheated_base: number; underheated_scenario: number;
+    load_base: number; load_scenario: number; flow_base: number; flow_scenario: number;
+    became_underheated: number; recovered: number; lost: number; new: number; changed: number;
+  };
+  lines: {
+    base: number; scenario: number; overloaded_base: number; overloaded_scenario: number;
+    became_overloaded: number; became_fast: number; relieved: number; lost: number; new: number; changed: number;
+  };
+  thresholds: { underheat_pct: number; head_delta_m: number; spec_loss_pa_m: number; velocity_ms: number };
+  kinds: Record<ScenarioRegimeKind, string>;
+  total: number;
+  truncated: boolean;
+  items: ScenarioRegimeItem[];
+}
+
 export type TopologyRuleSeverity = 'error' | 'warning';
 
 /** Замечание правил связности: error — sety не рассчитает, warning — подозрительно */

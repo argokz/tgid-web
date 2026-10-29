@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
+import type { ScenarioRegimeItem } from '~/services/api/types'
 import { resolveMdiSvgPath } from '~/utils/mdiSvgPaths'
 import {
   SCENARIO_KIND_META,
+  SCENARIO_REGIME_META,
   formatScenarioValue,
   isScenarioEdit,
   scenarioFieldsText,
   scenarioKindCounts,
   scenarioObjectTitle,
+  scenarioRegimeText,
+  scenarioRegimeTitle,
   scenarioTableLabel,
 } from '~/utils/scenarios'
 
@@ -40,6 +44,29 @@ describe('scenarios', () => {
 
   it('все иконки зарегистрированы', () => {
     for (const meta of Object.values(SCENARIO_KIND_META)) {
+      expect(resolveMdiSvgPath(meta.icon), meta.icon).toBeTruthy()
+    }
+  })
+})
+
+describe('scenarios: режим', () => {
+  it('текст потребителя и участка, нет результата — прочерк', () => {
+    const consumer: ScenarioRegimeItem = {
+      object: 'consumer', kind: 'lost', base_id: 536426, copy_id: 606565, anchor_type: 'node', anchor_id: 606565,
+      name: 'ТК-5', head: [30.04, null], supply: [105.2, null], flow: [10, null], lat: null, lng: null,
+    }
+    expect(scenarioRegimeText(consumer)).toBe('напор 30 → — м · обеспеченность 105 → — % · расход 10 → — т/ч')
+    expect(scenarioRegimeTitle(consumer)).toBe('Потребитель, узел №536426 «ТК-5»')
+    const line: ScenarioRegimeItem = {
+      object: 'line', kind: 'changed', base_id: null, copy_id: 404768, anchor_type: 'line', anchor_id: 404768,
+      name: null, flow: [952.06, 900.5], velocity: [0.334, 0.31], loss: [1, 0.9], lat: null, lng: null,
+    }
+    expect(scenarioRegimeTitle(line)).toBe('Участок №404768 (новый)')
+    expect(scenarioRegimeText(line)).toBe('расход 952,1 → 900,5 т/ч · скорость 0,33 → 0,31 м/с · потери 1 → 0,9 Па/м')
+  })
+
+  it('иконки видов режима зарегистрированы', () => {
+    for (const meta of Object.values(SCENARIO_REGIME_META)) {
       expect(resolveMdiSvgPath(meta.icon), meta.icon).toBeTruthy()
     }
   })

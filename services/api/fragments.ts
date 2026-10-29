@@ -1,6 +1,6 @@
 /** Фрагменты сети и данные карты. Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type { FeatureData, Fragment } from '~/types';
-import type { FragmentTransferReport, Scenario, ScenarioCreateResult, ScenarioDiff } from './types';
+import type { FragmentTransferReport, Scenario, ScenarioCreateResult, ScenarioDiff, ScenarioRegimeCompare } from './types';
 import { buildApiUrl, encodePath, fetchWithRetry, mutationOptions, request } from './http';
 
 export const fragmentsApi = {
@@ -69,6 +69,13 @@ export const fragmentsApi = {
   /** Отличия сценария от основы: правки сценария, конфликты, правки основы после создания */
   async getScenarioDiff(scenarioId: number, limit = 500): Promise<ScenarioDiff> {
     return request<ScenarioDiff>(`api/v1/scenarios/${encodePath(scenarioId)}/diff`, { query: { limit } });
+  },
+
+  /** Режим сценария против основы по двум расчётам: недотоп, напоры, расходы, перегрузка участков */
+  async compareScenarioCalculations(scenarioId: number, baseCalculationId: number, scenarioCalculationId: number): Promise<ScenarioRegimeCompare> {
+    return request<ScenarioRegimeCompare>(`api/v1/scenarios/${encodePath(scenarioId)}/compare`, {
+      query: { base_calculation_id: baseCalculationId, scenario_calculation_id: scenarioCalculationId },
+    });
   },
 
   async setScenarioStatus(scenarioId: number, status: Scenario['status']): Promise<{ id: number; status: Scenario['status'] }> {
