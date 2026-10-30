@@ -568,6 +568,7 @@ import { calculationScale } from '~/utils/calculationScale';
 import type { RegimePointsResult } from '~/utils/regimeMapPoints';
 import { useLocateMarkers } from '~/composables/useLocateMarkers';
 import { useMapDataVersion } from '~/composables/useMapDataVersion';
+import { useLiveChannel } from '~/composables/useLiveChannel';
 import type { LocatePoint } from '~/composables/useLocateMarkers';
 import { getNetworkFeatureKind, pickNetworkFeature } from '~/utils/networkFeature';
 import { nearestGroup, queryRenderedNear } from '~/utils/mapPick';
@@ -1535,6 +1536,8 @@ const onMapClickForTrace = async (e: any) => {
 // === Topology Edit Mode (composables/useTopologyEditor) ===
 // Правки других пользователей и десктопа — на карте через 30–60 с (версия данных в адресе тайлов)
 useMapDataVersion();
+// живая карта: кто на карте, правки других пользователей и десктопа — сразу (поток событий)
+useLiveChannel();
 
 const topologyEditor = useTopologyEditor({
   getMap: () => mapStore.map,

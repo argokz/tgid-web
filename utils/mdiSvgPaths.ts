@@ -192,6 +192,8 @@ import {
   mdiApplicationBracketsOutline,
   mdiSchoolOutline,
   mdiWebhook,
+  mdiAccountMultiple,
+  mdiAccountMultipleOutline,
 } from '@mdi/js'
 
 export const firstScreenMdiSvgPaths: Record<string, string> = {
@@ -377,6 +379,8 @@ export const firstScreenMdiSvgPaths: Record<string, string> = {
   mdiApplicationBracketsOutline,
   mdiSchoolOutline,
   mdiWebhook,
+  mdiAccountMultiple,
+  mdiAccountMultipleOutline,
 }
 
 /** Ленивый набор; null — ещё не загружен (и всегда на сервере: SSR и гидратация видят только первый экран) */

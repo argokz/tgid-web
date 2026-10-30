@@ -186,6 +186,9 @@
         </template>
       </HintTip>
 
+      <!-- Кто ещё на карте (живая карта) -->
+      <LivePresence />
+
       <!-- Пользователь -->
       <v-menu
         location="bottom end"
@@ -537,6 +540,7 @@ import type PlanningCalculationModal from '~/components/PlanningCalculationModal
 import type CalculationProtocol from '~/components/CalculationProtocol.vue';
 import ConfirmDialogHost from '~/components/ConfirmDialogHost.vue';
 import HintTip from '~/components/HintTip.vue';
+import LivePresence from '~/components/LivePresence.vue';
 import FirstRunHints from '~/components/FirstRunHints.vue';
 import AppLogo from '~/components/AppLogo.vue';
 import AppSplash from '~/components/AppSplash.vue';

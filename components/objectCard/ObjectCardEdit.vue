@@ -28,6 +28,36 @@
       >Повторить</v-btn>
     </div>
     <template v-else-if="card">
+      <!-- живая карта: объект сейчас правит кто-то ещё или его уже изменили -->
+      <v-alert
+        v-if="coEditors.length"
+        type="warning"
+        variant="tonal"
+        density="compact"
+        class="ma-2 mb-0"
+        icon="mdi-account-edit-outline"
+      >
+        Этот объект сейчас правит {{ coEditors.join(', ') }}. Сохранение второго из вас покажет конфликт.
+      </v-alert>
+      <v-alert
+        v-if="staleBy"
+        type="info"
+        variant="tonal"
+        density="compact"
+        class="ma-2 mb-0"
+        icon="mdi-update"
+      >
+        Объект изменил {{ staleBy }} — значения в форме устарели.
+        <template #append>
+          <v-btn
+            size="small"
+            variant="text"
+            @click="load"
+          >
+            Обновить
+          </v-btn>
+        </template>
+      </v-alert>
       <!-- кто создал объект в вебе (право «только свои») -->
       <div
         v-if="card.created"
@@ -400,7 +430,7 @@
 import HintTip from '~/components/HintTip.vue'
 /** «19.10.2026 12:21» — дата создания объекта в карточке */
 const formatCreated = (iso: string) => new Date(iso).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import CardFieldEditor from '~/components/objectCard/CardFieldEditor.vue';
 import CardHelperDialog from '~/components/objectCard/CardHelperDialog.vue';
 import ConsumerSchemeDialog from '~/components/objectCard/ConsumerSchemeDialog.vue';
@@ -409,6 +439,8 @@ import { ApiError, fastApiService } from '~/services/fastApiService';
 import { confirmAction } from '~/composables/useConfirm';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { useAuthStore } from '~/stores/authStore';
+import { useLiveStore } from '~/stores/liveStore';
+import { editorsOf, touches } from '~/utils/liveStream';
 import { formatApiError } from '~/utils/apiError';
 import { formatDesktopNumber } from '~/utils/desktopNumber';
 import {
@@ -440,9 +472,27 @@ const saving = ref(false);
 const tab = ref(0);
 const showErrors = ref(false);
 
+// живая карта: другие видят, что объект открыт на правку; правка объекта другими — предложить обновить форму
+const live = useLiveStore();
+const staleBy = ref('');
+const single = computed(() => !props.batchIds?.length);
+const coEditors = computed(() => (single.value
+  ? [...new Set(editorsOf(live.presence, props.kind, props.objectId, live.selfKey).map((p) => p.username))]
+  : []));
+watch(() => [props.kind, props.objectId, single.value] as const, ([kind, id, one]) => {
+  live.setEditing(one ? { kind, id, label: `карточка ${KIND_TEXT[kind].of} ${id}` } : null);
+}, { immediate: true });
+watch(() => live.lastChange, (c) => {
+  if (c && single.value && touches(c, card.value?.table ?? props.table, props.objectId)) {
+    staleBy.value = c.direct ? `десктоп (${c.by})` : c.by;
+  }
+});
+onBeforeUnmount(() => live.setEditing(null));
+
 const load = async () => {
   loading.value = true;
   loadError.value = '';
+  staleBy.value = '';
   try {
     const data = props.batchIds?.length
       ? await fastApiService.getCardBatch(props.batchIds, props.kind)
