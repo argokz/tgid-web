@@ -84,7 +84,7 @@
               aria-hidden="true"
             />
             <span class="flex-grow-1">
-              <b>{{ a.name }}</b> — {{ a.label }}<template v-if="a.pct != null">
+              <b>{{ a.name }}</b> — {{ a.label }}<template v-if="a.status === 'bad' && a.pct != null">
                 ({{ deviationText({ diff: a.diff ?? 0, pct: a.pct, status: 'bad', base_unit: '' }) }})
               </template>
             </span>
@@ -190,7 +190,7 @@
                     Факт
                   </th>
                   <th class="text-right">
-                    Расхождение
+                    От модели
                   </th>
                 </tr>
               </thead>
@@ -745,6 +745,11 @@ defineExpose({ openDialog });
 .tm-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-2, 8px); }
 .tm-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4, 16px); }
 .tm-table tbody tr { cursor: pointer; }
+/* длинные названия не выталкивают колонки факта и расхождения за край */
+.tm-table :deep(table) { table-layout: fixed; }
+.tm-table :deep(th:nth-child(2)) { width: 120px; }
+.tm-table :deep(th:nth-child(3)) { width: 104px; }
+.tm-table td:first-child .text-truncate, .tm-table td:first-child .text-caption { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tm-row--active { background: rgba(var(--v-theme-primary), 0.08); }
 .tm-alert { font-size: var(--text-sm, 0.8125rem); }
 .tm-alert__dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
