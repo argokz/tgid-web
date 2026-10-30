@@ -560,6 +560,34 @@ const chartOptions = computed(() => {
     );
   }
 
+  // Факт по датчикам телеметрии — точками поверх расчётных линий (ромб: показание, не расчёт)
+  const hasFacts = props.pathData.some((d) => d.h_pod_fact != null || d.h_obr_fact != null);
+  if (hasFacts) {
+    legendData.push('H под (датчик)', 'H обр (датчик)');
+    series.push(
+      {
+        name: 'H под (датчик)',
+        type: 'line',
+        data: props.pathData.map((d) => d.h_pod_fact ?? null),
+        lineStyle: { opacity: 0 },
+        itemStyle: { color: '#B71C1C', borderColor: '#fff', borderWidth: 1.5 },
+        symbol: 'diamond',
+        symbolSize: 13,
+        z: 5,
+      },
+      {
+        name: 'H обр (датчик)',
+        type: 'line',
+        data: props.pathData.map((d) => d.h_obr_fact ?? null),
+        lineStyle: { opacity: 0 },
+        itemStyle: { color: '#0D47A1', borderColor: '#fff', borderWidth: 1.5 },
+        symbol: 'diamond',
+        symbolSize: 13,
+        z: 5,
+      },
+    );
+  }
+
   if (showStatic.value && props.staticHead) {
     legendData.push('Статика');
     series.push({

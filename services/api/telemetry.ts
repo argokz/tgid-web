@@ -1,5 +1,5 @@
 /** Телеметрия (itwin-api routers/telemetry.py). Часть fastApiService (services/fastApiService.ts собирает разделы). */
-import type { ImportResult, Sensor, SensorInput, SensorSeries, TelemetryUnits } from '~/utils/telemetry';
+import type { ImportResult, Sensor, SensorInput, SensorSeries, TelemetryAlert, TelemetryUnits } from '~/utils/telemetry';
 import { encodePath, mutationOptions, request } from './http';
 
 export const telemetryApi = {
@@ -31,6 +31,15 @@ export const telemetryApi = {
 
   async deleteSensor(id: number): Promise<{ id: number; code: string; readings_deleted: number }> {
     return request(`api/v1/telemetry/sensors/${encodePath(id)}`, mutationOptions('DELETE'));
+  },
+
+  /** Тревоги: расхождение с моделью, датчик молчит, вернулся в норму; open — только непринятые */
+  async getTelemetryAlerts(open = false): Promise<TelemetryAlert[]> {
+    return request<TelemetryAlert[]>('api/v1/telemetry/alerts', { ...mutationOptions('GET'), query: open ? { open: true } : {} });
+  },
+
+  async acknowledgeTelemetryAlert(id: number): Promise<{ id: number }> {
+    return request(`api/v1/telemetry/alerts/${encodePath(id)}/ack`, mutationOptions('POST'));
   },
 
   /** Выгрузка ОДПУ: CSV или Excel, «время, код, значение» или «время, <код>, <код>…» */

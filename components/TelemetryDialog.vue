@@ -61,6 +61,52 @@
           </template>
         </v-alert>
 
+        <!-- непринятые тревоги: расхождение с моделью или датчик молчит -->
+        <v-alert
+          v-if="openAlerts.length"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+          icon="mdi-bell-alert-outline"
+        >
+          <div class="text-subtitle-2 mb-1">
+            Тревоги: {{ openAlerts.length }}
+          </div>
+          <div
+            v-for="a in openAlerts.slice(0, ALERTS_SHOWN)"
+            :key="a.id"
+            class="d-flex align-center ga-2 tm-alert"
+          >
+            <span
+              class="tm-alert__dot"
+              :style="{ background: ALERT_COLORS[a.status] }"
+              aria-hidden="true"
+            />
+            <span class="flex-grow-1">
+              <b>{{ a.name }}</b> — {{ a.label }}<template v-if="a.pct != null">
+                ({{ deviationText({ diff: a.diff ?? 0, pct: a.pct, status: 'bad', base_unit: '' }) }})
+              </template>
+            </span>
+            <span class="text-caption text-medium-emphasis text-no-wrap">{{ shortTime(a.at) }}</span>
+            <v-btn
+              v-if="canImport"
+              size="x-small"
+              variant="text"
+              :loading="acking === a.id"
+              @click="acknowledge(a)"
+            >
+              Принято
+            </v-btn>
+          </div>
+          <div
+            v-if="openAlerts.length > ALERTS_SHOWN"
+            class="text-caption"
+          >
+            и ещё {{ openAlerts.length - ALERTS_SHOWN }}
+          </div>
+        </v-alert>
+
         <!-- сводка -->
         <div class="tm-tiles mb-3">
           <KpiTile
@@ -436,6 +482,7 @@ import { useMapStore } from '~/stores/mapStore';
 import { useNotificationStore } from '~/stores/notificationStore';
 import { formatApiError } from '~/utils/apiError';
 import {
+  ALERT_COLORS,
   deviationText,
   sensorStatus,
   seriesOption,
@@ -449,6 +496,7 @@ import {
   type SensorKind,
   type SensorSeries,
   type SensorStatus,
+  type TelemetryAlert,
   type TelemetryUnits,
 } from '~/utils/telemetry';
 
@@ -487,6 +535,9 @@ const PERIODS = [
 ];
 
 const sensors = ref<Sensor[]>([]);
+const openAlerts = ref<TelemetryAlert[]>([]);
+const acking = ref<number | null>(null);
+const ALERTS_SHOWN = 5;
 const units = ref<TelemetryUnits | null>(null);
 const loading = ref(false);
 const saving = ref(false);
@@ -530,12 +581,14 @@ const placeText = (s: Sensor) => (s.node_id ? `узел ${s.node_name || s.node_
 const load = async () => {
   loading.value = true;
   try {
-    const [u, list] = await Promise.all([
+    const [u, list, alerts] = await Promise.all([
       units.value ? Promise.resolve(units.value) : fastApiService.getTelemetryUnits(),
       fastApiService.getSensors(),
+      fastApiService.getTelemetryAlerts(true),
     ]);
     units.value = u;
     sensors.value = list;
+    openAlerts.value = alerts;
   } catch (err: unknown) {
     errorMessage.value = formatApiError(err, 'Датчики не загружены');
   } finally {
@@ -555,6 +608,18 @@ const loadSeries = async () => {
     errorMessage.value = formatApiError(err, 'Показания не загружены');
   } finally {
     seriesLoading.value = false;
+  }
+};
+
+const acknowledge = async (a: TelemetryAlert) => {
+  acking.value = a.id;
+  try {
+    await fastApiService.acknowledgeTelemetryAlert(a.id);
+    openAlerts.value = openAlerts.value.filter((x) => x.id !== a.id);
+  } catch (err: unknown) {
+    errorMessage.value = formatApiError(err, 'Тревога не принята');
+  } finally {
+    acking.value = null;
   }
 };
 
@@ -681,6 +746,8 @@ defineExpose({ openDialog });
 .tm-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4, 16px); }
 .tm-table tbody tr { cursor: pointer; }
 .tm-row--active { background: rgba(var(--v-theme-primary), 0.08); }
+.tm-alert { font-size: var(--text-sm, 0.8125rem); }
+.tm-alert__dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .tm-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2, 8px); }
 @media (max-width: 900px) {
   .tm-grid { grid-template-columns: minmax(0, 1fr); }

@@ -514,6 +514,13 @@ export interface PiezometerPathNode {
   /** Двойной пьезометр: напоры второго расчёта */
   h_pod_2?: number | null;
   h_obr_2?: number | null;
+  /** Факт по датчикам телеметрии: напор = отметка + давление датчика, температура; время показания */
+  h_pod_fact?: number | null;
+  h_obr_fact?: number | null;
+  t_pod_fact?: number | null;
+  t_obr_fact?: number | null;
+  fact_at?: string | null;
+  fact_stale?: boolean;
 }
 
 /** Статика (gid8 Pjezo m_stat): max(отметка + высота здания) + 5 м по фрагментам маршрута */

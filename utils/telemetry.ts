@@ -82,6 +82,31 @@ export interface ImportResult {
   notes?: string[];
 }
 
+export type AlertStatus = 'bad' | 'silent' | 'normal';
+
+export interface TelemetryAlert {
+  id: number;
+  sensor_id: number;
+  code: string;
+  name: string;
+  kind: SensorKind;
+  pipe: SensorPipe;
+  status: AlertStatus;
+  prev_status: AlertStatus | null;
+  label: string;
+  at: string;
+  value: number | null;
+  model: number | null;
+  diff: number | null;
+  pct: number | null;
+  unit_label: string;
+  acknowledged_by: string | null;
+  acknowledged_at: string | null;
+}
+
+/** Цвет тревоги: расхождение, молчит, вернулся в норму */
+export const ALERT_COLORS: Record<AlertStatus, string> = { bad: '#C62828', silent: '#616161', normal: '#2E7D32' };
+
 /** Оценка датчика: молчит → нет показаний → нет модели → расхождение */
 export function sensorStatus(s: Pick<Sensor, 'last' | 'stale' | 'deviation' | 'model'>): SensorStatus {
   if (!s.last) return 'no_data';
