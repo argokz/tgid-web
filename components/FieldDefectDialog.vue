@@ -20,6 +20,12 @@
         />
       </v-card-title>
       <v-card-text>
+        <div
+          v-if="node"
+          class="text-body-2 mb-2"
+        >
+          Узел обхода: <b>{{ node.name }}</b> — отметится «с дефектом», дефект попадёт в контур осмотра.
+        </div>
         <div class="fdd-place mb-3">
           <v-icon
             :color="pos ? 'success' : 'warning'"
@@ -195,6 +201,7 @@ import {
   defaultSourceId,
   type DefectRef,
   type FieldDefectDraft,
+  type RouteNodeRef,
 } from '~/utils/fieldDefect';
 import { currentPosition, downscalePhoto, type LonLat } from '~/utils/fieldPhoto';
 
@@ -206,6 +213,8 @@ import { currentPosition, downscalePhoto, type LonLat } from '~/utils/fieldPhoto
 const props = defineProps<{
   sources: DefectRef[];
   categories: DefectRef[];
+  /** дефект с узла маршрута обхода */
+  node?: RouteNodeRef | null;
 }>();
 const emit = defineEmits<{ submit: [draft: FieldDefectDraft] }>();
 const open = defineModel<boolean>({ default: false });
@@ -283,6 +292,7 @@ function submit(): void {
     photo: photo.value,
     caption: caption.value.trim(),
     takenAt: takenAt.value,
+    node: props.node ?? null,
   });
   open.value = false;
 }

@@ -18,21 +18,31 @@
 <script setup lang="ts">
 /**
  * Карта места работ в полевом приложении (pages/field.vue): точка наряда, участки и узлы сети вокруг
- * (utils/fieldNetwork.ts — сохранены на телефоне, поэтому видны и без связи), положение бригады.
+ * (utils/fieldNetwork.ts — сохранены на телефоне, поэтому видны и без связи), положение бригады; у обхода —
+ * участки контура осмотра и узлы обхода, цвет узла — отметка (utils/fieldRoute.ts).
  * Подложка — растровые тайлы MapTiler: без связи их нет, сеть рисуется на сером фоне.
  */
 import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { FieldNetwork } from '~/utils/fieldNetwork';
+import { routePointFeatures, type WorkOrderRoute } from '~/utils/fieldRoute';
 import { formatDateTime, type WorkOrder } from '~/utils/workOrders';
 import { getMaplibreDefault } from '~/utils/maplibreLoader';
 import { getMapTilerStreetsTilesUrl } from '~/utils/maptiler';
 
-const props = defineProps<{ order: WorkOrder; network: FieldNetwork | null; online: boolean }>();
+const props = defineProps<{
+  order: WorkOrder;
+  network: FieldNetwork | null;
+  online: boolean;
+  /** маршрут обхода с учётом неотправленных отметок */
+  route?: WorkOrderRoute | null;
+}>();
 
 const ZOOM = 17;
 const ORDER_COLOR = '#D32F2F';
 const LINE_COLOR = '#1565C0';
+const ROUTE_COLOR = '#EF6C00';
+const FIT_PADDING = 32;
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 const mapEl = ref<HTMLElement | null>(null);
@@ -58,6 +68,18 @@ function draw(): void {
   (map.getSource('lines') as GeoJSONSource | undefined)?.setData(props.network?.lines ?? EMPTY);
   (map.getSource('nodes') as GeoJSONSource | undefined)?.setData(props.network?.nodes ?? EMPTY);
   (map.getSource('order') as GeoJSONSource | undefined)?.setData(orderPoint());
+  (map.getSource('route-lines') as GeoJSONSource | undefined)?.setData(props.route?.lines ?? EMPTY);
+  (map.getSource('route-points') as GeoJSONSource | undefined)?.setData(props.route ? routePointFeatures(props.route) : EMPTY);
+}
+
+/** Обход — весь маршрут в кадре (точка наряда у обхода — центр контура) */
+function fitRoute(): void {
+  const points = props.route?.points ?? [];
+  if (!map || points.length < 2) return;
+  const lons = points.map((p) => p.lon);
+  const lats = points.map((p) => p.lat);
+  map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
+    { padding: FIT_PADDING, maxZoom: ZOOM, duration: 0 });
 }
 
 onMounted(async () => {
@@ -79,6 +101,8 @@ onMounted(async () => {
         lines: { type: 'geojson', data: EMPTY },
         nodes: { type: 'geojson', data: EMPTY },
         order: { type: 'geojson', data: EMPTY },
+        'route-lines': { type: 'geojson', data: EMPTY },
+        'route-points': { type: 'geojson', data: EMPTY },
       },
       layers: [
         { id: 'bg', type: 'background', paint: { 'background-color': '#ECEFF1' } },
@@ -86,8 +110,17 @@ onMounted(async () => {
         { id: 'lines-casing', type: 'line', source: 'lines', paint: { 'line-color': '#FFFFFF', 'line-width': 6 } },
         { id: 'lines', type: 'line', source: 'lines', paint: { 'line-color': LINE_COLOR, 'line-width': 3 } },
         {
+          id: 'route-lines', type: 'line', source: 'route-lines',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': ROUTE_COLOR, 'line-width': 6, 'line-opacity': 0.75 },
+        },
+        {
           id: 'nodes', type: 'circle', source: 'nodes',
           paint: { 'circle-radius': 4, 'circle-color': '#FFFFFF', 'circle-stroke-color': LINE_COLOR, 'circle-stroke-width': 2 },
+        },
+        {
+          id: 'route-points', type: 'circle', source: 'route-points',
+          paint: { 'circle-radius': 7, 'circle-color': ['get', 'color'], 'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': 2 },
         },
         {
           id: 'order', type: 'circle', source: 'order',
@@ -100,10 +133,13 @@ onMounted(async () => {
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
   // где бригада относительно места работ (спутники телефона работают и без связи)
   map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'top-right');
-  map.on('load', draw);
+  map.on('load', () => {
+    draw();
+    fitRoute();
+  });
   // узел или участок по нажатию: имя и тип — текстом (setText, без HTML из базы)
   map.on('click', (e) => {
-    const f = map?.queryRenderedFeatures(e.point, { layers: ['nodes', 'lines'] })[0];
+    const f = map?.queryRenderedFeatures(e.point, { layers: ['route-points', 'nodes', 'lines'] })[0];
     if (!f || !map) return;
     const p = f.properties ?? {};
     const text = [p.title, p.node_type, p.card_type].filter(Boolean).join(' · ') || `объект ${p.id}`;
@@ -112,6 +148,10 @@ onMounted(async () => {
 });
 
 watch(() => props.network, draw);
+watch(() => props.route, (route, before) => {
+  draw();
+  if (route && !before) fitRoute();
+});
 watch(() => [props.order.lon, props.order.lat], () => {
   draw();
   if (props.order.lon != null && props.order.lat != null) map?.jumpTo({ center: [props.order.lon, props.order.lat] });

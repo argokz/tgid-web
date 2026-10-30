@@ -146,7 +146,7 @@
             variant="tonal"
             prepend-icon="mdi-alert-outline"
             class="mb-2"
-            @click="defectOpen = true"
+            @click="openDefect(null)"
           >
             Дефект на обходе
           </v-btn>
@@ -253,6 +253,10 @@
             {{ statusLabel(selected.status) }}
           </v-chip>
           <span class="text-caption text-medium-emphasis">{{ selected.kind_label }} · {{ selected.priority_label }}</span>
+          <span
+            v-if="selected.arrived_at"
+            class="text-caption text-success"
+          >· на месте с {{ timeText(selected.arrived_at) }}</span>
         </div>
         <h1 class="text-h6 mb-1">
           {{ selected.title }}
@@ -272,6 +276,7 @@
             :key="selected.id"
             :order="selected"
             :network="network"
+            :route="shownRoute"
             :online="online"
             class="mb-2"
           />
@@ -295,6 +300,82 @@
             На карте сети
           </v-btn>
         </div>
+
+        <!-- Обход по контуру осмотра: узлы по порядку, отметка «осмотрен» или дефект узла -->
+        <section
+          v-if="shownRoute"
+          class="fld-route mb-4"
+          aria-label="Обход"
+        >
+          <div class="d-flex align-center ga-2 mb-1">
+            <h2 class="text-subtitle-2 flex-grow-1">
+              Обход «{{ shownRoute.inspection.name }}»
+            </h2>
+            <span class="text-caption">{{ shownRoute.progress.ok + shownRoute.progress.defect }} из {{ shownRoute.progress.total }}</span>
+          </div>
+          <v-progress-linear
+            :model-value="routePercent"
+            color="success"
+            height="6"
+            rounded
+            class="mb-1"
+          />
+          <div class="text-caption text-medium-emphasis mb-2">
+            С дефектами: {{ shownRoute.progress.defect }}<template v-if="nextRoutePoint">
+              · <a
+                :href="routeLink(nextRoutePoint.lat, nextRoutePoint.lon, nextRoutePoint.name)"
+                class="text-primary"
+              >к следующему: {{ nextRoutePoint.name }}</a>
+            </template>
+          </div>
+          <div
+            v-for="p in shownRoute.points"
+            :key="p.node_id"
+            class="fld-point"
+            :class="{ 'fld-point--next': nextRoutePoint?.node_id === p.node_id }"
+          >
+            <span
+              class="fld-point__dot"
+              :style="{ background: CHECK_COLORS[p.state ?? 'none'] }"
+              aria-hidden="true"
+            />
+            <div class="flex-grow-1 min-w-0">
+              <div class="text-body-2 text-truncate">
+                {{ p.name }}
+              </div>
+              <div class="text-caption text-medium-emphasis">
+                {{ p.node_type || 'узел' }}<span v-if="p.state"> · {{ CHECK_LABELS[p.state] }}</span><span
+                  v-if="p.pending"
+                  class="text-warning"
+                > · не отправлено</span>
+              </div>
+            </div>
+            <template v-if="canEdit && routeOpen">
+              <v-btn
+                icon="mdi-check"
+                size="small"
+                color="success"
+                :variant="p.state === 'ok' ? 'flat' : 'tonal'"
+                :aria-label="`${p.name}: осмотрен`"
+                @click="queueCheck(p, 'ok')"
+              />
+              <v-btn
+                icon="mdi-alert-outline"
+                size="small"
+                color="error"
+                :variant="p.state === 'defect' ? 'flat' : 'tonal'"
+                :aria-label="`${p.name}: дефект`"
+                @click="reportNodeDefect(p)"
+              />
+            </template>
+          </div>
+          <div
+            v-if="shownRoute.truncated"
+            class="text-caption text-warning mt-1"
+          >
+            Контур большой — показана не вся часть маршрута.
+          </div>
+        </section>
 
         <!-- Действия бригады: только вперёд по цепочке «Начать» → «Выполнено» -->
         <div
@@ -322,6 +403,16 @@
               hide-details="auto"
               class="mb-2"
             />
+            <v-btn
+              v-if="shownRoute"
+              size="small"
+              variant="text"
+              prepend-icon="mdi-format-list-checks"
+              class="mb-2"
+              @click="resultText = routeSummary(shownRoute)"
+            >
+              Итог обхода
+            </v-btn>
             <v-btn
               block
               size="large"
@@ -458,6 +549,7 @@
       v-model="defectOpen"
       :sources="defectLookups.sources"
       :categories="defectLookups.categories"
+      :node="defectNode"
       @submit="queueDefect"
     />
 
@@ -476,7 +568,17 @@ import { ApiError } from '~/services/api/http';
 import { useAuthStore } from '~/stores/authStore';
 import { useFieldTrack } from '~/composables/useFieldTrack';
 import { appStorage } from '~/utils/appStorage';
-import { defectAction, defectRefs, type DefectRef, type FieldDefectDraft } from '~/utils/fieldDefect';
+import { defectAction, defectRefs, type DefectRef, type FieldDefectDraft, type RouteNodeRef } from '~/utils/fieldDefect';
+import {
+  CHECK_COLORS,
+  CHECK_LABELS,
+  applyPendingChecks,
+  nextPoint,
+  routeSummary,
+  type RouteCheckState,
+  type RoutePoint,
+  type WorkOrderRoute,
+} from '~/utils/fieldRoute';
 import { currentPosition, downscalePhoto, routeLink } from '~/utils/fieldPhoto';
 import {
   applyPending,
@@ -514,6 +616,7 @@ const SAVED_AT_KEY = 'field:savedAt';
 const CAN_EDIT_KEY = 'field:canEdit';
 const DEFECT_LOOKUPS_KEY = 'field:defectLookups';
 const ALL = 0;
+const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 const authStore = useAuthStore();
 const config = useRuntimeConfig();
@@ -525,6 +628,8 @@ const busy = ref(false);
 const photoBusy = ref(false);
 const loginOpen = ref(false);
 const defectOpen = ref(false);
+/** дефект с узла маршрута обхода (null — дефект просто на обходе) */
+const defectNode = ref<RouteNodeRef | null>(null);
 const notice = ref<{ type: 'success' | 'info' | 'warning' | 'error'; text: string } | null>(null);
 const cachedAt = ref('');
 
@@ -571,6 +676,18 @@ const shownOrders = computed(() =>
 );
 const selected = computed(() => shownOrders.value.find((o) => o.id === selectedId.value) ?? null);
 const pendingFor = (orderId: number) => queue.value.some((a) => a.orderId === orderId);
+
+/** Маршрут обхода открытого наряда с отметками, ещё не отправленными */
+const shownRoute = computed<WorkOrderRoute | null>(() => {
+  const route = network.value?.orderId === selectedId.value ? network.value?.route : null;
+  return route ? applyPendingChecks(route, queue.value) : null;
+});
+const nextRoutePoint = computed(() => (shownRoute.value ? nextPoint(shownRoute.value) : null));
+const routePercent = computed(() => {
+  const p = shownRoute.value?.progress;
+  return p?.total ? Math.round(((p.ok + p.defect) / p.total) * 100) : 0;
+});
+const routeOpen = computed(() => Boolean(selected.value && !['closed', 'cancelled'].includes(selected.value.status)));
 
 const photoTiles = computed(() => {
   const o = selected.value;
@@ -699,7 +816,28 @@ async function openOrder(id: number): Promise<void> {
   if (o && !isFresh(network.value)) {
     const fresh = await fetchNetwork(o);
     if (fresh && selectedId.value === id) network.value = fresh;
+  } else if (o?.inspection_id) {
+    await refreshRoute(o.id);
   }
+}
+
+/** Маршрут обхода с сервера — в сохранённую сеть наряда; нет связи — остаётся сохранённый */
+async function refreshRoute(orderId: number): Promise<void> {
+  if (!online.value) return;
+  try {
+    await saveRoute(await fastApiService.getWorkOrderRoute(orderId));
+  } catch {
+    // без связи или сервер занят — отметки покажет сохранённый маршрут и очередь
+  }
+}
+
+async function saveRoute(route: WorkOrderRoute): Promise<void> {
+  const net = (network.value?.orderId === route.order_id ? network.value : null)
+    ?? await fieldStore.loadNetwork(route.order_id)
+    ?? { orderId: route.order_id, savedAt: new Date().toISOString(), lines: EMPTY_FC, nodes: EMPTY_FC, truncated: false };
+  const next = { ...net, route };
+  await fieldStore.saveNetwork(next);
+  if (selectedId.value === route.order_id) network.value = next;
 }
 
 /** Сеть вокруг наряда — с сервера на телефон; не вышло (нет связи, сервер занят) — остаётся сохранённая */
@@ -708,11 +846,13 @@ async function fetchNetwork(o: WorkOrder): Promise<FieldNetwork | null> {
   try {
     const lines = await fastApiService.runNetworkSelect(networkSpec(o, 'lines'));
     const nodes = await fastApiService.runNetworkSelect(networkSpec(o, 'nodes'));
+    const route = o.inspection_id ? await fastApiService.getWorkOrderRoute(o.id) : null;
     const net: FieldNetwork = {
       orderId: o.id,
       savedAt: new Date().toISOString(),
       lines: resultToFeatures(lines),
       nodes: resultToFeatures(nodes),
+      route,
       truncated: lines.truncated || nodes.truncated,
     };
     await fieldStore.saveNetwork(net);
@@ -815,6 +955,22 @@ async function queueComment(): Promise<void> {
   await enqueue({ orderId: o.id, orderNumber: o.number, kind: 'comment', note });
 }
 
+function openDefect(node: RouteNodeRef | null): void {
+  defectNode.value = node;
+  defectOpen.value = true;
+}
+
+function reportNodeDefect(p: RoutePoint): void {
+  if (selected.value) openDefect({ orderId: selected.value.id, nodeId: p.node_id, name: p.name });
+}
+
+/** Отметка узла обхода — в очередь; карточка показывает её сразу (applyPendingChecks) */
+async function queueCheck(p: RoutePoint, state: RouteCheckState): Promise<void> {
+  const o = selected.value;
+  if (!o) return;
+  await enqueue({ orderId: o.id, orderNumber: o.number, kind: 'check', nodeId: p.node_id, nodeName: p.name, checkState: state });
+}
+
 /** Дефект с обхода — в очередь; место — из окна (уже замерено), заявку по нему создаст сервер */
 async function queueDefect(draft: FieldDefectDraft): Promise<void> {
   try {
@@ -852,13 +1008,20 @@ async function onPhoto(event: Event): Promise<void> {
   }
 }
 
-async function send(a: FieldAction): Promise<WorkOrder> {
+async function send(a: FieldAction): Promise<WorkOrder | null> {
   const stamp = { client_id: a.id, lon: a.lon, lat: a.lat };
+  if (a.kind === 'check') {
+    await saveRoute(await fastApiService.checkRoutePoint(a.orderId, {
+      node_id: a.nodeId as number, state: a.checkState ?? 'ok', ...stamp,
+    }));
+    return null;
+  }
   if (a.kind === 'defect') {
     // повтор после обрыва: сервер узнаёт дефект и фото по их ключам и вернёт ту же заявку
     const order = await fastApiService.reportFieldDefect({
       lon: a.lon as number, lat: a.lat as number, description: a.description ?? '', source_id: a.sourceId ?? null,
       category_id: a.categoryId ?? null, priority: a.priority ?? 2, found_at: a.createdAt, client_id: a.id,
+      order_id: a.routeOrderId ?? null, node_id: a.nodeId ?? null,
     });
     if (!a.photo) return order;
     return fastApiService.addWorkOrderPhoto(order.id, a.photo, {
@@ -901,6 +1064,8 @@ async function sync(): Promise<void> {
     syncing.value = false;
   }
   if (selected.value) void loadPhotos();
+  // дефект с узла обхода отмечает узел на сервере — маршрут заново
+  if (selected.value?.inspection_id) void refreshRoute(selected.value.id);
 }
 
 /** Конфликт перехода: наряд изменил диспетчер — повторить по его текущей версии, если переход ещё возможен */
@@ -1110,6 +1275,28 @@ onBeforeUnmount(() => {
 }
 .fld-pre {
   white-space: pre-wrap;
+}
+.fld-route {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+.fld-point {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+.fld-point--next {
+  background: rgba(var(--v-theme-primary), 0.06);
+}
+.fld-point__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 .fld-track {
   padding: 4px 12px 8px;

@@ -6,6 +6,7 @@ import type {
   WorkOrderLookups,
   WorkOrderStatus,
 } from '~/utils/workOrders';
+import type { RouteCheckState, WorkOrderRoute } from '~/utils/fieldRoute';
 import { encodePath, mutationOptions, request } from './http';
 
 /** Действие с устройства в поле: ключ (повтор отправки без дублей) и где был телефон */
@@ -25,6 +26,9 @@ export interface FieldDefectInput {
   category_id?: number | null;
   priority?: number;
   found_at?: string | null;
+  /** наряд на обход, в котором нашли, и узел его маршрута */
+  order_id?: number | null;
+  node_id?: number | null;
 }
 
 export interface WorkOrderFilters {
@@ -115,6 +119,19 @@ export const workOrdersApi = {
   async getFieldTrack(params: { brigade_id?: number; user?: string; since?: string; until?: string }): Promise<GeoJSON.FeatureCollection> {
     const query = Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) as Record<string, string | number>;
     return request<GeoJSON.FeatureCollection>('api/v1/field/track', { ...mutationOptions('GET'), query });
+  },
+
+  /** Обход по контуру осмотра: участки, узлы по порядку с отметками, итог */
+  async getWorkOrderRoute(id: number): Promise<WorkOrderRoute> {
+    return request<WorkOrderRoute>(`api/v1/work-orders/${encodePath(id)}/route`, mutationOptions('GET'));
+  },
+
+  /** Отметка узла обхода: осмотрен или с дефектом (ответ — маршрут с отметками) */
+  async checkRoutePoint(
+    id: number,
+    body: { node_id: number; state: RouteCheckState; note?: string } & FieldStamp,
+  ): Promise<WorkOrderRoute> {
+    return request<WorkOrderRoute>(`api/v1/work-orders/${encodePath(id)}/checks`, mutationOptions('POST', body));
   },
 
   /** Само фото (с токеном — поэтому blob, а не ссылка в <img>) */

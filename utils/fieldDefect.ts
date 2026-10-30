@@ -11,6 +11,13 @@ export interface DefectRef {
   name: string;
 }
 
+/** Дефект с узла маршрута обхода: наряд на обход и узел (дефект — в контур осмотра, узел — «с дефектом») */
+export interface RouteNodeRef {
+  orderId: number;
+  nodeId: number;
+  name: string;
+}
+
 export interface FieldDefectDraft {
   pos: LonLat;
   description: string;
@@ -20,6 +27,7 @@ export interface FieldDefectDraft {
   photo: Blob | null;
   caption: string;
   takenAt: string | null;
+  node?: RouteNodeRef | null;
 }
 
 /** Частые находки обхода — одним нажатием в описание */
@@ -60,6 +68,7 @@ export function defectAction(draft: FieldDefectDraft, ids: { id: string; photoId
     sourceId: draft.sourceId,
     categoryId: draft.categoryId,
     priority: draft.priority,
+    ...(draft.node ? { routeOrderId: draft.node.orderId, nodeId: draft.node.nodeId, nodeName: draft.node.name } : {}),
     ...(draft.photo ? { photo: draft.photo, photoId: ids.photoId, caption: draft.caption, takenAt: draft.takenAt ?? createdAt } : {}),
   };
 }

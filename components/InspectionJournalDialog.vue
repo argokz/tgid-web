@@ -512,6 +512,14 @@
               Редактировать
             </v-btn>
             <v-btn
+              v-if="selected && mutationsEnabled && authStore.canEditData"
+              variant="tonal"
+              prepend-icon="mdi-clipboard-list-outline"
+              @click="orderInspection(selected)"
+            >
+              Наряд на обход
+            </v-btn>
+            <v-btn
               v-if="selected"
               variant="tonal"
               prepend-icon="mdi-file-word-outline"
@@ -546,6 +554,8 @@ import { hasLonLat, localToday } from '~/utils/journalFields'
 import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
 import { useNotificationStore } from '~/stores/notificationStore'
+import { useAuthStore } from '~/stores/authStore'
+import { useUiStore } from '~/stores/uiStore'
 import { computed, reactive, ref, watch } from 'vue'
 import { useJournalEdit } from '~/composables/useJournalEdit'
 import { useMobile } from '~/composables/useMobile'
@@ -920,6 +930,18 @@ watch([responsibleId, coverageFilter, defectFilter, dateFrom, dateTo], () => {
   page.value = 1
   void loadInspections()
 })
+
+const authStore = useAuthStore()
+const uiStore = useUiStore()
+
+/** Наряд бригаде на обход этого контура: на телефоне — участки контура и узлы для отметки (фаза 2) */
+const orderInspection = (inspection: InspectionDetails) => {
+  detailsVisible.value = false
+  uiStore.requestToolDialog('workOrders', {
+    inspectionId: inspection.id,
+    title: `Обход: ${inspection.name || `контур №${inspection.id}`}`
+  })
+}
 
 const exportWord = async () => {
   if (!selected.value) return

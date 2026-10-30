@@ -177,6 +177,15 @@
                   class="wo-field"
                 />
               </div>
+              <v-alert
+                v-if="form.inspection_id"
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="mb-2"
+              >
+                Обход по контуру осмотра №{{ form.inspection_id }}: бригада отметит на телефоне каждый узел его участков.
+              </v-alert>
               <div class="d-flex ga-2">
                 <v-text-field
                   v-model.number="form.defect_id"
@@ -312,7 +321,10 @@
                 {{ current.title }}
               </div>
               <div class="text-caption text-medium-emphasis mb-2">
-                {{ current.kind_label }} · {{ placeText(current) }}
+                {{ current.kind_label }} · {{ placeText(current) }}<span
+                  v-if="current.arrived_at"
+                  class="text-success"
+                > · бригада на месте с {{ formatDateTime(current.arrived_at) }}</span>
               </div>
               <p
                 v-if="current.description"
@@ -581,6 +593,7 @@ interface FormState {
   kind: WorkOrderKind;
   priority: number;
   defect_id: number | null;
+  inspection_id: number | null;
   line_id: number | null;
   brigade_id: number | null;
   responsible_id: number | null;
@@ -589,7 +602,7 @@ interface FormState {
   description: string;
 }
 const emptyForm = (): FormState => ({
-  title: '', kind: 'repair', priority: 3, defect_id: null, line_id: null, brigade_id: null, responsible_id: null,
+  title: '', kind: 'repair', priority: 3, defect_id: null, inspection_id: null, line_id: null, brigade_id: null, responsible_id: null,
   planned_start: '', planned_finish: '', description: '',
 });
 const form = ref<FormState>(emptyForm());
@@ -681,7 +694,7 @@ const create = async () => {
     const f = form.value;
     await applied(await fastApiService.createWorkOrder({
       title: f.title.trim(), kind: f.kind, priority: f.priority, description: f.description,
-      defect_id: f.defect_id || null, line_id: f.line_id || null,
+      defect_id: f.defect_id || null, inspection_id: f.inspection_id || null, line_id: f.line_id || null,
       brigade_id: f.brigade_id, responsible_id: f.responsible_id,
       planned_start: fromInputDateTime(f.planned_start), planned_finish: fromInputDateTime(f.planned_finish),
     }));
@@ -812,10 +825,15 @@ watch(visible, async (open) => {
   await loadList();
 }, { immediate: true });
 
-/** Открыть окно; defectId / lineId — сразу форма нового наряда по дефекту или участку */
-const openDialog = (payload?: { defectId?: number; lineId?: number; title?: string }) => {
+/**
+ * Открыть окно; defectId / lineId — сразу форма нового наряда по дефекту или участку, inspectionId — наряд на
+ * обход по контуру осмотра (журнал осмотров)
+ */
+const openDialog = (payload?: { defectId?: number; lineId?: number; inspectionId?: number; title?: string }) => {
   visible.value = true;
-  if (payload?.defectId || payload?.lineId) {
+  if (payload?.inspectionId) {
+    startCreate({ inspection_id: payload.inspectionId, kind: 'inspection', title: payload.title ?? `Обход контура №${payload.inspectionId}` });
+  } else if (payload?.defectId || payload?.lineId) {
     startCreate({
       defect_id: payload.defectId ?? null, line_id: payload.lineId ?? null,
       title: payload.title ?? (payload.defectId ? `Устранить дефект №${payload.defectId}` : ''),

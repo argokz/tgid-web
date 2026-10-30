@@ -4,6 +4,7 @@
  * открывалась без связи. Только фрагмент наряда: сценарии — копии фрагментов с той же геометрией.
  */
 import type { SelectResult, SelectSpec } from '~/services/api/types';
+import type { WorkOrderRoute } from './fieldRoute';
 import type { WorkOrder } from './workOrders';
 
 /** Радиус: камеры и задвижки, которыми отключают участок, обычно в пределах квартала */
@@ -17,6 +18,8 @@ export interface FieldNetwork {
   savedAt: string;
   lines: GeoJSON.FeatureCollection;
   nodes: GeoJSON.FeatureCollection;
+  /** маршрут обхода (наряд по контуру осмотра) — тоже на телефоне, чтобы отмечать узлы без связи */
+  route?: WorkOrderRoute | null;
   /** не всё вошло (густая сеть) — подпись на карте */
   truncated: boolean;
 }

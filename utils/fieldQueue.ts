@@ -1,14 +1,15 @@
 /**
  * Очередь действий полевого приложения (pages/field.vue): бригада работает без связи — «Начать», «Выполнено»,
- * комментарии, фото и дефекты с обхода копятся на устройстве и уходят, когда сеть вернулась. Каждое действие несёт свой ключ
+ * комментарии, фото, дефекты и отметки обхода копятся на устройстве и уходят, когда сеть вернулась. Каждое действие несёт свой ключ
  * (client_id): если ответ потерялся после записи, повтор сервер узнаёт и второй раз не применяет
  * (itwin-api database/work_orders.py, _already_done).
  *
  * Здесь — чистые правила (порядок отправки, цепочка ревизий, что делать с ошибкой); хранение — fieldStore.ts.
  */
+import type { RouteCheckState } from './fieldRoute';
 import type { WorkOrder, WorkOrderStatus } from './workOrders';
 
-export type FieldActionKind = 'transition' | 'comment' | 'photo' | 'defect';
+export type FieldActionKind = 'transition' | 'comment' | 'photo' | 'defect' | 'check';
 /** У дефекта с обхода наряда ещё нет: заявку по нему создаст сервер */
 export const NEW_ORDER = 0;
 /** pending — ждёт отправки; conflict — наряд успели изменить (409); failed — сервер отказал, повтор не поможет */
@@ -41,6 +42,11 @@ export interface FieldAction {
   sourceId?: number | null;
   categoryId?: number | null;
   priority?: number;
+  // отметка узла обхода; у дефекта с узла — тот же узел и наряд на обход (routeOrderId)
+  nodeId?: number;
+  nodeName?: string;
+  checkState?: RouteCheckState;
+  routeOrderId?: number;
 }
 
 /** Что делать с ошибкой отправки */
@@ -70,6 +76,7 @@ export const ACTION_LABELS: Record<FieldActionKind, string> = {
   comment: 'Комментарий',
   photo: 'Фото',
   defect: 'Дефект',
+  check: 'Отметка обхода',
 };
 
 /** Подпись действия в списке «Не отправлено» */
@@ -77,6 +84,7 @@ export function describeAction(a: FieldAction, statusLabel: (s: WorkOrderStatus)
   if (a.kind === 'transition' && a.to) return `${a.orderNumber}: ${statusLabel(a.to)}`;
   if (a.kind === 'comment') return `${a.orderNumber}: «${(a.note ?? '').slice(0, 40)}»`;
   if (a.kind === 'defect') return `Дефект: «${(a.description ?? '').slice(0, 40)}»${a.photo ? ' с фото' : ''}`;
+  if (a.kind === 'check') return `${a.orderNumber}: ${a.nodeName ?? `узел ${a.nodeId}`} — ${a.checkState === 'defect' ? 'с дефектом' : 'осмотрен'}`;
   return `${a.orderNumber}: фото${a.caption ? ` «${a.caption.slice(0, 40)}»` : ''}`;
 }
 
@@ -103,11 +111,11 @@ export interface FlushResult {
   stopped: 'retry' | 'auth' | null;
   /** действия, получившие состояние conflict/failed, с текстом ошибки */
   marked: Array<{ id: string; state: Exclude<FieldActionState, 'pending'>; error: string }>;
-  /** свежие наряды из ответов сервера */
+  /** свежие наряды из ответов сервера (отметка обхода отвечает маршрутом — наряда в ответе нет) */
   orders: Map<number, WorkOrder>;
 }
 
-export type SendFn = (action: FieldAction) => Promise<WorkOrder>;
+export type SendFn = (action: FieldAction) => Promise<WorkOrder | null>;
 export type ErrorInfo = (error: unknown) => { status: number; message: string };
 
 /**
@@ -135,9 +143,9 @@ export async function flushQueue(queue: FieldAction[], send: SendFn, info: Error
     try {
       const order = await send(action);
       out.sent.push(action.id);
-      out.orders.set(order.id, order);
+      if (order) out.orders.set(order.id, order);
       if (action.kind === 'transition' && original.revision != null) {
-        chain.set(action.orderId, { from: original.revision, to: order.revision });
+        if (order) chain.set(action.orderId, { from: original.revision, to: order.revision });
       }
     } catch (error) {
       const { status, message } = info(error);

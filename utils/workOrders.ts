@@ -44,6 +44,10 @@ export interface WorkOrder {
   next: WorkOrderStatus[];
   defect_id: number | null;
   defect_name: string | null;
+  /** контур осмотра десктопа (osmotr): наряд на обход его участков */
+  inspection_id?: number | null;
+  /** когда бригада впервые оказалась у места работ (по треку телефона) */
+  arrived_at?: string | null;
   line_id: number | null;
   node_id: number | null;
   fileid: number | null;
@@ -89,6 +93,7 @@ export interface WorkOrderInput {
   kind: WorkOrderKind;
   priority: number;
   defect_id?: number | null;
+  inspection_id?: number | null;
   line_id?: number | null;
   node_id?: number | null;
   brigade_id?: number | null;
@@ -156,8 +161,9 @@ export function formatDateTime(iso: string | null | undefined): string {
 }
 
 /** Где работы: дефект, участок, узел */
-export function placeText(o: Pick<WorkOrder, 'defect_id' | 'line_id' | 'node_id' | 'fileid'>): string {
+export function placeText(o: Pick<WorkOrder, 'defect_id' | 'line_id' | 'node_id' | 'fileid'> & { inspection_id?: number | null }): string {
   const parts = [
+    o.inspection_id ? `контур осмотра №${o.inspection_id}` : '',
     o.defect_id ? `дефект №${o.defect_id}` : '',
     o.line_id ? `участок ${o.line_id}` : '',
     o.node_id ? `узел ${o.node_id}` : '',
