@@ -51,6 +51,7 @@ export type ToolEvent =
   | 'open-activity-log'
   | 'open-static-tiles'
   | 'open-embed-keys'
+  | 'open-webhooks'
   | 'open-group-setters'
   | 'open-pts-sites'
   | 'open-dictionaries'
@@ -106,6 +107,7 @@ export type ToolDialogKey =
   | 'activityLog'
   | 'staticTiles'
   | 'embedKeys'
+  | 'webhooks'
   | 'groupSetters'
   | 'ptsSites'
   | 'dictionaries'
@@ -233,6 +235,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
       { label: 'Пользователи', hint: 'Роли и права, блокировка, пароли', icon: 'mdi-account-cog', color: 'blue-grey-darken-3', event: 'open-users-admin', dialog: 'usersAdmin', requiresPerm: 'users_admin' },
       { label: 'Статичные слои (PMTiles)', hint: 'Здания и другие большие слои — готовым архивом тайлов: запечь, пересобрать, удалить', icon: 'mdi-layers-outline', color: 'blue-grey-darken-2', event: 'open-static-tiles', dialog: 'staticTiles', requires: 'admin' },
       { label: 'Встраиваемые карты', hint: 'Карта сети на портале акимата или в кабинете потребителя: ключи встраивания, код iframe и SDK', icon: 'mdi-application-brackets-outline', color: 'blue-grey-darken-2', event: 'open-embed-keys', dialog: 'embedKeys', requires: 'admin' },
+      { label: 'Вебхуки', hint: 'События для ERP, биллинга и CRM: новые дефекты, наряды и отключения — POST на адрес системы с подписью', icon: 'mdi-webhook', color: 'blue-grey-darken-2', event: 'open-webhooks', dialog: 'webhooks', requires: 'admin' },
     ],
   },
 ]

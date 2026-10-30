@@ -1809,6 +1809,7 @@ const toolDialogs: ToolDialogEntry[] = [
   { key: 'staticTiles', component: lazyDialog(() => import('./StaticTilesDialog.vue')) },
   // Встраиваемые карты (фаза 2, п. 14): ключи для iframe на чужих сайтах — администратор
   { key: 'embedKeys', component: lazyDialog(() => import('./EmbedKeysDialog.vue')) },
+  { key: 'webhooks', component: lazyDialog(() => import('./WebhooksDialog.vue')) },
   // Исходные данные (этап 9): участки ПТС, групповые установщики aSet* и справочники
   { key: 'ptsSites', component: lazyDialog(() => import('./PtsSitesDialog.vue')) },
   { key: 'groupSetters', component: lazyDialog(() => import('./GroupSetterDialog.vue')) },

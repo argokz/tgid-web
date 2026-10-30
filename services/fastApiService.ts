@@ -23,6 +23,7 @@ import { mapCommentsApi } from './api/mapComments';
 import { kpiApi } from './api/kpi';
 import { embedApi } from './api/embed';
 import { poiApi } from './api/poi';
+import { webhooksApi } from './api/webhooks';
 
 export const fastApiService = {
   ...coreApi,
@@ -43,4 +44,5 @@ export const fastApiService = {
   ...kpiApi,
   ...embedApi,
   ...poiApi,
+  ...webhooksApi,
 };
