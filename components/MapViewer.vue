@@ -1124,10 +1124,10 @@ const telemetryOverlay = useOverlayLayer(() => mapStore.map, 'telemetry-sensors'
 const onShowTelemetryOnMap = (data: GeoJSON.FeatureCollection) => {
   const map = mapStore.map;
   telemetryOverlay.show(data, [{
-    // участки пары датчиков (калибровка)
+    // участки пары датчиков (калибровка), зона баланса расхода (крупная — контуром)
     id: 'telemetry-sensors-lines',
     type: 'line',
-    filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+    filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString', 'Polygon', 'MultiPolygon']]],
     paint: { 'line-color': ['get', 'color'], 'line-width': 6, 'line-opacity': 0.85 },
   }, {
     id: 'telemetry-sensors-points',

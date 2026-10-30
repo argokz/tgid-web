@@ -180,10 +180,19 @@
           <v-tab value="forecast">
             Прогноз
           </v-tab>
+          <v-tab value="balance">
+            Баланс
+          </v-tab>
         </v-tabs>
 
         <!-- прогноз нагрузки по погоде -->
         <LoadForecastPanel v-if="tab === 'forecast'" />
+
+        <!-- баланс расхода по зонам между расходомерами: утечки -->
+        <FlowBalancePanel
+          v-else-if="tab === 'balance'"
+          @show-on-map="showBalanceZone"
+        />
 
         <!-- расчёт по фактическому режиму: граничные условия модели из телеметрии -->
         <div v-else-if="tab === 'regime'">
@@ -760,6 +769,7 @@ import {
 use([LineChart, MarkLineComponent]);
 
 const LoadForecastPanel = defineAsyncComponent(() => import('~/components/LoadForecastPanel.vue'));
+const FlowBalancePanel = defineAsyncComponent(() => import('~/components/FlowBalancePanel.vue'));
 
 /**
  * Телеметрия (фаза 3, «Цифровой двойник»): датчики давления, температуры и расхода в узлах и на участках,
@@ -794,7 +804,7 @@ const PERIODS = [
 ];
 
 const sensors = ref<Sensor[]>([]);
-const tab = ref<'sensors' | 'calibration' | 'regime' | 'forecast'>('sensors');
+const tab = ref<'sensors' | 'calibration' | 'regime' | 'forecast' | 'balance'>('sensors');
 const regime = ref<RegimeResult | null>(null);
 const regimeLoading = ref(false);
 const regimeTn = reactive<Record<number, number | null>>({});
@@ -943,6 +953,11 @@ watch(tab, (t) => {
   if (t === 'calibration') void loadCalibration();
   if (t === 'regime') void loadRegime();
 });
+
+const showBalanceZone = (fc: GeoJSON.FeatureCollection) => {
+  emit('show-on-map', fc);
+  overlay.markShown();
+};
 
 const showSegment = (seg: CalibrationSegment) => {
   emit('show-on-map', calibrationFeature(seg));

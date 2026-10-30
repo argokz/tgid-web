@@ -3,6 +3,7 @@ import type {
   CalibrationResult, ImportResult, RegimeResult, RegimeRunResult, Sensor, SensorInput, SensorSeries, TelemetryAlert,
   TelemetryUnits,
 } from '~/utils/telemetry';
+import type { BalanceResult, ZoneGeometry } from '~/utils/flowBalance';
 import { encodePath, mutationOptions, request } from './http';
 
 export const telemetryApi = {
@@ -58,6 +59,16 @@ export const telemetryApi = {
   /** Расчёт фрагмента по фактическому режиму (напоры и температура источника из телеметрии) — в очередь */
   async runRegime(fileid: number, tn: number | null): Promise<RegimeRunResult> {
     return request<RegimeRunResult>('api/v1/telemetry/regime/run', mutationOptions('POST', { fileid, tn }));
+  },
+
+  /** Баланс расхода по зонам между расходомерами: небаланс, ночной расход */
+  async getFlowBalance(): Promise<BalanceResult> {
+    return request<BalanceResult>('api/v1/telemetry/balance', mutationOptions('GET'));
+  },
+
+  /** Участки зоны баланса для карты */
+  async getBalanceZoneGeometry(key: number): Promise<ZoneGeometry> {
+    return request<ZoneGeometry>(`api/v1/telemetry/balance/zones/${encodePath(key)}/geometry`, mutationOptions('GET'));
   },
 
   /** Выгрузка ОДПУ: CSV или Excel, «время, код, значение» или «время, <код>, <код>…» */
