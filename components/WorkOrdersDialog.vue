@@ -88,6 +88,13 @@
             density="compact"
             hide-details
           />
+          <v-checkbox
+            v-if="canEdit"
+            v-model="brigadesOnMap"
+            label="Бригады"
+            density="compact"
+            hide-details
+          />
           <v-btn
             v-if="overlayShown"
             variant="tonal"
@@ -280,6 +287,23 @@
                       size="small"
                       aria-label="Показать на карте"
                       @click="emit('focus-coords', current.lon!, current.lat!)"
+                    />
+                  </template>
+                </HintTip>
+                <HintTip
+                  v-if="canEdit && current.brigade_id"
+                  :text="trackBrigadeId === current.brigade_id ? 'Убрать трек бригады' : 'Трек бригады за сутки'"
+                >
+                  <template #default="{ props: tip }">
+                    <v-btn
+                      v-bind="tip"
+                      icon="mdi-map-marker-path"
+                      variant="text"
+                      size="small"
+                      :color="trackBrigadeId === current.brigade_id ? 'primary' : undefined"
+                      :aria-pressed="trackBrigadeId === current.brigade_id"
+                      aria-label="Трек бригады за сутки"
+                      @click="toggleTrack(current.brigade_id)"
                     />
                   </template>
                 </HintTip>
@@ -477,6 +501,7 @@ import HintTip from '~/components/HintTip.vue';
 import KpiTile from '~/components/KpiTile.vue';
 import { useDialogMapOverlay } from '~/composables/useDialogMapOverlay';
 import { useMobile } from '~/composables/useMobile';
+import { useNotification } from '~/composables/useNotification';
 import { fastApiService } from '~/services/fastApiService';
 import { useAuthStore } from '~/stores/authStore';
 import { useUiStore } from '~/stores/uiStore';
@@ -485,6 +510,7 @@ import {
   PRIORITY_COLORS,
   STATUS_META,
   STATUS_ORDER,
+  fieldMapFeatures,
   formatDateTime,
   fromInputDateTime,
   isForward,
@@ -516,6 +542,7 @@ const { shown: overlayShown, keepOnMap } = overlay;
 const { isMobile } = useMobile();
 const authStore = useAuthStore();
 const uiStore = useUiStore();
+const { showInfo } = useNotification();
 const canEdit = computed(() => authStore.canEditData);
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -539,6 +566,12 @@ const errorMessage = ref('');
 const statusFilter = ref<WorkOrderStatus | null>(null);
 const search = ref('');
 const onMap = ref(false);
+/** бригады на карте (последние точки) и трек бригады за сутки — полевое приложение, право «Журналы» */
+const brigadesOnMap = ref(false);
+const trackBrigadeId = ref<number | null>(null);
+/** позиции бригад обновлять, пока они на карте: телефоны шлют точки раз в минуту */
+const POSITIONS_REFRESH_MS = 60_000;
+let positionsTimer: ReturnType<typeof setInterval> | null = null;
 const mode = ref<'view' | 'create'>('view');
 const comment = ref('');
 const resultText = ref('');
@@ -714,20 +747,50 @@ const sendComment = async () => {
 };
 
 const drawMap = async () => {
+  if (!onMap.value && !brigadesOnMap.value && !trackBrigadeId.value) {
+    emit('clear-highlight');
+    overlay.markCleared();
+    return;
+  }
   try {
-    emit('show-on-map', mapFeatures(await fastApiService.getWorkOrdersGeoJson()));
+    const [orders, positions, track] = await Promise.all([
+      onMap.value ? fastApiService.getWorkOrdersGeoJson() : null,
+      brigadesOnMap.value ? fastApiService.getFieldPositions() : null,
+      trackBrigadeId.value ? fastApiService.getFieldTrack({ brigade_id: trackBrigadeId.value }) : null,
+    ]);
+    const features = [...(orders ? mapFeatures(orders).features : []), ...fieldMapFeatures(positions, track)];
+    emit('show-on-map', { type: 'FeatureCollection', features });
     overlay.markShown();
+    return track;
   } catch (err: unknown) {
-    fail(err, 'Наряды на карте не показаны');
+    fail(err, 'Слой на карте не показан');
   }
 };
 
-watch(onMap, (on) => {
-  if (on) void drawMap();
-  else {
-    emit('clear-highlight');
-    overlay.markCleared();
-  }
+const toggleTrack = async (brigadeId: number) => {
+  trackBrigadeId.value = trackBrigadeId.value === brigadeId ? null : brigadeId;
+  const track = await drawMap();
+  if (!trackBrigadeId.value || !track) return;
+  // к последней точке трека; трека за сутки нет — сказать
+  const last = track.features.at(-1)?.geometry;
+  const coords = last?.type === 'LineString' ? last.coordinates.at(-1) : last?.type === 'Point' ? last.coordinates : null;
+  if (coords) emit('focus-coords', coords[0], coords[1]);
+  else showInfo('За сутки трека нет: бригада не передавала местоположение');
+};
+
+watch([onMap, brigadesOnMap], () => void drawMap());
+watch(brigadesOnMap, (on) => {
+  if (positionsTimer) clearInterval(positionsTimer);
+  positionsTimer = on ? setInterval(() => void drawMap(), POSITIONS_REFRESH_MS) : null;
+});
+watch(visible, (open) => {
+  if (open || !positionsTimer) return;
+  clearInterval(positionsTimer);
+  positionsTimer = null;
+  brigadesOnMap.value = false;
+});
+onBeforeUnmount(() => {
+  if (positionsTimer) clearInterval(positionsTimer);
 });
 
 watch(statusFilter, () => void loadList());

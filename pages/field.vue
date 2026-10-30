@@ -138,6 +138,46 @@
             class="flex-grow-1"
           />
         </div>
+        <template v-if="canEdit">
+          <v-btn
+            block
+            size="large"
+            color="error"
+            variant="tonal"
+            prepend-icon="mdi-alert-outline"
+            class="mb-2"
+            @click="defectOpen = true"
+          >
+            Дефект на обходе
+          </v-btn>
+          <div class="fld-track mb-3">
+            <v-switch
+              :model-value="trackOn"
+              color="primary"
+              density="compact"
+              hide-details
+              inset
+              label="Передавать местоположение"
+              @update:model-value="setTrack(Boolean($event))"
+            />
+            <div class="text-caption text-medium-emphasis">
+              <template v-if="trackOn">
+                Пока страница открыта и экран включён<span v-if="trackLastAt">
+                  · точка {{ timeText(trackLastAt) }}</span>
+              </template>
+              <template v-else>
+                Диспетчер увидит бригаду на карте
+              </template>
+              <span v-if="trackUnsent"> · не отправлено точек: {{ trackUnsent }}</span>
+            </div>
+            <div
+              v-if="trackError"
+              class="text-caption text-warning"
+            >
+              {{ trackError }}
+            </div>
+          </div>
+        </template>
         <div
           v-if="cachedAt"
           class="text-caption text-medium-emphasis mb-2"
@@ -413,6 +453,14 @@
       </template>
     </main>
 
+    <LazyFieldDefectDialog
+      v-if="defectOpen"
+      v-model="defectOpen"
+      :sources="defectLookups.sources"
+      :categories="defectLookups.categories"
+      @submit="queueDefect"
+    />
+
     <LazyLoginDialog
       v-if="loginOpen"
       v-model="loginOpen"
@@ -426,7 +474,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { fastApiService } from '~/services/fastApiService';
 import { ApiError } from '~/services/api/http';
 import { useAuthStore } from '~/stores/authStore';
+import { useFieldTrack } from '~/composables/useFieldTrack';
 import { appStorage } from '~/utils/appStorage';
+import { defectAction, defectRefs, type DefectRef, type FieldDefectDraft } from '~/utils/fieldDefect';
 import { currentPosition, downscalePhoto, routeLink } from '~/utils/fieldPhoto';
 import {
   applyPending,
@@ -462,6 +512,7 @@ const BRIGADE_KEY = 'field:brigade';
 const LOOKUPS_KEY = 'field:lookups';
 const SAVED_AT_KEY = 'field:savedAt';
 const CAN_EDIT_KEY = 'field:canEdit';
+const DEFECT_LOOKUPS_KEY = 'field:defectLookups';
 const ALL = 0;
 
 const authStore = useAuthStore();
@@ -473,10 +524,13 @@ const syncing = ref(false);
 const busy = ref(false);
 const photoBusy = ref(false);
 const loginOpen = ref(false);
+const defectOpen = ref(false);
 const notice = ref<{ type: 'success' | 'info' | 'warning' | 'error'; text: string } | null>(null);
 const cachedAt = ref('');
 
 const lookups = ref<WorkOrderLookups | null>(null);
+/** справочники журнала дефектов для «Дефект на обходе» (сохранённые — на случай без связи) */
+const defectLookups = ref<{ sources: DefectRef[]; categories: DefectRef[] }>({ sources: [], categories: [] });
 const orders = ref<WorkOrder[]>([]);
 const queue = ref<FieldAction[]>([]);
 const brigadeId = ref<number>(ALL);
@@ -552,6 +606,14 @@ function errorInfo(error: unknown): { status: number; message: string } {
 const cacheKey = () => `orders:${brigadeId.value || 'all'}`;
 const signedIn = () => authStore.isAuthenticated || authStore.authDisabled;
 
+const {
+  enabled: trackOn, unsent: trackUnsent, lastAt: trackLastAt, error: trackError,
+  setEnabled: setTrack, flush: flushTrack, forget: forgetTrack,
+} = useFieldTrack({ brigadeId: computed(() => brigadeId.value || null), online, canSend: signedIn, errorInfo });
+
+const timeText = (iso: string): string =>
+  new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
 async function loadOrders(): Promise<void> {
   // сервер ответил, что нужен вход, — сначала вход; сервер недоступен (настройки не пришли) — показать сохранённое
   if (!signedIn() && authStore.configLoaded) return;
@@ -562,6 +624,7 @@ async function loadOrders(): Promise<void> {
     // справочники — каждый раз при связи (бригады правят), сохранённые — только на случай без сети
     lookups.value = await fastApiService.getWorkOrderLookups();
     appStorage.setItem(LOOKUPS_KEY, JSON.stringify(lookups.value));
+    void loadDefectLookups();
     if (brigadeId.value !== ALL && !lookups.value.brigades.some((b) => b.id === brigadeId.value)) {
       brigadeId.value = ALL; // бригаду удалили — список заново загрузит наблюдатель
       return;
@@ -588,6 +651,17 @@ async function loadOrders(): Promise<void> {
     }
   } finally {
     loading.value = false;
+  }
+}
+
+/** Справочники для «Дефект на обходе»; не пришли — окно работает без них (источник и категория пустые) */
+async function loadDefectLookups(): Promise<void> {
+  try {
+    const res = await fastApiService.getDefectLookups();
+    defectLookups.value = { sources: defectRefs(res.sources), categories: defectRefs(res.categories) };
+    appStorage.setItem(DEFECT_LOOKUPS_KEY, JSON.stringify(defectLookups.value));
+  } catch {
+    // без связи — сохранённые с прошлого раза
   }
 }
 
@@ -741,6 +815,22 @@ async function queueComment(): Promise<void> {
   await enqueue({ orderId: o.id, orderNumber: o.number, kind: 'comment', note });
 }
 
+/** Дефект с обхода — в очередь; место — из окна (уже замерено), заявку по нему создаст сервер */
+async function queueDefect(draft: FieldDefectDraft): Promise<void> {
+  try {
+    const action = defectAction(draft, { id: newActionId(), photoId: newActionId() }, new Date().toISOString());
+    await fieldStore.putAction(action);
+    await reloadQueue();
+    await sync();
+    // сервер недоступен (а браузер считает, что сеть есть) — сказать, что дефект не потерялся
+    if (queue.value.some((a) => a.id === action.id && a.state === 'pending')) {
+      notice.value = { type: 'info', text: 'Дефект записан на телефоне — уйдёт, когда появится связь.' };
+    }
+  } catch (error) {
+    notice.value = { type: 'error', text: `Дефект не сохранился: ${errorInfo(error).message}` };
+  }
+}
+
 async function onPhoto(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -762,8 +852,19 @@ async function onPhoto(event: Event): Promise<void> {
   }
 }
 
-function send(a: FieldAction): Promise<WorkOrder> {
+async function send(a: FieldAction): Promise<WorkOrder> {
   const stamp = { client_id: a.id, lon: a.lon, lat: a.lat };
+  if (a.kind === 'defect') {
+    // повтор после обрыва: сервер узнаёт дефект и фото по их ключам и вернёт ту же заявку
+    const order = await fastApiService.reportFieldDefect({
+      lon: a.lon as number, lat: a.lat as number, description: a.description ?? '', source_id: a.sourceId ?? null,
+      category_id: a.categoryId ?? null, priority: a.priority ?? 2, found_at: a.createdAt, client_id: a.id,
+    });
+    if (!a.photo) return order;
+    return fastApiService.addWorkOrderPhoto(order.id, a.photo, {
+      caption: a.caption, takenAt: a.takenAt, client_id: a.photoId, lon: a.lon, lat: a.lat,
+    });
+  }
   if (a.kind === 'transition') {
     return fastApiService.transitionWorkOrder(a.orderId, {
       to: a.to as WorkOrderStatus, revision: a.revision as number, note: a.note ?? '', result: a.result ?? null, ...stamp,
@@ -794,6 +895,7 @@ async function sync(): Promise<void> {
     result.orders.forEach((o) => mergeOrder(o));
     if (result.stopped === 'auth') loginOpen.value = true;
     if (result.sent.length && !result.stopped) notice.value = { type: 'success', text: `Отправлено: ${result.sent.length}` };
+    void flushTrack();
   } finally {
     await reloadQueue();
     syncing.value = false;
@@ -835,6 +937,7 @@ async function logout(): Promise<void> {
     && !window.confirm(`Не отправлено: ${queue.value.length}. Это уйдёт от имени того, кто войдёт следующим. Выйти?`)) {
     return;
   }
+  await forgetTrack();
   authStore.logout();
   appStorage.removeItem(CAN_EDIT_KEY);
   savedCanEdit.value = false;
@@ -880,6 +983,12 @@ onMounted(async () => {
     appStorage.removeItem(LOOKUPS_KEY);
   }
   savedCanEdit.value = appStorage.getItem(CAN_EDIT_KEY) === '1';
+  try {
+    const raw = appStorage.getItem(DEFECT_LOOKUPS_KEY);
+    if (raw) defectLookups.value = JSON.parse(raw) as typeof defectLookups.value;
+  } catch {
+    appStorage.removeItem(DEFECT_LOOKUPS_KEY);
+  }
   const saved = Number(appStorage.getItem(BRIGADE_KEY));
   if (Number.isInteger(saved) && saved > 0) brigadeId.value = saved;
   // пришли из приложения — сессия уже в сторе, наблюдатель входа не сработает
@@ -1001,6 +1110,12 @@ onBeforeUnmount(() => {
 }
 .fld-pre {
   white-space: pre-wrap;
+}
+.fld-track {
+  padding: 4px 12px 8px;
+  border-radius: 12px;
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 .min-w-0 {
   min-width: 0;

@@ -1,6 +1,6 @@
 /**
  * Очередь действий полевого приложения (pages/field.vue): бригада работает без связи — «Начать», «Выполнено»,
- * комментарии и фото копятся на устройстве и уходят, когда сеть вернулась. Каждое действие несёт свой ключ
+ * комментарии, фото и дефекты с обхода копятся на устройстве и уходят, когда сеть вернулась. Каждое действие несёт свой ключ
  * (client_id): если ответ потерялся после записи, повтор сервер узнаёт и второй раз не применяет
  * (itwin-api database/work_orders.py, _already_done).
  *
@@ -8,7 +8,9 @@
  */
 import type { WorkOrder, WorkOrderStatus } from './workOrders';
 
-export type FieldActionKind = 'transition' | 'comment' | 'photo';
+export type FieldActionKind = 'transition' | 'comment' | 'photo' | 'defect';
+/** У дефекта с обхода наряда ещё нет: заявку по нему создаст сервер */
+export const NEW_ORDER = 0;
 /** pending — ждёт отправки; conflict — наряд успели изменить (409); failed — сервер отказал, повтор не поможет */
 export type FieldActionState = 'pending' | 'conflict' | 'failed';
 
@@ -29,10 +31,16 @@ export interface FieldAction {
   result?: string;
   // комментарий; у перехода — примечание
   note?: string;
-  // фото
+  // фото; у дефекта — снимок к нему (свой ключ photoId: ключ дефекта уже у события создания заявки)
   photo?: Blob;
   caption?: string;
   takenAt?: string;
+  photoId?: string;
+  // дефект с обхода
+  description?: string;
+  sourceId?: number | null;
+  categoryId?: number | null;
+  priority?: number;
 }
 
 /** Что делать с ошибкой отправки */
@@ -61,12 +69,14 @@ export const ACTION_LABELS: Record<FieldActionKind, string> = {
   transition: 'Смена статуса',
   comment: 'Комментарий',
   photo: 'Фото',
+  defect: 'Дефект',
 };
 
 /** Подпись действия в списке «Не отправлено» */
 export function describeAction(a: FieldAction, statusLabel: (s: WorkOrderStatus) => string): string {
   if (a.kind === 'transition' && a.to) return `${a.orderNumber}: ${statusLabel(a.to)}`;
   if (a.kind === 'comment') return `${a.orderNumber}: «${(a.note ?? '').slice(0, 40)}»`;
+  if (a.kind === 'defect') return `Дефект: «${(a.description ?? '').slice(0, 40)}»${a.photo ? ' с фото' : ''}`;
   return `${a.orderNumber}: фото${a.caption ? ` «${a.caption.slice(0, 40)}»` : ''}`;
 }
 

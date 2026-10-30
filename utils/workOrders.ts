@@ -172,7 +172,31 @@ export function mapFeatures(fc: GeoJSON.FeatureCollection): GeoJSON.FeatureColle
     type: 'FeatureCollection',
     features: fc.features.map((f) => {
       const status = (f.properties?.status ?? 'new') as WorkOrderStatus;
-      return { ...f, properties: { ...f.properties, color: STATUS_META[status]?.mapColor ?? '#607D8B' } };
+      return { ...f, properties: { ...f.properties, layer: 'order', color: STATUS_META[status]?.mapColor ?? '#607D8B' } };
     }),
   };
+}
+
+/** Бригады и трек на карте диспетчера (полевое приложение: «Передавать местоположение») */
+export const BRIGADE_MAP_COLOR = '#1565C0';
+export const TRACK_MAP_COLOR = '#7B1FA2';
+
+/** Давность последней точки бригады: «сейчас», «12 мин», «3 ч» */
+export function ageText(minutes: number): string {
+  if (minutes < 1) return 'сейчас';
+  if (minutes < 60) return `${minutes} мин`;
+  return `${Math.floor(minutes / 60)} ч`;
+}
+
+/** Позиции (GET /api/v1/field/positions) и трек (GET /api/v1/field/track) → объекты слоя нарядов */
+export function fieldMapFeatures(positions?: GeoJSON.FeatureCollection | null, track?: GeoJSON.FeatureCollection | null): GeoJSON.Feature[] {
+  const brigades = (positions?.features ?? []).map((f) => {
+    const p = f.properties ?? {};
+    return {
+      ...f,
+      properties: { ...p, layer: 'brigade', color: BRIGADE_MAP_COLOR, label: `${p.brigade_name ?? ''} · ${ageText(Number(p.age_min ?? 0))}` },
+    };
+  });
+  const lines = (track?.features ?? []).map((f) => ({ ...f, properties: { ...f.properties, layer: 'track', color: TRACK_MAP_COLOR } }));
+  return [...lines, ...brigades];
 }

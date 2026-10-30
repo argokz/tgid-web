@@ -1052,18 +1052,46 @@ const onShowOutagesOnMap = (data: GeoJSON.FeatureCollection) => {
   ]);
 };
 
-// === Наряды и заявки: открытые наряды точками (цвет — статус) ===
+// === Наряды и заявки: открытые наряды точками (цвет — статус), бригады и трек бригады (полевое приложение) ===
 const workOrdersOverlay = useOverlayLayer(() => mapStore.map, 'work-orders', {
-  layerIds: ['work-orders-halo', 'work-orders-points'],
+  layerIds: ['work-orders-track', 'work-orders-halo', 'work-orders-points', 'work-orders-brigades', 'work-orders-brigade-labels'],
 });
 
 const onShowWorkOrdersOnMap = (data: GeoJSON.FeatureCollection) => {
+  const layer = (name: string) => ['==', ['get', 'layer'], name];
   workOrdersOverlay.show(data, [
-    { id: 'work-orders-halo', type: 'circle', paint: { 'circle-radius': 11, 'circle-color': ['get', 'color'], 'circle-opacity': 0.25 } },
+    {
+      id: 'work-orders-track',
+      type: 'line',
+      filter: layer('track'),
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': ['get', 'color'], 'line-width': 3, 'line-opacity': 0.8 },
+    },
+    { id: 'work-orders-halo', type: 'circle', filter: layer('order'), paint: { 'circle-radius': 11, 'circle-color': ['get', 'color'], 'circle-opacity': 0.25 } },
     {
       id: 'work-orders-points',
       type: 'circle',
+      filter: layer('order'),
       paint: { 'circle-radius': 6, 'circle-color': ['get', 'color'], 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' },
+    },
+    {
+      id: 'work-orders-brigades',
+      type: 'circle',
+      filter: layer('brigade'),
+      paint: { 'circle-radius': 8, 'circle-color': ['get', 'color'], 'circle-stroke-width': 3, 'circle-stroke-color': '#fff' },
+    },
+    {
+      id: 'work-orders-brigade-labels',
+      type: 'symbol',
+      filter: layer('brigade'),
+      layout: {
+        'text-field': ['get', 'label'],
+        'text-font': ['Open Sans Regular'],
+        'text-size': 12,
+        'text-offset': [0, 1.3],
+        'text-anchor': 'top',
+      },
+      paint: { 'text-color': ['get', 'color'], 'text-halo-color': '#fff', 'text-halo-width': 1.5 },
     },
   ]);
 };

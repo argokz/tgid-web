@@ -56,6 +56,8 @@ export async function downscalePhoto(file: Blob): Promise<Blob> {
 export interface LonLat {
   lon: number;
   lat: number;
+  /** точность GPS, м */
+  accuracy?: number;
 }
 
 /** Где телефон сейчас; нет разрешения, нет спутников за 8 с — null (действие уходит без координат) */
@@ -66,7 +68,10 @@ export function currentPosition(): Promise<LonLat | null> {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lon: Number(p.coords.longitude.toFixed(6)), lat: Number(p.coords.latitude.toFixed(6)) }),
+      (p) => resolve({
+        lon: Number(p.coords.longitude.toFixed(6)), lat: Number(p.coords.latitude.toFixed(6)),
+        accuracy: Math.round(p.coords.accuracy),
+      }),
       () => resolve(null),
       { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: GPS_MAX_AGE_MS },
     );

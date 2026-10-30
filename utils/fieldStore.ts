@@ -5,21 +5,24 @@
  */
 import type { FieldNetwork } from './fieldNetwork';
 import type { FieldAction } from './fieldQueue';
+import type { TrackPoint } from './fieldTrack';
 import type { WorkOrder } from './workOrders';
 import { toRaw } from 'vue';
 import { storageKey } from './appStorage';
 
-// 2 — сеть вокруг нарядов (шаг 2: карта места работ без связи)
-const DB_VERSION = 2;
+// 2 — сеть вокруг нарядов (шаг 2: карта места работ без связи); 3 — точки трека бригады (шаг 3)
+const DB_VERSION = 3;
 const QUEUE = 'queue';
 const ORDERS = 'orders';
 const NETWORK = 'network';
+const TRACK = 'track';
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 const memory = {
   queue: new Map<string, FieldAction>(),
   orders: new Map<string, unknown>(),
   network: new Map<number, FieldNetwork>(),
+  track: new Map<string, TrackPoint>(),
 };
 
 function openDb(): Promise<IDBDatabase | null> {
@@ -36,6 +39,7 @@ function openDb(): Promise<IDBDatabase | null> {
         if (!db.objectStoreNames.contains(QUEUE)) db.createObjectStore(QUEUE, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(ORDERS)) db.createObjectStore(ORDERS);
         if (!db.objectStoreNames.contains(NETWORK)) db.createObjectStore(NETWORK, { keyPath: 'orderId' });
+        if (!db.objectStoreNames.contains(TRACK)) db.createObjectStore(TRACK, { keyPath: 't' });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
@@ -135,5 +139,45 @@ export const fieldStore = {
     const db = await openDb();
     const value = db ? await run<unknown>(db, ORDERS, 'readonly', (s) => s.get(key)) : memory.orders.get(key);
     return Array.isArray(value) ? (value as WorkOrder[]) : null;
+  },
+
+  async addTrackPoint(point: TrackPoint): Promise<void> {
+    const db = await openDb();
+    if (db) await run(db, TRACK, 'readwrite', (s) => s.put({ ...point }));
+    else memory.track.set(point.t, point);
+  },
+
+  /** Неотправленные точки трека, старые — первыми */
+  async listTrack(): Promise<TrackPoint[]> {
+    const db = await openDb();
+    const items = db ? await run<TrackPoint[]>(db, TRACK, 'readonly', (s) => s.getAll()) : [...memory.track.values()];
+    return items.sort((a, b) => a.t.localeCompare(b.t));
+  },
+
+  async countTrack(): Promise<number> {
+    const db = await openDb();
+    return db ? run<number>(db, TRACK, 'readonly', (s) => s.count()) : memory.track.size;
+  },
+
+  /** Отправленные (или все — при выходе: чужие точки не уходят от имени следующего) */
+  async deleteTrack(keys?: string[]): Promise<void> {
+    const db = await openDb();
+    if (!db) {
+      if (keys) keys.forEach((k) => memory.track.delete(k));
+      else memory.track.clear();
+      return;
+    }
+    if (!keys) {
+      await run(db, TRACK, 'readwrite', (s) => s.clear());
+      return;
+    }
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(TRACK, 'readwrite');
+      const store = tx.objectStore(TRACK);
+      keys.forEach((k) => store.delete(k));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? new Error('IndexedDB: транзакция прервана'));
+    });
   },
 };

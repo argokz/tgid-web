@@ -15,6 +15,18 @@ export interface FieldStamp {
   lat?: number | null;
 }
 
+/** Дефект с обхода: точка, что нашли; участок сервер берёт ближайший (до 30 м), если не указан */
+export interface FieldDefectInput {
+  lon: number;
+  lat: number;
+  description: string;
+  line_id?: number | null;
+  source_id?: number | null;
+  category_id?: number | null;
+  priority?: number;
+  found_at?: string | null;
+}
+
 export interface WorkOrderFilters {
   status?: WorkOrderStatus | null;
   brigade_id?: number | null;
@@ -79,6 +91,30 @@ export const workOrdersApi = {
       form.append('lat', String(opts.lat));
     }
     return request<WorkOrder>(`api/v1/work-orders/${encodePath(id)}/photos`, mutationOptions('POST', form));
+  },
+
+  /** «Дефект одной кнопкой» с обхода: дефект в журнал десктопа и заявка по нему (ответ — заявка) */
+  async reportFieldDefect(body: FieldDefectInput & FieldStamp): Promise<WorkOrder> {
+    return request<WorkOrder>('api/v1/work-orders/field-defect', mutationOptions('POST', body));
+  },
+
+  /** Пачка точек трека бригады; повтор той же пачки сервер не дублирует */
+  async sendFieldTrack(body: {
+    brigade_id: number | null;
+    points: Array<{ t: string; lon: number; lat: number; accuracy: number | null }>;
+  }): Promise<{ accepted: number; skipped: number }> {
+    return request('api/v1/field/track', mutationOptions('POST', body));
+  },
+
+  /** Где бригады сейчас: последняя точка каждого за hours часов (право «Журналы») */
+  async getFieldPositions(hours = 12): Promise<GeoJSON.FeatureCollection> {
+    return request<GeoJSON.FeatureCollection>('api/v1/field/positions', { ...mutationOptions('GET'), query: { hours } });
+  },
+
+  /** Трек бригады за период (по умолчанию — последние сутки) */
+  async getFieldTrack(params: { brigade_id?: number; user?: string; since?: string; until?: string }): Promise<GeoJSON.FeatureCollection> {
+    const query = Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) as Record<string, string | number>;
+    return request<GeoJSON.FeatureCollection>('api/v1/field/track', { ...mutationOptions('GET'), query });
   },
 
   /** Само фото (с токеном — поэтому blob, а не ссылка в <img>) */

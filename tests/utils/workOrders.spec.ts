@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BRIGADE_MAP_COLOR,
   STATUS_META,
   STATUS_ORDER,
+  TRACK_MAP_COLOR,
+  ageText,
+  fieldMapFeatures,
   formatDateTime,
   fromInputDateTime,
   isForward,
@@ -49,6 +53,20 @@ describe('workOrders: наряды', () => {
     const fc = mapFeatures({ type: 'FeatureCollection', features: [
       { type: 'Feature', geometry: { type: 'Point', coordinates: [71.5, 51.1] }, properties: { id: 1, status: 'in_progress' } },
     ] });
-    expect(fc.features[0]!.properties).toEqual({ id: 1, status: 'in_progress', color: STATUS_META.in_progress.mapColor });
+    expect(fc.features[0]!.properties).toEqual({ id: 1, status: 'in_progress', layer: 'order', color: STATUS_META.in_progress.mapColor });
+  });
+
+  it('бригады и трек на карте диспетчера', () => {
+    expect([ageText(0), ageText(12), ageText(125)]).toEqual(['сейчас', '12 мин', '2 ч']);
+    const positions = { type: 'FeatureCollection' as const, features: [
+      { type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [76.9, 43.2] }, properties: { brigade_name: 'Бригада Север', age_min: 7 } },
+    ] };
+    const track = { type: 'FeatureCollection' as const, features: [
+      { type: 'Feature' as const, geometry: { type: 'LineString' as const, coordinates: [[76.9, 43.2], [76.91, 43.2]] }, properties: { points: 2 } },
+    ] };
+    const [line, brigade] = fieldMapFeatures(positions, track);
+    expect(line!.properties).toMatchObject({ layer: 'track', color: TRACK_MAP_COLOR });
+    expect(brigade!.properties).toMatchObject({ layer: 'brigade', color: BRIGADE_MAP_COLOR, label: 'Бригада Север · 7 мин' });
+    expect(fieldMapFeatures(null, undefined)).toEqual([]);
   });
 });
