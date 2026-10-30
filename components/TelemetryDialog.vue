@@ -174,10 +174,138 @@
           <v-tab value="calibration">
             Калибровка
           </v-tab>
+          <v-tab value="regime">
+            Режим
+          </v-tab>
         </v-tabs>
 
+        <!-- расчёт по фактическому режиму: граничные условия модели из телеметрии -->
+        <div v-if="tab === 'regime'">
+          <p class="text-body-2 mb-2">
+            Напоры и температура в узлах заданного напора (источники, подкачки, вводы фрагментов) — в последнем расчёте
+            и по датчикам (среднее за {{ regime?.window_min ?? 15 }} мин). Расчёт по факту берёт их из показаний:
+            остальные датчики сравниваются уже с фактическим режимом. «Режим изменился» — отличие больше
+            {{ regime?.thresholds.head_m ?? 2 }} м или {{ regime?.thresholds.temp_c ?? 2 }} °C.
+            <template v-if="regime?.auto">
+              Перерасчёт запускается сам, не чаще раза в {{ regime.auto_every_min }} мин.
+            </template>
+          </p>
+          <v-progress-linear
+            v-if="regimeLoading && !regime"
+            indeterminate
+          />
+          <p
+            v-else-if="regime && !regime.fragments.length"
+            class="text-body-2 text-medium-emphasis"
+          >
+            В узлах заданного напора нет датчиков давления или температуры подачи. Поставьте датчик в узел источника
+            (вкладка «Датчики»).
+          </p>
+          <div
+            v-for="fr in regime?.fragments ?? []"
+            :key="fr.fileid"
+            class="tm-regime mb-4"
+          >
+            <div class="d-flex align-center flex-wrap ga-2 mb-1">
+              <div class="text-subtitle-2">
+                {{ fr.name || `Фрагмент ${fr.fileid}` }}
+              </div>
+              <div class="text-caption text-medium-emphasis">
+                <template v-if="fr.calculation">
+                  расчёт №{{ fr.calculation.id }}<template v-if="fr.calculation.at">
+                    от {{ shortTime(fr.calculation.at) }}
+                  </template>, Tн {{ fr.calculation.tn }} °C<template v-if="fr.calculation.by_fact">
+                    · по факту
+                  </template>
+                </template>
+                <template v-else>
+                  расчётов нет
+                </template>
+              </div>
+              <v-spacer />
+              <v-text-field
+                v-if="authStore.canCalculate"
+                v-model.number="regimeTn[fr.fileid]"
+                type="number"
+                label="Tн, °C"
+                density="compact"
+                hide-details
+                class="tm-regime__tn"
+              />
+              <v-btn
+                v-if="authStore.canCalculate"
+                size="small"
+                :variant="fr.recalc_needed ? 'flat' : 'tonal'"
+                :color="fr.recalc_needed ? 'primary' : undefined"
+                :disabled="!fr.can_run || regimeRunning !== null"
+                :loading="regimeRunning === fr.fileid"
+                @click="runRegime(fr)"
+              >
+                Рассчитать по факту
+              </v-btn>
+            </div>
+            <v-table
+              density="compact"
+              class="tm-cal"
+            >
+              <thead>
+                <tr>
+                  <th>Узел</th>
+                  <th class="text-right">
+                    Подача, м
+                  </th>
+                  <th class="text-right">
+                    Обратка, м
+                  </th>
+                  <th class="text-right">
+                    t подачи, °C
+                  </th>
+                  <th>Состояние</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="n in fr.nodes"
+                  :key="n.node_id"
+                >
+                  <td>
+                    {{ n.node_name || n.node_id }}
+                    <div class="text-caption text-medium-emphasis text-no-wrap">
+                      задано {{ n.set.p1 ?? '—' }} / {{ n.set.p2 ?? '—' }} м
+                    </div>
+                  </td>
+                  <td class="text-right text-no-wrap">
+                    {{ regimeCell(n.model?.p1, n.fact.p1) }}
+                  </td>
+                  <td class="text-right text-no-wrap">
+                    {{ regimeCell(n.model?.p2, n.fact.p2) }}
+                  </td>
+                  <td class="text-right text-no-wrap">
+                    {{ regimeCell(n.model?.t1, n.fact.t1) }}
+                  </td>
+                  <td>
+                    <span :style="{ color: regimeState(n).color }">{{ regimeState(n).text }}</span>
+                    <div
+                      v-if="n.changes.length || n.silent.length"
+                      class="text-caption text-medium-emphasis tm-cal__text"
+                    >
+                      {{ [...n.changes, ...(n.silent.length ? [`молчат: ${n.silent.join(', ')}`] : [])].join('; ') }}
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </div>
+          <div
+            v-if="regimeTask"
+            class="text-body-2"
+          >
+            {{ regimeTask }}
+          </div>
+        </div>
+
         <!-- калибровка: потери напора между соседними датчиками давления -->
-        <div v-if="tab === 'calibration'">
+        <div v-else-if="tab === 'calibration'">
           <p class="text-body-2 mb-2">
             Потери напора между соседними датчиками давления одной трубы — по показаниям (среднее за
             {{ calibration?.window_min ?? 30 }} мин) и по последнему расчёту. Расхождение в пределах погрешности
@@ -601,6 +729,8 @@ import {
   CALIBRATION_META,
   calibrationFeature,
   deviationText,
+  regimeCell,
+  regimeState,
   sensorStatus,
   seriesOption,
   seriesSummary,
@@ -610,6 +740,8 @@ import {
   type CalibrationResult,
   type CalibrationSegment,
   type ImportResult,
+  type RegimeFragment,
+  type RegimeResult,
   type Sensor,
   type SensorInput,
   type SensorKind,
@@ -654,7 +786,14 @@ const PERIODS = [
 ];
 
 const sensors = ref<Sensor[]>([]);
-const tab = ref<'sensors' | 'calibration'>('sensors');
+const tab = ref<'sensors' | 'calibration' | 'regime'>('sensors');
+const regime = ref<RegimeResult | null>(null);
+const regimeLoading = ref(false);
+const regimeTn = reactive<Record<number, number | null>>({});
+const regimeRunning = ref<number | null>(null);
+const regimeTask = ref('');
+const TASK_POLL_MS = 3_000;
+const TASK_POLL_MAX = 400; // 20 мин — расчёт крупного фрагмента
 const calibration = ref<CalibrationResult | null>(null);
 const calibrationLoading = ref(false);
 const openAlerts = ref<TelemetryAlert[]>([]);
@@ -743,8 +882,58 @@ const loadCalibration = async () => {
     calibrationLoading.value = false;
   }
 };
+const loadRegime = async () => {
+  regimeLoading.value = true;
+  try {
+    regime.value = await fastApiService.getRegime();
+    for (const fr of regime.value.fragments) {
+      if (regimeTn[fr.fileid] === undefined) regimeTn[fr.fileid] = fr.calculation?.tn ?? null;
+    }
+  } catch (err: unknown) {
+    errorMessage.value = formatApiError(err, 'Режим источников не загружен');
+  } finally {
+    regimeLoading.value = false;
+  }
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Ждёт задачу расчёта: true — расчёт записан */
+const waitTask = async (taskId: string): Promise<boolean> => {
+  for (let i = 0; i < TASK_POLL_MAX && visible.value; i++) {
+    await sleep(TASK_POLL_MS);
+    const st = await fastApiService.getTaskStatus(taskId);
+    if (st.status === 'SUCCESS') return true;
+    if (st.status === 'FAILURE') throw new Error(st.error || 'Расчёт завершился с ошибкой');
+  }
+  return false;
+};
+
+const runRegime = async (fr: RegimeFragment) => {
+  const tn = regimeTn[fr.fileid];
+  regimeRunning.value = fr.fileid;
+  regimeTask.value = '';
+  try {
+    const res = await fastApiService.runRegime(fr.fileid, typeof tn === 'number' && Number.isFinite(tn) ? tn : null);
+    regimeTask.value = `Расчёт по факту (Tн ${res.tn} °C) в очереди…`;
+    const done = await waitTask(res.task_id);
+    regimeTask.value = done ? 'Расчёт по факту записан: датчики сравниваются с фактическим режимом.'
+      : 'Расчёт ещё идёт — результат появится в списке расчётов.';
+    if (done) {
+      notify.showSuccess('Расчёт по факту записан');
+      await Promise.all([loadRegime(), load()]);
+    }
+  } catch (err: unknown) {
+    regimeTask.value = '';
+    errorMessage.value = formatApiError(err, 'Расчёт по факту не выполнен');
+  } finally {
+    regimeRunning.value = null;
+  }
+};
+
 watch(tab, (t) => {
   if (t === 'calibration') void loadCalibration();
+  if (t === 'regime') void loadRegime();
 });
 
 const showSegment = (seg: CalibrationSegment) => {
@@ -893,6 +1082,7 @@ defineExpose({ openDialog });
 .tm-table td:first-child .text-truncate, .tm-table td:first-child .text-caption { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tm-row--active { background: rgba(var(--v-theme-primary), 0.08); }
 .tm-cal { font-size: var(--text-sm, 0.8125rem); }
+.tm-regime__tn { max-width: 110px; }
 .tm-cal__text { white-space: normal; max-width: 280px; }
 .tm-alert { font-size: var(--text-sm, 0.8125rem); }
 .tm-alert__dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }

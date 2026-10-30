@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   deviationText,
+  regimeCell,
+  regimeState,
   sensorStatus,
   seriesOption,
   seriesSummary,
   sortSensors,
   valueText,
+  type RegimeNode,
   type Sensor,
   type SensorSeries,
 } from '~/utils/telemetry';
@@ -74,5 +77,28 @@ describe('calibrationFeature', () => {
     const fc = calibrationFeature(seg);
     expect(fc.features[0].properties).toEqual({ name: '2-20 → 2-40А', color: CALIBRATION_META.rough.color });
     expect(calibrationFeature({ ...seg, geometry: null }).features).toEqual([]);
+  });
+});
+
+describe('regime', () => {
+  const node: RegimeNode = {
+    node_id: 535303, fileid: 74, node_name: 'ТЭЦ-1', set: { p1: 120, p2: 54 },
+    fact: { p1: 111.6, p2: 53.5, t1: 124.8 }, model: { p1: 120, p2: 54, t1: 132 },
+    sensors: ['P1', 'P2', 'T1'], silent: [], problem: null, changes: ['напор подачи 120 → 111.6 м'],
+  };
+
+  it('regimeCell: расчёт → факт, без лишней стрелки', () => {
+    expect(regimeCell(120, 111.6)).toBe('120 → 111,6');
+    expect(regimeCell(54, 54.02)).toBe('54');
+    expect(regimeCell(132, null)).toBe('132');
+    expect(regimeCell(undefined, 53.5)).toBe('53,5');
+    expect(regimeCell(null, null)).toBe('—');
+  });
+
+  it('regimeState: ошибка факта важнее изменения', () => {
+    expect(regimeState(node).text).toBe('режим изменился');
+    expect(regimeState({ ...node, problem: 'нет свежих показаний' }).text).toBe('нет свежих показаний');
+    expect(regimeState({ ...node, changes: [] }).text).toBe('совпадает с расчётом');
+    expect(regimeState({ ...node, changes: [], model: null }).text).toBe('нет расчёта');
   });
 });

@@ -158,6 +158,58 @@ export function calibrationFeature(seg: CalibrationSegment): GeoJSON.FeatureColl
   };
 }
 
+/** Напоры подачи / обратки над отметкой (м) и температура подачи (°C) узла заданного напора */
+export interface RegimeValues { p1: number | null; p2: number | null; t1: number | null }
+
+export interface RegimeNode {
+  node_id: number;
+  fileid: number;
+  node_name: string | null;
+  set: { p1: number | null; p2: number | null };
+  fact: RegimeValues;
+  model: RegimeValues | null;
+  sensors: string[];
+  silent: string[];
+  problem: string | null;
+  changes: string[];
+}
+
+export interface RegimeFragment {
+  fileid: number;
+  name: string | null;
+  calculation: { id: number; at: string | null; tn: number | null; name: string | null; user: string | null;
+    by_fact: boolean } | null;
+  nodes: RegimeNode[];
+  can_run: boolean;
+  recalc_needed: boolean;
+}
+
+export interface RegimeResult {
+  window_min: number;
+  thresholds: { head_m: number; temp_c: number };
+  auto: boolean;
+  auto_every_min: number;
+  fragments: RegimeFragment[];
+}
+
+export interface RegimeRunResult { task_id: string; tn: number; zn_fakt: string; message: string }
+
+/** Ячейка «расчёт → факт»: факт без расчёта, расчёт без факта, «—» без обоих */
+export function regimeCell(model: number | null | undefined, fact: number | null): string {
+  const f = (v: number) => v.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
+  if (fact == null) return model == null ? '—' : f(model);
+  if (model == null || Math.abs(model - fact) < 0.05) return f(fact);
+  return `${f(model)} → ${f(fact)}`;
+}
+
+/** Состояние узла: годен ли факт для расчёта и отличается ли от расчёта */
+export function regimeState(node: RegimeNode): { text: string; color: string } {
+  if (node.problem) return { text: node.problem, color: '#6A1B9A' };
+  if (node.changes.length) return { text: 'режим изменился', color: '#B26A00' };
+  if (!node.model) return { text: 'нет расчёта', color: '#616161' };
+  return { text: 'совпадает с расчётом', color: '#2E7D32' };
+}
+
 /** Цвет тревоги: расхождение, молчит, вернулся в норму */
 export const ALERT_COLORS: Record<AlertStatus, string> = { bad: '#C62828', silent: '#616161', normal: '#2E7D32' };
 

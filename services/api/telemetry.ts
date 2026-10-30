@@ -1,6 +1,7 @@
 /** Телеметрия (itwin-api routers/telemetry.py). Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type {
-  CalibrationResult, ImportResult, Sensor, SensorInput, SensorSeries, TelemetryAlert, TelemetryUnits,
+  CalibrationResult, ImportResult, RegimeResult, RegimeRunResult, Sensor, SensorInput, SensorSeries, TelemetryAlert,
+  TelemetryUnits,
 } from '~/utils/telemetry';
 import { encodePath, mutationOptions, request } from './http';
 
@@ -47,6 +48,16 @@ export const telemetryApi = {
   /** Калибровка: потери напора между соседними датчиками давления, факт против модели */
   async getCalibration(): Promise<CalibrationResult> {
     return request<CalibrationResult>('api/v1/telemetry/calibration', mutationOptions('GET'));
+  },
+
+  /** Режим источников: граничные условия последнего расчёта против телеметрии */
+  async getRegime(): Promise<RegimeResult> {
+    return request<RegimeResult>('api/v1/telemetry/regime', mutationOptions('GET'));
+  },
+
+  /** Расчёт фрагмента по фактическому режиму (напоры и температура источника из телеметрии) — в очередь */
+  async runRegime(fileid: number, tn: number | null): Promise<RegimeRunResult> {
+    return request<RegimeRunResult>('api/v1/telemetry/regime/run', mutationOptions('POST', { fileid, tn }));
   },
 
   /** Выгрузка ОДПУ: CSV или Excel, «время, код, значение» или «время, <код>, <код>…» */
