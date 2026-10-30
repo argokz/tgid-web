@@ -3,7 +3,7 @@ import type {
   CalibrationResult, ImportResult, RegimeResult, RegimeRunResult, Sensor, SensorInput, SensorSeries, TelemetryAlert,
   TelemetryUnits,
 } from '~/utils/telemetry';
-import type { BalanceResult, ZoneGeometry } from '~/utils/flowBalance';
+import type { BalanceAlert, BalanceResult, ZoneGeometry } from '~/utils/flowBalance';
 import { encodePath, mutationOptions, request } from './http';
 
 export const telemetryApi = {
@@ -64,6 +64,16 @@ export const telemetryApi = {
   /** Баланс расхода по зонам между расходомерами: небаланс, ночной расход */
   async getFlowBalance(): Promise<BalanceResult> {
     return request<BalanceResult>('api/v1/telemetry/balance', mutationOptions('GET'));
+  },
+
+  /** Тревоги зон баланса расхода (openOnly — непринятые и не закрытые возвратом в норму) */
+  async getBalanceAlerts(openOnly = true): Promise<BalanceAlert[]> {
+    return request<BalanceAlert[]>('api/v1/telemetry/balance/alerts',
+      { ...mutationOptions('GET'), query: { open: openOnly } });
+  },
+
+  async acknowledgeBalanceAlert(id: number): Promise<unknown> {
+    return request(`api/v1/telemetry/balance/alerts/${encodePath(id)}/ack`, mutationOptions('POST'));
   },
 
   /** Участки зоны баланса для карты */

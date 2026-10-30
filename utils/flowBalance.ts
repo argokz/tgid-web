@@ -51,6 +51,35 @@ export interface BalanceResult {
   night_hours?: [number, number];
 }
 
+export interface BalanceAlert {
+  id: number;
+  zone_key: number;
+  zone_kind: ZoneKind;
+  boundary: number[];
+  status: 'growth' | 'leak' | 'normal';
+  prev_status: string | null;
+  at: string;
+  night: string | null;
+  night_value: number | null;
+  night_baseline: number | null;
+  night_growth: number | null;
+  excess: number | null;
+  uncertainty: number | null;
+  acknowledged_by: string | null;
+  acknowledged_at: string | null;
+}
+
+/** Тревога зоны одной строкой: что случилось и цифры */
+export function alertText(a: BalanceAlert): string {
+  const where = `${ZONE_KIND_LABELS[a.zone_kind]} (участки ${a.boundary.join(', ')})`;
+  if (a.status === 'growth') {
+    return `${where}: ночной расход ${flowText(a.night_baseline)} → ${flowText(a.night_value)} т/ч `
+      + `(${flowText(a.night_growth, true)})`;
+  }
+  if (a.status === 'leak') return `${where}: небаланс ${flowText(a.excess, true)} ± ${flowText(a.uncertainty)} т/ч`;
+  return `${where}: баланс в норме`;
+}
+
 export interface ZoneGeometry { key: number; lines: number; hull: boolean; geometry: GeoJSON.Geometry | null }
 
 /** Вывод по зоне: подпись и цвет (статусные цвета — не категориальные) */

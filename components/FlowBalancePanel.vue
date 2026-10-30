@@ -18,6 +18,34 @@
     >
       {{ errorMessage }}
     </v-alert>
+    <div
+      v-if="alerts.length"
+      class="fb-alerts mb-3"
+    >
+      <div class="text-subtitle-2 mb-1">
+        Тревоги: {{ alerts.length }}
+      </div>
+      <div
+        v-for="a in alerts"
+        :key="a.id"
+        class="d-flex align-center ga-2 text-body-2"
+      >
+        <span :style="{ color: BALANCE_META[a.status === 'leak' ? 'leak' : 'growth'].color }">
+          {{ a.status === 'growth' ? 'ночной рост' : 'небаланс' }}
+        </span>
+        <span class="flex-grow-1">{{ alertText(a) }}</span>
+        <span class="text-caption text-medium-emphasis text-no-wrap">{{ shortTime(a.at) }}</span>
+        <v-btn
+          v-if="canAck"
+          size="x-small"
+          variant="text"
+          :loading="acking === a.id"
+          @click="ack(a)"
+        >
+          Принято
+        </v-btn>
+      </div>
+    </div>
     <v-progress-linear
       v-if="loading && !result"
       indeterminate
@@ -131,12 +159,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { fastApiService } from '~/services/fastApiService';
+import { useAuthStore } from '~/stores/authStore';
 import { formatApiError } from '~/utils/apiError';
 import {
+  alertText,
   BALANCE_META,
   flowText,
   ZONE_KIND_LABELS,
   zoneFeature,
+  type BalanceAlert,
   type BalanceResult,
   type BalanceZone,
 } from '~/utils/flowBalance';
@@ -147,7 +178,12 @@ import {
  */
 const emit = defineEmits<{ 'show-on-map': [data: GeoJSON.FeatureCollection] }>();
 
+const authStore = useAuthStore();
 const result = ref<BalanceResult | null>(null);
+const alerts = ref<BalanceAlert[]>([]);
+const acking = ref<number | null>(null);
+const canAck = computed(() => authStore.canEditData && (authStore.permissions.general as string[]).includes('journals'));
+const shortTime = (iso: string) => new Date(iso).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
 const loading = ref(false);
 const mapLoading = ref<number | null>(null);
 const errorMessage = ref('');
@@ -157,11 +193,24 @@ const nightTo = computed(() => result.value?.night_hours?.[1] ?? 5);
 const load = async () => {
   loading.value = true;
   try {
-    result.value = await fastApiService.getFlowBalance();
+    [result.value, alerts.value] = await Promise.all([
+      fastApiService.getFlowBalance(), fastApiService.getBalanceAlerts(true)]);
   } catch (err: unknown) {
     errorMessage.value = formatApiError(err, 'Баланс расхода не рассчитался');
   } finally {
     loading.value = false;
+  }
+};
+
+const ack = async (a: BalanceAlert) => {
+  acking.value = a.id;
+  try {
+    await fastApiService.acknowledgeBalanceAlert(a.id);
+    alerts.value = alerts.value.filter((x) => x.id !== a.id);
+  } catch (err: unknown) {
+    errorMessage.value = formatApiError(err, 'Тревога не принята');
+  } finally {
+    acking.value = null;
   }
 };
 
@@ -184,4 +233,5 @@ defineExpose({ load });
 <style scoped>
 .fb-table { font-size: var(--text-sm, 0.8125rem); }
 .fb-text { white-space: normal; max-width: 280px; }
+.fb-alerts { border-left: 3px solid #C62828; padding-left: 8px; }
 </style>
