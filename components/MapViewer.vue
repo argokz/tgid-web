@@ -1098,6 +1098,23 @@ const onShowWorkOrdersOnMap = (data: GeoJSON.FeatureCollection) => {
   ]);
 };
 
+// === Показатели: дефекты со столбца графика (цвет — состояние) ===
+const kpiOverlay = useOverlayLayer(() => mapStore.map, 'kpi-defects', { layerIds: ['kpi-defects-points'] });
+
+const onShowKpiOnMap = (data: GeoJSON.FeatureCollection) => {
+  const map = mapStore.map;
+  kpiOverlay.show(data, [{
+    id: 'kpi-defects-points',
+    type: 'circle',
+    paint: { 'circle-radius': 6, 'circle-color': ['get', 'color'], 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' },
+  }]);
+  const bounds = featureBounds(data);
+  if (map && bounds) {
+    const [xmin, ymin, xmax, ymax] = bounds;
+    map.fitBounds([[xmin, ymin], [xmax, ymax]], { padding: 80, maxZoom: 16, duration: 800 });
+  }
+};
+
 // === Комментарии на карте: точки веток (клик — ветка), опрос нового для меня ===
 const commentPins = attachMapCommentPins({
   getMap: () => mapStore.map,
@@ -1728,6 +1745,12 @@ const toolDialogs: ToolDialogEntry[] = [
     key: 'workOrders',
     component: lazyDialog(() => import('./WorkOrdersDialog.vue')),
     on: { showOnMap: onShowWorkOrdersOnMap, clearHighlight: () => workOrdersOverlay.clear(), focusCoords: onFocusCoords },
+  },
+  // Показатели эксплуатации (фаза 2, дашборды KPI): дефекты со столбца графика — на карту
+  {
+    key: 'kpiDashboard',
+    component: lazyDialog(() => import('./KpiDashboardDialog.vue')),
+    on: { showOnMap: onShowKpiOnMap, clearHighlight: () => kpiOverlay.clear() },
   },
   // Комментарии на карте (фаза 2, п. 4): точки веток рисует commentPins, окно — ветки и ответы
   {
