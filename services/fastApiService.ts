@@ -26,6 +26,7 @@ import { poiApi } from './api/poi';
 import { webhooksApi } from './api/webhooks';
 import { formsApi } from './api/forms';
 import { telemetryApi } from './api/telemetry';
+import { loadForecastApi } from './api/loadForecast';
 
 export const fastApiService = {
   ...coreApi,
@@ -49,4 +50,5 @@ export const fastApiService = {
   ...webhooksApi,
   ...formsApi,
   ...telemetryApi,
+  ...loadForecastApi,
 };

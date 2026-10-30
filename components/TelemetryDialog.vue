@@ -177,10 +177,16 @@
           <v-tab value="regime">
             Режим
           </v-tab>
+          <v-tab value="forecast">
+            Прогноз
+          </v-tab>
         </v-tabs>
 
+        <!-- прогноз нагрузки по погоде -->
+        <LoadForecastPanel v-if="tab === 'forecast'" />
+
         <!-- расчёт по фактическому режиму: граничные условия модели из телеметрии -->
-        <div v-if="tab === 'regime'">
+        <div v-else-if="tab === 'regime'">
           <p class="text-body-2 mb-2">
             Напоры и температура в узлах заданного напора (источники, подкачки, вводы фрагментов) — в последнем расчёте
             и по датчикам (среднее за {{ regime?.window_min ?? 15 }} мин). Расчёт по факту берёт их из показаний:
@@ -712,7 +718,7 @@
 import { LineChart } from 'echarts/charts';
 import { MarkLineComponent } from 'echarts/components';
 import { use } from 'echarts/core';
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import ChartFrame from '~/components/ChartFrame.vue';
 import HintTip from '~/components/HintTip.vue';
 import KpiTile from '~/components/KpiTile.vue';
@@ -753,6 +759,8 @@ import {
 
 use([LineChart, MarkLineComponent]);
 
+const LoadForecastPanel = defineAsyncComponent(() => import('~/components/LoadForecastPanel.vue'));
+
 /**
  * Телеметрия (фаза 3, «Цифровой двойник»): датчики давления, температуры и расхода в узлах и на участках,
  * последние показания против последнего расчёта, график за период с линией модели, датчики на карте (цвет —
@@ -786,7 +794,7 @@ const PERIODS = [
 ];
 
 const sensors = ref<Sensor[]>([]);
-const tab = ref<'sensors' | 'calibration' | 'regime'>('sensors');
+const tab = ref<'sensors' | 'calibration' | 'regime' | 'forecast'>('sensors');
 const regime = ref<RegimeResult | null>(null);
 const regimeLoading = ref(false);
 const regimeTn = reactive<Record<number, number | null>>({});
