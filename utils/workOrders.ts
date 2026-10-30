@@ -48,6 +48,11 @@ export interface WorkOrder {
   inspection_id?: number | null;
   /** когда бригада впервые оказалась у места работ (по треку телефона) */
   arrived_at?: string | null;
+  /** форма обхода, которую заполняет бригада (FormsDialog): имя, текущая версия, раз на наряд или на узле */
+  form_id?: number | null;
+  form_name?: string | null;
+  form_version?: number | null;
+  form_scope?: 'order' | 'point' | null;
   line_id: number | null;
   node_id: number | null;
   fileid: number | null;
@@ -101,6 +106,7 @@ export interface WorkOrderInput {
   planned_start?: string | null;
   planned_finish?: string | null;
   description: string;
+  form_id?: number | null;
 }
 
 export const STATUS_ORDER: WorkOrderStatus[] = ['new', 'assigned', 'in_progress', 'done', 'closed', 'cancelled'];

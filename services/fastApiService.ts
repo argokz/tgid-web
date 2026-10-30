@@ -24,6 +24,7 @@ import { kpiApi } from './api/kpi';
 import { embedApi } from './api/embed';
 import { poiApi } from './api/poi';
 import { webhooksApi } from './api/webhooks';
+import { formsApi } from './api/forms';
 
 export const fastApiService = {
   ...coreApi,
@@ -45,4 +46,5 @@ export const fastApiService = {
   ...embedApi,
   ...poiApi,
   ...webhooksApi,
+  ...formsApi,
 };

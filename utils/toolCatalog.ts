@@ -15,6 +15,7 @@ export type ToolEvent =
   | 'open-passport-dialog'
   | 'open-defect-journal'
   | 'open-work-orders'
+  | 'open-forms'
   | 'open-outages'
   | 'open-map-comments'
   | 'open-kpi-dashboard'
@@ -69,6 +70,7 @@ export type ToolDialogKey =
   | 'passport'
   | 'defect'
   | 'workOrders'
+  | 'forms'
   | 'outages'
   | 'mapComments'
   | 'kpiDashboard'
@@ -151,6 +153,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
       { label: 'Трассировка сети', hint: 'К источнику, ниже по потоку, связанные, зоны и участки без питания', icon: 'mdi-transit-connection-variant', color: 'indigo-darken-2', event: 'open-network-trace', dialog: 'networkTrace' },
       { label: 'Нарушения', hint: 'Журнал дефектов и повреждений', icon: 'mdi-alert-decagram-outline', color: 'deep-orange-darken-2', event: 'open-defect-journal', dialog: 'defect' },
       { label: 'Наряды и заявки', hint: 'Заявка или дефект → наряд → бригада → выполнение → закрытие; просрочка, история, карта', icon: 'mdi-clipboard-list-outline', color: 'indigo-darken-2', event: 'open-work-orders', dialog: 'workOrders' },
+      { label: 'Формы обходов', hint: 'Конструктор форм осмотра для бригад: поля, варианты, условия, фото; импорт XLSForm, выгрузка в Excel', icon: 'mdi-form-select', color: 'indigo-darken-1', event: 'open-forms', dialog: 'forms', requires: 'admin' },
       { label: 'Отключения', hint: 'Плановые и аварийные: задвижки и потребители по изоляции, объявление, список для уведомления, зоны на карте', icon: 'mdi-calendar-alert', color: 'red-darken-2', event: 'open-outages', dialog: 'outages' },
       { label: 'Комментарии на карте', hint: 'Обсуждение в точке карты: ответы, @упоминания, «решено», ссылка на ветку', icon: 'mdi-comment-text-outline', color: 'blue-darken-2', event: 'open-map-comments', dialog: 'mapComments' },
       { label: 'Показатели', hint: 'Аварийность, ремонты, износ, наряды, отключения и сеть: графики по периоду и видимой области карты', icon: 'mdi-chart-box-outline', color: 'indigo-darken-2', event: 'open-kpi-dashboard', dialog: 'kpiDashboard' },

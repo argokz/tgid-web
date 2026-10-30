@@ -247,6 +247,15 @@
                 variant="outlined"
                 maxlength="5000"
               />
+              <AppSelect
+                v-if="formOptions.length"
+                v-model="form.form_id"
+                :items="formOptions"
+                item-title="title"
+                item-value="value"
+                label="Форма обхода (заполняет бригада)"
+                clearable
+              />
               <div class="d-flex ga-2">
                 <v-btn
                   color="primary"
@@ -442,6 +451,47 @@
                 />
               </div>
 
+              <AppSelect
+                v-if="formOptions.length || current.form_id"
+                v-model="edit.form_id"
+                :items="formOptions"
+                item-title="title"
+                item-value="value"
+                :label="formLabel"
+                :disabled="!editable"
+                clearable
+                class="mb-2"
+              />
+
+              <!-- формы, заполненные бригадой -->
+              <template v-if="submissions.length">
+                <div class="text-caption text-medium-emphasis mb-1">
+                  Заполненные формы
+                </div>
+                <v-expansion-panels
+                  variant="accordion"
+                  class="mb-3"
+                >
+                  <v-expansion-panel
+                    v-for="s in submissions"
+                    :key="s.id"
+                  >
+                    <v-expansion-panel-title class="py-1">
+                      <span class="text-truncate">{{ submissionTitle(s) }}</span>
+                      <span class="text-caption text-medium-emphasis ml-2 flex-shrink-0">{{ s.submitted_by }}, {{ formatDateTime(s.filled_at || s.created_at) }}</span>
+                    </v-expansion-panel-title>
+                    <v-expansion-panel-text>
+                      <FormRenderer
+                        :model-value="s.answers"
+                        :schema="s.schema"
+                        :photo-urls="submissionPhotoUrls(s)"
+                        readonly
+                      />
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+                </v-expansion-panels>
+              </template>
+
               <!-- фото с места работ (полевое приложение, pages/field.vue) -->
               <template v-if="current.photos?.length">
                 <div class="text-caption text-medium-emphasis mb-1">
@@ -511,6 +561,7 @@ import AppSelect from '~/components/AppSelect.vue';
 import DataTable, { type DataTableColumn } from '~/components/DataTable.vue';
 import HintTip from '~/components/HintTip.vue';
 import KpiTile from '~/components/KpiTile.vue';
+import FormRenderer from '~/components/forms/FormRenderer.vue';
 import { useDialogMapOverlay } from '~/composables/useDialogMapOverlay';
 import { useMobile } from '~/composables/useMobile';
 import { useNotification } from '~/composables/useNotification';
@@ -518,6 +569,7 @@ import { fastApiService } from '~/services/fastApiService';
 import { useAuthStore } from '~/stores/authStore';
 import { useUiStore } from '~/stores/uiStore';
 import { formatApiError } from '~/utils/apiError';
+import type { FormRow, FormSubmission } from '~/utils/forms';
 import {
   PRIORITY_COLORS,
   STATUS_META,
@@ -600,13 +652,45 @@ interface FormState {
   planned_start: string;
   planned_finish: string;
   description: string;
+  form_id: number | null;
 }
 const emptyForm = (): FormState => ({
   title: '', kind: 'repair', priority: 3, defect_id: null, inspection_id: null, line_id: null, brigade_id: null, responsible_id: null,
-  planned_start: '', planned_finish: '', description: '',
+  planned_start: '', planned_finish: '', description: '', form_id: null,
 });
 const form = ref<FormState>(emptyForm());
-const edit = ref({ brigade_id: null as number | null, responsible_id: null as number | null, planned_finish: '' });
+const edit = ref({ brigade_id: null as number | null, responsible_id: null as number | null, planned_finish: '', form_id: null as number | null });
+/** Действующие формы обходов (FormsDialog) — для выбора в наряде */
+const activeForms = ref<FormRow[]>([]);
+const formOptions = computed(() => activeForms.value.map((f) => ({
+  value: f.id, title: `${f.name} · ${f.scope === 'point' ? 'на каждом узле' : 'раз на наряд'}`,
+})));
+const formLabel = computed(() => {
+  const o = current.value;
+  const off = o?.form_id && !activeForms.value.some((f) => f.id === o.form_id);
+  return off ? `Форма: ${o?.form_name ?? o?.form_id} (выключена)` : 'Форма обхода';
+});
+/** Заполнения форм по наряду и ссылки на их фото */
+const submissions = ref<FormSubmission[]>([]);
+/** Узел — первым: форма у наряда одна, а узлов обхода много */
+const submissionTitle = (s: FormSubmission) => [s.node_name || (s.node_id ? `узел ${s.node_id}` : ''), s.form_name]
+  .filter(Boolean).join(' · ');
+const submissionPhotoUrls = (s: FormSubmission): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const [key, id] of Object.entries(s.photos ?? {})) {
+    if (id != null && photoUrls.value[id]) out[key] = photoUrls.value[id];
+  }
+  return out;
+};
+const loadSubmissions = async (order: WorkOrder) => {
+  submissions.value = [];
+  if (!order.form_id) return;
+  try {
+    submissions.value = await fastApiService.getWorkOrderForms(order.id);
+  } catch (err: unknown) {
+    fail(err, 'Заполненные формы не загружены');
+  }
+};
 
 const columns: DataTableColumn[] = [
   { key: 'number', title: '№', width: 120 },
@@ -622,7 +706,7 @@ const editChanged = computed(() => {
   const o = current.value;
   if (!o) return false;
   return edit.value.brigade_id !== o.brigade_id || edit.value.responsible_id !== o.responsible_id
-    || edit.value.planned_finish !== toInputDateTime(o.planned_finish);
+    || edit.value.planned_finish !== toInputDateTime(o.planned_finish) || (edit.value.form_id ?? null) !== (o.form_id ?? null);
 });
 
 const fail = (err: unknown, what: string) => {
@@ -659,9 +743,10 @@ onBeforeUnmount(() => Object.values(photoUrls.value).forEach((u) => URL.revokeOb
 const show = (order: WorkOrder) => {
   current.value = order;
   void loadPhotos(order);
+  void loadSubmissions(order);
   edit.value = {
     brigade_id: order.brigade_id, responsible_id: order.responsible_id,
-    planned_finish: toInputDateTime(order.planned_finish),
+    planned_finish: toInputDateTime(order.planned_finish), form_id: order.form_id ?? null,
   };
   resultText.value = order.result;
   mode.value = 'view';
@@ -697,6 +782,7 @@ const create = async () => {
       defect_id: f.defect_id || null, inspection_id: f.inspection_id || null, line_id: f.line_id || null,
       brigade_id: f.brigade_id, responsible_id: f.responsible_id,
       planned_start: fromInputDateTime(f.planned_start), planned_finish: fromInputDateTime(f.planned_finish),
+      form_id: f.form_id || null,
     }));
   } catch (err: unknown) {
     fail(err, 'Наряд не создан');
@@ -716,6 +802,7 @@ const saveEdit = async () => {
       brigade_id: edit.value.brigade_id ?? 0,
       responsible_id: edit.value.responsible_id ?? 0,
       planned_finish: fromInputDateTime(edit.value.planned_finish),
+      form_id: edit.value.form_id ?? 0,
     }));
   } catch (err: unknown) {
     fail(err, 'Изменения не сохранены');
@@ -821,6 +908,11 @@ watch(visible, async (open) => {
     } catch (err: unknown) {
       fail(err, 'Справочники нарядов не загружены');
     }
+  }
+  try {
+    activeForms.value = await fastApiService.getForms(true);
+  } catch {
+    activeForms.value = []; // без форм наряды работают как раньше
   }
   await loadList();
 }, { immediate: true });

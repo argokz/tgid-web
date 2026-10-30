@@ -352,6 +352,15 @@
             </div>
             <template v-if="canEdit && routeOpen">
               <v-btn
+                v-if="orderForm?.scope === 'point'"
+                icon="mdi-form-select"
+                size="small"
+                :color="formFilledNodes.has(p.node_id) ? 'primary' : undefined"
+                :variant="formFilledNodes.has(p.node_id) ? 'flat' : 'tonal'"
+                :aria-label="`${p.name}: форма «${orderForm.name}»`"
+                @click="openForm(p)"
+              />
+              <v-btn
                 icon="mdi-check"
                 size="small"
                 color="success"
@@ -374,6 +383,37 @@
             class="text-caption text-warning mt-1"
           >
             Контур большой — показана не вся часть маршрута.
+          </div>
+        </section>
+
+        <!-- Форма обхода наряда: раз на наряд — кнопка здесь, на каждом узле — у узлов обхода -->
+        <section
+          v-if="orderForm"
+          class="fld-form mb-4"
+          aria-label="Форма обхода"
+        >
+          <div class="d-flex align-center ga-2">
+            <v-icon
+              icon="mdi-form-select"
+              size="small"
+            />
+            <div class="flex-grow-1 min-w-0">
+              <div class="text-subtitle-2 text-truncate">
+                {{ orderForm.name }}
+              </div>
+              <div class="text-caption text-medium-emphasis">
+                {{ formStatusText }}
+              </div>
+            </div>
+            <v-btn
+              v-if="canEdit && (orderForm.scope === 'order' || (!shownRoute && selected?.node_id))"
+              color="primary"
+              variant="tonal"
+              prepend-icon="mdi-pencil"
+              @click="openForm(null)"
+            >
+              Заполнить
+            </v-btn>
           </div>
         </section>
 
@@ -544,6 +584,14 @@
       </template>
     </main>
 
+    <LazyFieldFormDialog
+      v-if="formOpen"
+      v-model="formOpen"
+      :form="orderForm"
+      :subtitle="formSubtitle"
+      @save="queueForm"
+    />
+
     <LazyFieldDefectDialog
       v-if="defectOpen"
       v-model="defectOpen"
@@ -589,6 +637,8 @@ import {
 } from '~/utils/fieldQueue';
 import { isFresh, networkSpec, resultToFeatures, type FieldNetwork } from '~/utils/fieldNetwork';
 import { fieldStore } from '~/utils/fieldStore';
+import type { FormRow } from '~/utils/forms';
+import type { FieldFormResult } from '~/components/FieldFormDialog.vue';
 import { getMaplibreDefault } from '~/utils/maplibreLoader';
 import { formatPermalinkHash } from '~/utils/mapPermalink';
 import {
@@ -615,6 +665,8 @@ const LOOKUPS_KEY = 'field:lookups';
 const SAVED_AT_KEY = 'field:savedAt';
 const CAN_EDIT_KEY = 'field:canEdit';
 const DEFECT_LOOKUPS_KEY = 'field:defectLookups';
+/** Действующие формы обходов — на телефоне, чтобы заполнять без связи */
+const FORMS_KEY = 'field:forms';
 const ALL = 0;
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
@@ -628,6 +680,12 @@ const busy = ref(false);
 const photoBusy = ref(false);
 const loginOpen = ref(false);
 const defectOpen = ref(false);
+const formOpen = ref(false);
+const formPoint = ref<RoutePoint | null>(null);
+const fieldForms = ref<FormRow[]>([]);
+/** Узлы наряда, по которым форма уже отправлена (с сервера) */
+const formSentNodes = ref<Set<number>>(new Set());
+const formSentCount = ref(0);
 /** дефект с узла маршрута обхода (null — дефект просто на обходе) */
 const defectNode = ref<RouteNodeRef | null>(null);
 const notice = ref<{ type: 'success' | 'info' | 'warning' | 'error'; text: string } | null>(null);
@@ -675,6 +733,23 @@ const shownOrders = computed(() =>
     .sort((a, b) => a.priority - b.priority || (a.planned_finish ?? '9').localeCompare(b.planned_finish ?? '9')),
 );
 const selected = computed(() => shownOrders.value.find((o) => o.id === selectedId.value) ?? null);
+/** Форма наряда — из сохранённых на телефоне; выключили или ещё не загрузили — раздела нет */
+const orderForm = computed(() => {
+  const id = selected.value?.form_id;
+  return id ? fieldForms.value.find((f) => f.id === id) ?? null : null;
+});
+const pendingForms = computed(() => queue.value.filter((a) => a.kind === 'form' && a.orderId === selectedId.value));
+/** Узлы с заполненной формой: отправленные и ждущие отправки */
+const formFilledNodes = computed(() => new Set([...formSentNodes.value,
+  ...pendingForms.value.map((a) => a.nodeId).filter((n): n is number => n != null)]));
+const formStatusText = computed(() => {
+  const f = orderForm.value;
+  if (!f) return '';
+  const waiting = pendingForms.value.length ? ` · ждёт отправки: ${pendingForms.value.length}` : '';
+  if (f.scope === 'point' && shownRoute.value) return `Заполняется на узлах обхода: ${formFilledNodes.value.size}${waiting}`;
+  return `${formSentCount.value ? `Заполнена: ${formSentCount.value}` : 'Ещё не заполнена'}${waiting}`;
+});
+const formSubtitle = computed(() => [selected.value?.number, formPoint.value?.name].filter(Boolean).join(' · '));
 const pendingFor = (orderId: number) => queue.value.some((a) => a.orderId === orderId);
 
 /** Маршрут обхода открытого наряда с отметками, ещё не отправленными */
@@ -742,6 +817,7 @@ async function loadOrders(): Promise<void> {
     lookups.value = await fastApiService.getWorkOrderLookups();
     appStorage.setItem(LOOKUPS_KEY, JSON.stringify(lookups.value));
     void loadDefectLookups();
+    void loadForms();
     if (brigadeId.value !== ALL && !lookups.value.brigades.some((b) => b.id === brigadeId.value)) {
       brigadeId.value = ALL; // бригаду удалили — список заново загрузит наблюдатель
       return;
@@ -768,6 +844,62 @@ async function loadOrders(): Promise<void> {
     }
   } finally {
     loading.value = false;
+  }
+}
+
+/** Действующие формы обходов: при связи — с сервера, без связи — сохранённые */
+async function loadForms(): Promise<void> {
+  try {
+    fieldForms.value = await fastApiService.getForms(true);
+    appStorage.setItem(FORMS_KEY, JSON.stringify(fieldForms.value));
+  } catch {
+    // без связи — сохранённые с прошлого раза
+  }
+}
+
+/** Что по форме наряда уже дошло до сервера (узлы обхода, число заполнений) */
+async function loadFormStatus(order: WorkOrder): Promise<void> {
+  formSentNodes.value = new Set();
+  formSentCount.value = 0;
+  if (!order.form_id) return;
+  try {
+    const sent = await fastApiService.getWorkOrderForms(order.id);
+    formSentCount.value = sent.length;
+    formSentNodes.value = new Set(sent.map((s) => s.node_id).filter((n): n is number => n != null));
+  } catch {
+    // без связи — видны только ждущие отправки
+  }
+}
+
+function openForm(point: RoutePoint | null): void {
+  formPoint.value = point;
+  formOpen.value = true;
+}
+
+/** Форма — в очередь: сначала её фото (как фото наряда, с ключами из ответа), затем сами ответы */
+async function queueForm(result: FieldFormResult): Promise<void> {
+  const o = selected.value;
+  const f = orderForm.value;
+  if (!o || !f) return;
+  const point = formPoint.value;
+  try {
+    const pos = await currentPosition();
+    const base = { orderId: o.id, orderNumber: o.number, createdAt: new Date().toISOString(),
+      lon: pos?.lon ?? null, lat: pos?.lat ?? null, state: 'pending' as const };
+    for (const p of result.photos) {
+      await fieldStore.putAction({ ...base, id: p.id, kind: 'photo', photo: p.blob, caption: p.caption, takenAt: p.takenAt });
+    }
+    await fieldStore.putAction({
+      ...base, id: newActionId(), kind: 'form', formId: f.id, formVersion: f.current_version, formName: f.name,
+      answers: result.answers,
+      // форма «на каждом узле» в наряде без маршрута обхода — по узлу самого наряда
+      nodeId: point?.node_id ?? (f.scope === 'point' ? o.node_id ?? undefined : undefined), nodeName: point?.name,
+    });
+    await reloadQueue();
+    await sync();
+    notice.value = { type: 'success', text: `Форма «${f.name}» сохранена${online.value ? '' : ' — уйдёт, когда появится связь'}` };
+  } catch (error) {
+    notice.value = { type: 'error', text: `Форма не сохранилась: ${errorInfo(error).message}` };
   }
 }
 
@@ -813,6 +945,7 @@ async function openOrder(id: number): Promise<void> {
   }
   void loadPhotos();
   const o = orders.value.find((x) => x.id === id);
+  if (o) void loadFormStatus(o);
   if (o && !isFresh(network.value)) {
     const fresh = await fetchNetwork(o);
     if (fresh && selectedId.value === id) network.value = fresh;
@@ -871,6 +1004,9 @@ async function prefetchForOffline(list: WorkOrder[]): Promise<void> {
   prefetching = true;
   try {
     void getMaplibreDefault().then(() => import('maplibre-gl/dist/maplibre-gl.css')).catch(() => undefined);
+    // окна дефекта и формы грузятся при первом открытии — без связи оно бы не удалось: файлы — в кеш сейчас
+    void import('~/components/FieldDefectDialog.vue').catch(() => undefined);
+    void import('~/components/FieldFormDialog.vue').catch(() => undefined);
     for (const o of list) {
       if (!online.value) break;
       if (!isFresh(await fieldStore.loadNetwork(o.id))) await fetchNetwork(o);
@@ -1010,6 +1146,15 @@ async function onPhoto(event: Event): Promise<void> {
 
 async function send(a: FieldAction): Promise<WorkOrder | null> {
   const stamp = { client_id: a.id, lon: a.lon, lat: a.lat };
+  if (a.kind === 'form') {
+    // повтор после обрыва: сервер узнаёт заполнение по ключу и второй раз не записывает
+    await fastApiService.submitForm({
+      form_id: a.formId as number, version: a.formVersion as number, work_order_id: a.orderId,
+      node_id: a.nodeId ?? null, answers: a.answers ?? {}, filled_at: a.createdAt, ...stamp,
+    });
+    if (a.orderId === selectedId.value && selected.value) void loadFormStatus(selected.value);
+    return null;
+  }
   if (a.kind === 'check') {
     await saveRoute(await fastApiService.checkRoutePoint(a.orderId, {
       node_id: a.nodeId as number, state: a.checkState ?? 'ok', ...stamp,
@@ -1153,6 +1298,12 @@ onMounted(async () => {
     if (raw) defectLookups.value = JSON.parse(raw) as typeof defectLookups.value;
   } catch {
     appStorage.removeItem(DEFECT_LOOKUPS_KEY);
+  }
+  try {
+    const raw = appStorage.getItem(FORMS_KEY);
+    if (raw) fieldForms.value = JSON.parse(raw) as FormRow[];
+  } catch {
+    appStorage.removeItem(FORMS_KEY);
   }
   const saved = Number(appStorage.getItem(BRIGADE_KEY));
   if (Number.isInteger(saved) && saved > 0) brigadeId.value = saved;

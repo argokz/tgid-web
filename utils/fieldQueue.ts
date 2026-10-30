@@ -6,10 +6,11 @@
  *
  * Здесь — чистые правила (порядок отправки, цепочка ревизий, что делать с ошибкой); хранение — fieldStore.ts.
  */
+import type { FormAnswers } from './forms';
 import type { RouteCheckState } from './fieldRoute';
 import type { WorkOrder, WorkOrderStatus } from './workOrders';
 
-export type FieldActionKind = 'transition' | 'comment' | 'photo' | 'defect' | 'check';
+export type FieldActionKind = 'transition' | 'comment' | 'photo' | 'defect' | 'check' | 'form';
 /** У дефекта с обхода наряда ещё нет: заявку по нему создаст сервер */
 export const NEW_ORDER = 0;
 /** pending — ждёт отправки; conflict — наряд успели изменить (409); failed — сервер отказал, повтор не поможет */
@@ -47,6 +48,11 @@ export interface FieldAction {
   nodeName?: string;
   checkState?: RouteCheckState;
   routeOrderId?: number;
+  // форма обхода (у формы «на каждом узле» — ещё nodeId и nodeName); фото полей — отдельные действия photo
+  formId?: number;
+  formVersion?: number;
+  formName?: string;
+  answers?: FormAnswers;
 }
 
 /** Что делать с ошибкой отправки */
@@ -77,6 +83,7 @@ export const ACTION_LABELS: Record<FieldActionKind, string> = {
   photo: 'Фото',
   defect: 'Дефект',
   check: 'Отметка обхода',
+  form: 'Форма обхода',
 };
 
 /** Подпись действия в списке «Не отправлено» */
@@ -84,6 +91,7 @@ export function describeAction(a: FieldAction, statusLabel: (s: WorkOrderStatus)
   if (a.kind === 'transition' && a.to) return `${a.orderNumber}: ${statusLabel(a.to)}`;
   if (a.kind === 'comment') return `${a.orderNumber}: «${(a.note ?? '').slice(0, 40)}»`;
   if (a.kind === 'defect') return `Дефект: «${(a.description ?? '').slice(0, 40)}»${a.photo ? ' с фото' : ''}`;
+  if (a.kind === 'form') return `${a.orderNumber}: форма «${a.formName ?? ''}»${a.nodeName ? ` · ${a.nodeName}` : ''}`;
   if (a.kind === 'check') return `${a.orderNumber}: ${a.nodeName ?? `узел ${a.nodeId}`} — ${a.checkState === 'defect' ? 'с дефектом' : 'осмотрен'}`;
   return `${a.orderNumber}: фото${a.caption ? ` «${a.caption.slice(0, 40)}»` : ''}`;
 }
