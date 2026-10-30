@@ -1,6 +1,7 @@
 /** Вход, выход, профиль. Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type { ServerPermissions } from '~/utils/permissions';
 import type { McpInfo, McpToken } from '~/utils/mcpClient';
+import type { ArcgisToken } from '~/utils/arcgisClient';
 import type { CityItem } from './types';
 import { mutationOptions, request } from './http';
 
@@ -77,6 +78,11 @@ export const authApi = {
   /** Токен ИИ-клиента: действует только на /mcp, права — пользователя */
   async createMcpToken(): Promise<McpToken> {
     return request<McpToken>('api/v1/mcp/token', mutationOptions('POST'));
+  },
+
+  /** Ключ ArcGIS-клиента: только чтение слоёв FeatureServer, права — пользователя */
+  async createArcgisToken(): Promise<ArcgisToken> {
+    return request<ArcgisToken>('api/v1/arcgis/token', mutationOptions('POST'));
   },
 
   /** Выход: сервер удаляет cookie доступа к GeoServer */
