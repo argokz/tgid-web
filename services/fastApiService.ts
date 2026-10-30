@@ -21,6 +21,7 @@ import { workOrdersApi } from './api/workOrders';
 import { outagesApi } from './api/outages';
 import { mapCommentsApi } from './api/mapComments';
 import { kpiApi } from './api/kpi';
+import { embedApi } from './api/embed';
 
 export const fastApiService = {
   ...coreApi,
@@ -39,4 +40,5 @@ export const fastApiService = {
   ...outagesApi,
   ...mapCommentsApi,
   ...kpiApi,
+  ...embedApi,
 };

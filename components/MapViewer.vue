@@ -1793,6 +1793,8 @@ const toolDialogs: ToolDialogEntry[] = [
   { key: 'activityLog', component: lazyDialog(() => import('./ActivityLogDialog.vue')) },
   // Статичные слои в PMTiles (фаза 1, п. 13): запекание и удаление архивов — администратор
   { key: 'staticTiles', component: lazyDialog(() => import('./StaticTilesDialog.vue')) },
+  // Встраиваемые карты (фаза 2, п. 14): ключи для iframe на чужих сайтах — администратор
+  { key: 'embedKeys', component: lazyDialog(() => import('./EmbedKeysDialog.vue')) },
   // Исходные данные (этап 9): участки ПТС, групповые установщики aSet* и справочники
   { key: 'ptsSites', component: lazyDialog(() => import('./PtsSitesDialog.vue')) },
   { key: 'groupSetters', component: lazyDialog(() => import('./GroupSetterDialog.vue')) },
