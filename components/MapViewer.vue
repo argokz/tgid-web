@@ -1117,6 +1117,30 @@ const onShowKpiOnMap = (data: GeoJSON.FeatureCollection) => {
   }
 };
 
+// === Телеметрия: датчики (цвет — оценка «факт против модели», подпись — показание) ===
+const telemetryOverlay = useOverlayLayer(() => mapStore.map, 'telemetry-sensors',
+  { layerIds: ['telemetry-sensors-points', 'telemetry-sensors-labels'] });
+
+const onShowTelemetryOnMap = (data: GeoJSON.FeatureCollection) => {
+  const map = mapStore.map;
+  telemetryOverlay.show(data, [{
+    id: 'telemetry-sensors-points',
+    type: 'circle',
+    paint: { 'circle-radius': 8, 'circle-color': ['get', 'color'], 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' },
+  }, {
+    id: 'telemetry-sensors-labels',
+    type: 'symbol',
+    minzoom: 13,
+    layout: { 'text-field': ['get', 'name'], 'text-size': 11, 'text-offset': [0, 1.4], 'text-anchor': 'top' },
+    paint: { 'text-color': '#263238', 'text-halo-color': '#fff', 'text-halo-width': 1.5 },
+  }]);
+  const bounds = featureBounds(data);
+  if (map && bounds) {
+    const [xmin, ymin, xmax, ymax] = bounds;
+    map.fitBounds([[xmin, ymin], [xmax, ymax]], { padding: 80, maxZoom: 16, duration: 800 });
+  }
+};
+
 // === Социальные объекты: точки категорий (цвет — категория) ===
 const poiOverlay = useOverlayLayer(() => mapStore.map, 'poi', { layerIds: POI_LAYER_IDS });
 
@@ -1814,6 +1838,12 @@ const toolDialogs: ToolDialogEntry[] = [
   { key: 'embedKeys', component: lazyDialog(() => import('./EmbedKeysDialog.vue')) },
   { key: 'webhooks', component: lazyDialog(() => import('./WebhooksDialog.vue')) },
   { key: 'forms', component: lazyDialog(() => import('./FormsDialog.vue')) },
+  // Телеметрия (фаза 3): датчики на карте — цвет по оценке «факт против модели»
+  {
+    key: 'telemetry',
+    component: lazyDialog(() => import('./TelemetryDialog.vue')),
+    on: { showOnMap: onShowTelemetryOnMap, clearHighlight: () => telemetryOverlay.clear() },
+  },
   // Исходные данные (этап 9): участки ПТС, групповые установщики aSet* и справочники
   { key: 'ptsSites', component: lazyDialog(() => import('./PtsSitesDialog.vue')) },
   { key: 'groupSetters', component: lazyDialog(() => import('./GroupSetterDialog.vue')) },
