@@ -190,6 +190,7 @@ import {
   mdiCodeJson,
   mdiDatabaseImport,
   mdiApplicationBracketsOutline,
+  mdiSchoolOutline,
 } from '@mdi/js'
 
 export const firstScreenMdiSvgPaths: Record<string, string> = {
@@ -373,6 +374,7 @@ export const firstScreenMdiSvgPaths: Record<string, string> = {
   mdiCodeJson,
   mdiDatabaseImport,
   mdiApplicationBracketsOutline,
+  mdiSchoolOutline,
 }
 
 /** Ленивый набор; null — ещё не загружен (и всегда на сервере: SSR и гидратация видят только первый экран) */

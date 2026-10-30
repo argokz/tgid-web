@@ -22,6 +22,7 @@ import { outagesApi } from './api/outages';
 import { mapCommentsApi } from './api/mapComments';
 import { kpiApi } from './api/kpi';
 import { embedApi } from './api/embed';
+import { poiApi } from './api/poi';
 
 export const fastApiService = {
   ...coreApi,
@@ -41,4 +42,5 @@ export const fastApiService = {
   ...mapCommentsApi,
   ...kpiApi,
   ...embedApi,
+  ...poiApi,
 };

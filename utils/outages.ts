@@ -3,6 +3,8 @@
  * Чистые функции — окно OutagesDialog.vue и оверлей MapViewer пользуются одними правилами.
  */
 
+import type { PoiItem } from '~/utils/poi';
+
 export type OutageStatus = 'planned' | 'announced' | 'active' | 'finished' | 'cancelled';
 export type OutageKind = 'planned' | 'emergency';
 
@@ -79,6 +81,8 @@ export interface Outage {
   area?: GeoJSON.Geometry | null;
   events?: OutageEvent[];
   conflicts?: OutageConflict[];
+  /** Школы, больницы и другие социальные объекты в зоне (itwin-api database/poi.py) */
+  social?: PoiItem[];
 }
 
 export interface OutageList {

@@ -297,6 +297,23 @@
                 Пересекается с {{ c.number }} «{{ c.title }}» ({{ formatDateTime(c.planned_start) }} —
                 {{ formatDateTime(c.planned_end) }}): общих потребителей {{ c.shared_consumers }}
               </v-alert>
+              <v-alert
+                v-if="current.social?.length"
+                type="info"
+                variant="tonal"
+                density="compact"
+                icon="mdi-school-outline"
+                class="mb-2"
+              >
+                <strong>Социальные объекты в зоне ({{ current.social.length }})</strong> — предупредить в первую очередь:
+                <div
+                  v-for="s in current.social"
+                  :key="s.id"
+                  class="text-body-2"
+                >
+                  {{ s.category_label }} — {{ s.name || 'без названия' }}<span v-if="s.address">, {{ s.address }}</span>
+                </div>
+              </v-alert>
 
               <div
                 v-if="canEdit"

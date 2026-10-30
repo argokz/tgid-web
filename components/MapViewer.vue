@@ -546,6 +546,7 @@ import type { ToolDialogKey, ToolEvent } from '~/utils/toolCatalog';
 import type { LayerConfig } from '~/types';
 import { getApiBaseUrl } from '~/services/api/http';
 import { absoluteApiBase, applyStaticTiles, type StaticTileArchive } from '~/utils/staticTiles';
+import { POI_LAYER_IDS, poiLayers } from '~/utils/poi';
 import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowReactive, watch } from 'vue';
 import type { Component } from 'vue';
 import { markPerf, measurePerf, timeAsync } from '~/utils/perf';
@@ -1113,6 +1114,13 @@ const onShowKpiOnMap = (data: GeoJSON.FeatureCollection) => {
     const [xmin, ymin, xmax, ymax] = bounds;
     map.fitBounds([[xmin, ymin], [xmax, ymax]], { padding: 80, maxZoom: 16, duration: 800 });
   }
+};
+
+// === Социальные объекты: точки категорий (цвет — категория) ===
+const poiOverlay = useOverlayLayer(() => mapStore.map, 'poi', { layerIds: POI_LAYER_IDS });
+
+const onShowPoiOnMap = (data: GeoJSON.FeatureCollection) => {
+  poiOverlay.show(data, poiLayers());
 };
 
 // === Комментарии на карте: точки веток (клик — ветка), опрос нового для меня ===
@@ -1763,6 +1771,12 @@ const toolDialogs: ToolDialogEntry[] = [
     key: 'networkSelect',
     component: lazyDialog(() => import('./NetworkSelectDialog.vue')),
     on: { showOnMap: onShowSelectOnMap, clearHighlight: () => selectOverlay.clear(), focusCoords: onFocusCoords },
+  },
+  // Социальные объекты (фаза 2, слои POI): показ на карте, загрузка, «скрыть»
+  {
+    key: 'poi',
+    component: lazyDialog(() => import('./PoiDialog.vue')),
+    on: { showOnMap: onShowPoiOnMap, clearHighlight: () => poiOverlay.clear(), focusCoords: onFocusCoords },
   },
   // Гидравлический режим и стрелки потоков
   {

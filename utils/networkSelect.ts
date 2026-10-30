@@ -32,6 +32,10 @@ export interface BuilderState {
   nearOn: boolean;
   nearNode: string;
   nearMeters: number;
+  /** «Рядом с социальными объектами»: категории (пусто — все) и расстояние */
+  poiOn: boolean;
+  poiCategories: string[];
+  poiMeters: number;
   inView: boolean;
   /** visible — фрагменты на карте; all — все фрагменты; list — названные в запросе (fragments) */
   scope: 'visible' | 'all' | 'list';
@@ -54,6 +58,9 @@ export const emptyBuilder = (target: SelectTarget = 'lines'): BuilderState => ({
   nearOn: false,
   nearNode: '',
   nearMeters: DEFAULT_NEAR_M,
+  poiOn: false,
+  poiCategories: [],
+  poiMeters: DEFAULT_NEAR_M,
   inView: false,
   scope: 'visible',
   fragments: [],
@@ -132,6 +139,7 @@ export const buildSpec = (
     conditions,
     match: state.match,
     near: state.nearOn && nearNode ? { node_name: nearNode, meters: state.nearMeters } : null,
+    near_poi: state.poiOn ? { categories: [...state.poiCategories], meters: state.poiMeters } : null,
     in_view: state.inView,
     fragment_ids: scopeFragments(state, visibleFragments),
     order_by: state.orderBy,
@@ -162,6 +170,9 @@ export const builderFromSpec = (spec: SelectSpec, visibleFragments: number[]): B
     nearOn: !!near,
     nearNode: near?.node_name ?? (near?.node_id != null ? String(near.node_id) : ''),
     nearMeters: near?.meters ?? DEFAULT_NEAR_M,
+    poiOn: !!spec.near_poi,
+    poiCategories: [...(spec.near_poi?.categories ?? [])],
+    poiMeters: spec.near_poi?.meters ?? DEFAULT_NEAR_M,
     inView: spec.in_view,
     scope,
     fragments: scope === 'list' ? [...ids] : [],

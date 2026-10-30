@@ -203,6 +203,46 @@
             />
           </template>
         </div>
+        <div class="d-flex flex-wrap align-center ga-2">
+          <v-checkbox
+            v-model="state.poiOn"
+            label="Рядом с социальными объектами"
+            density="compact"
+            hide-details
+          />
+          <template v-if="state.poiOn">
+            <v-select
+              v-model="state.poiCategories"
+              :items="poiItems"
+              label="Какими"
+              placeholder="все"
+              persistent-placeholder
+              multiple
+              chips
+              closable-chips
+              density="compact"
+              variant="outlined"
+              hide-details
+              class="select-row__field"
+            />
+            <v-text-field
+              v-model.number="state.poiMeters"
+              label="Радиус"
+              suffix="м"
+              type="number"
+              :min="1"
+              :max="fields?.max_near_m ?? 5000"
+              density="compact"
+              variant="outlined"
+              hide-details
+              class="select-row__num"
+            />
+          </template>
+          <span
+            v-if="state.poiOn && !poiLoaded"
+            class="text-caption text-medium-emphasis"
+          >Социальные объекты ещё не загружены — «Социальные объекты» в каталоге инструментов</span>
+        </div>
         <div class="d-flex flex-wrap align-center ga-2 mb-2">
           <v-checkbox
             v-model="state.inView"
@@ -426,6 +466,10 @@ const directionItems = [
   { value: true, label: 'По убыванию' },
   { value: false, label: 'По возрастанию' },
 ];
+/** Категории социальных объектов (itwin-api database/poi.py) с числом загруженных */
+const poiItems = computed(() => (fields.value?.poi_categories ?? [])
+  .map((c) => ({ value: c.value, title: `${c.label} (${c.count})` })));
+const poiLoaded = computed(() => (fields.value?.poi_categories ?? []).some((c) => c.count > 0));
 
 const targetFields = computed<SelectField[]>(() =>
   fields.value?.targets.find((t) => t.key === state.value.target)?.fields ?? []);

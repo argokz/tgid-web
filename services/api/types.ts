@@ -1032,6 +1032,12 @@ export interface SelectCondition {
   values?: SelectValue[];
 }
 
+/** «В N м от социальных объектов» (itwin-api database/poi.py); пустые категории — все */
+export interface SelectNearPoi {
+  categories: string[];
+  meters: number;
+}
+
 export interface SelectNear {
   node_id?: number | null;
   node_name?: string | null;
@@ -1045,6 +1051,7 @@ export interface SelectSpec {
   conditions: SelectCondition[];
   match: 'all' | 'any';
   near?: SelectNear | null;
+  near_poi?: SelectNearPoi | null;
   in_view: boolean;
   /** null — все фрагменты */
   fragment_ids?: number[] | null;
@@ -1075,6 +1082,8 @@ export interface SelectFields {
   op_labels: Record<SelectOp, string>;
   max_limit: number;
   max_near_m: number;
+  /** Категории социальных объектов и сколько их загружено */
+  poi_categories?: Array<{ value: string; label: string; count: number }>;
 }
 
 export interface SelectItem {
