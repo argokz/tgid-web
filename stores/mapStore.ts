@@ -56,6 +56,7 @@ import {
   type PlanetLayerStyleOverride,
 } from '~/utils/planetV4Layers';
 import { isMapMeasureActive } from '~/composables/useMapDraw';
+import { hitsCommentPin } from '~/utils/mapComments';
 import { contextHoverSummary } from '~/utils/buildingStyle';
 import { bindMapMovingClass } from '~/utils/mapMoving';
 import { MapScaleControl } from '~/utils/mapScaleControl';
@@ -839,6 +840,8 @@ export const useMapStore = defineStore('map', {
     async handleMapClick(e: MapMouseEvent) {
       // Во время измерения клик ставит точку линейки, а не выбирает объект
       if (!this.identifyModeEnabled || isMapMeasureActive()) return;
+      // клик по точке ветки комментариев открывает ветку (useMapCommentPins), объект под ней не выбирается
+      if (hitsCommentPin(this.map, e.point)) return;
       this.identifyFeature(e);
     },
 

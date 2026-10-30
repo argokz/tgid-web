@@ -16,6 +16,7 @@ export type ToolEvent =
   | 'open-defect-journal'
   | 'open-work-orders'
   | 'open-outages'
+  | 'open-map-comments'
   | 'open-shurf-journal'
   | 'open-inspection-journal'
   | 'open-repair-journal'
@@ -65,6 +66,7 @@ export type ToolDialogKey =
   | 'defect'
   | 'workOrders'
   | 'outages'
+  | 'mapComments'
   | 'shurf'
   | 'inspection'
   | 'repair'
@@ -142,6 +144,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
       { label: 'Нарушения', hint: 'Журнал дефектов и повреждений', icon: 'mdi-alert-decagram-outline', color: 'deep-orange-darken-2', event: 'open-defect-journal', dialog: 'defect' },
       { label: 'Наряды и заявки', hint: 'Заявка или дефект → наряд → бригада → выполнение → закрытие; просрочка, история, карта', icon: 'mdi-clipboard-list-outline', color: 'indigo-darken-2', event: 'open-work-orders', dialog: 'workOrders' },
       { label: 'Отключения', hint: 'Плановые и аварийные: задвижки и потребители по изоляции, объявление, список для уведомления, зоны на карте', icon: 'mdi-calendar-alert', color: 'red-darken-2', event: 'open-outages', dialog: 'outages' },
+      { label: 'Комментарии на карте', hint: 'Обсуждение в точке карты: ответы, @упоминания, «решено», ссылка на ветку', icon: 'mdi-comment-text-outline', color: 'blue-darken-2', event: 'open-map-comments', dialog: 'mapComments' },
       { label: 'Шурфовки', hint: 'План, предписания, выполнение', icon: 'mdi-shovel', color: 'brown-darken-2', event: 'open-shurf-journal', dialog: 'shurf' },
       { label: 'Осмотры', hint: 'Контуры осмотра и результаты', icon: 'mdi-clipboard-search-outline', color: 'teal-darken-2', event: 'open-inspection-journal', dialog: 'inspection' },
       { label: 'Ремонты', hint: 'План и факт по контурам', icon: 'mdi-hammer-wrench', color: 'deep-purple-darken-2', event: 'open-repair-journal', dialog: 'repair' },

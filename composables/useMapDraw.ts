@@ -17,7 +17,8 @@ import { registerHotkeys } from '~/composables/useHotkeys';
 import { sampleElevation } from '~/utils/terrainSample';
 import { formatDeg, formatTurn, signedTurnDeg, vertexAngles } from '~/utils/cadGeometry';
 
-export type DrawMode = 'none' | 'measure-distance' | 'measure-area';
+/** pick-point — разовый выбор точки на карте (pickMapPoint: место нового комментария) */
+export type DrawMode = 'none' | 'measure-distance' | 'measure-area' | 'pick-point';
 
 /** Текущий режим измерения — чтобы клики по карте не выбирали объекты и не правили сеть */
 export const activeDrawMode = ref<DrawMode>('none');

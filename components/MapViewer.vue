@@ -532,6 +532,8 @@
 import { appStorage } from '~/utils/appStorage';
 import { formatApiError } from '~/utils/apiError';
 import { activeDrawMode, isMapMeasureActive } from '~/composables/useMapDraw';
+import { attachMapCommentPins } from '~/composables/useMapCommentPins';
+import { threadFromHash } from '~/utils/mapComments';
 import { useMapStore } from '~/stores/mapStore';
 import { useLayerStore } from '~/stores/layerStore';
 import { useCesiumStore } from '~/stores/cesiumStore';
@@ -1095,6 +1097,15 @@ const onShowWorkOrdersOnMap = (data: GeoJSON.FeatureCollection) => {
     },
   ]);
 };
+
+// === Комментарии на карте: точки веток (клик — ветка), опрос нового для меня ===
+const commentPins = attachMapCommentPins({
+  getMap: () => mapStore.map,
+  openThread: (threadId) => openLazyDialog('mapComments', { threadId }),
+  signedIn: () => authStore.isAuthenticated || authStore.authDisabled,
+  onNewUnread: (count) => useNotificationStore().showInfo(
+    `Новое в комментариях на карте: ${count}. Откройте «Комментарии на карте» → «Мне».`),
+});
 
 // === Hydraulic Thematic Maps & Flow Arrows ===
 const FLOW_ARROW_ICON = 'hydraulic-flow-arrow';
@@ -1718,6 +1729,12 @@ const toolDialogs: ToolDialogEntry[] = [
     component: lazyDialog(() => import('./WorkOrdersDialog.vue')),
     on: { showOnMap: onShowWorkOrdersOnMap, clearHighlight: () => workOrdersOverlay.clear(), focusCoords: onFocusCoords },
   },
+  // Комментарии на карте (фаза 2, п. 4): точки веток рисует commentPins, окно — ветки и ответы
+  {
+    key: 'mapComments',
+    component: lazyDialog(() => import('./MapCommentsDialog.vue')),
+    on: { focusCoords: onFocusCoords },
+  },
   // Выборка по условиям и вопрос словами (фаза 1, п. 10)
   {
     key: 'networkSelect',
@@ -1837,6 +1854,10 @@ const initMap = async () => {
     await applyLayersToMap(props.initialLayers);
     // внешние слои пользователя (WMS/WMTS/XYZ) — под сетью ТГИД
     useExternalLayerStore().syncToMap();
+    // ссылка на ветку комментариев (…&c=12): номер — до того, как ссылка на вид перепишет адрес
+    const sharedThread = threadFromHash(window.location.hash);
+    commentPins.start();
+    if (sharedThread) openLazyDialog('mapComments', { threadId: sharedThread });
     if (mapStore.map) {
       await mapPermalink.applyFromUrl(mapStore.map);
       stopPermalink?.();
@@ -1933,6 +1954,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  commentPins.stop();
   stopPermalink?.();
   stopPermalink = null;
   if (process.client) {
