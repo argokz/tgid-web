@@ -35,6 +35,28 @@ const makeMap = () => {
 const FC = { type: 'FeatureCollection', features: [] };
 
 describe('useOverlayLayer', () => {
+  it('стиль ещё грузится — слой рисуется, когда карта успокоится; новый show отменяет отложенный', () => {
+    const map = makeMap() as any;
+    const waiting: (() => void)[] = [];
+    let loaded = false;
+    const add = map.addSource;
+    map.addSource = (id: string, spec: any) => {
+      if (!loaded) throw new Error('Style is not done loading.');
+      add(id, spec);
+    };
+    map.once = (event: string, cb: () => void) => { if (event === 'idle') waiting.push(cb); };
+    const ov = useOverlayLayer(() => map, 'src');
+    expect(ov.show(FC, [{ id: 'a', type: 'circle' }])).toBe(true);
+    expect(map.sources.size).toBe(0);
+    ov.show(FC, [{ id: 'b', type: 'line' }]);
+    loaded = true;
+    waiting.forEach((cb) => cb());
+    expect(map.layers.map((l: any) => l.id)).toEqual(['b']);
+    // другая ошибка — не ждём, а сообщаем
+    map.addSource = () => { throw new Error('boom'); };
+    expect(() => ov.show(FC, [])).toThrow('boom');
+  });
+
   it('show добавляет источник и слои с подставленным source', () => {
     const map = makeMap();
     const ov = useOverlayLayer(() => map as any, 'src');

@@ -7,7 +7,11 @@ export type OverlayLayerSpec = { id: string; type: string; [key: string]: any };
 type MapLike = Pick<
   maplibregl.Map,
   'addSource' | 'addLayer' | 'getSource' | 'getLayer' | 'removeLayer' | 'removeSource' | 'setLayoutProperty' | 'setPaintProperty'
->;
+> & Partial<Pick<maplibregl.Map, 'once'>>;
+
+/** Стиль карты ещё грузится (смена подложки, первая загрузка) — повторить, когда карта успокоится */
+const STYLE_RETRIES = 20;
+const styleNotLoaded = (e: unknown) => /not done loading/i.test(String((e as Error)?.message ?? e));
 
 interface Options {
   /** Слои, которые снимаются при clear() даже если show() в этом сеансе не вызывался */
@@ -32,15 +36,27 @@ export function useOverlayLayer(getMap: () => MapLike | null | undefined, source
     if (map.getSource(sourceId)) map.removeSource(sourceId);
   };
 
-  /** Снять прежний оверлей и нарисовать новый; false — карты нет */
-  const show = (data: any, layers: OverlayLayerSpec[]): boolean => {
+  let pending = 0;
+
+  /** Снять прежний оверлей и нарисовать новый; false — карты нет. Стиль ещё грузится — нарисуется позже */
+  const show = (data: any, layers: OverlayLayerSpec[], attempt = 0): boolean => {
     const map = getMap();
     if (!map) return false;
+    const call = ++pending;
     clear();
-    map.addSource(sourceId, { type: 'geojson', data });
-    for (const layer of layers) {
-      if (!layerIds.includes(layer.id)) layerIds.push(layer.id);
-      map.addLayer({ ...layer, source: sourceId } as any);
+    try {
+      map.addSource(sourceId, { type: 'geojson', data });
+      for (const layer of layers) {
+        if (!layerIds.includes(layer.id)) layerIds.push(layer.id);
+        map.addLayer({ ...layer, source: sourceId } as any);
+      }
+    } catch (e) {
+      if (!styleNotLoaded(e) || !map.once || attempt >= STYLE_RETRIES) throw e;
+      clear();
+      // новый show() отменяет отложенный: рисуется последнее
+      map.once('idle', () => {
+        if (call === pending) show(data, layers, attempt + 1);
+      });
     }
     return true;
   };

@@ -104,6 +104,60 @@ export interface TelemetryAlert {
   acknowledged_at: string | null;
 }
 
+export type CalibrationStatus = 'ok' | 'noise' | 'rough' | 'local' | 'check';
+
+export interface CalibrationSegment {
+  pipe: SensorPipe;
+  label: string;
+  from: { sensor_id: number; code: string; node_id: number; node_name: string | null };
+  to: { sensor_id: number; code: string; node_id: number; node_name: string | null };
+  calculation_id: number;
+  dh_model: number;
+  dh_fact: number;
+  ratio: number;
+  uncertainty: number;
+  status: CalibrationStatus;
+  text: string;
+  roughness_factor: number | null;
+  roughness_mm: number | null;
+  roughness_suggested_mm: number | null;
+  line_ids: number[];
+  lines: number;
+  length_m: number;
+  d_min: number | null;
+  d_max: number | null;
+  geometry: GeoJSON.Geometry | null;
+}
+
+export interface CalibrationResult {
+  window_min: number;
+  accuracy_m: number;
+  segments: CalibrationSegment[];
+  skipped: string[];
+}
+
+/** Вывод калибровки: подпись и цвет (значок — в окне) */
+export const CALIBRATION_META: Record<CalibrationStatus, { label: string; color: string }> = {
+  ok: { label: 'согласовано', color: '#2E7D32' },
+  noise: { label: 'в погрешности', color: '#616161' },
+  rough: { label: 'шероховатость', color: '#B26A00' },
+  local: { label: 'местное сопротивление', color: '#C62828' },
+  check: { label: 'проверить датчики', color: '#6A1B9A' },
+};
+
+/** Участки пары для карты: линия цвета вывода */
+export function calibrationFeature(seg: CalibrationSegment): GeoJSON.FeatureCollection {
+  if (!seg.geometry) return { type: 'FeatureCollection', features: [] };
+  return {
+    type: 'FeatureCollection',
+    features: [{
+      type: 'Feature',
+      geometry: seg.geometry,
+      properties: { name: seg.label, color: CALIBRATION_META[seg.status].color },
+    }],
+  };
+}
+
 /** Цвет тревоги: расхождение, молчит, вернулся в норму */
 export const ALERT_COLORS: Record<AlertStatus, string> = { bad: '#C62828', silent: '#616161', normal: '#2E7D32' };
 

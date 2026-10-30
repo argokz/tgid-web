@@ -63,3 +63,16 @@ describe('telemetry', () => {
     expect(seriesSummary({ ...series, points: [] }, null)).toBe('Показаний за период нет');
   });
 });
+
+describe('calibrationFeature', () => {
+  it('линия пары цвета вывода; без геометрии — пусто', async () => {
+    const { calibrationFeature, CALIBRATION_META } = await import('~/utils/telemetry');
+    const seg = {
+      pipe: 'supply', label: '2-20 → 2-40А', status: 'rough',
+      geometry: { type: 'MultiLineString', coordinates: [[[76.9, 43.2], [76.91, 43.21]]] },
+    } as unknown as import('~/utils/telemetry').CalibrationSegment;
+    const fc = calibrationFeature(seg);
+    expect(fc.features[0].properties).toEqual({ name: '2-20 → 2-40А', color: CALIBRATION_META.rough.color });
+    expect(calibrationFeature({ ...seg, geometry: null }).features).toEqual([]);
+  });
+});

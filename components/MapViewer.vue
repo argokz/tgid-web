@@ -1119,18 +1119,26 @@ const onShowKpiOnMap = (data: GeoJSON.FeatureCollection) => {
 
 // === Телеметрия: датчики (цвет — оценка «факт против модели», подпись — показание) ===
 const telemetryOverlay = useOverlayLayer(() => mapStore.map, 'telemetry-sensors',
-  { layerIds: ['telemetry-sensors-points', 'telemetry-sensors-labels'] });
+  { layerIds: ['telemetry-sensors-lines', 'telemetry-sensors-points', 'telemetry-sensors-labels'] });
 
 const onShowTelemetryOnMap = (data: GeoJSON.FeatureCollection) => {
   const map = mapStore.map;
   telemetryOverlay.show(data, [{
+    // участки пары датчиков (калибровка)
+    id: 'telemetry-sensors-lines',
+    type: 'line',
+    filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+    paint: { 'line-color': ['get', 'color'], 'line-width': 6, 'line-opacity': 0.85 },
+  }, {
     id: 'telemetry-sensors-points',
     type: 'circle',
+    filter: ['==', ['geometry-type'], 'Point'],
     paint: { 'circle-radius': 8, 'circle-color': ['get', 'color'], 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' },
   }, {
     id: 'telemetry-sensors-labels',
     type: 'symbol',
     minzoom: 13,
+    filter: ['==', ['geometry-type'], 'Point'],
     layout: { 'text-field': ['get', 'name'], 'text-size': 11, 'text-offset': [0, 1.4], 'text-anchor': 'top' },
     paint: { 'text-color': '#263238', 'text-halo-color': '#fff', 'text-halo-width': 1.5 },
   }]);

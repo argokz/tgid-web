@@ -163,7 +163,122 @@
           </v-btn>
         </div>
 
-        <div class="tm-grid">
+        <v-tabs
+          v-model="tab"
+          density="compact"
+          class="mb-3"
+        >
+          <v-tab value="sensors">
+            Датчики
+          </v-tab>
+          <v-tab value="calibration">
+            Калибровка
+          </v-tab>
+        </v-tabs>
+
+        <!-- калибровка: потери напора между соседними датчиками давления -->
+        <div v-if="tab === 'calibration'">
+          <p class="text-body-2 mb-2">
+            Потери напора между соседними датчиками давления одной трубы — по показаниям (среднее за
+            {{ calibration?.window_min ?? 30 }} мин) и по последнему расчёту. Расхождение в пределах погрешности
+            датчиков (±{{ calibration?.accuracy_m ?? 0.5 }} м вод. ст. каждый) модель не меняет; «шероховатость» —
+            эквивалентная шероховатость участков пары ×r⁴; «местное сопротивление» — шероховатостью не объяснить.
+            Модель не меняется: участки и значение — для проверки (групповые установщики, сценарий).
+          </p>
+          <v-progress-linear
+            v-if="calibrationLoading"
+            indeterminate
+          />
+          <p
+            v-else-if="calibration && !calibration.segments.length"
+            class="text-body-2 text-medium-emphasis"
+          >
+            Пар для сравнения нет: нужны два и больше датчика давления одной трубы в соседних узлах с показаниями
+            и расчётом.
+          </p>
+          <v-table
+            v-else-if="calibration"
+            density="compact"
+            class="tm-cal"
+          >
+            <thead>
+              <tr>
+                <th>Участок</th>
+                <th class="text-right">
+                  Потери: модель / факт
+                </th>
+                <th class="text-right">
+                  Отношение
+                </th>
+                <th>Вывод</th>
+                <th class="text-right">
+                  Шероховатость, мм
+                </th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="seg in calibration.segments"
+                :key="`${seg.pipe}-${seg.from.node_id}-${seg.to.node_id}`"
+              >
+                <td>
+                  {{ seg.label }}
+                  <div class="text-caption text-medium-emphasis">
+                    {{ seg.pipe === 'supply' ? 'подача' : 'обратка' }} · {{ (seg.length_m / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) }} км ·
+                    участков {{ seg.lines }}<template v-if="seg.d_min">
+                      · d внутр. {{ seg.d_min === seg.d_max ? seg.d_min : `${seg.d_min}–${seg.d_max}` }} мм
+                    </template>
+                  </div>
+                </td>
+                <td class="text-right text-no-wrap">
+                  {{ seg.dh_model.toLocaleString('ru-RU') }} / {{ seg.dh_fact.toLocaleString('ru-RU') }} м
+                </td>
+                <td class="text-right text-no-wrap">
+                  {{ seg.ratio.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) }}
+                  <div class="text-caption text-medium-emphasis">
+                    ±{{ Math.round(seg.uncertainty * 100) }} %
+                  </div>
+                </td>
+                <td>
+                  <span :style="{ color: CALIBRATION_META[seg.status].color }">{{ CALIBRATION_META[seg.status].label }}</span>
+                  <div class="text-caption text-medium-emphasis tm-cal__text">
+                    {{ seg.text }}
+                  </div>
+                </td>
+                <td class="text-right text-no-wrap">
+                  <template v-if="seg.roughness_suggested_mm != null">
+                    {{ seg.roughness_mm }} → <b>{{ seg.roughness_suggested_mm }}</b>
+                  </template>
+                  <template v-else>
+                    {{ seg.roughness_mm ?? '—' }}
+                  </template>
+                </td>
+                <td>
+                  <v-btn
+                    v-if="seg.geometry"
+                    size="x-small"
+                    variant="text"
+                    icon="mdi-map-marker-path"
+                    :aria-label="`Участки пары ${seg.label} на карте`"
+                    @click="showSegment(seg)"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+          <div
+            v-if="calibration?.skipped.length"
+            class="text-caption text-medium-emphasis mt-2"
+          >
+            Не сравниваются: {{ calibration.skipped.join('; ') }}
+          </div>
+        </div>
+
+        <div
+          v-else
+          class="tm-grid"
+        >
           <!-- датчики -->
           <div class="tm-list">
             <v-progress-linear
@@ -483,6 +598,8 @@ import { useNotificationStore } from '~/stores/notificationStore';
 import { formatApiError } from '~/utils/apiError';
 import {
   ALERT_COLORS,
+  CALIBRATION_META,
+  calibrationFeature,
   deviationText,
   sensorStatus,
   seriesOption,
@@ -490,6 +607,8 @@ import {
   sortSensors,
   STATUS_META,
   valueText,
+  type CalibrationResult,
+  type CalibrationSegment,
   type ImportResult,
   type Sensor,
   type SensorInput,
@@ -535,6 +654,9 @@ const PERIODS = [
 ];
 
 const sensors = ref<Sensor[]>([]);
+const tab = ref<'sensors' | 'calibration'>('sensors');
+const calibration = ref<CalibrationResult | null>(null);
+const calibrationLoading = ref(false);
 const openAlerts = ref<TelemetryAlert[]>([]);
 const acking = ref<number | null>(null);
 const ALERTS_SHOWN = 5;
@@ -609,6 +731,25 @@ const loadSeries = async () => {
   } finally {
     seriesLoading.value = false;
   }
+};
+
+const loadCalibration = async () => {
+  calibrationLoading.value = true;
+  try {
+    calibration.value = await fastApiService.getCalibration();
+  } catch (err: unknown) {
+    errorMessage.value = formatApiError(err, 'Калибровка не рассчиталась');
+  } finally {
+    calibrationLoading.value = false;
+  }
+};
+watch(tab, (t) => {
+  if (t === 'calibration') void loadCalibration();
+});
+
+const showSegment = (seg: CalibrationSegment) => {
+  emit('show-on-map', calibrationFeature(seg));
+  overlay.markShown();
 };
 
 const acknowledge = async (a: TelemetryAlert) => {
@@ -751,6 +892,8 @@ defineExpose({ openDialog });
 .tm-table :deep(th:nth-child(3)) { width: 104px; }
 .tm-table td:first-child .text-truncate, .tm-table td:first-child .text-caption { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tm-row--active { background: rgba(var(--v-theme-primary), 0.08); }
+.tm-cal { font-size: var(--text-sm, 0.8125rem); }
+.tm-cal__text { white-space: normal; max-width: 280px; }
 .tm-alert { font-size: var(--text-sm, 0.8125rem); }
 .tm-alert__dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .tm-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2, 8px); }
