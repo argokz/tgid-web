@@ -1960,6 +1960,7 @@ const toolDialogs: ToolDialogEntry[] = [
     on: { showOnMap: onShowFailureRiskOnMap, clearHighlight: () => failureRiskOverlay.clear() },
   },
   { key: 'emChapter', component: lazyDialog(() => import('./EmChapterDialog.vue')) },
+  { key: 'loadPerspective', component: lazyDialog(() => import('./LoadPerspectiveDialog.vue')) },
   // Исходные данные (этап 9): участки ПТС, групповые установщики aSet* и справочники
   { key: 'ptsSites', component: lazyDialog(() => import('./PtsSitesDialog.vue')) },
   { key: 'groupSetters', component: lazyDialog(() => import('./GroupSetterDialog.vue')) },

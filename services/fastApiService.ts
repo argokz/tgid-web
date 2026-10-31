@@ -31,6 +31,7 @@ import { waterApi } from './api/water';
 import { utilitiesApi } from './api/utilities';
 import { failureForecastApi } from './api/failureForecast';
 import { emChapterApi } from './api/emChapter';
+import { loadPerspectiveApi } from './api/loadPerspective';
 
 export const fastApiService = {
   ...coreApi,
@@ -59,4 +60,5 @@ export const fastApiService = {
   ...utilitiesApi,
   ...failureForecastApi,
   ...emChapterApi,
+  ...loadPerspectiveApi,
 };
