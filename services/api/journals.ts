@@ -2,6 +2,7 @@
 import type { AlsekoAddressBindResult, AlsekoAddressCandidates, AlsekoBuildingDetails, AlsekoBuildingSummary, AlsekoConsumerBindResult, AlsekoLoadDetails, AlsekoLoadSummary, AlsekoLookups, AlsekoReconciliationIssues, AlsekoReconciliationSummary, ConsumerLoadDetails, ConsumerLoadLookups, ConsumerLoadSummary, ConsumerLoadType, CorrosionIndicatorDetails, CorrosionIndicatorLookups, CorrosionIndicatorSummary, DefectDetails, DefectLookups, DefectSummary, ElectricalBindObjectType, ElectricalBindResult, ElectricalNetworkLookups, ElectricalObjectDetails, ElectricalObjectSummary, ElectricalObjectType, ElectricalReconciliation, HeatLossLookups, HeatLossLosesType, HeatLossNormRun, HeatLossNormRunSummary, HeatLossNormScope, HeatLossNormSeason, HeatLossNormSection, HeatLossSeasonDetails, HeatLossSeasonSummary, HeatLossSourceDetails, HeatLossSourceSummary, InspectionDetails, InspectionLookups, InspectionSummary, JournalFilters, PaginatedResponse, PressureTestDetails, PressureTestLookups, PressureTestSummary, RepairDetails, RepairLookups, RepairSummary, ShurfDetails, ShurfLookups, ShurfSummary, TechnicalConditionDetails, TechnicalConditionLookups, TechnicalConditionSummary } from './types';
 import { REPORT_TIMEOUT_MS, encodePath, mutationOptions, request, runFileJob } from './http';
 import type { FileJobOptions } from './http';
+import type { HotspotResult, SimilarResult } from '~/utils/defectSimilarity';
 
 export const journalsApi = {
   async getDefects(filters: JournalFilters = {}): Promise<PaginatedResponse<DefectSummary>> {
@@ -9,6 +10,14 @@ export const journalsApi = {
   },
   async getDefect(id: number): Promise<DefectDetails> {
     return request(`api/defects/${encodePath(id)}`);
+  },
+  /** Похожие аварии рядом: вид, труба, Ду, место, общие слова */
+  async getSimilarDefects(id: number, radiusM = 1000, limit = 10): Promise<SimilarResult> {
+    return request(`api/v1/defects/${encodePath(id)}/similar`, { query: { radius_m: radiusM, limit } });
+  },
+  /** Места повторных отказов (порывы, свищи, утечки) — кандидаты на перекладку */
+  async getFailureHotspots(years = 5): Promise<HotspotResult> {
+    return request('api/v1/defects/hotspots', { query: { years } });
   },
   async getDefectLookups(): Promise<DefectLookups> {
     return request('api/defects/lookups');

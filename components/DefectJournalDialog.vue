@@ -23,6 +23,15 @@
         <v-btn
           color="secondary"
           variant="tonal"
+          prepend-icon="mdi-map-marker-multiple-outline"
+          class="mr-2"
+          @click="hotspotsVisible = true"
+        >
+          Повторные отказы
+        </v-btn>
+        <v-btn
+          color="secondary"
+          variant="tonal"
           prepend-icon="mdi-printer"
           class="mr-2"
           @click="openForm11Report"
@@ -252,6 +261,11 @@
         </template>
       </DataTable>
     </JournalShell>
+    <FailureHotspotsDialog
+      v-model="hotspotsVisible"
+      @open="openDetails"
+      @locate="locatePoint"
+    />
 
     <v-dialog
       v-model="detailsVisible"
@@ -377,6 +391,13 @@
                 :record-label="selected.name || `Нарушение ${selected.id}`"
                 @changed="refreshSelected"
               />
+              <SimilarDefectsPanel
+                v-if="selected && !isEditing"
+                class="mt-4"
+                :defect-id="selected.id"
+                @open="openDetails"
+                @locate="locatePoint"
+              />
             </template>
           </StateView>
         </v-card-text>
@@ -455,6 +476,8 @@ import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
 import HintTip from '~/components/HintTip.vue'
 import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
 import JournalShell from '~/components/JournalShell.vue'
+import FailureHotspotsDialog from '~/components/FailureHotspotsDialog.vue'
+import SimilarDefectsPanel from '~/components/SimilarDefectsPanel.vue'
 import KpiTile, { type KpiStatus } from '~/components/KpiTile.vue'
 import SearchField from '~/components/SearchField.vue'
 import StateView from '~/components/StateView.vue'
@@ -710,6 +733,16 @@ const resetFilters = () => {
   dateFrom.value = ''
   dateTo.value = ''
   void list.reload()
+}
+
+const hotspotsVisible = ref(false)
+
+// похожая авария или место повторных отказов — на карту (журнал закрывается, как у «На карте»)
+const locatePoint = (point: { longitude: number; latitude: number; id: number }) => {
+  emit('locate-defect', point)
+  hotspotsVisible.value = false
+  detailsVisible.value = false
+  visible.value = false
 }
 
 const locate = (item: DefectSummary) => {
