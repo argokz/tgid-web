@@ -46,6 +46,8 @@
         <RelayPlanPanel
           :run="run"
           :can-edit="canEditPrices"
+          :can-export="canExport"
+          :can-refresh="authStore.canCalculate && authStore.canEditData"
           @show="showFrame"
         />
       </v-card-text>
@@ -311,6 +313,7 @@ const LIST_LIMIT = 30;
 const tab = ref<'forecast' | 'plan'>('forecast');
 const canEditPrices = computed(() => authStore.canEditData
   && (authStore.permissions.general as string[]).includes('refs'));
+const canExport = computed(() => (authStore.permissions.general as string[]).includes('export'));
 const TOP_ON_MAP = 200;
 const run = ref<FailureRun | null>(null);
 const top = ref<FailureTop | null>(null);
@@ -326,8 +329,11 @@ const populationText = computed(() => {
   const rule = r.metrics.population_rule;
   const base = `В расчёт вошли ${r.population.toLocaleString('ru-RU')} участков с заполненным паспортом`;
   if (!rule) return `${base}: журнал ведётся по ним.`;
+  const copies = rule.copies_merged
+    ? ` Копии одной трубы в разных фрагментах (сеть по сезонам) склеены: ${rule.copies_merged.toLocaleString('ru-RU')}.`
+    : '';
   return `${base} (не меньше ${rule.min_filled} из ${rule.passport_fields.length} полей — как у `
-    + `${pctText(rule.damaged_kept, 0)} повреждённых): журнал ведётся по ним.`;
+    + `${pctText(rule.damaged_kept, 0)} повреждённых): журнал ведётся по ним.${copies}`;
 });
 const num = (v: number | null | undefined, digits = 1) => (v == null ? '—'
   : v.toLocaleString('ru-RU', { maximumFractionDigits: digits }));

@@ -1,8 +1,8 @@
 <template>
   <div>
     <p class="text-body-2 mb-2">
-      Что переложить в пределах бюджета, чтобы снять больше ожидаемых повреждений: польза трассы — вероятность
-      повреждения × последствия (износ, расход через участок), единица — трасса между развилками.
+      Что переложить в пределах бюджета, чтобы снять больше ожидаемого ущерба: польза трассы — вероятность
+      повреждения × последствия (кого отключит авария по задвижкам, оценка износа), единица — трасса между развилками.
     </p>
     <v-alert
       v-if="errorMessage"
@@ -16,6 +16,15 @@
       {{ errorMessage }}
     </v-alert>
     <div class="d-flex align-center flex-wrap ga-2 mb-2">
+      <v-select
+        v-model="objective"
+        :items="RELAY_OBJECTIVES"
+        label="Последствия повреждения"
+        density="compact"
+        variant="outlined"
+        hide-details
+        class="rp-objective"
+      />
       <v-text-field
         v-model.number="budget"
         type="number"
@@ -68,6 +77,23 @@
       Затраты объекта — вскрытие, отключение, благоустройство в метрах трубы: без них в план попадают обрезки
       по 2 м. В деньгах — после заполнения расценок ниже.
     </p>
+    <div
+      v-if="outageObjective"
+      class="d-flex align-center flex-wrap ga-2 mb-2 text-caption text-medium-emphasis"
+    >
+      <span>{{ outageText }}</span>
+      <v-btn
+        v-if="canRefresh"
+        size="x-small"
+        variant="text"
+        prepend-icon="mdi-refresh"
+        :loading="busy === 'refresh'"
+        :disabled="!!busy"
+        @click="refreshConsequences"
+      >
+        Пересчитать после изменения сети
+      </v-btn>
+    </div>
 
     <template v-if="plan">
       <v-alert
@@ -79,7 +105,13 @@
         {{ summaryText }}
       </v-alert>
       <p
-        v-if="plan.consequence_values <= 1"
+        v-if="plan.copies_merged"
+        class="text-caption text-medium-emphasis mb-2"
+      >
+        Копии одной трубы в разных фрагментах склеены: {{ plan.copies_merged.toLocaleString('ru-RU') }}.
+      </p>
+      <p
+        v-if="plan.objective === 'wear' && plan.consequence_values <= 1"
         class="text-caption text-medium-emphasis mb-2"
       >
         Последствия в паспортах участков одинаковы (не заполнены) — польза различается только по расходу через
@@ -90,6 +122,18 @@
           Объекты перекладки
         </div>
         <v-spacer />
+        <v-btn
+          v-if="canExport"
+          size="small"
+          variant="text"
+          prepend-icon="mdi-microsoft-excel"
+          class="mr-1"
+          :loading="busy === 'xlsx'"
+          :disabled="!!busy"
+          @click="downloadXlsx"
+        >
+          Excel
+        </v-btn>
         <v-btn
           size="small"
           variant="tonal"
@@ -119,6 +163,18 @@
             <th class="text-right">
               Ожид. повр.
             </th>
+            <th
+              class="text-right"
+              title="Сколько потребителей отключит повреждение худшего участка объекта"
+            >
+              Отключит
+            </th>
+            <th
+              class="text-right"
+              title="Школы, детсады, больницы, поликлиники, соцучреждения среди них"
+            >
+              Соц.
+            </th>
             <th class="text-right">
               {{ plan.unit === 'km' ? 'км' : plan.currency }}
             </th>
@@ -144,6 +200,12 @@
             </td>
             <td class="text-right">
               {{ num(o.expected_failures, 3) }}
+            </td>
+            <td class="text-right">
+              {{ num(o.consumers_max, 0) }}
+            </td>
+            <td class="text-right">
+              {{ o.social_max || '' }}
             </td>
             <td class="text-right">
               {{ num(o.cost, plan.unit === 'km' ? 3 : 0) }}
@@ -240,23 +302,36 @@
 import { computed, ref, watch } from 'vue';
 import { fastApiService } from '~/services/fastApiService';
 import { formatApiError } from '~/utils/apiError';
-import { pctText, planFrame, type FailureRun, type RelayPlan, type RelayPrice } from '~/utils/failureForecast';
+import {
+  pctText,
+  planFrame,
+  RELAY_OBJECTIVES,
+  type FailureRun,
+  type OutageConsequenceStatus,
+  type RelayObjective,
+  type RelayPlan,
+  type RelayPrice,
+} from '~/utils/failureForecast';
+import { downloadBlob } from '~/utils/printRender';
+import { pluralRu } from '~/utils/pluralRu';
 
 /**
  * План перекладок (itwin-api database/relay_plan.py): бюджет в км или деньгах, постоянные затраты объекта,
  * объекты перекладки с ожидаемыми повреждениями, сравнение с «самыми старыми первыми», расценки по диаметру.
  */
-const props = defineProps<{ run: FailureRun | null; canEdit: boolean }>();
+const props = defineProps<{ run: FailureRun | null; canEdit: boolean; canExport: boolean; canRefresh: boolean }>();
 const emit = defineEmits<{ show: [data: GeoJSON.FeatureCollection] }>();
 
 const LIST_LIMIT = 30;
 const budget = ref(5);
 const unit = ref<'km' | 'money'>('km');
 const overhead = ref(25);
+const objective = ref<RelayObjective>('consumers');
+const outage = ref<OutageConsequenceStatus | null>(null);
 const plan = ref<RelayPlan | null>(null);
 const prices = ref<RelayPrice[]>([]);
 const priceRows = ref<RelayPrice[]>([]);
-const busy = ref<'' | 'plan' | 'prices'>('');
+const busy = ref<'' | 'plan' | 'prices' | 'xlsx' | 'refresh'>('');
 const errorMessage = ref('');
 
 const currency = computed(() => prices.value[0]?.currency ?? 'KZT');
@@ -264,13 +339,29 @@ const pricesValid = computed(() => priceRows.value.every((p) => p.dn_max_mm > 0 
   && new Set(priceRows.value.map((p) => p.dn_max_mm)).size === priceRows.value.length);
 const num = (v: number | null | undefined, digits = 1) => (v == null ? '—'
   : v.toLocaleString('ru-RU', { maximumFractionDigits: digits }));
+const outageObjective = computed(() => objective.value === 'consumers' || objective.value === 'load');
+const outageText = computed(() => {
+  const o = outage.value;
+  if (!o) return '';
+  if (!o.computed) return 'Кого отключит авария на каждом участке, посчитается при первом плане (~15 с).';
+  const at = o.created_at ? new Date(o.created_at).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : '';
+  return `Последствия аварий посчитаны ${at} по задвижкам: зона отключения и потребители ниже без обходного `
+    + `питания (оценка по топологии); потребителей в сети — ${num(o.consumers, 0)}.`;
+});
 const summaryText = computed(() => {
   const p = plan.value;
   if (!p) return '';
   const spent = p.unit === 'km' ? `${num(p.length_km, 2)} км` : `${num(p.spent, 0)} ${p.currency} (${num(p.length_km, 2)} км)`;
-  return `${p.objects.length} объектов, ${p.lines} участков, ${spent}: снимают ${num(p.expected_failures, 1)} из `
-    + `ожидаемых повреждений за ${p.horizon_years} года (${pctText(p.expected_failures_share)}). `
-    + `«Самые старые первыми» в том же бюджете — ${pctText(p.oldest_first.expected_failures_share)}.`;
+  const old = p.oldest_first;
+  const head = `${p.objects.length} ${pluralRu(p.objects.length, ['объект', 'объекта', 'объектов'])}, `
+    + `${p.lines} ${pluralRu(p.lines, ['участок', 'участка', 'участков'])}, ${spent}: снимают `
+    + `${pctText(p.expected_failures_share)} ожидаемых повреждений за ${p.horizon_years} года`;
+  if (p.expected_consumers_share == null) {
+    return `${head}. «Самые старые первыми» в том же бюджете — ${pctText(old.expected_failures_share)}.`;
+  }
+  return `${head} и ${pctText(p.expected_consumers_share)} ожидаемых отключений потребителей `
+    + `(социальных объектов — ${pctText(p.expected_social_share)}). «Самые старые первыми» в том же бюджете — `
+    + `${pctText(old.expected_failures_share)} и ${pctText(old.expected_consumers_share)}.`;
 });
 
 const loadPrices = async () => {
@@ -282,14 +373,51 @@ const loadPrices = async () => {
   }
 };
 
+const loadOutage = async () => {
+  try {
+    outage.value = await fastApiService.getOutageConsequences();
+  } catch (err: unknown) {
+    errorMessage.value = formatApiError(err, 'Не загрузилось состояние последствий аварий');
+  }
+};
+
 const makePlan = async () => {
   busy.value = 'plan';
   errorMessage.value = '';
   try {
-    plan.value = await fastApiService.getRelayPlan(budget.value, unit.value, overhead.value);
+    plan.value = await fastApiService.getRelayPlan(budget.value, unit.value, overhead.value, objective.value);
+    outage.value = plan.value.outage;
     emit('show', planFrame(plan.value));
   } catch (err: unknown) {
     errorMessage.value = formatApiError(err, 'План не составлен');
+  } finally {
+    busy.value = '';
+  }
+};
+
+const downloadXlsx = async () => {
+  const p = plan.value;
+  if (!p) return;
+  busy.value = 'xlsx';
+  try {
+    const blob = await fastApiService.getRelayPlanXlsx(p.budget, p.unit, p.job_overhead_m, p.objective);
+    downloadBlob(blob, `План перекладок ${p.unit === 'km' ? `${p.budget} км` : `${p.budget} ${p.currency}`}.xlsx`);
+  } catch (err: unknown) {
+    errorMessage.value = formatApiError(err, 'Excel не выгрузился');
+  } finally {
+    busy.value = '';
+  }
+};
+
+const refreshConsequences = async () => {
+  busy.value = 'refresh';
+  errorMessage.value = '';
+  try {
+    outage.value = await fastApiService.refreshOutageConsequences();
+    await loadOutage();
+    plan.value = null;
+  } catch (err: unknown) {
+    errorMessage.value = formatApiError(err, 'Последствия не пересчитаны');
   } finally {
     busy.value = '';
   }
@@ -313,10 +441,12 @@ watch(() => props.run?.id, () => {
   plan.value = null;
 }, { immediate: false });
 void loadPrices();
+void loadOutage();
 </script>
 
 <style scoped>
 .rp-num { max-width: 170px; }
+.rp-objective { max-width: 260px; }
 .rp-cur { max-width: 90px; }
 .rp-table { font-size: var(--text-sm, 0.8125rem); }
 </style>

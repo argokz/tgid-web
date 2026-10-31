@@ -1,5 +1,7 @@
 /** Прогноз аварийности (itwin-api routers/failure_forecast.py). Часть fastApiService (services/fastApiService.ts собирает разделы). */
-import type { FailureRun, FailureTop, RelayPlan, RelayPrice } from '~/utils/failureForecast';
+import type {
+  FailureRun, FailureTop, OutageConsequenceStatus, RelayObjective, RelayPlan, RelayPrice,
+} from '~/utils/failureForecast';
 import { encodePath, mutationOptions, request } from './http';
 
 export const failureForecastApi = {
@@ -22,9 +24,29 @@ export const failureForecastApi = {
   async setRelayPrices(prices: RelayPrice[]): Promise<RelayPrice[]> {
     return request<RelayPrice[]>('api/v1/relay/prices', mutationOptions('PUT', { prices }));
   },
-  /** План перекладок в пределах бюджета (км или деньги) по последнему прогнозу */
-  async getRelayPlan(budget: number, unit: 'km' | 'money', jobOverheadM: number, fileid?: number): Promise<RelayPlan> {
-    return request<RelayPlan>('api/v1/relay/plan',
-      mutationOptions('POST', { budget, unit, job_overhead_m: jobOverheadM, ...(fileid ? { fileid } : {}) }));
+  /** План перекладок в пределах бюджета (км или деньги) по последнему прогнозу; первый план по отключениям
+   * считает последствия аварий всех участков (~15 с на Астане) */
+  async getRelayPlan(budget: number, unit: 'km' | 'money', jobOverheadM: number, objective: RelayObjective = 'consumers',
+    fileid?: number): Promise<RelayPlan> {
+    return request<RelayPlan>('api/v1/relay/plan', {
+      ...mutationOptions('POST', { budget, unit, job_overhead_m: jobOverheadM, objective, ...(fileid ? { fileid } : {}) }),
+      timeout: 180_000,
+    });
+  },
+  /** Тот же план в Excel: итоги, объекты, участки (право «Выгрузка») */
+  async getRelayPlanXlsx(budget: number, unit: 'km' | 'money', jobOverheadM: number,
+    objective: RelayObjective = 'consumers'): Promise<Blob> {
+    return request<Blob>('api/v1/relay/plan.xlsx', {
+      ...mutationOptions('POST', { budget, unit, job_overhead_m: jobOverheadM, objective }),
+      responseType: 'blob', timeout: 180_000,
+    });
+  },
+  async getOutageConsequences(): Promise<OutageConsequenceStatus> {
+    return request<OutageConsequenceStatus>('api/v1/relay/consequences', mutationOptions('GET'));
+  },
+  /** Пересчитать последствия аварий участков после изменения сети (право «Расчёт») */
+  async refreshOutageConsequences(): Promise<OutageConsequenceStatus> {
+    return request<OutageConsequenceStatus>('api/v1/relay/consequences/refresh',
+      { ...mutationOptions('POST'), timeout: 180_000 });
   },
 };

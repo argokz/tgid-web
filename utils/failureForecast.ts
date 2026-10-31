@@ -12,7 +12,10 @@ export interface FailureMetrics {
   /** Ретроспектива плана: доля повреждений окна проверки на участках, переложенных первыми в пределах N км */
   capture_by_km?: Record<'model' | 'oldest_first' | 'near_defects', Record<string, number | null>>;
   length_km?: number;
-  population_rule?: { passport_fields: string[]; min_filled: number; lines: number; lines_all: number; damaged_kept: number | null };
+  population_rule?: {
+    passport_fields: string[]; min_filled: number; lines: number; lines_all: number; damaged_kept: number | null;
+    copies_merged?: number;
+  };
 }
 
 export interface FailureRun {
@@ -109,26 +112,69 @@ export interface RelayObject {
   max_prob: number;
   dn_min: number | null;
   dn_max: number | null;
+  /** худшее отключение при повреждении одного участка объекта */
+  consumers_max: number;
+  load_max: number;
+  social_max: number;
 }
 
-export interface RelayPlan {
+/** Критерий плана: последствия одного повреждения */
+export type RelayObjective = 'consumers' | 'load' | 'wear' | 'failures';
+export const RELAY_OBJECTIVES: { value: RelayObjective; title: string }[] = [
+  { value: 'consumers', title: 'Отключаемые потребители' },
+  { value: 'load', title: 'Отключаемая нагрузка' },
+  { value: 'wear', title: 'Оценка износа (паспорт)' },
+  { value: 'failures', title: 'Только число повреждений' },
+];
+
+/** Снятый ожидаемый ущерб плана или «самых старых первыми» */
+export interface RelayExpected {
+  lines: number;
+  expected_failures: number;
+  expected_failures_share: number | null;
+  expected_consumers: number;
+  expected_consumers_share: number | null;
+  expected_load: number;
+  expected_load_share: number | null;
+  expected_social: number;
+  expected_social_share: number | null;
+}
+
+/** Последствия аварий участков (database/outage_consequence.py) */
+export interface OutageConsequenceStatus {
+  computed: boolean;
+  id?: number;
+  lines?: number;
+  consumers?: number;
+  lines_with_consumers?: number;
+  lines_with_downstream?: number;
+  seconds?: number;
+  created_by?: string | null;
+  created_at?: string;
+}
+
+export interface RelayPlan extends RelayExpected {
   run_id: number;
   horizon_years: number;
   unit: 'km' | 'money';
   budget: number;
+  objective: RelayObjective;
+  objective_label: string;
   job_overhead_m: number;
   currency: string | null;
   spent: number;
-  lines: number;
   length_km: number;
-  expected_failures: number;
-  expected_failures_share: number;
   benefit_share: number;
-  oldest_first: { lines: number; expected_failures: number; expected_failures_share: number };
+  oldest_first: RelayExpected;
   consequence_values: number;
   flow_known: number;
+  /** участков, у которых посчитаны последствия отключения */
+  outage_known: number;
+  outage: OutageConsequenceStatus;
   runs: number;
   population: number;
+  /** копий одной трубы в разных фрагментах, склеенных в план */
+  copies_merged: number;
   objects: RelayObject[];
   geojson: GeoJSON.FeatureCollection;
 }
