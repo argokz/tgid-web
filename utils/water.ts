@@ -23,6 +23,8 @@ export interface WaterRunSummary {
   thresholds: { low_pressure_m: number; high_velocity_ms: number };
   /** Сценарий утечек расчёта (нет — базовый расчёт) */
   leaks?: WaterLeak[];
+  /** Расчёт отключения участка (database/water_isolation.py) */
+  isolation?: { link: string; close_valves: number; segment_links: number; no_water_nodes: number; demand_ls: number };
 }
 
 export interface WaterLeak {
@@ -114,7 +116,7 @@ export interface WaterZone {
   nodes: number;
   junctions: number;
   sources: string[];
-  base_demand_ls: number;
+  demand_ls: number;
   inlets: string[];
 }
 
@@ -225,10 +227,80 @@ export function zoneFrame(net: GeoJSON.FeatureCollection, zones: WaterZones): Ge
 
 /** Подпись расчёта в списке: номер, базовый или сценарий утечек */
 export function runLabel(run: WaterRun): string {
+  if (run.summary.isolation) return `№${run.id} · отключение трубы ${run.summary.isolation.link}`;
   const leaks = run.summary.leaks ?? [];
   if (!leaks.length) return `№${run.id} · базовый`;
   const where = leaks.map((l) => `${l.node} (${l.area_cm2.toLocaleString('ru-RU')} см²)`).join(', ');
   return `№${run.id} · утечка ${where}`;
+}
+
+// --- отключение участка задвижками (database/water_isolation.py) ---
+
+export interface WaterValves extends GeoJSON.FeatureCollection {
+  count: number;
+  by_source: Record<string, number>;
+}
+
+export interface WaterShortNode { node: string; expected_ls: number; delivered_ls: number; base_delivered_ls?: number | null }
+
+export interface WaterIsolation {
+  link: string;
+  segment: { links: string[]; nodes: string[]; length_m: number };
+  close_valves: { id: number; link: string; node: string }[];
+  close_devices: string[];
+  sources_inside: string[];
+  no_water: { segment_nodes: string[]; cut_off_nodes: string[]; demand_ls: number };
+  closed_links: string[];
+  valves_total: number;
+  /** С расчётом: номер расчёта модели (null — EPANET не сошёлся, причина в simulation_error) */
+  run_id?: number | null;
+  simulation_error?: string | null;
+  supply?: {
+    expected_ls: number | null;
+    delivered_ls: number | null;
+    short_nodes: number;
+    pressure_short_nodes: number;
+    pressure_short: WaterShortNode[];
+  };
+}
+
+export const ISOLATION_META = {
+  segment: { label: 'отключаемый участок', color: '#C62828' },
+  cut_off: { label: 'отрезаны от источников', color: '#6A1B9A' },
+  pressure: { label: 'недоподача из-за давления', color: '#EF6C00' },
+  valve: { label: 'закрыть', color: '#212121' },
+  other: { label: 'остальная сеть', color: '#B0BEC5' },
+} as const;
+const SEGMENT_WIDTH = 5;
+
+/** Кадр карты «отключение»: участок — красный, закрываемые трубы и задвижки — тёмные, отрезанные узлы — фиолетовые,
+ * узлы с недоподачей из-за давления — оранжевые, остальная сеть — серая */
+export function isolationFrame(net: GeoJSON.FeatureCollection, iso: WaterIsolation,
+  valves: GeoJSON.FeatureCollection | null): GeoJSON.FeatureCollection {
+  const segLinks = new Set(iso.segment.links);
+  const closed = new Set(iso.closed_links);
+  const segNodes = new Set(iso.segment.nodes);
+  const cutOff = new Set(iso.no_water.cut_off_nodes);
+  const pressure = new Set((iso.supply?.pressure_short ?? []).map((s) => s.node));
+  const toClose = new Set(iso.close_valves.map((v) => v.id));
+  const features = net.features.map((f) => {
+    const p = f.properties ?? {};
+    let color: string = ISOLATION_META.other.color;
+    let width: number | undefined;
+    if (p.kind === 'link') {
+      if (segLinks.has(p.id)) {
+        color = ISOLATION_META.segment.color;
+        width = SEGMENT_WIDTH;
+      } else if (closed.has(p.id)) color = ISOLATION_META.valve.color;
+    } else if (segNodes.has(p.id)) color = ISOLATION_META.segment.color;
+    else if (cutOff.has(p.id)) color = ISOLATION_META.cut_off.color;
+    else if (pressure.has(p.id)) color = ISOLATION_META.pressure.color;
+    return { ...f, properties: { ...p, color, ...(width ? { width } : {}) } };
+  });
+  const valveFeatures = (valves?.features ?? [])
+    .filter((v) => toClose.has(v.properties?.id))
+    .map((v) => ({ ...v, properties: { ...v.properties, color: ISOLATION_META.valve.color } }));
+  return { type: 'FeatureCollection', features: [...features, ...valveFeatures] };
 }
 
 /** Время шага расчёта: «5 ч 30 мин» от начала периода модели */

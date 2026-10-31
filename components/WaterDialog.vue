@@ -195,7 +195,7 @@
               <span class="text-body-2 text-no-wrap">{{ stepLabel }}</span>
             </div>
             <div
-              v-if="!zoneMap"
+              v-if="!zoneMap && !isolationMap"
               class="d-flex flex-wrap ga-3 text-caption mt-1"
             >
               <span
@@ -229,7 +229,17 @@
             :can-calc="authStore.canCalculate"
             :engine-available="!!status?.available"
             @zones="onZones"
-            @ran="onLeakRun"
+            @ran="onRunAdded"
+          />
+          <v-divider class="my-3" />
+          <WaterIsolationPanel
+            :model-id="selected.id"
+            :network="network"
+            :can-edit="canImport"
+            :can-calc="authStore.canCalculate"
+            :engine-available="!!status?.available"
+            @isolation="onIsolation"
+            @ran="onRunAdded"
           />
         </template>
       </v-card-text>
@@ -250,20 +260,24 @@ import {
   runLabel,
   stepTime,
   VELOCITY_CLASSES,
+  isolationFrame,
   waterFrame,
   zoneFrame,
+  type WaterIsolation,
   type WaterModel,
   type WaterRun,
   type WaterStatus,
   type WaterStep,
+  type WaterValves,
   type WaterZones,
 } from '~/utils/water';
+import WaterIsolationPanel from '~/components/WaterIsolationPanel.vue';
 import WaterZonesPanel from '~/components/WaterZonesPanel.vue';
 
 /**
  * Водопровод (фаза 4): модели EPANET, загрузка учебных сетей, гидравлический расчёт отдельным движком,
  * сеть на карте — узлы по давлению, трубы по скорости, перемотка по часам расчёта; зоны водоучёта и сценарий
- * утечки — WaterZonesPanel.
+ * утечки — WaterZonesPanel, отключение участка задвижками — WaterIsolationPanel.
  */
 const visible = defineModel<boolean>({ default: false });
 const emit = defineEmits<{
@@ -283,6 +297,7 @@ const selectedId = ref<number | null>(null);
 const runs = ref<WaterRun[]>([]);
 const run = ref<WaterRun | null>(null);
 const zoneMap = ref<WaterZones | null>(null);
+const isolationMap = ref<{ result: WaterIsolation; valves: WaterValves | null } | null>(null);
 const network = ref<GeoJSON.FeatureCollection | null>(null);
 const stepData = ref<WaterStep | null>(null);
 const step = ref(0);
@@ -303,7 +318,12 @@ const num = (v: number | null | undefined) => (v == null ? '—' : v.toLocaleStr
 
 const showFrame = () => {
   if (!network.value) return;
-  emit('show-on-map', zoneMap.value ? zoneFrame(network.value, zoneMap.value) : waterFrame(network.value, stepData.value));
+  const net = network.value;
+  let frame: GeoJSON.FeatureCollection;
+  if (isolationMap.value) frame = isolationFrame(net, isolationMap.value.result, isolationMap.value.valves);
+  else if (zoneMap.value) frame = zoneFrame(net, zoneMap.value);
+  else frame = waterFrame(net, stepData.value);
+  emit('show-on-map', frame);
   overlay.markShown();
 };
 
@@ -331,6 +351,7 @@ const select = async (m: WaterModel) => {
   runs.value = [];
   run.value = null;
   zoneMap.value = null;
+  isolationMap.value = null;
   stepData.value = null;
   step.value = 0;
   try {
@@ -416,7 +437,13 @@ const onZones = (z: WaterZones | null) => {
   showFrame();
 };
 
-const onLeakRun = async (id: number) => {
+const onIsolation = (data: { result: WaterIsolation; valves: WaterValves | null } | null) => {
+  isolationMap.value = data;
+  showFrame();
+};
+
+/** Панель выполнила расчёт (утечка, отключение) — он появляется в списке и становится текущим */
+const onRunAdded = async (id: number) => {
   if (!selected.value) return;
   try {
     runs.value = await fastApiService.getWaterRuns(selected.value.id);

@@ -1,5 +1,7 @@
 /** Водопровод (itwin-api routers/water.py). Часть fastApiService (services/fastApiService.ts собирает разделы). */
-import type { WaterBalance, WaterModel, WaterRun, WaterStatus, WaterStep, WaterZones } from '~/utils/water';
+import type {
+  WaterBalance, WaterIsolation, WaterModel, WaterRun, WaterStatus, WaterStep, WaterValves, WaterZones,
+} from '~/utils/water';
 import { encodePath, mutationOptions, request } from './http';
 
 export const waterApi = {
@@ -49,5 +51,18 @@ export const waterApi = {
   async getWaterBalance(id: number, runId: number, baseline?: number): Promise<WaterBalance> {
     return request<WaterBalance>(`api/v1/water/models/${encodePath(id)}/runs/${encodePath(runId)}/balance`,
       { ...mutationOptions('GET'), query: baseline ? { baseline } : {} });
+  },
+  /** Задвижки модели точками */
+  async getWaterValves(id: number): Promise<WaterValves> {
+    return request<WaterValves>(`api/v1/water/models/${encodePath(id)}/valves`, mutationOptions('GET'));
+  },
+  /** Расставить задвижки «N−1» (у узла с N трубами — на N−1 из них) */
+  async generateWaterValves(id: number): Promise<WaterValves> {
+    return request<WaterValves>(`api/v1/water/models/${encodePath(id)}/valves/generate`, mutationOptions('POST'));
+  },
+  /** Отключение трубы: задвижки, узлы без воды; run — ещё и расчёт EPANET с отбором по давлению */
+  async waterIsolation(id: number, linkId: string, run = false): Promise<WaterIsolation> {
+    return request<WaterIsolation>(`api/v1/water/models/${encodePath(id)}/isolation${run ? '/run' : ''}`,
+      mutationOptions('POST', { link_id: linkId }));
   },
 };

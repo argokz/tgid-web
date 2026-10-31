@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ISOLATION_META,
+  isolationFrame,
   METER_COLOR,
   PRESSURE_META,
   pressureStatus,
@@ -12,6 +14,7 @@ import {
   ZONE_SOURCE_COLOR,
   zoneColors,
   zoneFrame,
+  type WaterIsolation,
   type WaterRun,
   type WaterStep,
   type WaterZone,
@@ -56,7 +59,7 @@ describe('water', () => {
 });
 
 const zone = (index: number, kind: WaterZone['kind']): WaterZone => ({
-  index, name: `Зона ${index}`, kind, nodes: 1, junctions: 1, sources: [], base_demand_ls: 0, inlets: [],
+  index, name: `Зона ${index}`, kind, nodes: 1, junctions: 1, sources: [], demand_ls: 0, inlets: [],
 });
 
 describe('зоны водоучёта', () => {
@@ -89,5 +92,30 @@ describe('зоны водоучёта', () => {
     const leak = { id: 3, summary: { leaks: [{ node: '141', area_cm2: 2.5, avg_ls: 1, volume_m3: 1 }] } } as unknown as WaterRun;
     expect(runLabel(base)).toBe('№1 · базовый');
     expect(runLabel(leak)).toBe('№3 · утечка 141 (2,5 см²)');
+  });
+});
+
+describe('отключение участка', () => {
+  const iso = {
+    link: '60', segment: { links: ['60'], nodes: ['10'], length_m: 100 }, close_valves: [{ id: 7, link: '61', node: '10' }],
+    close_devices: [], sources_inside: [], no_water: { segment_nodes: ['10'], cut_off_nodes: [], demand_ls: 1 },
+    closed_links: ['60', '61'], valves_total: 2,
+  } as WaterIsolation;
+  const valves: GeoJSON.FeatureCollection = {
+    type: 'FeatureCollection',
+    features: [7, 8].map((id) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { kind: 'valve', id } })),
+  };
+
+  it('isolationFrame: участок красный и толстый, закрываемая задвижка добавлена, остальные — нет', () => {
+    const f = isolationFrame(net, iso, valves).features.map((x) => x.properties ?? {});
+    expect(f[0]).toMatchObject({ id: '60', color: ISOLATION_META.segment.color, width: 5 });
+    expect(f[1]).toMatchObject({ id: '10', color: ISOLATION_META.segment.color });
+    expect(f[2]).toMatchObject({ id: 'Lake', color: ISOLATION_META.other.color });
+    expect(f.filter((p) => p.kind === 'valve')).toEqual([{ kind: 'valve', id: 7, color: ISOLATION_META.valve.color }]);
+  });
+
+  it('runLabel: расчёт отключения', () => {
+    const run = { id: 9, summary: { isolation: { link: '129' } } } as unknown as WaterRun;
+    expect(runLabel(run)).toBe('№9 · отключение трубы 129');
   });
 });

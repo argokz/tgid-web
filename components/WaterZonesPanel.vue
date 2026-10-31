@@ -311,7 +311,7 @@ const rows = computed<Row[]>(() => {
   });
 });
 
-const num = (v: number | null | undefined) => (v == null ? '—' : v.toLocaleString('ru-RU', { maximumFractionDigits: 1 }));
+const num = (v: number | null | undefined) => (v == null ? '—' : (Math.round(v * 10) / 10 || 0).toLocaleString('ru-RU'));
 const signed = (v: number) => {
   const r = Math.round(v * 10) / 10;
   return r === 0 ? '0' : `${r > 0 ? '+' : ''}${num(r)}`;
