@@ -1118,6 +1118,42 @@ const onShowKpiOnMap = (data: GeoJSON.FeatureCollection) => {
 };
 
 // === Телеметрия: датчики (цвет — оценка «факт против модели», подпись — показание) ===
+// === Водопровод (фаза 4): трубы по скорости, узлы по давлению; перемотка — только данные слоя ===
+const waterOverlay = useOverlayLayer(() => mapStore.map, 'water-network',
+  { layerIds: ['water-network-pipes', 'water-network-nodes'] });
+let waterFitKey = '';
+
+const onShowWaterOnMap = (data: GeoJSON.FeatureCollection) => {
+  const key = `${data.features.length}:${data.features[0]?.properties?.id ?? ''}`;
+  if (key === waterFitKey && waterOverlay.update(data)) return;
+  waterOverlay.show(data, [{
+    id: 'water-network-pipes',
+    type: 'line',
+    filter: ['==', ['geometry-type'], 'LineString'],
+    paint: {
+      'line-color': ['get', 'color'],
+      'line-width': ['interpolate', ['linear'], ['coalesce', ['get', 'diameter_mm'], 150], 100, 2, 300, 3.5, 600, 5],
+    },
+  }, {
+    id: 'water-network-nodes',
+    type: 'circle',
+    filter: ['==', ['geometry-type'], 'Point'],
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 2.5, 16, 5],
+      'circle-color': ['get', 'color'],
+      'circle-stroke-width': 1,
+      'circle-stroke-color': '#fff',
+    },
+  }]);
+  const bounds = featureBounds(data);
+  const map = mapStore.map;
+  if (map && bounds && key !== waterFitKey) {
+    const [xmin, ymin, xmax, ymax] = bounds;
+    map.fitBounds([[xmin, ymin], [xmax, ymax]], { padding: 60, maxZoom: 16, duration: 800 });
+  }
+  waterFitKey = key;
+};
+
 const telemetryOverlay = useOverlayLayer(() => mapStore.map, 'telemetry-sensors',
   { layerIds: ['telemetry-sensors-lines', 'telemetry-sensors-points', 'telemetry-sensors-labels'] });
 
@@ -1859,6 +1895,12 @@ const toolDialogs: ToolDialogEntry[] = [
     key: 'telemetry',
     component: lazyDialog(() => import('./TelemetryDialog.vue')),
     on: { showOnMap: onShowTelemetryOnMap, clearHighlight: () => telemetryOverlay.clear() },
+  },
+  // Водопровод (фаза 4): модели EPANET и расчёт отдельным движком — сеть на карте по давлению и скорости
+  {
+    key: 'water',
+    component: lazyDialog(() => import('./WaterDialog.vue')),
+    on: { showOnMap: onShowWaterOnMap, clearHighlight: () => { waterOverlay.clear(); waterFitKey = ''; } },
   },
   // Исходные данные (этап 9): участки ПТС, групповые установщики aSet* и справочники
   { key: 'ptsSites', component: lazyDialog(() => import('./PtsSitesDialog.vue')) },

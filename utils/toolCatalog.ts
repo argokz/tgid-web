@@ -17,6 +17,7 @@ export type ToolEvent =
   | 'open-work-orders'
   | 'open-forms'
   | 'open-telemetry'
+  | 'open-water'
   | 'open-outages'
   | 'open-map-comments'
   | 'open-kpi-dashboard'
@@ -73,6 +74,7 @@ export type ToolDialogKey =
   | 'workOrders'
   | 'forms'
   | 'telemetry'
+  | 'water'
   | 'outages'
   | 'mapComments'
   | 'kpiDashboard'
@@ -188,6 +190,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
     color: 'primary',
     items: [
       { label: 'Телеметрия: факт против модели', hint: 'Датчики давления, температуры и расхода: показания против расчёта, графики, выгрузки ОДПУ, датчики на карте', icon: 'mdi-gauge', color: 'teal-darken-2', event: 'open-telemetry', dialog: 'telemetry' },
+      { label: 'Водопровод: расчёт сети', hint: 'Модели EPANET, гидравлический расчёт водопровода по часам: давление в узлах, скорость в трубах на карте', icon: 'mdi-water-pump', color: 'blue-darken-2', event: 'open-water', dialog: 'water' },
       { label: 'Гидравлический режим на карте', hint: 'Стрелки потоков, hуд > 80 Па/м, скорости и напоры', icon: 'mdi-map-clock-outline', color: 'indigo-darken-2', event: 'open-hydraulic-thematic', dialog: 'hydraulicThematic' },
       { label: 'Тематическая карта', hint: 'Участки по диаметру, году, износу, теплопотерям, напору — классы и легенда', icon: 'mdi-palette-swatch-variant', color: 'deep-purple-darken-2', event: 'open-thematic-map', dialog: 'thematicMap' },
       { label: 'Выборка по условиям', hint: 'Участки и узлы по паспорту, режиму, износу, «в N м от узла»; вопрос словами — помощник ИИ', icon: 'mdi-database-search', color: 'blue-darken-3', event: 'open-network-select', dialog: 'networkSelect' },

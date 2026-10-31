@@ -27,6 +27,7 @@ import { webhooksApi } from './api/webhooks';
 import { formsApi } from './api/forms';
 import { telemetryApi } from './api/telemetry';
 import { loadForecastApi } from './api/loadForecast';
+import { waterApi } from './api/water';
 
 export const fastApiService = {
   ...coreApi,
@@ -51,4 +52,5 @@ export const fastApiService = {
   ...formsApi,
   ...telemetryApi,
   ...loadForecastApi,
+  ...waterApi,
 };
