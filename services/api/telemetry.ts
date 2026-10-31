@@ -1,7 +1,7 @@
 /** Телеметрия (itwin-api routers/telemetry.py). Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type {
   CalibrationResult, ImportResult, RegimeResult, RegimeRunResult, Sensor, SensorInput, SensorSeries, TelemetryAlert,
-  TelemetryUnits,
+  TelemetryUnits, TimelineResult,
 } from '~/utils/telemetry';
 import type { BalanceAlert, BalanceResult, ZoneGeometry } from '~/utils/flowBalance';
 import { encodePath, mutationOptions, request } from './http';
@@ -49,6 +49,11 @@ export const telemetryApi = {
   /** Калибровка: потери напора между соседними датчиками давления, факт против модели */
   async getCalibration(): Promise<CalibrationResult> {
     return request<CalibrationResult>('api/v1/telemetry/calibration', mutationOptions('GET'));
+  },
+
+  /** Шкала времени для карты: показания и оценка всех датчиков по интервалам периода */
+  async getTelemetryTimeline(from: string, to: string): Promise<TimelineResult> {
+    return request<TimelineResult>('api/v1/telemetry/timeline', { ...mutationOptions('GET'), query: { from, to } });
   },
 
   /** Режим источников: граничные условия последнего расчёта против телеметрии */

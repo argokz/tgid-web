@@ -7,10 +7,13 @@ import {
   seriesOption,
   seriesSummary,
   sortSensors,
+  timelineCounts,
+  timelineFrame,
   valueText,
   type RegimeNode,
   type Sensor,
   type SensorSeries,
+  type TimelineResult,
 } from '~/utils/telemetry';
 
 const base: Sensor = {
@@ -100,5 +103,30 @@ describe('regime', () => {
     expect(regimeState({ ...node, problem: 'нет свежих показаний' }).text).toBe('нет свежих показаний');
     expect(regimeState({ ...node, changes: [] }).text).toBe('совпадает с расчётом');
     expect(regimeState({ ...node, changes: [], model: null }).text).toBe('нет расчёта');
+  });
+});
+
+describe('timeline', () => {
+  const tl: TimelineResult = {
+    step_min: 15,
+    buckets: ['2026-10-30T10:00:00+00:00', '2026-10-30T10:15:00+00:00'],
+    sensors: [
+      { id: 1, name: 'ТЭЦ-1 P1', kind: 'pressure', pipe: 'supply', unit: 'кгс/см²', lon: 76.9, lat: 43.2, model: 11,
+        values: [11.05, null], status: ['ok', 'no_data'], dev: [0.5, null] },
+      { id: 2, name: '7-31 P1', kind: 'pressure', pipe: 'supply', unit: 'кгс/см²', lon: 76.95, lat: 43.25, model: 7.9,
+        values: [7.0, 7.0], status: ['bad', 'bad'], dev: [-11.4, -11.4] },
+    ],
+  };
+
+  it('timelineFrame: цвет оценки и подпись со значением', () => {
+    const fc = timelineFrame(tl, 0);
+    expect(fc.features[0].properties).toMatchObject({ status: 'ok', label: 'ТЭЦ-1 P1\n11,05 кгс/см²' });
+    expect(fc.features[1].properties?.color).toBe('#C62828');
+    expect(timelineFrame(tl, 1).features[0].properties?.label).toBe('ТЭЦ-1 P1\nнет показаний');
+  });
+
+  it('timelineCounts', () => {
+    expect(timelineCounts(tl, 0)).toEqual({ ok: 1, bad: 1 });
+    expect(timelineCounts(tl, 1)).toEqual({ no_data: 1, bad: 1 });
   });
 });

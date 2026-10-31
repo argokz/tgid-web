@@ -61,6 +61,18 @@ export function useOverlayLayer(getMap: () => MapLike | null | undefined, source
     return true;
   };
 
+  /**
+   * Заменить только данные (следующий кадр той же картинки — шкала времени): без пересоздания слоёв, работает и
+   * пока стиль догружается. false — оверлея ещё нет, нужен show().
+   */
+  const update = (data: any): boolean => {
+    const source = getMap()?.getSource(sourceId) as { setData?: (d: any) => unknown } | undefined;
+    if (!source?.setData) return false;
+    pending++; // отложенный show() с прежними данными больше не нужен
+    source.setData(data);
+    return true;
+  };
+
   const isShown = () => Boolean(getMap()?.getSource(sourceId));
 
   const setLayout = (layerId: string, name: string, value: unknown) => {
@@ -89,6 +101,7 @@ export function useOverlayLayer(getMap: () => MapLike | null | undefined, source
       return [...layerIds];
     },
     show,
+    update,
     clear,
     isShown,
     setLayout,

@@ -1121,8 +1121,14 @@ const onShowKpiOnMap = (data: GeoJSON.FeatureCollection) => {
 const telemetryOverlay = useOverlayLayer(() => mapStore.map, 'telemetry-sensors',
   { layerIds: ['telemetry-sensors-lines', 'telemetry-sensors-points', 'telemetry-sensors-labels'] });
 
+// шкала времени шлёт кадр за кадром: масштаб подгоняется только при смене набора датчиков, иначе карта прыгает
+let telemetryFitKey = '';
+
 const onShowTelemetryOnMap = (data: GeoJSON.FeatureCollection) => {
   const map = mapStore.map;
+  const key = data.features.map((f) => `${f.id ?? ''}:${f.geometry.type}`).join(',');
+  // тот же набор датчиков — только данные кадра, слои не пересоздаются
+  if (key === telemetryFitKey && telemetryOverlay.update(data)) return;
   telemetryOverlay.show(data, [{
     // участки пары датчиков (калибровка), зона баланса расхода (крупная — контуром)
     id: 'telemetry-sensors-lines',
@@ -1139,14 +1145,16 @@ const onShowTelemetryOnMap = (data: GeoJSON.FeatureCollection) => {
     type: 'symbol',
     minzoom: 13,
     filter: ['==', ['geometry-type'], 'Point'],
-    layout: { 'text-field': ['get', 'name'], 'text-size': 11, 'text-offset': [0, 1.4], 'text-anchor': 'top' },
+    layout: { 'text-field': ['coalesce', ['get', 'label'], ['get', 'name']], 'text-size': 11, 'text-offset': [0, 1.4],
+      'text-anchor': 'top' },
     paint: { 'text-color': '#263238', 'text-halo-color': '#fff', 'text-halo-width': 1.5 },
   }]);
   const bounds = featureBounds(data);
-  if (map && bounds) {
+  if (map && bounds && key !== telemetryFitKey) {
     const [xmin, ymin, xmax, ymax] = bounds;
     map.fitBounds([[xmin, ymin], [xmax, ymax]], { padding: 80, maxZoom: 16, duration: 800 });
   }
+  telemetryFitKey = key;
 };
 
 // === Социальные объекты: точки категорий (цвет — категория) ===

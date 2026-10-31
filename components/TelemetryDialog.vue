@@ -704,12 +704,12 @@
                 За этот период показаний нет.
               </p>
             </template>
-            <p
-              v-else
-              class="text-body-2 text-medium-emphasis"
-            >
-              Выберите датчик — покажем его показания за период и линию расчётного значения.
-            </p>
+            <template v-else>
+              <p class="text-body-2 text-medium-emphasis mb-3">
+                Выберите датчик — покажем его показания за период и линию расчётного значения.
+              </p>
+              <TelemetryTimelinePanel @show-on-map="showTimelineFrame" />
+            </template>
           </div>
         </div>
         <p class="text-caption text-medium-emphasis mt-3">
@@ -770,6 +770,7 @@ use([LineChart, MarkLineComponent]);
 
 const LoadForecastPanel = defineAsyncComponent(() => import('~/components/LoadForecastPanel.vue'));
 const FlowBalancePanel = defineAsyncComponent(() => import('~/components/FlowBalancePanel.vue'));
+const TelemetryTimelinePanel = defineAsyncComponent(() => import('~/components/TelemetryTimelinePanel.vue'));
 
 /**
  * Телеметрия (фаза 3, «Цифровой двойник»): датчики давления, температуры и расхода в узлах и на участках,
@@ -953,6 +954,11 @@ watch(tab, (t) => {
   if (t === 'calibration') void loadCalibration();
   if (t === 'regime') void loadRegime();
 });
+
+const showTimelineFrame = (fc: GeoJSON.FeatureCollection) => {
+  emit('show-on-map', fc);
+  overlay.markShown();
+};
 
 const showBalanceZone = (fc: GeoJSON.FeatureCollection) => {
   emit('show-on-map', fc);

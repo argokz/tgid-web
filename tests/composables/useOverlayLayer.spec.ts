@@ -57,6 +57,20 @@ describe('useOverlayLayer', () => {
     expect(() => ov.show(FC, [])).toThrow('boom');
   });
 
+  it('update меняет только данные источника; без оверлея — false; отменяет отложенный show', () => {
+    const map = makeMap() as any;
+    const ov = useOverlayLayer(() => map, 'src');
+    expect(ov.update(FC)).toBe(false);
+    ov.show(FC, [{ id: 'a', type: 'circle' }]);
+    const frames: any[] = [];
+    map.sources.get('src').setData = (d: any) => frames.push(d);
+    map.calls.length = 0;
+    const next = { type: 'FeatureCollection', features: [{ id: 1 }] };
+    expect(ov.update(next)).toBe(true);
+    expect(frames).toEqual([next]);
+    expect(map.calls).toEqual([]); // слои и источник не пересоздавались
+  });
+
   it('show добавляет источник и слои с подставленным source', () => {
     const map = makeMap();
     const ov = useOverlayLayer(() => map as any, 'src');

@@ -210,6 +210,56 @@ export function regimeState(node: RegimeNode): { text: string; color: string } {
   return { text: 'совпадает с расчётом', color: '#2E7D32' };
 }
 
+/** Шкала времени для карты (GET /api/v1/telemetry/timeline) */
+export interface TimelineSensor {
+  id: number;
+  name: string;
+  kind: SensorKind;
+  pipe: 'supply' | 'return';
+  unit: string;
+  lon: number;
+  lat: number;
+  model: number | null;
+  values: (number | null)[];
+  status: SensorStatus[];
+  /** давление и расход — %, температура — °C */
+  dev: (number | null)[];
+}
+
+export interface TimelineResult { step_min: number; buckets: string[]; sensors: TimelineSensor[] }
+
+/** Кадр шкалы для карты: точки датчиков с цветом оценки и подписью «имя — значение» */
+export function timelineFrame(tl: TimelineResult, index: number): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: tl.sensors.map((s) => {
+      const status = s.status[index] ?? 'no_data';
+      const v = s.values[index];
+      return {
+        type: 'Feature',
+        id: s.id,
+        geometry: { type: 'Point', coordinates: [s.lon, s.lat] },
+        properties: {
+          id: s.id, name: s.name, status, value: v, unit: s.unit, color: STATUS_META[status].color,
+          label: v == null ? `${s.name}
+нет показаний` : `${s.name}
+${nf(v, 3)} ${s.unit}`,
+        },
+      };
+    }),
+  };
+}
+
+/** Сколько датчиков в каждой оценке на кадре — для легенды под шкалой */
+export function timelineCounts(tl: TimelineResult, index: number): Partial<Record<SensorStatus, number>> {
+  const out: Partial<Record<SensorStatus, number>> = {};
+  for (const s of tl.sensors) {
+    const st = s.status[index] ?? 'no_data';
+    out[st] = (out[st] ?? 0) + 1;
+  }
+  return out;
+}
+
 /** Цвет тревоги: расхождение, молчит, вернулся в норму */
 export const ALERT_COLORS: Record<AlertStatus, string> = { bad: '#C62828', silent: '#616161', normal: '#2E7D32' };
 
