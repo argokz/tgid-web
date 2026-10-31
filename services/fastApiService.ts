@@ -32,6 +32,7 @@ import { utilitiesApi } from './api/utilities';
 import { failureForecastApi } from './api/failureForecast';
 import { emChapterApi } from './api/emChapter';
 import { loadPerspectiveApi } from './api/loadPerspective';
+import { network3dApi } from './api/network3d';
 
 export const fastApiService = {
   ...coreApi,
@@ -61,4 +62,5 @@ export const fastApiService = {
   ...failureForecastApi,
   ...emChapterApi,
   ...loadPerspectiveApi,
+  ...network3dApi,
 };
