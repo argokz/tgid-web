@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { pctText, RISK_CLASSES, riskClass, riskFrame, validationText, type FailureRun, type FailureTop } from '~/utils/failureForecast';
+import {
+  captureRows,
+  pctText,
+  PLAN_COLOR,
+  PLAN_TOP_COLOR,
+  planFrame,
+  RISK_CLASSES,
+  riskClass,
+  riskFrame,
+  validationText,
+  type FailureMetrics,
+  type FailureRun,
+  type FailureTop,
+  type RelayPlan,
+} from '~/utils/failureForecast';
 
 describe('прогноз аварийности', () => {
   it('riskClass: верхние 5 % — тёмные, дальше светлее', () => {
@@ -25,5 +39,22 @@ describe('прогноз аварийности', () => {
       metrics: { top_share: 0.1, top_capture: 0.788, auc: 0.892, test: { events: 113 } } } as unknown as FailureRun;
     expect(validationText(run)).toBe('Модель, обученная на данных до 2020 г., на 2022–2023 гг. (их она не видела): '
       + '79 % из 113 повреждений пришлись на 10 % участков с наибольшим прогнозом; ROC-AUC 0,892.');
+  });
+
+  it('planFrame: первые 10 объектов — темнее и толще', () => {
+    const f = (object: number): GeoJSON.Feature => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1]] }, properties: { object } });
+    const plan = { geojson: { type: 'FeatureCollection', features: [f(1), f(11)] } } as unknown as RelayPlan;
+    const props = planFrame(plan).features.map((x) => x.properties);
+    expect(props[0]).toMatchObject({ color: PLAN_TOP_COLOR, width: 6 });
+    expect(props[1]).toMatchObject({ color: PLAN_COLOR, width: 4 });
+  });
+
+  it('captureRows: по бюджетам в км', () => {
+    const m = { capture_by_km: { model: { 1: 0.018, 5: 0.195 }, oldest_first: { 1: 0, 5: 0 }, near_defects: { 1: 0, 5: 0.035 } } } as unknown as FailureMetrics;
+    expect(captureRows(m)).toEqual([
+      { km: '1', model: 0.018, oldest: 0, near: 0 },
+      { km: '5', model: 0.195, oldest: 0, near: 0.035 },
+    ]);
+    expect(captureRows({} as FailureMetrics)).toEqual([]);
   });
 });

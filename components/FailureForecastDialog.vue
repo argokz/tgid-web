@@ -22,9 +22,37 @@
           @click="visible = false"
         />
       </v-card-title>
+      <v-tabs
+        v-model="tab"
+        density="compact"
+        class="px-2"
+      >
+        <v-tab value="forecast">
+          Прогноз
+        </v-tab>
+        <v-tab
+          value="plan"
+          :disabled="!run"
+        >
+          План перекладок
+        </v-tab>
+      </v-tabs>
       <v-divider />
 
-      <v-card-text class="pa-4">
+      <v-card-text
+        v-show="tab === 'plan'"
+        class="pa-4"
+      >
+        <RelayPlanPanel
+          :run="run"
+          :can-edit="canEditPrices"
+          @show="showFrame"
+        />
+      </v-card-text>
+      <v-card-text
+        v-show="tab === 'forecast'"
+        class="pa-4"
+      >
         <p class="text-body-2 mb-2">
           Вероятность повреждения участка в ближайшие {{ run?.horizon_years ?? 2 }} года — по журналу повреждений,
           возрасту, длине, диаметру, прокладке, глубине и повреждениям рядом. Модель проверяется на годах, которых не
@@ -86,6 +114,52 @@
             журнала как в {{ run.cutoffs.final.slice(0, 4) }}–{{ Number(run.cutoffs.final.slice(0, 4)) + run.horizon_years - 1 }} гг.
             (модель училась на них).
           </div>
+
+          <template v-if="captureRows(run.metrics).length">
+            <div class="text-subtitle-2 mb-1">
+              Если бы перекладывали по прогнозу
+            </div>
+            <p class="text-caption text-medium-emphasis mb-1">
+              Доля повреждений {{ run.cutoffs.test.slice(0, 4) }}–{{ Number(run.cutoffs.test.slice(0, 4)) + run.horizon_years - 1 }} гг.
+              на участках, переложенных первыми в пределах бюджета (сеть в расчёте — {{ num(run.metrics.length_km, 0) }} км).
+            </p>
+            <v-table
+              density="compact"
+              class="fd-table mb-3"
+            >
+              <thead>
+                <tr>
+                  <th>Переложить</th>
+                  <th class="text-right">
+                    По прогнозу
+                  </th>
+                  <th class="text-right">
+                    Самые старые первыми
+                  </th>
+                  <th class="text-right">
+                    Где рядом были повреждения
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="c in captureRows(run.metrics)"
+                  :key="c.km"
+                >
+                  <td>{{ c.km }} км</td>
+                  <td class="text-right font-weight-medium">
+                    {{ pctText(c.model, 0) }}
+                  </td>
+                  <td class="text-right">
+                    {{ pctText(c.oldest, 0) }}
+                  </td>
+                  <td class="text-right">
+                    {{ pctText(c.near, 0) }}
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </template>
 
           <div class="text-subtitle-2 mb-1">
             Что влияет на прогноз
@@ -208,7 +282,9 @@ import { useMobile } from '~/composables/useMobile';
 import { fastApiService } from '~/services/fastApiService';
 import { useAuthStore } from '~/stores/authStore';
 import { formatApiError } from '~/utils/apiError';
+import RelayPlanPanel from '~/components/RelayPlanPanel.vue';
 import {
+  captureRows,
   pctText,
   RISK_CLASSES,
   riskClass,
@@ -232,6 +308,9 @@ const { isMobile } = useMobile();
 const authStore = useAuthStore();
 
 const LIST_LIMIT = 30;
+const tab = ref<'forecast' | 'plan'>('forecast');
+const canEditPrices = computed(() => authStore.canEditData
+  && (authStore.permissions.general as string[]).includes('refs'));
 const TOP_ON_MAP = 200;
 const run = ref<FailureRun | null>(null);
 const top = ref<FailureTop | null>(null);
@@ -284,10 +363,13 @@ const calculate = async () => {
   }
 };
 
-const showMap = () => {
-  if (!top.value) return;
-  emit('show-on-map', riskFrame(top.value));
+const showFrame = (fc: GeoJSON.FeatureCollection) => {
+  emit('show-on-map', fc);
   overlay.markShown();
+};
+
+const showMap = () => {
+  if (top.value) showFrame(riskFrame(top.value));
 };
 
 watch(visible, (v) => {

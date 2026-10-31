@@ -9,6 +9,9 @@ export interface FailureMetrics {
   top_capture: number | null;
   train: { lines: number; events: number };
   test: { lines: number; events: number };
+  /** Ретроспектива плана: доля повреждений окна проверки на участках, переложенных первыми в пределах N км */
+  capture_by_km?: Record<'model' | 'oldest_first' | 'near_defects', Record<string, number | null>>;
+  length_km?: number;
   population_rule?: { passport_fields: string[]; min_filled: number; lines: number; lines_all: number; damaged_kept: number | null };
 }
 
@@ -87,4 +90,68 @@ export function validationText(run: FailureRun): string {
   return `Модель, обученная на данных до ${run.cutoffs.train.slice(0, 4)} г., на ${from}–${to} гг. (их она не видела): `
     + `${pctText(m.top_capture, 0)} из ${m.test.events} повреждений пришлись на ${share} % участков с наибольшим `
     + `прогнозом; ROC-AUC ${m.auc?.toLocaleString('ru-RU') ?? '—'}.`;
+}
+
+// --- план перекладок (database/relay_plan.py) ---
+
+export interface RelayPrice { dn_max_mm: number; price_per_m: number; currency: string; source?: string | null }
+
+export interface RelayObject {
+  n: number;
+  fragment: string | null;
+  fileid: number | null;
+  lines: number;
+  lineids: number[];
+  length_m: number;
+  cost: number;
+  expected_failures: number;
+  benefit: number;
+  max_prob: number;
+  dn_min: number | null;
+  dn_max: number | null;
+}
+
+export interface RelayPlan {
+  run_id: number;
+  horizon_years: number;
+  unit: 'km' | 'money';
+  budget: number;
+  job_overhead_m: number;
+  currency: string | null;
+  spent: number;
+  lines: number;
+  length_km: number;
+  expected_failures: number;
+  expected_failures_share: number;
+  benefit_share: number;
+  oldest_first: { lines: number; expected_failures: number; expected_failures_share: number };
+  consequence_values: number;
+  flow_known: number;
+  runs: number;
+  population: number;
+  objects: RelayObject[];
+  geojson: GeoJSON.FeatureCollection;
+}
+
+export const PLAN_COLOR = '#1565C0';
+export const PLAN_TOP_COLOR = '#0D47A1';
+
+/** Участки плана на карте: первые 10 объектов — темнее и толще */
+export function planFrame(plan: RelayPlan): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: plan.geojson.features.map((f) => {
+      const top = (f.properties?.object ?? Infinity) <= 10;
+      return { ...f, properties: { ...f.properties, color: top ? PLAN_TOP_COLOR : PLAN_COLOR, width: top ? 6 : 4 } };
+    }),
+  };
+}
+
+/** Строки ретроспективы: для каждого бюджета в км — доля повреждений у модели и у правил «старые», «рядом» */
+export function captureRows(m: FailureMetrics): { km: string; model: number | null; oldest: number | null; near: number | null }[] {
+  const c = m.capture_by_km;
+  if (!c) return [];
+  return Object.keys(c.model).map((km) => ({
+    km, model: c.model[km] ?? null, oldest: c.oldest_first[km] ?? null, near: c.near_defects[km] ?? null,
+  }));
 }
