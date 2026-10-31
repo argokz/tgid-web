@@ -20,6 +20,7 @@ export type ToolEvent =
   | 'open-water'
   | 'open-utilities'
   | 'open-failure-forecast'
+  | 'open-em-chapter'
   | 'open-outages'
   | 'open-map-comments'
   | 'open-kpi-dashboard'
@@ -79,6 +80,7 @@ export type ToolDialogKey =
   | 'water'
   | 'utilities'
   | 'failureForecast'
+  | 'emChapter'
   | 'outages'
   | 'mapComments'
   | 'kpiDashboard'
@@ -221,6 +223,7 @@ export const TOOL_GROUPS: ToolGroupDescriptor[] = [
       { label: 'Отчёты и паспорта', hint: 'Паспорта участков в Excel', icon: 'mdi-file-tree', color: 'success', event: 'open-passport-dialog', dialog: 'passport' },
       { label: 'Участки ПТС', hint: 'Участки МС/РС: характеристика, привязка труб (карта, цепочка узлов), паспорт', icon: 'mdi-map-marker-path', color: 'green-darken-2', event: 'open-pts-sites', dialog: 'ptsSites' },
       { label: 'Печать карты', hint: 'Макет A4/A3: масштаб, легенда, штамп; PNG и PDF', icon: 'mdi-printer', color: 'blue-grey-darken-2', event: 'open-print-layout', dialog: 'printLayout' },
+      { label: 'Схема теплоснабжения: «Электронная модель»', hint: 'Черновик главы 3 в Word по п. 55 Требований (ПП РФ № 154): соответствие подпунктам, сеть, паспорт, балансы, надёжность', icon: 'mdi-book-open-page-variant-outline', color: 'indigo-darken-2', event: 'open-em-chapter', dialog: 'emChapter' },
       { label: 'Отчёты Excel', hint: 'Таблицы десктопа: участки, потребители, задвижки, результаты расчёта', icon: 'mdi-file-excel', color: 'green-darken-3', event: 'open-excel-reports', dialog: 'excelReports' },
       { label: 'Технические условия', hint: 'Реестр ТУ и нагрузки', icon: 'mdi-file-certificate-outline', color: 'cyan-darken-3', event: 'open-technical-condition-journal', dialog: 'technicalCondition' },
       { label: 'Объекты АЛСЕКО', hint: 'Договорные нагрузки и здания', icon: 'mdi-office-building-marker', color: 'indigo-darken-2', event: 'open-alseko-journal', dialog: 'alseko' },
