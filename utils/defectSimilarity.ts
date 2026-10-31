@@ -49,6 +49,21 @@ export interface FailureHotspot {
   line: { id: number; diameter: number | null; length_m: number | null; laid: string | null; distance_m: number } | null;
 }
 
+/** Предпросмотр записи участков в журнал нарушений (GET /api/v1/defects/line-binding) */
+export interface LineBindingPlan {
+  unplaced: number;
+  without_place: number;
+  to_bind: number;
+  far: number;
+  snap_m: number;
+  with_copies: number;
+  by_fragment: Record<string, number>;
+  rule: string;
+  items: { defect_id: number; line_id: number; fileid: number; fragment: string | null; distance_m: number; copies: number }[];
+}
+
+export interface LineBindingResult { bound: number; skipped: number; far: number; change_group_id: string | null }
+
 export interface HotspotResult { years: number; eps_m: number; min_count: number; items: FailureHotspot[] }
 
 const KIND_TEXT: Record<string, string> = {

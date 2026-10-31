@@ -30,6 +30,16 @@
           Повторные отказы
         </v-btn>
         <v-btn
+          v-if="mutationsEnabled && canBindLines"
+          color="secondary"
+          variant="tonal"
+          prepend-icon="mdi-vector-polyline"
+          class="mr-2"
+          @click="bindingVisible = true"
+        >
+          Привязать к участкам
+        </v-btn>
+        <v-btn
           color="secondary"
           variant="tonal"
           prepend-icon="mdi-printer"
@@ -261,6 +271,10 @@
         </template>
       </DataTable>
     </JournalShell>
+    <DefectLineBindingDialog
+      v-model="bindingVisible"
+      @changed="loadDefects"
+    />
     <FailureHotspotsDialog
       v-model="hotspotsVisible"
       @open="openDetails"
@@ -476,6 +490,7 @@ import DataTable, { type DataTableColumn } from '~/components/DataTable.vue'
 import HintTip from '~/components/HintTip.vue'
 import JournalDetailFields, { type JournalDetailField, type JournalDetailGroup } from '~/components/JournalDetailFields.vue'
 import JournalShell from '~/components/JournalShell.vue'
+import DefectLineBindingDialog from '~/components/DefectLineBindingDialog.vue'
 import FailureHotspotsDialog from '~/components/FailureHotspotsDialog.vue'
 import SimilarDefectsPanel from '~/components/SimilarDefectsPanel.vue'
 import KpiTile, { type KpiStatus } from '~/components/KpiTile.vue'
@@ -486,6 +501,7 @@ import { downloadBlob } from '~/utils/printRender'
 import { hasLonLat, localToday } from '~/utils/journalFields'
 import { useCloseOnMapPick } from '~/composables/useJournalMapBridge'
 import { formatApiError } from '~/utils/apiError'
+import { useAuthStore } from '~/stores/authStore'
 import { useNotificationStore } from '~/stores/notificationStore'
 import { computed, reactive, ref, watch } from 'vue'
 import { useJournalEdit } from '~/composables/useJournalEdit'
@@ -517,6 +533,7 @@ const emit = defineEmits<{
 
 const { isMobile } = useMobile()
 const mutationsEnabled = useMutationsEnabled()
+const authStore = useAuthStore()
 
 const openForm11Report = () => {
   const url = fastApiService.getFormReportUrl('f11_defect', search.value)
@@ -736,6 +753,9 @@ const resetFilters = () => {
 }
 
 const hotspotsVisible = ref(false)
+const bindingVisible = ref(false)
+// запись участков — правка журнала: право «Журналы» (как редактирование записи)
+const canBindLines = computed(() => (authStore.permissions.general as string[]).includes('journals'))
 
 // похожая авария или место повторных отказов — на карту (журнал закрывается, как у «На карте»)
 const locatePoint = (point: { longitude: number; latitude: number; id: number }) => {
