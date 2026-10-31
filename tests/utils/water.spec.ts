@@ -1,5 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { PRESSURE_META, pressureStatus, stepTime, velocityColor, waterFrame, type WaterStep } from '~/utils/water';
+import {
+  METER_COLOR,
+  PRESSURE_META,
+  pressureStatus,
+  runLabel,
+  stepTime,
+  velocityColor,
+  waterFrame,
+  ZONE_COLORS,
+  ZONE_OTHER_COLOR,
+  ZONE_SOURCE_COLOR,
+  zoneColors,
+  zoneFrame,
+  type WaterRun,
+  type WaterStep,
+  type WaterZone,
+  type WaterZones,
+} from '~/utils/water';
 
 const net: GeoJSON.FeatureCollection = {
   type: 'FeatureCollection',
@@ -35,5 +52,42 @@ describe('water', () => {
   it('stepTime', () => {
     expect(stepTime(28800)).toBe('8 ч');
     expect(stepTime(5400)).toBe('1 ч 30 мин');
+  });
+});
+
+const zone = (index: number, kind: WaterZone['kind']): WaterZone => ({
+  index, name: `Зона ${index}`, kind, nodes: 1, junctions: 1, sources: [], base_demand_ls: 0, inlets: [],
+});
+
+describe('зоны водоучёта', () => {
+  it('zoneColors: районы — по порядку, девятый — «прочие», источники — серые', () => {
+    const zones = [zone(1, 'dma'), zone(2, 'source'), ...Array.from({ length: 8 }, (_, i) => zone(i + 3, 'dma'))];
+    const c = zoneColors(zones);
+    expect(c[1]).toBe(ZONE_COLORS[0]);
+    expect(c[2]).toBe(ZONE_SOURCE_COLOR);
+    expect(c[3]).toBe(ZONE_COLORS[1]); // источник не занимает цвет района
+    expect(c[9]).toBe(ZONE_COLORS[7]);
+    expect(c[10]).toBe(ZONE_OTHER_COLOR);
+  });
+
+  it('zoneFrame: участки и узлы — цветом зоны, расходомер — тёмный и толстый', () => {
+    const zones: WaterZones = {
+      meters: ['60'],
+      zones: [zone(1, 'dma'), zone(2, 'source')],
+      boundary: [{ link: '60', type: 'Pipe', reason: 'meter', start: '10', end: 'Lake', start_zone: 1, end_zone: 2 }],
+      node_zone: { 10: 1, Lake: 2 },
+      link_zone: {},
+    };
+    const f = zoneFrame(net, zones).features.map((x) => x.properties ?? {});
+    expect(f[0]).toMatchObject({ boundary: 'meter', color: METER_COLOR, width: 5 });
+    expect(f[1]).toMatchObject({ zone: 1, color: ZONE_COLORS[0] });
+    expect(f[2]).toMatchObject({ zone: 2, color: ZONE_SOURCE_COLOR });
+  });
+
+  it('runLabel', () => {
+    const base = { id: 1, summary: {} } as unknown as WaterRun;
+    const leak = { id: 3, summary: { leaks: [{ node: '141', area_cm2: 2.5, avg_ls: 1, volume_m3: 1 }] } } as unknown as WaterRun;
+    expect(runLabel(base)).toBe('№1 · базовый');
+    expect(runLabel(leak)).toBe('№3 · утечка 141 (2,5 см²)');
   });
 });

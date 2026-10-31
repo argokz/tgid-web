@@ -1118,7 +1118,7 @@ const onShowKpiOnMap = (data: GeoJSON.FeatureCollection) => {
 };
 
 // === Телеметрия: датчики (цвет — оценка «факт против модели», подпись — показание) ===
-// === Водопровод (фаза 4): трубы по скорости, узлы по давлению; перемотка — только данные слоя ===
+// === Водопровод (фаза 4): трубы по скорости, узлы по давлению или сеть по зонам водоучёта; перемотка — только данные слоя ===
 const waterOverlay = useOverlayLayer(() => mapStore.map, 'water-network',
   { layerIds: ['water-network-pipes', 'water-network-nodes'] });
 let waterFitKey = '';
@@ -1132,7 +1132,8 @@ const onShowWaterOnMap = (data: GeoJSON.FeatureCollection) => {
     filter: ['==', ['geometry-type'], 'LineString'],
     paint: {
       'line-color': ['get', 'color'],
-      'line-width': ['interpolate', ['linear'], ['coalesce', ['get', 'diameter_mm'], 150], 100, 2, 300, 3.5, 600, 5],
+      'line-width': ['coalesce', ['get', 'width'],
+        ['interpolate', ['linear'], ['coalesce', ['get', 'diameter_mm'], 150], 100, 2, 300, 3.5, 600, 5]],
     },
   }, {
     id: 'water-network-nodes',

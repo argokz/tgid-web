@@ -21,6 +21,17 @@ export interface WaterRunSummary {
   negative_pressure_nodes: string[];
   high_velocity_pipes: string[];
   thresholds: { low_pressure_m: number; high_velocity_ms: number };
+  /** Сценарий утечек расчёта (нет — базовый расчёт) */
+  leaks?: WaterLeak[];
+}
+
+export interface WaterLeak {
+  node: string;
+  area_cm2: number;
+  avg_ls: number | null;
+  volume_m3: number | null;
+  /** Зона водоучёта узла утечки (в ответе баланса) */
+  zone?: number | null;
 }
 
 export interface WaterRun {
@@ -90,6 +101,134 @@ export function waterFrame(net: GeoJSON.FeatureCollection, step: WaterStep | nul
       return { ...f, properties: { ...p, pressure_m: pressure, status, color: PRESSURE_META[status].color } };
     }),
   };
+}
+
+// --- зоны водоучёта (database/water_zones.py) ---
+
+export type WaterZoneKind = 'dma' | 'source' | 'transit';
+
+export interface WaterZone {
+  index: number;
+  name: string;
+  kind: WaterZoneKind;
+  nodes: number;
+  junctions: number;
+  sources: string[];
+  base_demand_ls: number;
+  inlets: string[];
+}
+
+export interface WaterBoundary {
+  link: string;
+  type: string;
+  reason: 'meter' | 'pump' | 'valve' | 'closed';
+  start: string;
+  end: string;
+  start_zone: number;
+  end_zone: number;
+}
+
+export interface WaterZones {
+  meters: string[];
+  zones: WaterZone[];
+  boundary: WaterBoundary[];
+  node_zone: Record<string, number>;
+  link_zone: Record<string, number>;
+}
+
+export interface WaterZoneBalance {
+  index: number;
+  name: string;
+  kind: WaterZoneKind;
+  supply_avg_ls: number;
+  use_avg_ls: number | null;
+  mnf_ls: number | null;
+  mnf_time_s: number | null;
+  mnf_share: number | null;
+  imbalance_ls: number;
+  leak_avg_ls: number | null;
+  supply_ls: number[];
+  nodes: number;
+  junctions: number;
+}
+
+export interface WaterDetection {
+  index: number;
+  d_supply_avg_ls: number;
+  d_mnf_ls: number;
+  d_mnf_share: number | null;
+  threshold_ls: number;
+  detected: boolean;
+}
+
+export interface WaterMeterChange { link: string; from_zone: number; to_zone: number; avg_ls: number; d_avg_ls: number }
+
+export interface WaterBalance {
+  run_id: number;
+  times_s: number[];
+  meters: string[];
+  zones: WaterZoneBalance[];
+  leaks: WaterLeak[];
+  baseline_id: number | null;
+  detection: WaterDetection[];
+  meter_changes: WaterMeterChange[];
+}
+
+/** Зоны — категориальная шкала в постоянном порядке (номер зоны — по размеру); девятая и дальше — «прочие» */
+export const ZONE_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
+export const ZONE_OTHER_COLOR = '#B0BEC5';
+export const ZONE_SOURCE_COLOR = '#78909C';
+export const METER_COLOR = '#212121';
+export const BOUNDARY_COLOR = '#616161';
+const METER_WIDTH = 5;
+
+export const ZONE_KIND_LABEL: Record<WaterZoneKind, string> = {
+  dma: 'район водоучёта',
+  source: 'источник',
+  transit: 'без потребителей',
+};
+
+/** Цвет зоны по её месту среди районов водоучёта (источники и зоны без потребителей — серые) */
+export function zoneColors(zones: WaterZone[]): Record<number, string> {
+  const out: Record<number, string> = {};
+  let slot = 0;
+  for (const z of zones) {
+    if (z.kind !== 'dma') out[z.index] = ZONE_SOURCE_COLOR;
+    else out[z.index] = ZONE_COLORS[slot++] ?? ZONE_OTHER_COLOR;
+  }
+  return out;
+}
+
+/** Кадр карты «по зонам»: участки и узлы — цветом зоны, расходомеры — толстые тёмные, прочие границы — серые */
+export function zoneFrame(net: GeoJSON.FeatureCollection, zones: WaterZones): GeoJSON.FeatureCollection {
+  const colors = zoneColors(zones.zones);
+  const boundary = new Map(zones.boundary.map((b) => [b.link, b]));
+  return {
+    type: 'FeatureCollection',
+    features: net.features.map((f) => {
+      const p = f.properties ?? {};
+      if (p.kind === 'link') {
+        const b = boundary.get(p.id);
+        if (b) {
+          const meter = b.reason === 'meter';
+          return { ...f, properties: { ...p, zone: null, boundary: b.reason, color: meter ? METER_COLOR : BOUNDARY_COLOR,
+            ...(meter ? { width: METER_WIDTH } : {}) } };
+        }
+        const zone = zones.link_zone[p.id] ?? null;
+        return { ...f, properties: { ...p, zone, color: zone == null ? ZONE_OTHER_COLOR : colors[zone] ?? ZONE_OTHER_COLOR } };
+      }
+      const zone = zones.node_zone[p.id] ?? null;
+      return { ...f, properties: { ...p, zone, color: zone == null ? ZONE_OTHER_COLOR : colors[zone] ?? ZONE_OTHER_COLOR } };
+    }),
+  };
+}
+
+/** Подпись расчёта в списке: номер, базовый или сценарий утечек */
+export function runLabel(run: WaterRun): string {
+  const leaks = run.summary.leaks ?? [];
+  if (!leaks.length) return `№${run.id} · базовый`;
+  const where = leaks.map((l) => `${l.node} (${l.area_cm2.toLocaleString('ru-RU')} см²)`).join(', ');
+  return `№${run.id} · утечка ${where}`;
 }
 
 /** Время шага расчёта: «5 ч 30 мин» от начала периода модели */

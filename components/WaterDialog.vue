@@ -154,6 +154,17 @@
             </v-btn>
           </div>
           <template v-if="run">
+            <v-select
+              v-if="runs.length > 1"
+              :model-value="run.id"
+              :items="runs.map((r) => ({ title: runLabel(r), value: r.id }))"
+              label="Расчёт"
+              density="compact"
+              hide-details
+              variant="outlined"
+              class="wd-run mb-2"
+              @update:model-value="chooseRun"
+            />
             <div class="d-flex flex-wrap ga-4 text-body-2 mb-1">
               <span>Давление: {{ num(run.summary.min_pressure_m) }}…{{ num(run.summary.max_pressure_m) }} м</span>
               <span>Скорость до {{ num(run.summary.max_velocity_ms) }} м/с</span>
@@ -183,7 +194,10 @@
               />
               <span class="text-body-2 text-no-wrap">{{ stepLabel }}</span>
             </div>
-            <div class="d-flex flex-wrap ga-3 text-caption mt-1">
+            <div
+              v-if="!zoneMap"
+              class="d-flex flex-wrap ga-3 text-caption mt-1"
+            >
               <span
                 v-for="(meta, key) in legendPressure"
                 :key="key"
@@ -206,6 +220,17 @@
           >
             Расчётов модели ещё нет — сеть на карте без значений.
           </p>
+          <v-divider class="my-3" />
+          <WaterZonesPanel
+            :model-id="selected.id"
+            :run="run"
+            :network="network"
+            :can-edit="canImport"
+            :can-calc="authStore.canCalculate"
+            :engine-available="!!status?.available"
+            @zones="onZones"
+            @ran="onLeakRun"
+          />
         </template>
       </v-card-text>
     </v-card>
@@ -222,18 +247,23 @@ import { useAuthStore } from '~/stores/authStore';
 import { formatApiError } from '~/utils/apiError';
 import {
   PRESSURE_META,
+  runLabel,
   stepTime,
   VELOCITY_CLASSES,
   waterFrame,
+  zoneFrame,
   type WaterModel,
   type WaterRun,
   type WaterStatus,
   type WaterStep,
+  type WaterZones,
 } from '~/utils/water';
+import WaterZonesPanel from '~/components/WaterZonesPanel.vue';
 
 /**
  * Водопровод (фаза 4): модели EPANET, загрузка учебных сетей, гидравлический расчёт отдельным движком,
- * сеть на карте — узлы по давлению, трубы по скорости, перемотка по часам расчёта.
+ * сеть на карте — узлы по давлению, трубы по скорости, перемотка по часам расчёта; зоны водоучёта и сценарий
+ * утечки — WaterZonesPanel.
  */
 const visible = defineModel<boolean>({ default: false });
 const emit = defineEmits<{
@@ -250,7 +280,9 @@ const library = ref<{ name: string; file: string }[]>([]);
 const libraryName = ref<string | null>('Net3');
 const models = ref<WaterModel[]>([]);
 const selectedId = ref<number | null>(null);
+const runs = ref<WaterRun[]>([]);
 const run = ref<WaterRun | null>(null);
+const zoneMap = ref<WaterZones | null>(null);
 const network = ref<GeoJSON.FeatureCollection | null>(null);
 const stepData = ref<WaterStep | null>(null);
 const step = ref(0);
@@ -271,7 +303,7 @@ const num = (v: number | null | undefined) => (v == null ? '—' : v.toLocaleStr
 
 const showFrame = () => {
   if (!network.value) return;
-  emit('show-on-map', waterFrame(network.value, stepData.value));
+  emit('show-on-map', zoneMap.value ? zoneFrame(network.value, zoneMap.value) : waterFrame(network.value, stepData.value));
   overlay.markShown();
 };
 
@@ -295,13 +327,17 @@ const select = async (m: WaterModel) => {
   stop();
   errorMessage.value = '';
   selectedId.value = m.id;
+  network.value = null; // зоны новой модели не наложатся на сеть прежней
+  runs.value = [];
   run.value = null;
+  zoneMap.value = null;
   stepData.value = null;
   step.value = 0;
   try {
-    const [net, runs] = await Promise.all([fastApiService.getWaterNetwork(m.id), fastApiService.getWaterRuns(m.id)]);
+    const [net, list] = await Promise.all([fastApiService.getWaterNetwork(m.id), fastApiService.getWaterRuns(m.id)]);
     network.value = net;
-    run.value = runs[0] ?? null;
+    runs.value = list;
+    run.value = list[0] ?? null;
     if (run.value) await loadStep();
     else showFrame();
   } catch (err: unknown) {
@@ -368,6 +404,29 @@ const remove = async (m: WaterModel) => {
   }
 };
 
+const chooseRun = async (id: number) => {
+  stop();
+  run.value = runs.value.find((r) => r.id === id) ?? run.value;
+  if (step.value !== 0) step.value = 0; // перезагрузит шаг через watch
+  else await loadStep();
+};
+
+const onZones = (z: WaterZones | null) => {
+  zoneMap.value = z;
+  showFrame();
+};
+
+const onLeakRun = async (id: number) => {
+  if (!selected.value) return;
+  try {
+    runs.value = await fastApiService.getWaterRuns(selected.value.id);
+    await chooseRun(id);
+    await load();
+  } catch (err: unknown) {
+    errorMessage.value = formatApiError(err, 'Расчёты не загрузились');
+  }
+};
+
 const toggle = () => {
   if (playing.value) {
     stop();
@@ -398,6 +457,7 @@ defineExpose({ openDialog });
 
 <style scoped>
 .wd-lib { max-width: 220px; }
+.wd-run { max-width: 420px; }
 .wd-table { font-size: var(--text-sm, 0.8125rem); }
 .wd-row { cursor: pointer; }
 .wd-row--active { background: rgba(var(--v-theme-primary), 0.08); }

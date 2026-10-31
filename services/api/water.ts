@@ -1,5 +1,5 @@
 /** Водопровод (itwin-api routers/water.py). Часть fastApiService (services/fastApiService.ts собирает разделы). */
-import type { WaterModel, WaterRun, WaterStatus, WaterStep } from '~/utils/water';
+import type { WaterBalance, WaterModel, WaterRun, WaterStatus, WaterStep, WaterZones } from '~/utils/water';
 import { encodePath, mutationOptions, request } from './http';
 
 export const waterApi = {
@@ -19,9 +19,11 @@ export const waterApi = {
   async deleteWaterModel(id: number): Promise<unknown> {
     return request(`api/v1/water/models/${encodePath(id)}`, mutationOptions('DELETE'));
   },
-  async runWaterModel(id: number, durationH = 24, reportStepH = 1): Promise<{ id: number }> {
+  /** Расчёт модели; leaks — сценарий утечек: истечение из отверстия площадью area_cm2 в узле */
+  async runWaterModel(id: number, durationH = 24, reportStepH = 1,
+    leaks: { node: string; area_cm2: number }[] = []): Promise<{ id: number }> {
     return request(`api/v1/water/models/${encodePath(id)}/runs`,
-      mutationOptions('POST', { duration_h: durationH, report_step_h: reportStepH }));
+      mutationOptions('POST', { duration_h: durationH, report_step_h: reportStepH, leaks }));
   },
   async getWaterRuns(id: number): Promise<WaterRun[]> {
     return request<WaterRun[]>(`api/v1/water/models/${encodePath(id)}/runs`, mutationOptions('GET'));
@@ -34,5 +36,18 @@ export const waterApi = {
   async getWaterStep(id: number, runId: number, step: number): Promise<WaterStep> {
     return request<WaterStep>(`api/v1/water/models/${encodePath(id)}/runs/${encodePath(runId)}/step`,
       { ...mutationOptions('GET'), query: { step } });
+  },
+  /** Зоны водоучёта (DMA) между насосами, арматурой, закрытыми трубами и расходомерами */
+  async getWaterZones(id: number): Promise<WaterZones> {
+    return request<WaterZones>(`api/v1/water/models/${encodePath(id)}/zones`, mutationOptions('GET'));
+  },
+  /** Расходомеры модели — трубы-вводы зон */
+  async setWaterMeters(id: number, links: string[]): Promise<WaterZones> {
+    return request<WaterZones>(`api/v1/water/models/${encodePath(id)}/meters`, mutationOptions('PUT', { links }));
+  },
+  /** Баланс по зонам расчёта; сценарий утечки — против базового расчёта (baseline — свой выбор) */
+  async getWaterBalance(id: number, runId: number, baseline?: number): Promise<WaterBalance> {
+    return request<WaterBalance>(`api/v1/water/models/${encodePath(id)}/runs/${encodePath(runId)}/balance`,
+      { ...mutationOptions('GET'), query: baseline ? { baseline } : {} });
   },
 };
