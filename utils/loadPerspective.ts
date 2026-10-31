@@ -51,3 +51,45 @@ export function droppedText(dropped: Record<string, number>): string {
   return Object.entries(dropped).sort((a, b) => b[1] - a[1])
     .map(([reason, n]) => `${reason} — ${n.toLocaleString('ru-RU')}`).join('; ');
 }
+
+/** Перспективный режим фрагмента (itwin-api database/perspective_scenario.py) */
+export interface PerspectiveConsumer {
+  node: number;
+  type: 'generalized' | 'real';
+  id: number;
+  name: string;
+  load: number;
+  add: number;
+  factor: number;
+}
+
+export interface PerspectiveScenarioPlan {
+  fileid: number;
+  horizon: number;
+  years: [number, number];
+  city_growth: number;
+  radius_m: number;
+  parts: { fragment: number; other_fragments: number; new_areas: number; no_location: number };
+  fragment_growth: number;
+  skipped_zero_load: number;
+  fragment_load: number;
+  consumers: PerspectiveConsumer[];
+  consumers_count: number;
+  copies_excluded: number;
+}
+
+export interface PerspectiveScenarioResult {
+  scenario_id: number;
+  name: string;
+  fileid: number;
+  consumers_changed: number;
+  plan: PerspectiveScenarioPlan;
+}
+
+/** Куда ушёл прирост города: фрагмент, другие фрагменты, новые районы без сети, ТУ без здания */
+export function partsText(p: PerspectiveScenarioPlan): string {
+  const n = (v: number) => v.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
+  return `Прирост города за ${p.horizon} лет — ${n(p.city_growth)} Гкал/ч: во фрагменте — ${n(p.parts.fragment)}, `
+    + `в других фрагментах — ${n(p.parts.other_fragments)}, в новых районах без сети (дальше ${n(p.radius_m)} м `
+    + `от потребителей) — ${n(p.parts.new_areas)}, ТУ без здания на карте — ${n(p.parts.no_location)}.`;
+}
