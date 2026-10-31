@@ -1184,6 +1184,23 @@ const onShowUtilitiesOnMap = (data: GeoJSON.FeatureCollection) => {
   }
 };
 
+// === Прогноз аварийности (фаза 5): участки с наибольшим риском — цвет и толщина по классу риска ===
+const failureRiskOverlay = useOverlayLayer(() => mapStore.map, 'failure-risk', { layerIds: ['failure-risk-lines'] });
+
+const onShowFailureRiskOnMap = (data: GeoJSON.FeatureCollection) => {
+  failureRiskOverlay.show(data, [{
+    id: 'failure-risk-lines',
+    type: 'line',
+    paint: { 'line-color': ['get', 'color'], 'line-width': ['coalesce', ['get', 'width'], 4] },
+  }]);
+  const bounds = featureBounds(data);
+  const map = mapStore.map;
+  if (map && bounds) {
+    const [xmin, ymin, xmax, ymax] = bounds;
+    map.fitBounds([[xmin, ymin], [xmax, ymax]], { padding: 60, maxZoom: 16, duration: 800 });
+  }
+};
+
 const telemetryOverlay = useOverlayLayer(() => mapStore.map, 'telemetry-sensors',
   { layerIds: ['telemetry-sensors-lines', 'telemetry-sensors-points', 'telemetry-sensors-labels'] });
 
@@ -1936,6 +1953,11 @@ const toolDialogs: ToolDialogEntry[] = [
     key: 'utilities',
     component: lazyDialog(() => import('./UtilitiesDialog.vue')),
     on: { showOnMap: onShowUtilitiesOnMap, clearHighlight: () => utilitiesOverlay.clear() },
+  },
+  {
+    key: 'failureForecast',
+    component: lazyDialog(() => import('./FailureForecastDialog.vue')),
+    on: { showOnMap: onShowFailureRiskOnMap, clearHighlight: () => failureRiskOverlay.clear() },
   },
   // Исходные данные (этап 9): участки ПТС, групповые установщики aSet* и справочники
   { key: 'ptsSites', component: lazyDialog(() => import('./PtsSitesDialog.vue')) },
