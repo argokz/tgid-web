@@ -49,6 +49,23 @@
           {{ errorMessage }}
         </v-alert>
 
+        <div
+          v-if="depthSummary"
+          class="text-caption text-medium-emphasis mb-2"
+        >
+          {{ depthSummary }}
+          <v-btn
+            v-if="canEditNorm"
+            size="x-small"
+            variant="text"
+            :loading="busy === 'depth'"
+            :disabled="!!busy"
+            @click="refreshDepth"
+          >
+            Пересчитать
+          </v-btn>
+        </div>
+
         <template v-if="tab === 'conflicts'">
           <p class="text-body-2 mb-2">
             Водопровод (модель) против теплосети города: трассы, пересекающиеся в плане, и участки ближе нормы по
@@ -114,11 +131,41 @@
                 :style="{ background: CONFLICT_META.close.color }"
               />Ближе нормы: {{ conflicts.summary.close }} ({{ num(conflicts.summary.close_length_m) }} м)</span>
             </div>
-            <p
-              v-if="conflicts.depth_note"
-              class="text-caption text-medium-emphasis mb-2"
+            <v-table
+              v-if="crossingRows.length"
+              density="compact"
+              class="ud-table mb-2"
             >
-              {{ conflicts.depth_note }}. Расстояние по вертикали в пересечениях проверяется по исполнительной съёмке.
+              <thead>
+                <tr>
+                  <th>Пересечение: водопровод</th>
+                  <th>Теплосеть</th>
+                  <th>Верх трубы теплосети</th>
+                  <th>Низ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="c in crossingRows"
+                  :key="`x${c.water_link}-${c.heat_line}`"
+                >
+                  <td>{{ c.water_link }} <span class="text-caption text-medium-emphasis">Ø{{ num(c.water_d_mm) }}</span></td>
+                  <td>участок {{ c.heat_line }} <span class="text-caption text-medium-emphasis">Ø{{ num(c.heat_d_mm) }}</span></td>
+                  <td>
+                    {{ depthText(c.heat_depth_top_m, c.heat_depth_source) }}
+                    <div
+                      v-if="c.heat_depth_source"
+                      class="text-caption text-medium-emphasis"
+                    >
+                      {{ DEPTH_SOURCE_LABEL[c.heat_depth_source] }}
+                    </div>
+                  </td>
+                  <td>{{ depthText(c.heat_depth_bottom_m, c.heat_depth_source) }}</td>
+                </tr>
+              </tbody>
+            </v-table>
+            <p class="text-caption text-medium-emphasis mb-2">
+              Глубин водопровода в модели нет — расстояние по вертикали в пересечении сверяется с исполнительной съёмкой.
             </p>
             <v-table
               v-if="closeRows.length"
@@ -202,12 +249,6 @@
                 · владельцы: {{ ownersText }}
               </template>
             </div>
-            <p
-              v-if="dig.depth_note && dig.heat.length"
-              class="text-caption text-medium-emphasis mb-1"
-            >
-              {{ dig.depth_note }}.
-            </p>
             <v-table
               v-if="dig.heat.length || dig.water.length"
               density="compact"
@@ -221,6 +262,7 @@
                   <th class="text-right">
                     Ø, мм
                   </th>
+                  <th>Глубина верха</th>
                   <th class="text-right">
                     До места, м
                   </th>
@@ -249,6 +291,7 @@
                   <td class="text-right">
                     {{ num(h.d_mm) }}
                   </td>
+                  <td>{{ depthRangeText(h.depth_min_m, h.depth_max_m, h.depth_source) }}</td>
                   <td class="text-right">
                     {{ num(h.distance_m) }}
                   </td>
@@ -268,6 +311,7 @@
                   <td class="text-right">
                     {{ num(w.d_mm) }}
                   </td>
+                  <td>—</td>
                   <td class="text-right">
                     {{ num(w.distance_m) }}
                   </td>
@@ -298,11 +342,15 @@ import { formatApiError } from '~/utils/apiError';
 import {
   clearanceText,
   CONFLICT_META,
+  DEPTH_SOURCE_LABEL,
+  depthRangeText,
+  depthText,
   conflictsFrame,
   excavationFrame,
   NET_COLOR,
   pointGeometry,
   UTILITY_KIND_LABEL,
+  type HeatDepthStatus,
   type UtilityConflicts,
   type UtilityExcavation,
   type UtilityNorm,
@@ -332,12 +380,26 @@ const normValue = ref<number | null>(null);
 const conflicts = ref<UtilityConflicts | null>(null);
 const dig = ref<UtilityExcavation | null>(null);
 const bufferM = ref(10);
-const busy = ref<'' | 'conflicts' | 'dig' | 'norm'>('');
+const busy = ref<'' | 'conflicts' | 'dig' | 'norm' | 'depth'>('');
+const depth = ref<HeatDepthStatus | null>(null);
 const errorMessage = ref('');
 
 const canEditNorm = computed(() => authStore.canEditData && (authStore.permissions.general as string[]).includes('refs'));
 const closeRows = computed(() => [...(conflicts.value?.close ?? [])]
   .sort((a, b) => a.clearance_m - b.clearance_m).slice(0, LIST_LIMIT));
+const crossingRows = computed(() => (conflicts.value?.crossings ?? []).slice(0, LIST_LIMIT));
+const pct = (v: number | undefined) => `${Math.round((v ?? 0) * 100)} %`;
+/** Сводка глубин: у скольких участков и насколько точна оценка по соседям (проверка на узлах с известной глубиной) */
+const depthSummary = computed(() => {
+  const r = depth.value?.report;
+  if (!r) return '';
+  const known = (r.lines_by_source.nodes ?? 0) + (r.lines_by_source.node ?? 0);
+  const est = r.lines_by_source.neighbors ?? 0;
+  const h = r.holdout.by_hops?.['1'] ?? r.holdout;
+  return `Глубина теплосети — из отметок узлов (земля − верх трубы): по отметкам у ${known.toLocaleString('ru-RU')}, `
+    + `оценка по соседним узлам у ${est.toLocaleString('ru-RU')} из ${r.lines.toLocaleString('ru-RU')} участков. `
+    + `Оценка по соседу ошибается в среднем на ${num(h.mae_m)} м, ${pct(h.within_0_5_m)} — в пределах 0,5 м.`;
+});
 const ownersText = computed(() => Object.entries(dig.value?.owners ?? {}).map(([o, n]) => `${o} (${n})`).join(', '));
 const num = (v: number | null | undefined) => (v == null ? '—' : (Math.round(v * 10) / 10 || 0).toLocaleString('ru-RU'));
 
@@ -353,6 +415,7 @@ const load = async () => {
     if (!modelId.value && list.length) modelId.value = list[0].id;
     norm.value = norms.find((n) => n.kind_a === 'heat' && n.kind_b === 'water') ?? null;
     normValue.value = norm.value?.horizontal_m ?? null;
+    depth.value = await fastApiService.getHeatDepthStatus();
   } catch (err: unknown) {
     errorMessage.value = formatApiError(err, 'Модели и нормы не загрузились');
   }
@@ -382,6 +445,18 @@ const saveNorm = async () => {
     errorMessage.value = formatApiError(err, 'Норма не сохранена');
   } finally {
     if (busy.value === 'norm') busy.value = '';
+  }
+};
+
+const refreshDepth = async () => {
+  busy.value = 'depth';
+  try {
+    await fastApiService.refreshHeatDepth();
+    depth.value = await fastApiService.getHeatDepthStatus();
+  } catch (err: unknown) {
+    errorMessage.value = formatApiError(err, 'Глубины не пересчитаны');
+  } finally {
+    busy.value = '';
   }
 };
 

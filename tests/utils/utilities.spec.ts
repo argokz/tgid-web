@@ -3,6 +3,8 @@ import {
   clearanceText,
   CONFLICT_META,
   conflictsFrame,
+  depthRangeText,
+  depthText,
   excavationFrame,
   NET_COLOR,
   pointGeometry,
@@ -38,5 +40,15 @@ describe('общая карта коммуникаций', () => {
     expect(clearanceText(0.25)).toBe('0,25 м');
     expect(clearanceText(-0.22)).toBe('перекрытие 0,22 м');
     expect(pointGeometry(76.123456789, 43.987654321).coordinates).toEqual([76.1234568, 43.9876543]);
+  });
+
+  it('depthText и depthRangeText: над землёй, оценка, диапазон', () => {
+    expect(depthText(1.5)).toBe('1,5 м');
+    expect(depthText(-2)).toBe('над землёй 2 м');
+    expect(depthText(1.234, 'neighbors')).toBe('≈1,23 м');
+    expect(depthText(null)).toBe('—');
+    expect(depthRangeText(-2, 1.5, 'nodes')).toBe('над землёй 2 м … 1,5 м');
+    expect(depthRangeText(1.5, 1.52)).toBe('1,5 м');
+    expect(depthRangeText(null, 1.2, 'node')).toBe('1,2 м');
   });
 });

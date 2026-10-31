@@ -22,7 +22,14 @@ interface ConflictBase {
   point: GeoJSON.Point | null;
 }
 
-export interface UtilityCrossing extends ConflictBase { heat_depth_m: number | null }
+export type DepthSource = 'nodes' | 'node' | 'neighbors';
+
+export interface UtilityCrossing extends ConflictBase {
+  /** Глубина верха и низа трубы теплосети в точке пересечения, м (минус — над землёй) */
+  heat_depth_top_m: number | null;
+  heat_depth_bottom_m: number | null;
+  heat_depth_source: DepthSource | null;
+}
 
 export interface UtilityClose extends ConflictBase {
   axis_m: number;
@@ -35,7 +42,6 @@ export interface UtilityConflicts {
   norm: UtilityNorm | null;
   crossings: UtilityCrossing[];
   close: UtilityClose[];
-  depth_note: string | null;
   truncated: boolean;
   summary: { crossings: number; close: number; close_length_m: number };
 }
@@ -43,12 +49,48 @@ export interface UtilityConflicts {
 export interface UtilityExcavation {
   buffer_m: number;
   heat: { id: number; fileid: number | null; fragment: string | null; owner: string | null; d_mm: number | null;
-    depth_m: number | null; pipes: number; distance_m: number }[];
+    depth_min_m: number | null; depth_max_m: number | null; depth_source: DepthSource | null; pipes: number;
+    distance_m: number }[];
   water: { model_id: number; model: string; link: string; type: string; d_mm: number | null; distance_m: number }[];
   owners: Record<string, number>;
-  depth_note: string | null;
   truncated: boolean;
   geojson: GeoJSON.FeatureCollection;
+}
+
+export interface HoldoutStats { checked: number; mae_m?: number; median_m?: number; within_0_5_m?: number }
+
+export interface HeatDepthStatus {
+  report: {
+    nodes_with_depth: number;
+    lines: number;
+    lines_by_source: Partial<Record<DepthSource, number>>;
+    lines_unknown: number;
+    holdout: HoldoutStats & { by_hops?: Record<string, HoldoutStats> };
+    took_s: number;
+  } | null;
+  updated_at: string | null;
+}
+
+export const DEPTH_SOURCE_LABEL: Record<DepthSource, string> = {
+  nodes: 'по отметкам узлов',
+  node: 'по отметке одного узла',
+  neighbors: 'оценка по соседним узлам',
+};
+
+/** Глубина верха трубы: «1,5 м», над землёй — «над землёй 2 м»; оценка — с пометкой */
+export function depthText(m: number | null | undefined, source?: DepthSource | null): string {
+  if (m == null) return '—';
+  const v = Math.abs(Math.round(m * 100) / 100).toLocaleString('ru-RU');
+  const text = m < 0 ? `над землёй ${v} м` : `${v} м`;
+  return source === 'neighbors' ? `≈${text}` : text;
+}
+
+/** Диапазон глубин участка (начало — конец) */
+export function depthRangeText(min: number | null | undefined, max: number | null | undefined,
+  source?: DepthSource | null): string {
+  if (min == null || max == null) return depthText(min ?? max, source);
+  if (Math.abs(max - min) < 0.05) return depthText(min, source);
+  return `${depthText(min, source)} … ${depthText(max)}`;
 }
 
 export const UTILITY_KIND_LABEL: Record<UtilityKind, string> = { heat: 'теплосеть', water: 'водопровод' };
