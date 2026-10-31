@@ -1155,6 +1155,35 @@ const onShowWaterOnMap = (data: GeoJSON.FeatureCollection) => {
   waterFitKey = key;
 };
 
+// === Общая карта коммуникаций (фаза 4): зона раскопок, сети в ней, точки сближений и пересечений ===
+const utilitiesOverlay = useOverlayLayer(() => mapStore.map, 'utilities',
+  { layerIds: ['utilities-zone', 'utilities-lines', 'utilities-points'] });
+
+const onShowUtilitiesOnMap = (data: GeoJSON.FeatureCollection) => {
+  utilitiesOverlay.show(data, [{
+    id: 'utilities-zone',
+    type: 'fill',
+    filter: ['==', ['geometry-type'], 'Polygon'],
+    paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.25, 'fill-outline-color': ['get', 'color'] },
+  }, {
+    id: 'utilities-lines',
+    type: 'line',
+    filter: ['==', ['geometry-type'], 'LineString'],
+    paint: { 'line-color': ['get', 'color'], 'line-width': 4 },
+  }, {
+    id: 'utilities-points',
+    type: 'circle',
+    filter: ['==', ['geometry-type'], 'Point'],
+    paint: { 'circle-radius': 6, 'circle-color': ['get', 'color'], 'circle-stroke-width': 1.5, 'circle-stroke-color': '#fff' },
+  }]);
+  const bounds = featureBounds(data);
+  const map = mapStore.map;
+  if (map && bounds) {
+    const [xmin, ymin, xmax, ymax] = bounds;
+    map.fitBounds([[xmin, ymin], [xmax, ymax]], { padding: 60, maxZoom: 18, duration: 800 });
+  }
+};
+
 const telemetryOverlay = useOverlayLayer(() => mapStore.map, 'telemetry-sensors',
   { layerIds: ['telemetry-sensors-lines', 'telemetry-sensors-points', 'telemetry-sensors-labels'] });
 
@@ -1902,6 +1931,11 @@ const toolDialogs: ToolDialogEntry[] = [
     key: 'water',
     component: lazyDialog(() => import('./WaterDialog.vue')),
     on: { showOnMap: onShowWaterOnMap, clearHighlight: () => { waterOverlay.clear(); waterFitKey = ''; } },
+  },
+  {
+    key: 'utilities',
+    component: lazyDialog(() => import('./UtilitiesDialog.vue')),
+    on: { showOnMap: onShowUtilitiesOnMap, clearHighlight: () => utilitiesOverlay.clear() },
   },
   // Исходные данные (этап 9): участки ПТС, групповые установщики aSet* и справочники
   { key: 'ptsSites', component: lazyDialog(() => import('./PtsSitesDialog.vue')) },

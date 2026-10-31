@@ -28,6 +28,7 @@ import { formsApi } from './api/forms';
 import { telemetryApi } from './api/telemetry';
 import { loadForecastApi } from './api/loadForecast';
 import { waterApi } from './api/water';
+import { utilitiesApi } from './api/utilities';
 
 export const fastApiService = {
   ...coreApi,
@@ -53,4 +54,5 @@ export const fastApiService = {
   ...telemetryApi,
   ...loadForecastApi,
   ...waterApi,
+  ...utilitiesApi,
 };
