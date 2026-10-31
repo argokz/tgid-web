@@ -15,6 +15,11 @@ export const journalsApi = {
   async getSimilarDefects(id: number, radiusM = 1000, limit = 10): Promise<SimilarResult> {
     return request(`api/v1/defects/${encodePath(id)}/similar`, { query: { radius_m: radiusM, limit } });
   },
+  /** Похожие аварии, пересортированные ИИ (Claude читает тексты); без ИИ — порядок по признакам и ai_error */
+  async getSimilarDefectsAi(id: number, radiusM = 1000, limit = 10): Promise<SimilarResult> {
+    return request(`api/v1/ai/defects/${encodePath(id)}/similar`,
+      mutationOptions('POST', { radius_m: radiusM, limit }));
+  },
   /** Места повторных отказов (порывы, свищи, утечки) — кандидаты на перекладку */
   async getFailureHotspots(years = 5): Promise<HotspotResult> {
     return request('api/v1/defects/hotspots', { query: { years } });

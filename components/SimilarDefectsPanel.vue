@@ -17,12 +17,40 @@
       <v-btn
         size="small"
         variant="tonal"
-        :loading="loading"
-        @click="load"
+        :loading="loading && !aiMode"
+        :disabled="loading"
+        @click="load(false)"
       >
         {{ result ? 'Обновить' : 'Найти' }}
       </v-btn>
+      <v-btn
+        v-if="authStore.canUseAi"
+        size="small"
+        variant="tonal"
+        color="primary"
+        prepend-icon="mdi-robot-outline"
+        :loading="loading && aiMode"
+        :disabled="loading"
+        @click="load(true)"
+      >
+        Уточнить с ИИ
+      </v-btn>
     </div>
+    <div
+      v-if="result?.ranking === 'ai'"
+      class="text-caption mt-1"
+    >
+      Порядок — по оценке ИИ: модель прочитала тексты (ФИО и номера скрыты) и объяснила сходство.
+    </div>
+    <v-alert
+      v-else-if="result?.ai_error"
+      type="info"
+      density="compact"
+      variant="tonal"
+      class="mt-2"
+    >
+      ИИ не ответил ({{ result.ai_error }}) — порядок по признакам.
+    </v-alert>
     <div
       v-if="result"
       class="text-caption text-medium-emphasis mt-1"
@@ -52,13 +80,13 @@
     >
       <div class="d-flex align-center ga-2">
         <v-progress-linear
-          :model-value="scorePct(item.score)"
+          :model-value="item.ai_relevance ?? scorePct(item.score)"
           height="6"
           rounded
           class="sd-bar"
-          :aria-label="`Сходство ${scorePct(item.score)} %`"
+          :aria-label="`Сходство ${item.ai_relevance ?? scorePct(item.score)} %`"
         />
-        <span class="text-caption text-no-wrap">{{ scorePct(item.score) }} %</span>
+        <span class="text-caption text-no-wrap">{{ item.ai_relevance ?? scorePct(item.score) }} %</span>
         <span class="text-caption text-medium-emphasis text-no-wrap">
           {{ item.detected_at ? new Date(item.detected_at).toLocaleDateString('ru-RU') : 'без даты' }}
         </span>
@@ -82,6 +110,12 @@
       <div class="text-body-2 sd-text">
         {{ item.text }}
       </div>
+      <div
+        v-if="item.ai_reason"
+        class="text-caption"
+      >
+        ИИ: {{ item.ai_reason }}
+      </div>
       <div class="text-caption text-medium-emphasis">
         {{ item.reasons.join(' · ') }}
       </div>
@@ -92,6 +126,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { fastApiService } from '~/services/fastApiService';
+import { useAuthStore } from '~/stores/authStore';
 import { formatApiError } from '~/utils/apiError';
 import { featuresText, scorePct, type SimilarResult } from '~/utils/defectSimilarity';
 
@@ -108,17 +143,22 @@ const RADII = [
   { title: '3 км', value: 3000 },
   { title: '10 км', value: 10000 },
 ];
+const authStore = useAuthStore();
 const radius = ref(1000);
+const aiMode = ref(false);
 const result = ref<SimilarResult | null>(null);
 const loading = ref(false);
 const errorMessage = ref('');
 const radiusText = computed(() => RADII.find((r) => r.value === radius.value)?.title ?? `${radius.value} м`);
 
-const load = async () => {
+const load = async (ai = aiMode.value) => {
+  aiMode.value = ai;
   loading.value = true;
   errorMessage.value = '';
   try {
-    result.value = await fastApiService.getSimilarDefects(props.defectId, radius.value);
+    result.value = ai
+      ? await fastApiService.getSimilarDefectsAi(props.defectId, radius.value)
+      : await fastApiService.getSimilarDefects(props.defectId, radius.value);
   } catch (err: unknown) {
     errorMessage.value = formatApiError(err, 'Похожие аварии не найдены');
   } finally {
@@ -129,6 +169,7 @@ const load = async () => {
 // другое нарушение — прежний список уже не про него
 watch(() => props.defectId, () => {
   result.value = null;
+  aiMode.value = false;
   errorMessage.value = '';
 });
 watch(radius, () => {

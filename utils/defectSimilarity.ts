@@ -18,6 +18,9 @@ export interface SimilarDefect {
   score: number;
   parts: Record<string, number>;
   reasons: string[];
+  /** Пересортировка ИИ: насколько похоже (0–100) и почему — словами модели */
+  ai_relevance?: number | null;
+  ai_reason?: string | null;
 }
 
 export interface SimilarResult {
@@ -26,6 +29,10 @@ export interface SimilarResult {
   radius_m: number | null;
   candidates: number;
   items: SimilarDefect[];
+  /** ai — порядок модели, features — по признакам (ИИ не вызывался или не ответил: ai_error) */
+  ranking?: 'ai' | 'features';
+  model?: string;
+  ai_error?: string;
 }
 
 export interface FailureHotspot {
