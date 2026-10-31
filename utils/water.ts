@@ -303,6 +303,81 @@ export function isolationFrame(net: GeoJSON.FeatureCollection, iso: WaterIsolati
   return { type: 'FeatureCollection', features: [...features, ...valveFeatures] };
 }
 
+// --- сеть водоканала из ГИС (database/water_gis.py) ---
+
+export interface WaterGisInspect {
+  format: string | null;
+  layer: string | null;
+  layers: { name: string; geometry_type: string | null; count: number }[];
+  columns: string[];
+  geometry_type: string | null;
+  crs: string | null;
+  count: number;
+  warnings: string[];
+  suggested: {
+    diameter_field: string | null;
+    material_field: string | null;
+    id_field: string | null;
+    status_field: string | null;
+    valves_layer: string | null;
+  };
+}
+
+export interface WaterGisParams {
+  layer?: string | null;
+  valves_layer?: string | null;
+  diameter_field?: string | null;
+  material_field?: string | null;
+  id_field?: string | null;
+  status_field?: string | null;
+  total_demand_ls: number;
+  source_head_m: number;
+  elevation_m: number;
+  snap_m: number;
+  components: 'largest' | 'each';
+}
+
+export interface WaterGisReport {
+  epsg: number;
+  lines_in: number;
+  rows_without_lines: number;
+  t_splits: number;
+  zero_length_dropped: number;
+  components: number;
+  kept_components: number;
+  pipes: number;
+  junctions: number;
+  dropped_pipes: number;
+  length_km: number;
+  diameter: { field_in_metres: boolean; missing: number };
+  materials: Record<string, number>;
+  sources: { node: string; auto: boolean; lon: number; lat: number }[];
+  source_head_m: number;
+  valves?: { points: number; matched: number; missed: number };
+  engine: { Nodes: number; Links: number };
+}
+
+/** Линейные слои файла — кандидаты в слой труб; точечные — в слой задвижек */
+export function gisLayers(info: WaterGisInspect | null, kind: 'line' | 'point'): string[] {
+  return (info?.layers ?? []).filter((l) => String(l.geometry_type ?? '').toLowerCase().includes(kind)).map((l) => l.name);
+}
+
+/** Отчёт сборки сети одной строкой: трубы, длина, части, Т-примыкания, отброшенное */
+export function gisReportLines(r: WaterGisReport): string[] {
+  const n = (v: number) => v.toLocaleString('ru-RU');
+  const lines = [
+    `Труб в модели: ${n(r.pipes)} (${n(r.length_km)} км), узлов: ${n(r.junctions)}, источников: ${r.sources.length}.`,
+    `Связных частей: ${r.components}, в модели — ${r.kept_components}` +
+      (r.dropped_pipes ? `; отброшено труб: ${n(r.dropped_pipes)} (не связаны с источником).` : '.'),
+  ];
+  if (r.t_splits) lines.push(`Т-примыканий разрезано: ${n(r.t_splits)}.`);
+  if (r.zero_length_dropped) lines.push(`Нулевых труб (короче допуска сшивки): ${n(r.zero_length_dropped)}.`);
+  if (r.diameter.missing) lines.push(`Без диаметра: ${n(r.diameter.missing)} — взят диаметр по умолчанию.`);
+  if (r.diameter.field_in_metres) lines.push('Диаметры в поле — в метрах, переведены в мм.');
+  if (r.valves) lines.push(`Задвижек: ${n(r.valves.matched)} привязано, ${n(r.valves.missed)} без трубы рядом.`);
+  return lines;
+}
+
 /** Время шага расчёта: «5 ч 30 мин» от начала периода модели */
 export function stepTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);

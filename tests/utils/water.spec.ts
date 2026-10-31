@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  gisLayers,
+  gisReportLines,
   ISOLATION_META,
   isolationFrame,
   METER_COLOR,
@@ -14,6 +16,8 @@ import {
   ZONE_SOURCE_COLOR,
   zoneColors,
   zoneFrame,
+  type WaterGisInspect,
+  type WaterGisReport,
   type WaterIsolation,
   type WaterRun,
   type WaterStep,
@@ -117,5 +121,33 @@ describe('отключение участка', () => {
   it('runLabel: расчёт отключения', () => {
     const run = { id: 9, summary: { isolation: { link: '129' } } } as unknown as WaterRun;
     expect(runLabel(run)).toBe('№9 · отключение трубы 129');
+  });
+});
+
+describe('сеть из ГИС', () => {
+  it('gisLayers: линейные — трубы, точечные — задвижки', () => {
+    const info = { layers: [
+      { name: 'pipes', geometry_type: 'MultiLineString', count: 10 },
+      { name: 'valves', geometry_type: 'Point', count: 5 },
+      { name: 'zones', geometry_type: 'Polygon', count: 2 },
+    ] } as WaterGisInspect;
+    expect(gisLayers(info, 'line')).toEqual(['pipes']);
+    expect(gisLayers(info, 'point')).toEqual(['valves']);
+    expect(gisLayers(null, 'line')).toEqual([]);
+  });
+
+  it('gisReportLines: только то, что случилось', () => {
+    const base = {
+      pipes: 3833, length_km: 276.465, junctions: 3337, sources: Array(18).fill({}), components: 18, kept_components: 18,
+      dropped_pipes: 0, t_splits: 4, zero_length_dropped: 0, diameter: { missing: 0, field_in_metres: false },
+      valves: { points: 4335, matched: 4212, missed: 0 },
+    } as unknown as WaterGisReport;
+    const lines = gisReportLines(base);
+    expect(lines[0]).toBe('Труб в модели: 3 833 (276,465 км), узлов: 3 337, источников: 18.');
+    expect(lines[1]).toBe('Связных частей: 18, в модели — 18.');
+    expect(lines).toContain('Т-примыканий разрезано: 4.');
+    expect(lines.some((l) => l.startsWith('Без диаметра'))).toBe(false);
+    const dropped = gisReportLines({ ...base, kept_components: 1, dropped_pipes: 1977 });
+    expect(dropped[1]).toBe('Связных частей: 18, в модели — 1; отброшено труб: 1 977 (не связаны с источником).');
   });
 });

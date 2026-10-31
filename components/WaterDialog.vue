@@ -74,6 +74,21 @@
           </v-btn>
         </div>
 
+        <v-expansion-panels
+          v-if="canImport"
+          variant="accordion"
+          class="mb-3"
+        >
+          <v-expansion-panel title="Загрузить сеть водоканала из ГИС (SHP, GeoPackage…)">
+            <v-expansion-panel-text>
+              <WaterGisImport
+                :engine-available="!!status?.available"
+                @imported="onGisImported"
+              />
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
+
         <v-progress-linear
           v-if="loading && !models.length"
           indeterminate
@@ -271,6 +286,7 @@ import {
   type WaterValves,
   type WaterZones,
 } from '~/utils/water';
+import WaterGisImport from '~/components/WaterGisImport.vue';
 import WaterIsolationPanel from '~/components/WaterIsolationPanel.vue';
 import WaterZonesPanel from '~/components/WaterZonesPanel.vue';
 
@@ -393,6 +409,12 @@ const importLibrary = async () => {
   } finally {
     busy.value = '';
   }
+};
+
+const onGisImported = async (id: number) => {
+  await load();
+  const m = models.value.find((x) => x.id === id);
+  if (m) await select(m);
 };
 
 const runModel = async () => {

@@ -1,6 +1,7 @@
 /** Водопровод (itwin-api routers/water.py). Часть fastApiService (services/fastApiService.ts собирает разделы). */
 import type {
-  WaterBalance, WaterIsolation, WaterModel, WaterRun, WaterStatus, WaterStep, WaterValves, WaterZones,
+  WaterBalance, WaterGisInspect, WaterGisParams, WaterGisReport, WaterIsolation, WaterModel, WaterRun, WaterStatus,
+  WaterStep, WaterValves, WaterZones,
 } from '~/utils/water';
 import { encodePath, mutationOptions, request } from './http';
 
@@ -64,5 +65,22 @@ export const waterApi = {
   async waterIsolation(id: number, linkId: string, run = false): Promise<WaterIsolation> {
     return request<WaterIsolation>(`api/v1/water/models/${encodePath(id)}/isolation${run ? '/run' : ''}`,
       mutationOptions('POST', { link_id: linkId }));
+  },
+  /** Разбор файла ГИС: слои, поля слоя труб, подсказки */
+  async inspectWaterGis(files: File[], layer?: string | null): Promise<WaterGisInspect> {
+    const form = new FormData();
+    files.forEach((f) => form.append('files', f, f.name));
+    if (layer) form.append('layer', layer);
+    return request<WaterGisInspect>('api/v1/water/models/gis/inspect', mutationOptions('POST', form));
+  },
+  /** Сеть водоканала из ГИС → модель EPANET: dryRun — отчёт сборки без записи */
+  async importWaterGis(files: File[], params: WaterGisParams, name: string, dryRun: boolean):
+    Promise<{ dry_run: boolean; report: WaterGisReport; model?: { id: number } }> {
+    const form = new FormData();
+    files.forEach((f) => form.append('files', f, f.name));
+    form.append('params', JSON.stringify(params));
+    form.append('name', name);
+    form.append('dry_run', dryRun ? 'true' : 'false');
+    return request('api/v1/water/models/gis', mutationOptions('POST', form));
   },
 };
